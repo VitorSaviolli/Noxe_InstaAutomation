@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "noxe-insta-automation",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-01",
+
+  // ---------------------------------------------------------------------
+  // PREENCHER: o banco D1 e SEU, o ID abaixo nao vem pronto.
+  //
+  // O banco guarda o cooldown por usuario, a deduplicacao de comentarios e o
+  // access token cifrado. Crie o seu com:
+  //   npx wrangler d1 create noxe-insta-automation
+  // O comando imprime um `database_id` (um codigo com tracos, tipo
+  // 1a2b3c4d-...). Cole esse codigo no lugar de COLE_AQUI_O_ID_DO_SEU_BANCO_D1.
+  // Sem isso o deploy falha: o ID e unico por conta Cloudflare.
+  // ---------------------------------------------------------------------
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "noxe-insta-automation",
+      "database_id": "COLE_AQUI_O_ID_DO_SEU_BANCO_D1"
+    }
+  ],
+
+  // UM unico cron: varre retry_pending e checa se o token precisa renovar.
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+
+  // Apenas configuracao NAO secreta. Segredos vao por `wrangler secret put`.
+  // ATENCAO: este bloco e SOBRESCRITO a cada deploy — editar pelo dashboard
+  // nao adianta, o proximo deploy apaga. Este arquivo e a fonte da verdade.
+  "vars": {
+    // PREENCHER: ID publico do SEU app no Meta for Developers.
+    // Onde achar: developers.facebook.com -> seu app -> Configuracoes ->
+    // Basico -> campo "ID do aplicativo". E um numero longo e NAO e segredo
+    // (aparece na URL do login). Troque COLE_AQUI_O_ID_DO_SEU_APP_META por ele.
+    "META_APP_ID": "COLE_AQUI_O_ID_DO_SEU_APP_META",
+    // Versao da Graph API. Ver README para a politica de atualizacao.
+    "META_API_VERSION": "v25.0",
+    // Preenchido automaticamente apos o primeiro login OAuth; deixe vazio.
+    "META_IG_USER_ID": ""
+  },
+
+  // Lista dos segredos que o Worker espera encontrar. O wrangler usa essa
+  // lista para gerar os tipos e para AVISAR, durante o `npm run dev`, quando
+  // algum esta faltando. E um aviso, nao um bloqueio: o deploy nao para por
+  // causa disso. Confira voce mesmo com `npx wrangler secret list`.
+  "secrets": {
+    "required": [
+      "META_APP_SECRET",
+      "META_WEBHOOK_VERIFY_TOKEN",
+      "TOKEN_ENCRYPTION_KEY",
+      "SETUP_ADMIN_TOKEN"
+    ]
+  },
+
+  "observability": {
+    "enabled": true
+  }
+}

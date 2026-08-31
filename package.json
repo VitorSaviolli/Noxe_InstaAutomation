@@ -1,0 +1,55 @@
+{
+  "name": "noxe-insta-automation",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Automacao de comentarios do Instagram em Cloudflare Workers",
+  "keywords": [
+    "instagram",
+    "automation",
+    "cloudflare-workers",
+    "d1",
+    "meta-graph-api",
+    "webhook",
+    "direct-message",
+    "comentarios"
+  ],
+  "license": "MIT",
+  "author": "Vitor S. Gonsalez (Noxelora)",
+  "homepage": "https://github.com/VitorSaviolli/Noxe_InstaAutomation#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VitorSaviolli/Noxe_InstaAutomation.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VitorSaviolli/Noxe_InstaAutomation/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "configurar": "node scripts/configurar.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests scripts",
+    "lint:fix": "biome check --write src tests scripts",
+    "format": "biome format --write src tests scripts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate:local": "wrangler d1 migrations apply noxe-insta-automation --local",
+    "db:migrate:remote": "wrangler d1 migrations apply noxe-insta-automation --remote",
+    "tail": "wrangler tail",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "verificar": "node scripts/verificar-antes-de-publicar.mjs",
+    "test:webhook": "node scripts/simular-webhook.mjs",
+    "gerar:segredos": "node scripts/gerar-segredos.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.11",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20260828.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.127.1"
+  }
+}

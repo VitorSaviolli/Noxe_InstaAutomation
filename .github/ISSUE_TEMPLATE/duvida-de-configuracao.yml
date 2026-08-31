@@ -1,0 +1,83 @@
+name: Duvida de configuracao
+description: Voce travou em algum passo do setup e nao consegue seguir adiante
+title: '[setup]: '
+labels: ['duvida-de-configuracao']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este modelo se voce empacou seguindo o passo a passo — nao consegue
+        criar o app na Meta, o Worker nao publica, o webhook nao verifica, o
+        banco D1 nao conecta, e por ai vai.
+
+        Nao existe pergunta boba aqui. O projeto foi escrito para quem nao
+        programa; se um passo nao ficou claro, o problema e do texto, nao seu.
+
+        **Se o que voce encontrou for uma falha de seguranca**, nao use este
+        modelo: relate em canal privado pela aba **Security** do repositorio,
+        em **"Report a vulnerability"**.
+
+  - type: dropdown
+    id: documento
+    attributes:
+      label: Em qual documento voce travou
+      options:
+        - README.md
+        - SETUP_META.md (configuracao do app da Meta)
+        - SETUP_CLOUDFLARE.md (configuracao da Cloudflare e do banco D1)
+        - SECURITY.md
+        - CONTRIBUTING.md
+        - Outro / nao sei dizer
+    validations:
+      required: true
+
+  - type: input
+    id: passo
+    attributes:
+      label: Em qual passo
+      description: O numero da secao ou o titulo do passo onde voce parou. Se puder, copie a linha exata do documento.
+      placeholder: 'Secao 4, passo 3 — "Verificar a Callback URL no painel da Meta"'
+    validations:
+      required: true
+
+  - type: textarea
+    id: mensagem
+    attributes:
+      label: Qual mensagem apareceu
+      description: 'Cole a mensagem de erro exatamente como apareceu — no terminal, no navegador ou no painel da Meta. Se nao apareceu mensagem nenhuma, escreva o que aconteceu (ou o que nao aconteceu). **Confira antes que nao ha token, App Secret, `code=` nem `state=` no que voce colou.**'
+      placeholder: |
+        No painel da Meta, ao clicar em "Verificar e salvar", aparece:
+        "The URL couldn't be validated. Callback verification failed with the
+        following errors: curl_errno = 28"
+    validations:
+      required: true
+
+  - type: textarea
+    id: o-que-ja-tentou
+    attributes:
+      label: O que voce ja tentou (opcional)
+      description: Se voce ja tentou alguma coisa para resolver, conte aqui. Ajuda a nao sugerir o que voce ja descartou.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: sistema-operacional
+    attributes:
+      label: Sistema operacional
+      description: Onde voce esta rodando os comandos. Isso importa mais do que parece — varios comandos mudam de forma no Windows.
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Outro
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: sem-segredos
+    attributes:
+      label: Confirmacao obrigatoria
+      description: Esta issue fica publica na internet para sempre. Um segredo colado aqui e um segredo vazado.
+      options:
+        - label: 'Confirmo que **nao colei nenhum segredo** nesta issue: nem token de acesso, nem `META_APP_SECRET`, nem `SETUP_ADMIN_TOKEN`, nem `TOKEN_ENCRYPTION_KEY`, nem `META_WEBHOOK_VERIFY_TOKEN`, nem o conteudo do meu `.dev.vars` ou `.env`, nem URL contendo `code=` ou `state=`.'
+          required: true

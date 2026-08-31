@@ -1,0 +1,29 @@
+# Atualizacao automatica das dependencias.
+#
+# Por que isso existe neste projeto especifico:
+#
+# 1. O `wrangler` (a ferramenta da Cloudflare que roda e publica o Worker) se
+#    move muito rapido. Versao antiga costuma parar de conversar com a API da
+#    Cloudflare, e ai o `npm run deploy` quebra sem aviso.
+# 2. A versao da Graph API da Meta tambem envelhece: cada versao tem prazo de
+#    validade e, quando ela e desligada, a automacao para de mandar Direct. Os
+#    tipos e utilitarios que acompanham as dependencias ajudam a perceber isso
+#    antes de quebrar.
+#
+# Ou seja: ficar para tras aqui nao e divida tecnica confortavel, e automacao
+# parada. O Dependabot abre os PRs; a CI (.github/workflows/ci.yml) roda lint,
+# typecheck e testes em cada um, entao da para ver se a atualizacao passa antes
+# de aceitar.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    # Limite baixo de proposito: cinco PRs abertos por vez e o que uma pessoa
+    # consegue revisar sem transformar a caixa de entrada em ruido.
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
