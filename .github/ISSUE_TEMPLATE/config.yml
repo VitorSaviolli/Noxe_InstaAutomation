@@ -1,0 +1,18 @@
+# Issue em branco fica desligada de proposito: os dois modelos cobrem os casos
+# reais e ja pedem a confirmacao de que nenhum segredo foi colado no relato.
+blank_issues_enabled: false
+
+contact_links:
+  - name: Reportar uma vulnerabilidade de seguranca
+    url: https://github.com/VitorSaviolli/Noxe_InstaAutomation/blob/main/SECURITY.md
+    about: >-
+      Falha de seguranca NUNCA vai em issue publica. Leia o SECURITY.md e relate
+      em canal privado pela aba Security do repositorio, no botao "Report a
+      vulnerability".
+
+  - name: Duvidas gerais e conversa
+    url: https://github.com/VitorSaviolli/Noxe_InstaAutomation/discussions
+    about: >-
+      Perguntas abertas, ideias e trocas de experiencia vao no Discussions. Se
+      voce travou num passo especifico do setup, prefira o modelo "Duvida de
+      configuracao".

@@ -1,0 +1,92 @@
+name: Bug
+description: Algo esta quebrado ou funciona diferente do que a documentacao diz
+title: '[bug]: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar. Preencha os campos abaixo com calma — quanto mais
+        concreto o relato, mais rapido da para entender o que aconteceu.
+
+        **Antes de continuar:** se o que voce encontrou for uma falha de
+        seguranca (forjar webhook, driblar a protecao das rotas `/setup/*`, ler
+        token cifrado, fazer o Worker mandar Direct em nome de outra pessoa),
+        **feche esta pagina** e relate em canal privado pela aba **Security** do
+        repositorio, em **"Report a vulnerability"**. Issue de seguranca e
+        publica e deixa todo mundo exposto ate a correcao sair.
+
+  - type: textarea
+    id: o-que-aconteceu
+    attributes:
+      label: O que aconteceu
+      description: Descreva o comportamento que voce viu. Se apareceu alguma mensagem de erro, cole ela aqui.
+      placeholder: |
+        Comentei "eu quero" no meu Reel e nao chegou nenhum Direct. A resposta
+        publica tambem nao apareceu.
+    validations:
+      required: true
+
+  - type: textarea
+    id: o-que-era-esperado
+    attributes:
+      label: O que voce esperava que acontecesse
+      description: Diga o que deveria ter acontecido, na sua leitura da documentacao.
+      placeholder: |
+        Esperava receber o Direct com o link e ver a resposta publica no
+        comentario, como descrito no passo 1 do README.
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos-para-reproduzir
+    attributes:
+      label: Passos para reproduzir
+      description: A sequencia exata do que voce fez, numerada. Se voce conseguir fazer o problema acontecer de novo, descreva como.
+      placeholder: |
+        1. Rodei `npm run deploy`
+        2. Abri `/setup/subscribe` com o token de admin
+        3. Comentei "eu quero" no Reel X
+        4. Esperei 2 minutos e nada chegou
+    validations:
+      required: true
+
+  - type: dropdown
+    id: sistema-operacional
+    attributes:
+      label: Sistema operacional
+      description: Onde voce estava rodando os comandos.
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Outro
+    validations:
+      required: true
+
+  - type: input
+    id: versao-node
+    attributes:
+      label: Versao do Node.js
+      description: 'Rode `node --version` no terminal e cole o resultado. O projeto exige Node 20 ou mais novo.'
+      placeholder: v20.11.1
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs ou saida do terminal (opcional)
+      description: 'Cole aqui a saida de `npm run check`, do `npm run tail` ou o que mais ajudar. **Confira antes que nao ha token, App Secret, `code=` nem `state=` no que voce colou.**'
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: sem-segredos
+    attributes:
+      label: Confirmacao obrigatoria
+      description: Este relato fica publico na internet para sempre. Um segredo colado aqui e um segredo vazado.
+      options:
+        - label: 'Confirmo que **nao colei nenhum segredo** neste relato: nem token de acesso, nem `META_APP_SECRET`, nem `SETUP_ADMIN_TOKEN`, nem `TOKEN_ENCRYPTION_KEY`, nem `META_WEBHOOK_VERIFY_TOKEN`, nem o conteudo do meu `.dev.vars` ou `.env`, nem URL contendo `code=` ou `state=`.'
+          required: true

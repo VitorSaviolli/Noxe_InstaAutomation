@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    // "@cloudflare/vitest-pool-workers/types" declara o modulo "cloudflare:test",
+    // usado pelos arquivos de tests/. Sem ele o typecheck da pasta tests quebra.
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  // Os testes tambem passam pelo typecheck: sem isso o CI dava uma falsa
+  // sensacao de cobertura. A pasta scripts/ fica de fora de proposito, porque
+  // e JavaScript (.mjs) e ligar allowJs so traria ruido; ela e coberta pelo lint.
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

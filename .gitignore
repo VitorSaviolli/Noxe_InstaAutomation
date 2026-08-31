@@ -1,0 +1,52 @@
+# Segredos - NUNCA commitar
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+# Certificados e chaves privadas
+*.pem
+*.key
+
+# Dependencias
+node_modules/
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+
+# Cloudflare / Wrangler
+# .wrangler/ guarda o e-mail e o Account ID da sua conta Cloudflare.
+.wrangler/
+.mf/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / SO
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Assistentes e ambiente local da maquina
+# .claude/ pode conter settings.local.json com caminhos e dados seus.
+.claude/
+.direnv/
+
+# Lacunas comuns que os padroes acima nao pegam
+*~
+*.bak
+*.orig
+* copy*
+secrets.txt
+.env.backup-*
+
+# Testes / build
+coverage/
+.vitest/

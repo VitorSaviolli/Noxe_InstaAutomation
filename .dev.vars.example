@@ -1,0 +1,20 @@
+# Copie para .dev.vars e preencha com valores REAIS para desenvolvimento local.
+# O .dev.vars e ignorado pelo git e NUNCA deve ser commitado.
+#
+# Em producao estes valores vao por `npx wrangler secret put <NOME>`.
+
+# App Secret do app da Meta. Assina os webhooks (X-Hub-Signature-256)
+# e e usado na troca de code por token no OAuth.
+META_APP_SECRET=
+
+# Valor que voce inventa e informa no painel de webhooks da Meta.
+# Gere com: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+META_WEBHOOK_VERIFY_TOKEN=
+
+# Chave AES-GCM de 32 bytes em base64. Cifra o access token guardado no D1.
+# Gere com: openssl rand -base64 32
+TOKEN_ENCRYPTION_KEY=
+
+# Protege as rotas administrativas (/setup/*). Enviado como Authorization: Bearer.
+# Gere com: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+SETUP_ADMIN_TOKEN=

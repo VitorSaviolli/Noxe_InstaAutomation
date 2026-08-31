@@ -1,0 +1,49 @@
+# Verificacao automatica das contribuicoes.
+#
+# Este workflow roda exatamente os mesmos comandos que o `npm run check` local:
+# lint, typecheck e testes. Ele precisa passar num clone limpo, entao NAO usa
+# nenhum segredo, nao le .env nem .dev.vars e nao faz deploy. Os testes usam os
+# bindings ficticios que o vitest.config.ts injeta via Miniflare, por isso nao
+# e necessaria nenhuma credencial da Meta ou da Cloudflare.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Somente leitura do repositorio. O workflow nao escreve nada de volta.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar o codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar o Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm ci` instala exatamente o que esta no package-lock.json, sem
+      # atualizar nada. E o que garante que a CI testa as mesmas versoes que
+      # voce testou na sua maquina.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Testes
+        run: npm test

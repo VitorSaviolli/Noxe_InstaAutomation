@@ -1,0 +1,14 @@
+# Todo arquivo de texto e guardado e entregue com fim de linha LF.
+#
+# Sem isso, o git no Windows entrega os arquivos com CRLF e o `npm run lint`
+# (biome, que usa LF) acusa o projeto inteiro como mal formatado logo depois
+# do clone. Com esta linha, Windows, Mac e Linux veem exatamente o mesmo.
+* text=auto eol=lf
+
+# Binarios: nunca converter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
