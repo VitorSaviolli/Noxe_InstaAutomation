@@ -1,12 +1,20 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { type AutomationConfig, automationConfig } from '../src/config'
 import worker, { processEvents, runScheduledTasks } from '../src/index'
-import type { MetaApiClient } from '../src/services/meta-api'
-import { storeAccessToken } from '../src/services/token-manager'
 import type { CommentEvent } from '../src/types/meta'
-import { limparBanco } from './fixtures/banco'
-import { comoD1, D1Contador } from './fixtures/dubles'
+import { ligarConta, limparBanco } from './fixtures/banco'
+import {
+  AGORA,
+  comoApi,
+  comoD1,
+  configDeTeste,
+  D1Contador,
+  MetaFalsa,
+  MetaQueFalha,
+  pedir,
+  responder,
+  TETO_DE_SUBREQUESTS,
+} from './fixtures/dubles'
 
 /**
  * REG — regressao do roteador.
@@ -16,21 +24,12 @@ import { comoD1, D1Contador } from './fixtures/dubles'
  * respondem exatamente o que respondem, e o 404 continua sendo 404.
  */
 
-const AGORA = 1_700_000_000_000
-const RAIZ = 'https://exemplo.workers.dev'
-
 /** Corpo e status do `default:` de hoje. E o que o painel vai substituir. */
 const NAO_ENCONTRADO = { status: 404, corpo: 'Not Found' }
 
-async function responder(request: Request): Promise<Response> {
-  const ctx = createExecutionContext()
-  const resposta = await worker.fetch(request, env, ctx)
-  await waitOnExecutionContext(ctx)
-  return resposta
-}
-
-function get(caminho: string, cabecalhos: Record<string, string> = {}): Request {
-  return new Request(`${RAIZ}${caminho}`, { headers: cabecalhos })
+/** O `responder` do fixture, ja com o env desta suite. */
+function responderComEnv(request: Request): Promise<Response> {
+  return responder(request, env)
 }
 
 /** As sete rotas registradas hoje, com o status que cada uma devolve sem nada. */
@@ -56,7 +55,7 @@ describe('REG — o roteador antes do painel', () => {
 
     const obtidos: Record<string, number> = {}
     for (const rota of SETE_ROTAS) {
-      obtidos[rota.caminho] = (await responder(get(rota.caminho))).status
+      obtidos[rota.caminho] = (await responderComEnv(pedir(rota.caminho))).status
     }
 
     expect(obtidos).toEqual(Object.fromEntries(SETE_ROTAS.map((r) => [r.caminho, r.status])))
@@ -64,29 +63,29 @@ describe('REG — o roteador antes do painel', () => {
 
   test('REG-24: /qualquer-coisa continua 404', async () => {
     for (const caminho of ['/qualquer-coisa', '/', '/setup', '/oauth', '/webhooks']) {
-      const resposta = await responder(get(caminho))
+      const resposta = await responderComEnv(pedir(caminho))
       expect(resposta.status).toBe(NAO_ENCONTRADO.status)
       expect(await resposta.text()).toBe(NAO_ENCONTRADO.corpo)
     }
   })
 
   test('REG-25: /painelzinho cai no 404 e nao no painel', async () => {
-    const resposta = await responder(get('/painelzinho'))
+    const resposta = await responderComEnv(pedir('/painelzinho'))
 
     expect(resposta.status).toBe(NAO_ENCONTRADO.status)
     expect(await resposta.text()).toBe(NAO_ENCONTRADO.corpo)
   })
 
   test('REG-26: /painel e /painel/ levam ao mesmo lugar', async () => {
-    const semBarra = await responder(get('/painel'))
-    const comBarra = await responder(get('/painel/'))
+    const semBarra = await responderComEnv(pedir('/painel'))
+    const comBarra = await responderComEnv(pedir('/painel/'))
 
     expect(comBarra.status).toBe(semBarra.status)
     expect(await comBarra.text()).toBe(await semBarra.text())
   })
 
   test('REG-27: /health continua com o mesmo corpo', async () => {
-    const resposta = await responder(get('/health'))
+    const resposta = await responderComEnv(pedir('/health'))
     const corpo = (await resposta.json()) as Record<string, unknown>
 
     // O conjunto EXATO de campos. A etapa que acrescentar o campo do painel
@@ -104,11 +103,13 @@ describe('REG — o roteador antes do painel', () => {
 
   test('REG-28: as paginas legais continuam sem exigir sessao', async () => {
     for (const caminho of ['/privacy-policy', '/data-deletion']) {
-      const semNada = await responder(get(caminho))
+      const semNada = await responderComEnv(pedir(caminho))
       expect(semNada.status).toBe(200)
       expect(semNada.headers.get('set-cookie')).toBeNull()
 
-      const comCookieQualquer = await responder(get(caminho, { cookie: 'painel_sessao=lixo' }))
+      const comCookieQualquer = await responderComEnv(
+        pedir(caminho, { cookie: 'painel_sessao=lixo' }),
+      )
       expect(comCookieQualquer.status).toBe(200)
     }
   })
@@ -119,12 +120,12 @@ describe('REG — o roteador antes do painel', () => {
     // `default:`. A metade que cita `routePainel` pelo nome entra na etapa
     // que cria o roteador do painel.
     for (const rota of SETE_ROTAS) {
-      const resposta = await responder(get(rota.caminho))
+      const resposta = await responderComEnv(pedir(rota.caminho))
       expect(resposta.status).not.toBe(NAO_ENCONTRADO.status)
     }
 
     // E o contrapositivo: quem nao tem `case` cai no `default:`.
-    const desconhecida = await responder(get('/nao-existe'))
+    const desconhecida = await responderComEnv(pedir('/nao-existe'))
     expect(desconhecida.status).toBe(NAO_ENCONTRADO.status)
     expect(await desconhecida.text()).toBe(NAO_ENCONTRADO.corpo)
   })
@@ -169,46 +170,6 @@ describe('REG-29 — o cron', () => {
  * excedente que o webhook nao coube. Estes testes ficam neste arquivo porque e
  * aqui que o cron ja mora (REG-29).
  */
-const IG_USER_ID = '17841400000000000'
-const USERNAME_CONTA = 'conta_de_teste'
-const TETO_DE_SUBREQUESTS = 50
-
-/** Duble da Meta que guarda o texto exato de cada Direct. */
-class ApiDoCron {
-  readonly textosEnviados: string[] = []
-  chamadas = 0
-
-  async sendPrivateReply(_ig: string, _comment: string, text: string) {
-    this.chamadas++
-    this.textosEnviados.push(text)
-    return { ok: true as const, data: { message_id: 'msg-cron' } }
-  }
-
-  async replyToComment(_comment: string, _message: string) {
-    this.chamadas++
-    return { ok: true as const, data: { id: 'reply-cron' } }
-  }
-
-  async getMediaInfo(_mediaId: string) {
-    this.chamadas++
-    return { ok: true as const, data: { id: 'media-1', media_product_type: 'REELS' } }
-  }
-}
-
-function comoApi(falsa: ApiDoCron): MetaApiClient {
-  return falsa as unknown as MetaApiClient
-}
-
-async function ligarConta(): Promise<void> {
-  await storeAccessToken(env, {
-    igUserId: IG_USER_ID,
-    username: USERNAME_CONTA,
-    accessToken: 'token-de-teste',
-    expiresInSeconds: 60 * 24 * 60 * 60,
-    now: AGORA,
-  })
-}
-
 function comentario(indice: number): CommentEvent {
   return {
     commentId: `comment-cron-${indice}`,
@@ -219,11 +180,6 @@ function comentario(indice: number): CommentEvent {
     parentId: null,
     mediaProductType: 'REELS',
   }
-}
-
-/** Config de teste: nunca depende do `src/config.ts` de quem clonou o projeto. */
-function config(patch: Partial<AutomationConfig> = {}): AutomationConfig {
-  return { ...automationConfig, destinationUrl: 'https://exemplo.com/link', ...patch }
 }
 
 async function statusPorComentario(): Promise<Record<string, string>> {
@@ -238,16 +194,16 @@ async function statusPorComentario(): Promise<Record<string, string>> {
 describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
-    await ligarConta()
+    await ligarConta(env, AGORA)
   })
 
   test('§16.1: o excedente reagendado e entregue na varredura seguinte', async () => {
-    const doWebhook = new ApiDoCron()
+    const doWebhook = new MetaFalsa()
     await processEvents(
       Array.from({ length: 10 }, (_, i) => comentario(i)),
       env,
       AGORA,
-      { createApi: () => comoApi(doWebhook), resolveConfig: () => config() },
+      { createApi: () => comoApi(doWebhook), resolveConfig: () => configDeTeste() },
     )
 
     // A fatia entregou 5; os outros 5 ficaram esperando.
@@ -255,11 +211,11 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
       Object.values(await statusPorComentario()).filter((s) => s === 'retry_pending'),
     ).toHaveLength(5)
 
-    const doCron = new ApiDoCron()
+    const doCron = new MetaFalsa()
     const contador = new D1Contador(env.DB)
     await runScheduledTasks({ ...env, DB: comoD1(contador) }, AGORA, {
       createApi: () => comoApi(doCron),
-      resolveConfig: () => config(),
+      resolveConfig: () => configDeTeste(),
     })
 
     // Nenhum comentario ficou pelo caminho.
@@ -269,7 +225,7 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
 
     // E a varredura tambem coube no teto: consultas ao D1 e chamadas a Meta
     // dividem os mesmos 50 subrequests por invocacao.
-    expect(contador.prepares + doCron.chamadas).toBeLessThan(TETO_DE_SUBREQUESTS)
+    expect(contador.prepares + doCron.total).toBeLessThan(TETO_DE_SUBREQUESTS)
   })
 
   test('§16.1: uma varredura cheia cabe no teto de 50, com fila maior que o lote', async () => {
@@ -287,15 +243,15 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
       ),
     )
 
-    const doCron = new ApiDoCron()
+    const doCron = new MetaFalsa()
     const contador = new D1Contador(env.DB)
     await runScheduledTasks({ ...env, DB: comoD1(contador) }, AGORA, {
       createApi: () => comoApi(doCron),
-      resolveConfig: () => config(),
+      resolveConfig: () => configDeTeste(),
     })
 
     // Consultas ao D1 e chamadas a Meta dividem os mesmos 50 subrequests.
-    expect(contador.prepares + doCron.chamadas).toBeLessThan(TETO_DE_SUBREQUESTS)
+    expect(contador.prepares + doCron.total).toBeLessThan(TETO_DE_SUBREQUESTS)
 
     // E a varredura drenou de verdade — nao passou raspando por estar vazia.
     const status = await statusPorComentario()
@@ -307,7 +263,7 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
 describe('§16.3 — a retentativa do cron passa por renderTemplate', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
-    await ligarConta()
+    await ligarConta(env, AGORA)
   })
 
   test('§16.3: o Direct da retentativa troca TODAS as ocorrencias e sanitiza', async () => {
@@ -321,20 +277,78 @@ describe('§16.3 — a retentativa do cron passa por renderTemplate', () => {
       .bind(AGORA, AGORA, AGORA)
       .run()
 
-    const api = new ApiDoCron()
+    const api = new MetaFalsa()
     await runScheduledTasks(env, AGORA, {
       createApi: () => comoApi(api),
       resolveConfig: () =>
-        config({
+        configDeTeste({
           privateReplyText: 'Oi {username}! Link: {link} — de novo: {link}',
           // O caractere de controle no meio e o que o `.replace()` cru deixava
           // passar para dentro da mensagem.
-          destinationUrl: 'https://exemplo.com/a b',
+          destinationUrl: 'https://exemplo.com/a\u0000b',
         }),
     })
 
     expect(api.textosEnviados).toEqual([
       'Oi ! Link: https://exemplo.com/ab — de novo: https://exemplo.com/ab',
     ])
+  })
+})
+
+describe('§16.1 — a retentativa do cron tem a mesma escada do caminho inline', () => {
+  beforeEach(async () => {
+    await limparBanco(env.DB)
+    await ligarConta(env, AGORA)
+  })
+
+  /** Grava um pendente com o numero de tentativas ja gastas. */
+  async function pendente(commentId: string, tentativas: number): Promise<void> {
+    await env.DB.prepare(
+      `INSERT INTO processed_comments
+         (comment_id, media_id, commenter_scoped_id_hash, status,
+          attempt_count, next_retry_at, created_at, updated_at)
+       VALUES (?, 'media-1', 'hash-1', 'retry_pending', ?, ?, ?, ?)`,
+    )
+      .bind(commentId, tentativas, AGORA, AGORA, AGORA)
+      .run()
+  }
+
+  async function registro(commentId: string) {
+    return env.DB.prepare(
+      'SELECT status, attempt_count, next_retry_at FROM processed_comments WHERE comment_id = ?',
+    )
+      .bind(commentId)
+      .first<{ status: string; attempt_count: number; next_retry_at: number | null }>()
+  }
+
+  test('§16.1: erro retentavel na varredura agenda de novo, nao mata o comentario', async () => {
+    await pendente('comment-transitorio', 0)
+    const api = new MetaQueFalha()
+
+    await runScheduledTasks(env, AGORA, {
+      createApi: () => comoApi(api),
+      resolveConfig: () => configDeTeste(),
+    })
+
+    // Antes de §16.1 so caia aqui quem ja tinha falhado uma entrega, e um unico
+    // 500 transitorio da Meta bastava para marcar `failed`. Agora todo
+    // comentario a partir do sexto do lote passa por aqui: perder na primeira
+    // seria perder comentario, que e a garantia que esta etapa promete.
+    const linha = await registro('comment-transitorio')
+    expect(linha?.status).toBe('retry_pending')
+    expect(linha?.attempt_count).toBe(1)
+    expect(linha?.next_retry_at).toBeGreaterThan(AGORA)
+  })
+
+  test('§16.1: esgotadas as tentativas, a varredura marca failed', async () => {
+    await pendente('comment-esgotado', 3)
+    const api = new MetaQueFalha()
+
+    await runScheduledTasks(env, AGORA, {
+      createApi: () => comoApi(api),
+      resolveConfig: () => configDeTeste(),
+    })
+
+    expect((await registro('comment-esgotado'))?.status).toBe('failed')
   })
 })

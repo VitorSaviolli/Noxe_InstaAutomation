@@ -33,6 +33,43 @@ export interface CommentRecord {
   updated_at: number
 }
 
+/**
+ * Status que contam como "esta pessoa ja acionou a automacao".
+ *
+ * `ignored` e `failed` ficam de fora de proposito: nao devem bloquear uma
+ * tentativa legitima seguinte.
+ */
+const STATUS_QUE_ACIONARAM: readonly CommentStatus[] = [
+  'private_sent',
+  'completed',
+  'processing',
+  'uncertain',
+]
+
+/**
+ * Os mesmos, mais `retry_pending`.
+ *
+ * Um comentario esperando o cron e um Direct PROMETIDO: se ele nao contasse, o
+ * autor reagendado numa invocacao nao seria barrado na proxima e receberia dois
+ * Directs. O caminho inline (`isUserInCooldown`) NAO usa esta lista — incluir
+ * `retry_pending` la mudaria o comportamento que esta etapa existe para
+ * congelar. O portao do reagendamento e, de proposito, o mais estrito dos dois.
+ */
+const STATUS_QUE_PROMETEM_DIRECT: readonly CommentStatus[] = [
+  ...STATUS_QUE_ACIONARAM,
+  'retry_pending',
+]
+
+/**
+ * Monta a lista de um `IN (...)`.
+ *
+ * So recebe valores de `CommentStatus`, que e uma uniao fechada escrita neste
+ * arquivo: nao ha entrada externa alcancando esta string.
+ */
+function comoListaSql(status: readonly CommentStatus[]): string {
+  return status.map((valor) => `'${valor}'`).join(', ')
+}
+
 /** Comentario que ficou fora da fatia da invocacao e vai esperar o cron. (§16.1) */
 export interface DeferredComment {
   commentId: string
@@ -57,7 +94,7 @@ const SQL_REAGENDAR = `INSERT INTO processed_comments
           SELECT 1 FROM processed_comments
            WHERE commenter_scoped_id_hash = ?
              AND created_at >= ?
-             AND status IN ('private_sent', 'completed', 'processing', 'uncertain'))
+             AND status IN (${comoListaSql(STATUS_QUE_PROMETEM_DIRECT)}))
    ON CONFLICT (comment_id) DO NOTHING`
 
 export class CommentsRepository {
@@ -95,8 +132,9 @@ export class CommentsRepository {
    * Um unico `db.batch()` — transacao implicita e UM subrequest — grava o
    * excedente inteiro. Cada INSERT carrega dentro de si os dois portoes que o
    * caminho normal pagaria com uma consulta cada: o `ON CONFLICT DO NOTHING`
-   * cobre o dedup e o `WHERE NOT EXISTS` cobre o cooldown do autor. Sem isso o
-   * excedente furaria as duas regras justamente no lote grande.
+   * cobre o dedup e o `WHERE NOT EXISTS` cobre o cooldown do autor, contando
+   * tambem quem ja esta reagendado. Sem isso o excedente furaria as duas regras
+   * justamente no lote grande.
    *
    * Devolve quantas linhas foram realmente criadas.
    */
@@ -220,7 +258,7 @@ export class CommentsRepository {
         `SELECT 1 AS hit FROM processed_comments
           WHERE commenter_scoped_id_hash = ?
             AND created_at >= ?
-            AND status IN ('private_sent', 'completed', 'processing', 'uncertain')
+            AND status IN (${comoListaSql(STATUS_QUE_ACIONARAM)})
           LIMIT 1`,
       )
       .bind(commenterHash, since)

@@ -10,6 +10,8 @@
  * Este arquivo mora em `tests/fixtures/`, que nao casa com o `include` do
  * vitest (`tests/**\/*.test.ts`), entao ele nao vira uma suite vazia.
  */
+import { storeAccessToken } from '../../src/services/token-manager'
+import { IG_USER_ID, USERNAME_CONTA } from './dubles'
 
 /**
  * Tabelas do schema, na ordem em que devem ser esvaziadas.
@@ -28,4 +30,23 @@ export const TABELAS_DO_SCHEMA = ['processed_comments', 'account_tokens'] as con
  */
 export async function limparBanco(db: D1Database): Promise<void> {
   await db.batch(TABELAS_DO_SCHEMA.map((tabela) => db.prepare(`DELETE FROM ${tabela}`)))
+}
+
+/**
+ * Liga uma conta do Instagram no banco de teste.
+ *
+ * Sem isto `processEvents` e `runScheduledTasks` param na primeira linha —
+ * toda suite que exercita o caminho de entrega precisa do mesmo cenario.
+ */
+export async function ligarConta(
+  env: { DB: D1Database; TOKEN_ENCRYPTION_KEY: string },
+  now: number,
+): Promise<void> {
+  await storeAccessToken(env as Parameters<typeof storeAccessToken>[0], {
+    igUserId: IG_USER_ID,
+    username: USERNAME_CONTA,
+    accessToken: 'token-de-teste',
+    expiresInSeconds: 60 * 24 * 60 * 60,
+    now,
+  })
 }

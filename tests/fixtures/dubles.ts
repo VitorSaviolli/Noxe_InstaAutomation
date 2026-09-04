@@ -1,9 +1,18 @@
 /**
- * Dubles injetados por parametro. Nada de mock de modulo.
+ * Dubles injetados por parametro e o cenario minimo compartilhado.
+ *
+ * Nada de mock de modulo: os dubles sao classes locais que o teste passa por
+ * parametro. Um nome por conceito — quem precisa de um duble da Meta, de um
+ * relogio fixo ou de uma config de teste importa daqui, e nao escreve o seu.
  *
  * Este arquivo mora em `tests/fixtures/`, que nao casa com o `include` do
  * vitest, entao ele nao vira uma suite vazia.
  */
+import { createExecutionContext, waitOnExecutionContext } from 'cloudflare:test'
+import type { AutomationConfig } from '../../src/config'
+import worker from '../../src/index'
+import type { MetaApiClient } from '../../src/services/meta-api'
+import type { Env } from '../../src/types/env'
 
 /** Statements que gravam. Serve para separar leitura de escrita na contagem. */
 const ESCRITA = /^\s*(insert|update|delete|replace)/i
@@ -62,4 +71,156 @@ export class D1Contador {
 /** Entrega o contador onde o codigo de producao espera um D1Database. */
 export function comoD1(contador: D1Contador): D1Database {
   return contador as unknown as D1Database
+}
+
+// ---------------------------------------------------------------------------
+// O cenario minimo que toda suite de regressao monta
+// ---------------------------------------------------------------------------
+
+/** Relogio fixo do projeto. Sem fake timers: `now` e sempre injetado. */
+export const AGORA = 1_700_000_000_000
+
+/** Conta profissional ficticia usada em todas as suites. */
+export const IG_USER_ID = '17841400000000000'
+export const USERNAME_CONTA = 'conta_de_teste'
+
+/** Raiz ficticia do Worker nos testes. */
+export const RAIZ = 'https://exemplo.workers.dev'
+
+/** Teto de subrequests por invocacao. Nao e imposto pelo Miniflare (§13.3). */
+export const TETO_DE_SUBREQUESTS = 50
+
+/**
+ * Config de teste ESCRITA AQUI, e nao derivada de `src/config.ts`.
+ *
+ * Este repositorio e um template publico: quem instala clona e troca a
+ * palavra-gatilho, o texto e o link. Um teste que dependesse desses valores
+ * ficaria vermelho na maquina de todo mundo que usa o produto como ele foi
+ * feito para ser usado. O que a regressao congela e o COMPORTAMENTO dado uma
+ * config conhecida — a forma do contrato de `src/config.ts` e conferida a
+ * parte, campo a campo.
+ */
+export const CONFIG_DE_TESTE: AutomationConfig = {
+  enabled: true,
+  triggerKeywords: ['eu quero', 'quero o link'],
+  matchMode: 'exact',
+  caseSensitive: false,
+  normalizeAccents: true,
+  ignorePunctuation: true,
+  processOnlyReels: true,
+  allowedMediaIds: ['*'],
+  publicReplyEnabled: true,
+  publicReplyText: 'Enviei as informacoes no seu Direct.',
+  privateReplyEnabled: true,
+  privateReplyText: 'Ola, {username}! Aqui esta o link que voce pediu: {link}',
+  destinationUrl: 'https://exemplo.com/link',
+  userCooldownHours: 24,
+}
+
+/** A config de teste com um campo trocado. */
+export function configDeTeste(patch: Partial<AutomationConfig> = {}): AutomationConfig {
+  return { ...CONFIG_DE_TESTE, ...patch }
+}
+
+/**
+ * Duble da Graph API da Meta.
+ *
+ * Guarda a ORDEM das chamadas — e o que prova que nenhuma consulta extra
+ * entrou no caminho — e o texto exato de cada Direct.
+ */
+export class MetaFalsa {
+  readonly chamadas: string[] = []
+  readonly textosEnviados: string[] = []
+
+  async sendPrivateReply(_ig: string, _comment: string, text: string) {
+    this.chamadas.push('private')
+    this.textosEnviados.push(text)
+    return { ok: true as const, data: { message_id: 'msg-1' } }
+  }
+
+  async replyToComment(_comment: string, _message: string) {
+    this.chamadas.push('public')
+    return { ok: true as const, data: { id: 'reply-1' } }
+  }
+
+  async getMediaInfo(mediaId: string) {
+    this.chamadas.push('mediaInfo')
+    return { ok: true as const, data: { id: mediaId, media_product_type: 'REELS' } }
+  }
+
+  /** Quantas chamadas a Meta — que contam no mesmo teto das consultas ao D1. */
+  get total(): number {
+    return this.chamadas.length
+  }
+}
+
+/** Entrega o duble onde o codigo de producao espera um MetaApiClient. */
+export function comoApi(falsa: MetaFalsa | MetaQueFalha): MetaApiClient {
+  return falsa as unknown as MetaApiClient
+}
+
+/**
+ * Duble da Meta que sempre falha o Direct com um erro RETENTAVEL.
+ *
+ * `HTTP_500` esta na lista de `isRetryable`: e o 500 transitorio que nao pode
+ * consumir a unica tentativa de um comentario reagendado.
+ */
+export class MetaQueFalha {
+  tentativasDeDirect = 0
+
+  async sendPrivateReply(_ig: string, _comment: string, _text: string) {
+    this.tentativasDeDirect++
+    return {
+      ok: false as const,
+      error: {
+        status: 500,
+        code: null,
+        subcode: null,
+        message: 'indisponivel',
+        shortCode: 'HTTP_500',
+      },
+    }
+  }
+
+  async replyToComment(_comment: string, _message: string) {
+    return { ok: true as const, data: { id: 'reply-1' } }
+  }
+
+  async getMediaInfo(mediaId: string) {
+    return { ok: true as const, data: { id: mediaId, media_product_type: 'REELS' } }
+  }
+}
+
+/** D1 que estoura em `batch()`, para provar que a falha nao escapa em silencio. */
+export class D1BatchQuebrado {
+  constructor(private readonly real: D1Database) {}
+
+  prepare(sql: string): D1PreparedStatement {
+    return this.real.prepare(sql)
+  }
+
+  batch<T = unknown>(_statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    return Promise.reject(new Error('D1 fora do ar'))
+  }
+
+  exec(query: string): Promise<D1ExecResult> {
+    return this.real.exec(query)
+  }
+
+  dump(): Promise<ArrayBuffer> {
+    return this.real.dump()
+  }
+}
+
+/** Roda o Worker de verdade e espera o `waitUntil` terminar. */
+export async function responder(request: Request, env: Env): Promise<Response> {
+  const ctx = createExecutionContext()
+  const resposta = await worker.fetch(request, env, ctx)
+  await waitOnExecutionContext(ctx)
+  return resposta
+}
+
+/** GET na raiz ficticia, com os cabecalhos informados e NADA alem deles. */
+export function pedir(caminho: string, cabecalhos: Record<string, string> = {}): Request {
+  return new Request(`${RAIZ}${caminho}`, { headers: cabecalhos })
 }

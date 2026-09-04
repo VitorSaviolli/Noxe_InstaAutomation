@@ -55,7 +55,9 @@ export interface ProcessDeps {
 
 /** Espera exponencial: 1min, 4min, 16min. */
 const RETRY_BASE_MS = 60_000
-const MAX_ATTEMPTS = 3
+
+/** Quantas vezes um Direct e retentado antes de virar `failed`. */
+export const MAX_ATTEMPTS = 3
 
 export function computeNextRetry(attemptCount: number, now: number): number {
   return now + RETRY_BASE_MS * 4 ** attemptCount

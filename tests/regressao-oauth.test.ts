@@ -1,11 +1,11 @@
-import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
+import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
-import worker from '../src/index'
 import { TokensRepository } from '../src/repositories/tokens-repository'
 import { decrypt } from '../src/security/encryption'
 import { createState, STATE_TTL_MS, validateState } from '../src/security/oauth-state'
 import { storeAccessToken } from '../src/services/token-manager'
 import { limparBanco } from './fixtures/banco'
+import { AGORA, IG_USER_ID, pedir, RAIZ, responder, USERNAME_CONTA } from './fixtures/dubles'
 
 /**
  * REG — regressao do fluxo OAuth de instalacao.
@@ -20,19 +20,11 @@ import { limparBanco } from './fixtures/banco'
  * um modulo proprio nao mudou um unico byte do que sai na URL.
  */
 
-const AGORA = 1_700_000_000_000
 const ADMIN = 'admin-token-de-teste'
-const RAIZ = 'https://exemplo.workers.dev'
 
-async function responder(request: Request): Promise<Response> {
-  const ctx = createExecutionContext()
-  const resposta = await worker.fetch(request, env, ctx)
-  await waitOnExecutionContext(ctx)
-  return resposta
-}
-
-function pedido(caminho: string, cabecalhos: Record<string, string> = {}): Request {
-  return new Request(`${RAIZ}${caminho}`, { headers: cabecalhos })
+/** O `responder` do fixture, ja com o env desta suite. */
+function responderComEnv(request: Request): Promise<Response> {
+  return responder(request, env)
 }
 
 describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => {
@@ -41,15 +33,15 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
   })
 
   test('REG-11: /setup/authorize sem cabecalho continua 401', async () => {
-    const resposta = await responder(pedido('/setup/authorize'))
+    const resposta = await responderComEnv(pedir('/setup/authorize'))
 
     expect(resposta.status).toBe(401)
     expect(await resposta.text()).toBe('Nao autorizado')
   })
 
   test('REG-12: /setup/authorize com Bearer continua devolvendo authorizationUrl', async () => {
-    const resposta = await responder(
-      pedido('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
+    const resposta = await responderComEnv(
+      pedir('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
     )
 
     expect(resposta.status).toBe(200)
@@ -65,18 +57,20 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
   })
 
   test('REG-13: token na query string continua nao sendo aceito', async () => {
-    const porQuery = await responder(pedido(`/setup/authorize?token=${ADMIN}`))
+    const porQuery = await responderComEnv(pedir(`/setup/authorize?token=${ADMIN}`))
     expect(porQuery.status).toBe(401)
 
-    const comoBearer = await responder(pedido(`/setup/authorize?access_token=${ADMIN}`))
+    const comoBearer = await responderComEnv(pedir(`/setup/authorize?access_token=${ADMIN}`))
     expect(comoBearer.status).toBe(401)
   })
 
   test('REG-17: /setup/subscribe continua exigindo Bearer', async () => {
-    const semNada = await responder(new Request(`${RAIZ}/setup/subscribe`, { method: 'POST' }))
+    const semNada = await responderComEnv(
+      new Request(`${RAIZ}/setup/subscribe`, { method: 'POST' }),
+    )
     expect(semNada.status).toBe(401)
 
-    const comTokenErrado = await responder(
+    const comTokenErrado = await responderComEnv(
       new Request(`${RAIZ}/setup/subscribe`, {
         method: 'POST',
         headers: { authorization: 'Bearer token-errado' },
@@ -85,7 +79,7 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     expect(comTokenErrado.status).toBe(401)
 
     // Com o token certo e sem conta ligada, para em 409 — sem tocar a rede.
-    const comTokenCerto = await responder(
+    const comTokenCerto = await responderComEnv(
       new Request(`${RAIZ}/setup/subscribe`, {
         method: 'POST',
         headers: { authorization: `Bearer ${ADMIN}` },
@@ -97,8 +91,8 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
   test('REG-18: o token da conta continua cifrado no banco e nao e devolvido', async () => {
     const TOKEN = 'IGQVJXsegredo-do-token-de-acesso-longo'
     await storeAccessToken(env, {
-      igUserId: '17841400000000000',
-      username: 'conta_de_teste',
+      igUserId: IG_USER_ID,
+      username: USERNAME_CONTA,
       accessToken: TOKEN,
       expiresInSeconds: 60 * 24 * 60 * 60,
       now: AGORA,
@@ -110,11 +104,11 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     expect(await decrypt(registro?.encrypted_token ?? '', env.TOKEN_ENCRYPTION_KEY)).toBe(TOKEN)
 
     // Nenhuma rota publica devolve o token.
-    const saude = await responder(pedido('/health'))
+    const saude = await responderComEnv(pedir('/health'))
     expect(await saude.text()).not.toContain(TOKEN)
 
-    const autorizar = await responder(
-      pedido('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
+    const autorizar = await responderComEnv(
+      pedir('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
     )
     expect(await autorizar.text()).not.toContain(TOKEN)
   })
@@ -123,25 +117,27 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     const comCookie = { cookie: 'painel_sessao=qualquer-coisa' }
 
     // Nao aceitam: o cookie nao substitui o Bearer.
-    const autorizar = await responder(pedido('/setup/authorize', comCookie))
+    const autorizar = await responderComEnv(pedir('/setup/authorize', comCookie))
     expect(autorizar.status).toBe(401)
     expect(autorizar.headers.get('set-cookie')).toBeNull()
 
-    const inscrever = await responder(
+    const inscrever = await responderComEnv(
       new Request(`${RAIZ}/setup/subscribe`, { method: 'POST', headers: comCookie }),
     )
     expect(inscrever.status).toBe(401)
     expect(inscrever.headers.get('set-cookie')).toBeNull()
 
     // Nao emitem: nem no caminho autorizado.
-    const autorizado = await responder(
-      pedido('/setup/authorize', { authorization: `Bearer ${ADMIN}`, ...comCookie }),
+    const autorizado = await responderComEnv(
+      pedir('/setup/authorize', { authorization: `Bearer ${ADMIN}`, ...comCookie }),
     )
     expect(autorizado.status).toBe(200)
     expect(autorizado.headers.get('set-cookie')).toBeNull()
 
     // E o callback tambem nao, nem quando recusa.
-    const callback = await responder(pedido('/oauth/callback?state=invalido&code=abc', comCookie))
+    const callback = await responderComEnv(
+      pedir('/oauth/callback?state=invalido&code=abc', comCookie),
+    )
     expect(callback.status).toBe(403)
     expect(callback.headers.get('set-cookie')).toBeNull()
   })
@@ -235,8 +231,8 @@ describe('REG — o `state` do OAuth continua exatamente como e hoje', () => {
       reason: 'expirado',
     })
 
-    const resposta = await responder(
-      pedido(`/oauth/callback?state=${encodeURIComponent(state)}&code=qualquer`),
+    const resposta = await responderComEnv(
+      pedir(`/oauth/callback?state=${encodeURIComponent(state)}&code=qualquer`),
     )
     // O callback usa o relogio real, muito depois de AGORA: state vencido.
     expect(resposta.status).toBe(403)
@@ -244,8 +240,8 @@ describe('REG — o `state` do OAuth continua exatamente como e hoje', () => {
 
   test('REG-16: callback com state de outro segredo continua recusado', async () => {
     const forjado = await createState('segredo-do-atacante', Date.now())
-    const resposta = await responder(
-      pedido(`/oauth/callback?state=${encodeURIComponent(forjado)}&code=qualquer`),
+    const resposta = await responderComEnv(
+      pedir(`/oauth/callback?state=${encodeURIComponent(forjado)}&code=qualquer`),
     )
 
     expect(resposta.status).toBe(403)

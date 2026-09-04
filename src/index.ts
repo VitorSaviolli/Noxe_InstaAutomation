@@ -26,7 +26,11 @@
  * ============================================================
  */
 import { type AutomationConfig, automationConfig, resolveConfigForMedia } from './config'
-import { CommentsRepository, type DeferredComment } from './repositories/comments-repository'
+import {
+  type CommentRecord,
+  CommentsRepository,
+  type DeferredComment,
+} from './repositories/comments-repository'
 import { TokensRepository } from './repositories/tokens-repository'
 import { handleHealth } from './routes/health'
 import { handleDataDeletion, handlePrivacyPolicy } from './routes/legal'
@@ -37,8 +41,14 @@ import {
   handleSubscribe,
 } from './routes/oauth'
 import { handleWebhookVerification, readWebhookRequest } from './routes/webhook'
-import { evaluateComment, isReelFromEvent, processComment } from './services/automation'
-import { MetaApiClient } from './services/meta-api'
+import {
+  computeNextRetry,
+  evaluateComment,
+  isReelFromEvent,
+  MAX_ATTEMPTS,
+  processComment,
+} from './services/automation'
+import { isRetryable, MetaApiClient } from './services/meta-api'
 import {
   loadAccessToken,
   refreshLongLivedToken,
@@ -224,10 +234,14 @@ export async function processEvents(
  * que veio no proprio webhook. Os dois que custam consulta — dedup e cooldown —
  * viajam dentro do proprio INSERT, em `deferForRetry`.
  *
- * A unica confirmacao que NAO e refeita e a do tipo da midia quando o webhook
- * nao o informou: perguntar a Meta custaria uma chamada por comentario, que e
- * exatamente o gasto que a fatia existe para evitar. Na pratica o webhook de
- * comentarios da Meta sempre traz `media_product_type`.
+ * Quando `processOnlyReels` esta ligado e o webhook NAO informou o tipo da
+ * midia, o comentario nao e reagendado. Perguntar a Meta custaria uma chamada
+ * por comentario, que e o gasto que a fatia existe para evitar, e a alternativa
+ * seria reagendar sem saber — o `retryPending` entrega sem consultar nada, e ai
+ * o Direct sairia numa publicacao que talvez nao seja Reel. Na duvida NAO
+ * processamos, que e a mesma escolha do caminho inline (`isReel`): e melhor
+ * perder um acionamento do que responder na publicacao errada. Na pratica o
+ * webhook de comentarios da Meta sempre traz `media_product_type`.
  */
 async function reagendarExcedente(
   events: readonly CommentEvent[],
@@ -251,7 +265,7 @@ async function reagendarExcedente(
     const veredito = evaluateComment(event, config, deps.igUserId, deps.accountUsername)
     if (!veredito.process) continue
 
-    if (config.processOnlyReels && isReelFromEvent(event) === false) continue
+    if (config.processOnlyReels && isReelFromEvent(event) !== true) continue
 
     // O `WHERE NOT EXISTS` do INSERT enxerga o que ja esta gravado, mas nao o
     // que entra no MESMO lote: dois comentarios do mesmo autor no excedente
@@ -269,9 +283,19 @@ async function reagendarExcedente(
     })
   }
 
-  const reagendados = await deps.repo.deferForRetry(pendentes, deps.now)
-  if (reagendados > 0) {
-    console.log(`Lote fatiado: ${reagendados} comentario(s) reagendado(s) para o cron`)
+  // `processEvents` roda dentro de `ctx.waitUntil`: uma rejeicao aqui sumiria
+  // em silencio, e junto com ela o excedente inteiro. O laco de entrega acima
+  // ja trata do mesmo jeito.
+  try {
+    const reagendados = await deps.repo.deferForRetry(pendentes, deps.now)
+    if (reagendados > 0) {
+      console.log(`Lote fatiado: ${reagendados} comentario(s) reagendado(s) para o cron`)
+    }
+  } catch (cause) {
+    console.error(
+      `Falha ao reagendar ${pendentes.length} comentario(s) do lote:`,
+      cause instanceof Error ? cause.message : cause,
+    )
   }
 }
 
@@ -325,29 +349,67 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
   const api = deps.createApi(env.META_API_VERSION, credencial.token)
 
   for (const registro of pendentes) {
-    // O texto do comentario nao e guardado (coleta minima), entao a nova
-    // tentativa reenvia apenas o Direct, que e a etapa que falhou.
-    const config = deps.resolveConfig(registro.media_id)
-    // O `.replace()` cru daqui trocava so a PRIMEIRA ocorrencia e nao passava
-    // pela sanitizacao. `renderTemplate` usa `replaceAll` e limpa caracteres
-    // de controle — e e o unico ponto de renderizacao do projeto. (§16.3)
-    const texto = renderTemplate(config.privateReplyText, {
-      username: '',
-      link: config.destinationUrl,
+    await reentregar(registro, {
+      api,
+      repo,
+      config: deps.resolveConfig(registro.media_id),
+      igUserId: credencial.igUserId,
+      now,
     })
-    const envio = await api.sendPrivateReply(credencial.igUserId, registro.comment_id, texto)
+  }
+}
 
-    if (envio.ok) {
-      await repo.markPrivateSent(registro.comment_id, envio.data.message_id ?? null, now)
-      const resposta = await api.replyToComment(registro.comment_id, config.publicReplyText)
-      if (resposta.ok) {
-        await repo.markCompleted(registro.comment_id, resposta.data.id, now)
-      } else {
-        await repo.markStatus(registro.comment_id, 'uncertain', now, resposta.error.shortCode)
-      }
+/**
+ * Reenvia o Direct de UM pendente e atualiza o estado.
+ *
+ * O texto do comentario e o username nao sao guardados (coleta minima), entao
+ * a nova tentativa reenvia so o Direct — a etapa que faltou.
+ */
+async function reentregar(
+  registro: CommentRecord,
+  deps: {
+    api: MetaApiClient
+    repo: CommentsRepository
+    config: AutomationConfig
+    igUserId: string
+    now: number
+  },
+): Promise<void> {
+  const { api, repo, config, now } = deps
+
+  // Aqui havia um `.replace('{link}', ...)` cru: trocava so a PRIMEIRA
+  // ocorrencia e nao sanitizava. `renderTemplate` usa `replaceAll` e limpa
+  // caracteres de controle — e e o unico ponto de renderizacao do projeto.
+  // (§16.3)
+  const texto = renderTemplate(config.privateReplyText, {
+    username: '',
+    link: config.destinationUrl,
+  })
+
+  const envio = await api.sendPrivateReply(deps.igUserId, registro.comment_id, texto)
+
+  if (!envio.ok) {
+    // Mesma escada do caminho inline: ate MAX_ATTEMPTS com espera exponencial.
+    // Antes de §16.1 so chegava aqui quem ja tinha falhado uma entrega; agora
+    // chega todo comentario a partir do sexto de cada lote, e um 500
+    // transitorio da Meta perderia o comentario de vez. (§16.1)
+    const { shortCode } = envio.error
+    if (isRetryable(shortCode) && registro.attempt_count < MAX_ATTEMPTS) {
+      const nextRetryAt = computeNextRetry(registro.attempt_count, now)
+      await repo.scheduleRetry(registro.comment_id, nextRetryAt, shortCode, now)
     } else {
-      await repo.markStatus(registro.comment_id, 'failed', now, envio.error.shortCode)
+      await repo.markStatus(registro.comment_id, 'failed', now, shortCode)
     }
+    return
+  }
+
+  await repo.markPrivateSent(registro.comment_id, envio.data.message_id ?? null, now)
+
+  const resposta = await api.replyToComment(registro.comment_id, config.publicReplyText)
+  if (resposta.ok) {
+    await repo.markCompleted(registro.comment_id, resposta.data.id, now)
+  } else {
+    await repo.markStatus(registro.comment_id, 'uncertain', now, resposta.error.shortCode)
   }
 }
 
