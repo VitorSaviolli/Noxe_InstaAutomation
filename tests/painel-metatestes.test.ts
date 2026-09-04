@@ -11,7 +11,7 @@ import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
  * tabela; os outros sete chegam com as etapas que criam rota, campo e sessao.
  *
  * META-03: toda tabela do schema aparece em `limparBanco()`.
- * META-04: todo binding obrigatorio existe no ambiente de teste.
+ * META-04: todo binding do wrangler.jsonc existe no ambiente de teste.
  * META-05: `PANEL_SESSION_KEY` e diferente das outras chaves.
  * META-08: `PRAGMA table_info` confere o conjunto EXATO de colunas.
  */
@@ -226,46 +226,66 @@ describe('META — tabelas', () => {
 })
 
 /**
- * Todo binding que `src/types/env.ts` declara obrigatorio.
+ * Todo binding que o `wrangler.jsonc` declara — `vars`, segredos, D1, KV, R2,
+ * Durable Objects, filas, servicos e o que vier depois.
  *
- * Escrita aqui de proposito: o TypeScript some em tempo de execucao, entao
- * quem esquecer de propagar um binding novo para o `vitest.config.ts` descobre
- * por este teste. A conferencia no nivel do ARQUIVO — o binding existe mesmo
- * em `wrangler.jsonc` e no `.dev.vars.example` — nao cabe num teste do
- * workerd e mora no `scripts/verificar-antes-de-publicar.mjs` (§13.1).
+ * A lista NAO e escrita aqui: ela e derivada do proprio `wrangler.jsonc` pelo
+ * `vitest.config.ts` e entregue por binding, porque o teste roda dentro do
+ * workerd e la nao ha sistema de arquivos. Uma lista escrita a mao envelhece
+ * em silencio — foi exatamente o que aconteceu quando o `vitest.config.ts`
+ * passou a ler o arquivo campo a campo: as `vars` continuaram herdadas e todo
+ * o resto parou de derivar, sem nenhum teste ficar vermelho.
+ *
+ * O TypeScript nao cobre isto: ele some em tempo de execucao, e um binding
+ * declarado em `src/types/env.ts` que nunca chegou ao ambiente de teste passa
+ * pelo typecheck sem uma palavra.
  */
-const BINDINGS_OBRIGATORIOS = [
-  'DB',
-  'META_APP_ID',
-  'META_API_VERSION',
-  'META_IG_USER_ID',
-  'META_APP_SECRET',
-  'META_WEBHOOK_VERIFY_TOKEN',
-  'TOKEN_ENCRYPTION_KEY',
-  'SETUP_ADMIN_TOKEN',
-  'PANEL_RP_ID',
-  'PANEL_SESSION_KEY',
-  'ALLOWED_LINK_DOMAINS',
-] as const
-
 /**
  * Os tres limitadores sao OPCIONAIS e a ausencia aqui e proposital (§7.4).
  *
  * Nada do desenho pode depender deles para estar correto; se um dia entrarem
- * nos bindings de teste, a suite passaria a provar menos do que promete.
+ * nos bindings de teste, a suite passaria a provar menos do que promete. Sao
+ * tambem a unica subtracao permitida do conjunto declarado no `wrangler.jsonc`
+ * — a excecao declarada, e nao um esquecimento.
  */
-const LIMITADORES_QUE_FICAM_DE_FORA = [
+const LIMITADORES_QUE_FICAM_DE_FORA: readonly string[] = [
   'PANEL_LIMITER_LOGIN',
   'PANEL_LIMITER_CODIGO',
   'PANEL_LIMITER_STOP',
-] as const
+]
+
+/** O conjunto esperado: o que o arquivo declara, menos a excecao declarada. */
+function bindingsEsperados(): string[] {
+  return env.TEST_BINDINGS_DO_WRANGLER.filter(
+    (nome) => !LIMITADORES_QUE_FICAM_DE_FORA.includes(nome),
+  )
+}
 
 describe('META — bindings', () => {
-  test('META-04: todo binding obrigatorio existe no ambiente de teste', () => {
+  test('META-04: todo binding do wrangler.jsonc existe no ambiente de teste', () => {
     const ambiente = env as unknown as Record<string, unknown>
-    const ausentes = BINDINGS_OBRIGATORIOS.filter((nome) => ambiente[nome] === undefined)
+    const esperados = bindingsEsperados()
+
+    // Contrapositivo do proprio teste: uma derivacao quebrada devolveria lista
+    // vazia e o `filter` abaixo passaria comparando nada com nada.
+    expect(esperados).toContain('DB')
+    expect(esperados.length).toBeGreaterThan(LIMITADORES_QUE_FICAM_DE_FORA.length)
+
+    const ausentes = esperados.filter((nome) => ambiente[nome] === undefined)
 
     expect(ausentes).toEqual([])
+  })
+
+  test('META-04: o conjunto declarado cobre var, segredo e binding de recurso', () => {
+    // As tres formas que o `wrangler.jsonc` usa para nomear o que chega ao
+    // `env`. Se a derivacao parasse de ler uma delas — foi o que aconteceu com
+    // tudo o que nao e `var` —, o teste acima passaria cobrindo menos.
+    const declarados = env.TEST_BINDINGS_DO_WRANGLER
+
+    expect(declarados).toContain('ALLOWED_LINK_DOMAINS') // vars
+    expect(declarados).toContain('PANEL_SESSION_KEY') // secrets.required
+    expect(declarados).toContain('DB') // d1_databases[].binding
+    expect(declarados).toContain('PANEL_LIMITER_STOP') // ratelimits[].name
   })
 
   test('META-04: com os bindings de teste o portao de sanidade abre', () => {

@@ -28,6 +28,93 @@ const migrations = await readD1Migrations('./migrations')
  */
 const producao = unstable_readConfig({ config: './wrangler.jsonc' })
 
+/**
+ * Todo nome de binding declarado no `wrangler.jsonc`, entregue ao ambiente de
+ * teste para o metateste META-04 conferir a propagacao.
+ *
+ * A leitura acima e explicita campo a campo, e o preco disso e que um binding
+ * NOVO (KV, R2, Durable Object, fila, servico, um D1 a mais) chega ao Worker
+ * publicado e NAO chega ao ambiente de teste — a suite continuaria verde
+ * provando menos do que promete. Herdar `producao.vars` cobre so as `vars`; o
+ * resto some em silencio. Esta lista fecha esse buraco: o conjunto vem do
+ * arquivo, e o metateste compara com o `env` de teste.
+ *
+ * Vai como binding porque o teste roda dentro do workerd, onde nao existe
+ * sistema de arquivos nem `unstable_readConfig` — o mesmo caminho que
+ * `TEST_MIGRATIONS` ja usa.
+ */
+/** Containers cujos itens nomeiam o binding em `name`, e nao em `binding`. */
+const NOMEADOS_POR_NAME: readonly (readonly string[])[] = [
+  ['ratelimits'],
+  ['send_email'],
+  ['durable_objects', 'bindings'],
+  ['unsafe', 'bindings'],
+]
+
+function ehObjeto(valor: unknown): valor is Record<string, unknown> {
+  return typeof valor === 'object' && valor !== null
+}
+
+/**
+ * Coleta recursivamente todo `binding: "NOME"`.
+ *
+ * E generico de proposito: `binding` e a convencao da Cloudflare para KV, R2,
+ * D1, Vectorize, Hyperdrive, servicos, filas, assets, AI e o que vier depois.
+ * Uma lista escrita a mao de containers envelheceria no primeiro tipo novo, e
+ * envelheceria em silencio, que e o defeito que este arquivo esta corrigindo.
+ */
+function coletarPorBinding(valor: unknown, achados: Set<string>): void {
+  if (Array.isArray(valor)) {
+    for (const item of valor) coletarPorBinding(item, achados)
+    return
+  }
+  if (!ehObjeto(valor)) return
+  if (typeof valor.binding === 'string') achados.add(valor.binding)
+  for (const dentro of Object.values(valor)) coletarPorBinding(dentro, achados)
+}
+
+function emCaminho(config: Record<string, unknown>, caminho: readonly string[]): unknown {
+  let atual: unknown = config
+  for (const passo of caminho) {
+    if (!ehObjeto(atual)) return undefined
+    atual = atual[passo]
+  }
+  return atual
+}
+
+function nomesDeBinding(config: Record<string, unknown>): string[] {
+  const achados = new Set<string>()
+
+  // As `vars` publicas chegam ao Worker com o nome da propria chave. Elas
+  // ficam FORA da varredura recursiva: o valor de um var pode ser um objeto
+  // JSON qualquer, inclusive um que tenha uma chave chamada `binding`.
+  for (const nome of Object.keys((config.vars ?? {}) as Record<string, unknown>)) achados.add(nome)
+
+  // Os segredos declarados. Nao sao binding de recurso, mas chegam ao `env`
+  // pelo mesmo nome e o teste precisa deles preenchidos.
+  const segredos = (config.secrets ?? {}) as { required?: unknown }
+  if (Array.isArray(segredos.required)) {
+    for (const nome of segredos.required) if (typeof nome === 'string') achados.add(nome)
+  }
+
+  for (const [chave, valor] of Object.entries(config)) {
+    if (chave === 'vars' || chave === 'secrets') continue
+    coletarPorBinding(valor, achados)
+  }
+
+  for (const caminho of NOMEADOS_POR_NAME) {
+    const lista = emCaminho(config, caminho)
+    if (!Array.isArray(lista)) continue
+    for (const item of lista) {
+      if (ehObjeto(item) && typeof item.name === 'string') achados.add(item.name)
+    }
+  }
+
+  return [...achados].sort()
+}
+
+const BINDINGS_DO_WRANGLER = nomesDeBinding(producao as unknown as Record<string, unknown>)
+
 export default defineConfig({
   plugins: [
     cloudflareTest({
@@ -64,6 +151,9 @@ export default defineConfig({
           PANEL_SESSION_KEY: 'chave-de-sessao-do-painel-de-teste',
           // Consumido por tests/setup.ts para criar o schema antes dos testes.
           TEST_MIGRATIONS: migrations,
+          // Consumido pelo metateste META-04: os nomes de binding que o
+          // wrangler.jsonc declara, para conferir a propagacao ate aqui.
+          TEST_BINDINGS_DO_WRANGLER: BINDINGS_DO_WRANGLER,
         },
       },
     }),

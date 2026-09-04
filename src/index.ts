@@ -166,6 +166,12 @@ export default {
       case '/data-deletion':
         return handleDataDeletion()
 
+      // Trava de RL-07, e ela e uma trava POR AUSENCIA: o limitador do painel
+      // NAO entra aqui, nem hoje nem depois. Quem entrega neste caminho e a
+      // Meta, ja autenticada pela assinatura do corpo; um 429 devolvido a ela
+      // faz a entrega ser reenviada e, no limite, a inscricao ser cancelada.
+      // Acrescentar `limitar(...)` nesta linha parece defesa e e perda de
+      // comentario. O teste de RL-07 fica vermelho se alguem tentar.
       case WEBHOOK_PATH:
         return handleWebhook(request, env, ctx, url, now)
 

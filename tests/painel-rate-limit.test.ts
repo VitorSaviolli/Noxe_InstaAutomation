@@ -4,8 +4,10 @@ import worker from '../src/index'
 import {
   chaveDoBalde,
   JANELA_EM_SEGUNDOS,
+  LimitadorDeReserva,
   limitadorDaFamilia,
   limitar,
+  TETO_DE_BALDES,
   zerarLimite,
 } from '../src/routes/painel/guardas'
 import { CAMINHO_DA_PARADA, handleGerarCodigos, handleParada } from '../src/routes/painel/parada'
@@ -51,6 +53,14 @@ const OUTRO_IP = '198.51.100.9'
 const TETO_DO_LOGIN = 10
 const TETO_DO_CODIGO = 30
 const TETO_DA_PARADA = 30
+
+/**
+ * Quantas chaves o teste do despejo cria ALEM do teto de baldes.
+ *
+ * Uma so ja bastaria para provar o despejo; quinhentas fazem a poda rodar
+ * quinhentas vezes, entao o teste nao passa por sorte de um unico despejo.
+ */
+const MARGEM_DE_DESPEJO = 500
 
 /** Um POST qualquer do painel, com ou sem o IP que a Cloudflare carimba. */
 function pedidoDoPainel(ip: string | null = null): Request {
@@ -198,7 +208,40 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     })
   })
 
-  test('RL-08: tentativa bem-sucedida zera o contador daquele IP', async () => {
+  test('RL-01: encher o isolate de baldes NAO zera o contador de quem esta martelando', async () => {
+    // O unico teste que exercita `podar()` e o `TETO_DE_BALDES`. Ele existe
+    // porque a poda e um limite de MEMORIA que, feito por ordem de insercao,
+    // vira um limitador que se apaga sob demanda: o balde do atacante e o mais
+    // antigo por construcao — ele estourou o teto ANTES de comecar a encher —
+    // e sairia primeiro. `TETO_DE_BALDES - 1` chaves saem de graca de um `/64`
+    // de IPv6, entao o enchimento nao e hipotese, e o preco de zerar o proprio
+    // contador. Instancia propria, e nao a de modulo, para nao deixar dez mil
+    // baldes para o teste seguinte.
+    const limitador = new LimitadorDeReserva(TETO_DO_LOGIN)
+    const atacante = chaveDoBalde('login', pedidoDoPainel(IP))
+
+    for (let i = 0; i < TETO_DO_LOGIN; i++) await limitador.permitir(atacante, AGORA)
+    expect((await limitador.permitir(atacante, AGORA)).permitido).toBe(false)
+
+    // Ele enche o isolate ate passar do teto — e continua tentando enquanto
+    // enche, que e o que um atacante faz. E o toque a cada tentativa que o
+    // poe no FIM da fila de despejo.
+    let liberouDurante = false
+    for (let i = 0; i < TETO_DE_BALDES + MARGEM_DE_DESPEJO; i++) {
+      await limitador.permitir(`painel:enchimento-${i}`, AGORA)
+      if ((await limitador.permitir(atacante, AGORA)).permitido) liberouDurante = true
+    }
+
+    expect(liberouDurante).toBe(false)
+    expect((await limitador.permitir(atacante, AGORA)).permitido).toBe(false)
+
+    // E a memoria continua limitada, que e a razao de `podar()` existir: as
+    // dez mil e quinhentas chaves criadas acima nao viraram dez mil e
+    // quinhentos baldes guardados.
+    expect(limitador.baldesGuardados).toBeLessThanOrEqual(TETO_DE_BALDES)
+  })
+
+  test('RL-08: tentativa bem-sucedida zera o contador daquele IP na reserva', async () => {
     const request = pedidoDoPainel(IP)
     await tentar(TETO_DO_LOGIN, request, 'login')
     expect((await limitar(request, env, 'login', AGORA)).permitido).toBe(false)
@@ -210,6 +253,33 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     expect(await tentar(TETO_DO_LOGIN, request, 'login')).toEqual(todasPassam(TETO_DO_LOGIN))
     // E zerar nao e passe livre: o teto volta a valer do zero.
     expect((await limitar(request, env, 'login', AGORA)).permitido).toBe(false)
+  })
+
+  test('RL-08: com o binding cadastrado, zerar devolve so a reserva — o contador que manda continua cheio', async () => {
+    // A metade ausente de RL-08, afirmada em vez de silenciada. Na configuracao
+    // RECOMENDADA — os tres bindings cadastrados — quem decide e o contador da
+    // Cloudflare, e ele nao expoe como zerar um balde `[C]`. Entao um login
+    // bem-sucedido NAO devolve ao dono as tentativas que o binding ja contou.
+    const binding = new BindingDeLimiteFalso(TETO_DO_LOGIN)
+    const ambiente = comLimitadores({ PANEL_LIMITER_LOGIN: comoBindingDeLimite(binding) })
+    const request = pedidoDoPainel(IP)
+
+    // O contador do binding vai ao teto pelo caminho do binding...
+    await tentar(TETO_DO_LOGIN, request, 'login', ambiente)
+    // ...e o da reserva vai ao teto pelo caminho sem binding. As duas metades
+    // de RL-08 ficam observaveis na mesma chave.
+    await tentar(TETO_DO_LOGIN, request, 'login')
+    expect((await limitar(request, env, 'login', AGORA)).permitido).toBe(false)
+
+    zerarLimite(request, ambiente, 'login')
+
+    // A metade que RL-08 cumpre: a reserva por tras do binding voltou ao inicio.
+    expect((await limitar(request, env, 'login', AGORA)).permitido).toBe(true)
+
+    // A metade que RL-08 NAO cumpre: pelo binding, a tentativa seguinte
+    // continua recusada, porque as dez que ele contou continuam contadas.
+    expect((await limitar(request, ambiente, 'login', AGORA)).permitido).toBe(false)
+    expect(binding.total).toBe(TETO_DO_LOGIN + 1)
   })
 
   test('RL-08: zerar um balde nao mexe no balde do vizinho', async () => {
@@ -346,9 +416,37 @@ describe('RL — o adaptador do binding', () => {
 
     expect(quebrado.chamadas).toBe(TETO_DO_LOGIN + 1)
     // A falha aparece no log com o codigo do projeto, e a chave — que carrega
-    // um IP — nao vai junto.
-    expect(console.linhas.every((linha) => linha.startsWith('painel: indisponivel'))).toBe(true)
+    // um IP — nao vai junto. O codigo e `limitador_indisponivel` e nao o
+    // `indisponivel` de §11.4: aquele e o do 503, e esta rota nao respondeu
+    // 503 — ela caiu na reserva e seguiu.
+    expect(
+      console.linhas.every((linha) => linha.startsWith('painel: limitador_indisponivel')),
+    ).toBe(true)
     expect(console.linhas.some((linha) => linha.includes(IP))).toBe(false)
+  })
+
+  test('RL-06: a queda do binding vira UMA linha de log por invocacao, e nao uma por chamada', async () => {
+    const quebrado = new BindingDeLimiteQuebrado()
+    const ambiente = comLimitadores({ PANEL_LIMITER_LOGIN: comoBindingDeLimite(quebrado) })
+    // O limitador da invocacao, construido UMA vez — como a escada de §11.3 o
+    // constroi por requisicao. Consultar o mesmo limitador tres vezes nao pode
+    // render tres linhas iguais: numa queda do binding sob rajada, o volume do
+    // log e pago pelo dono e nao acrescenta informacao nenhuma.
+    const limitador = limitadorDaFamilia(ambiente, 'login')
+    const chave = chaveDoBalde('login', pedidoDoPainel(IP))
+
+    const console = capturarConsole()
+    try {
+      await limitador.permitir(chave, AGORA)
+      await limitador.permitir(chave, AGORA)
+      await limitador.permitir(chave, AGORA)
+    } finally {
+      console.parar()
+    }
+
+    // As tres chamadas chegaram mesmo ao binding — nao houve atalho.
+    expect(quebrado.chamadas).toBe(3)
+    expect(console.linhas).toHaveLength(1)
   })
 
   test('RL-06: limitador indisponivel NAO tranca a parada', async () => {
@@ -429,6 +527,30 @@ describe('RL — a rota, com o duble injetado', () => {
       escritas: contador.escritas,
       batches: contador.batches,
     }).toEqual({ prepares: 0, escritas: 0, batches: 0 })
+  })
+
+  test('RL-01: o limitador vem ANTES da normalizacao — codigo malformado tambem para em 429', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    const recusa = new LimitadorFalso({ permitido: false, esperarSegundos: 60 })
+
+    // `nao-e-um-codigo` nao tem o formato de §10.11, entao a normalizacao o
+    // devolve como `null` e a rota responderia `403 codigo_incorreto`. Este
+    // teste fixa a ORDEM do bloco do limitador na escada: descer o bloco para
+    // depois da normalizacao troca este 429 por um 403 — e a rota passaria a
+    // gastar a normalizacao de todo lixo que um bot mandar antes de olhar o
+    // balde.
+    const resposta = await handleParada(
+      postDaParada(comOCodigo('nao-e-um-codigo'), { 'cf-connecting-ip': IP }),
+      env,
+      AGORA,
+      { limitador: recusa },
+    )
+
+    expect(resposta.status).toBe(429)
+    expect(resposta.headers.get('retry-after')).toBe('60')
+    // E a prova de que o limitador foi mesmo consultado: depois da
+    // normalizacao ele nem seria chamado neste caminho.
+    expect(recusa.chaves).toEqual([`parada:${IP}`])
   })
 
   test('RL-04: sem CF-Connecting-IP a rota da parada usa o balde global', async () => {
@@ -520,9 +642,16 @@ describe('RL — o webhook e a camada ausente', () => {
     expect(await estadoDaAutomacao()).toBe(0)
   })
 
-  test('RL-06: sem binding, quem assume e a reserva — e ela limita de verdade', async () => {
+  test('RL-06: sem binding a reserva assume, e recusa a partir do teto naquele isolate', async () => {
     // `limitadorDaFamilia` devolve a reserva, e nao um "sempre pode". A prova e
     // comportamental: a reserva recusa depois do teto, sem binding nenhum.
+    //
+    // O nome diz "naquele isolate" porque e so isso que este teste prova, e o
+    // residual esta escrito no `wrangler.jsonc`, onde o dono le (§13.4): sem
+    // os tres bindings cadastrados, o teto vale por isolate e por IP, entao
+    // trafego distribuido multiplica o numero por quantos IPs e quantos
+    // isolates ele alcancar. A camada continua valendo contra o bot de um IP
+    // so; ela nao compra cota contra uma botnet.
     const reserva = limitadorDaFamilia(env, 'login')
     const chave = chaveDoBalde('login', pedidoDoPainel(IP))
 

@@ -121,6 +121,15 @@ const FRASES = {
 } as const
 
 /**
+ * O unico cabecalho que esta rota acrescenta por conta propria.
+ *
+ * Escrito como tipo fechado, e nao como `Record<string, string>`: um mapa
+ * aberto deixaria um chamador futuro passar `content-security-policy` para o
+ * construtor de resposta da rota que §11.5 mais protege.
+ */
+type ExtrasDaPagina = { 'retry-after'?: string }
+
+/**
  * Uma das tres respostas, montada sem interpolar NADA que venha de fora.
  *
  * Nenhuma delas contem campo de configuracao, link, contagem ou estado da
@@ -132,7 +141,7 @@ const FRASES = {
  * ele nao serve para logar, ler nem editar. A ausencia do cabecalho e a trava,
  * e ela mora aqui porque este e o unico construtor de resposta desta rota.
  */
-function pagina(frase: string, status: number, extras: Record<string, string> = {}): Response {
+function pagina(frase: string, status: number, extras: ExtrasDaPagina = {}): Response {
   const corpo = `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -146,7 +155,11 @@ function pagina(frase: string, status: number, extras: Record<string, string> = 
 </html>
 `
 
-  return new Response(corpo, { status, headers: { ...cabecalhosDePagina(), ...extras } })
+  // Os cabecalhos de §11.5 vem DEPOIS dos extras, e a ordem e a trava: fosse
+  // o contrario, um chamador futuro sobrescreveria a CSP desta pagina passando
+  // uma chave com o mesmo nome. O tipo estreito de `extras` ja impede isso; a
+  // ordem impede tambem quando o tipo for alargado um dia.
+  return new Response(corpo, { status, headers: { ...extras, ...cabecalhosDePagina() } })
 }
 
 /**
@@ -324,6 +337,9 @@ export async function handleParada(
     // consome a cota de que o dono precisa; e uma falha do binding cai no
     // limitador de reserva (§13.4), nunca em porta trancada.
     const veredito = await limitar(request, env, 'parada', now, deps.limitador)
+    // Trava de RL-01: passado o teto da familia, a resposta e 429 com
+    // `Retry-After` — inclusive para um codigo malformado, porque o limitador
+    // esta ANTES da normalizacao e nao depois.
     if (!veredito.permitido) {
       console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 429, 'muitas_tentativas')
       return pagina(FRASES.indisponivel, 429, {

@@ -11,11 +11,17 @@ import type { Env as WorkerEnv } from '../src/types/env'
  *
  * `TEST_MIGRATIONS` nao existe em producao: e injetado pelo vitest.config.ts
  * e consumido por tests/setup.ts para montar o schema do D1 de teste.
+ *
+ * `TEST_BINDINGS_DO_WRANGLER` tambem nao existe em producao: e a lista de
+ * nomes de binding lida do wrangler.jsonc pelo vitest.config.ts, consumida
+ * pelo metateste META-04. Ela chega por binding porque o teste roda dentro do
+ * workerd, onde nao ha sistema de arquivos para ler o arquivo de novo.
  */
 declare global {
   namespace Cloudflare {
     interface Env extends WorkerEnv {
       TEST_MIGRATIONS: D1Migration[]
+      TEST_BINDINGS_DO_WRANGLER: string[]
     }
   }
 }

@@ -56,6 +56,9 @@ const JANELA_EM_MILISSEGUNDOS = JANELA_EM_SEGUNDOS * 1000
 /**
  * Teto de cada familia, copiado de §7.4.
  *
+ * Trava de RL-09: a parada tem limite proprio, e ele e maior que o do login.
+ * Igualar estes numeros nao quebraria nenhuma outra garantia — quebraria esta.
+ *
  * A parada e o codigo de recuperacao tem teto **mais generoso** que o login de
  * proposito: os dois sao caminho de emergencia, e um bot martelando a tela de
  * entrar nao pode consumir a cota de que o dono precisa quando algo ja deu
@@ -101,8 +104,10 @@ const LIBERADO: Veredito = { permitido: true, esperarSegundos: 0 }
 /**
  * A chave do balde, especificada em §7.4 porque ha teste que a afirma.
  *
- * Trava de RL-04 e de RL-10: o prefixo vem da familia da rota, o resto e o IP
- * que a Cloudflare carimba, e a ausencia do carimbo cai no balde global.
+ * Trava de RL-03, de RL-04 e de RL-10: o prefixo vem da familia da rota, o
+ * resto e o IP que a Cloudflare carimba — e e o IP dentro da chave que faz
+ * dois clientes diferentes nunca caem no mesmo balde. A ausencia do carimbo
+ * cai no balde global daquela familia, e continua limitada.
  */
 export function chaveDoBalde(familia: FamiliaDeLimite, request: Request): string {
   const carimbado = (request.headers.get('cf-connecting-ip') ?? '').trim()
@@ -125,9 +130,20 @@ interface Balde {
  * Sem ele, um atacante com muitos IPs faria a memoria do isolate crescer sem
  * limite — trocar um limitador por um vazamento de memoria seria um negocio
  * pessimo. Ao estourar, os baldes vencidos saem primeiro e, se ainda faltar
- * espaco, os mais antigos saem junto.
+ * espaco, sai o **menos recentemente tocado**.
+ *
+ * **Por que menos-recentemente-tocado e nao ordem de insercao.** Despejar por
+ * ordem de insercao poe justamente o balde do atacante na frente da fila: ele
+ * e o mais antigo por construcao, porque ele estourou o teto ANTES de comecar
+ * a encher a memoria. Nesse desenho, 9.999 chaves — um `/64` de IPv6 da isso
+ * de graca — zeravam o contador de quem o limitador existe para limitar. Com o
+ * despejo por recencia o defeito se inverte: quem esta martelando toca o
+ * proprio balde a cada tentativa e vira o ULTIMO a sair.
+ *
+ * Exportado porque o teste do despejo enche ate este numero: uma copia escrita
+ * a mao la envelheceria em silencio no dia em que este valor mudasse.
  */
-const TETO_DE_BALDES = 10_000
+export const TETO_DE_BALDES = 10_000
 
 /**
  * Janela fixa por isolate, para quando o binding nao existe (§13.4).
@@ -148,6 +164,12 @@ const TETO_DE_BALDES = 10_000
  * que maquinario ausente.
  */
 export class LimitadorDeReserva implements Limitador {
+  /**
+   * Um balde por chave (§7.4), e a ORDEM do `Map` e a ordem de recencia.
+   *
+   * Trava de RL-03: a chave e o que separa um cliente do outro — IPs
+   * diferentes nunca compartilham contador porque nunca compartilham entrada.
+   */
   private readonly baldes = new Map<string, Balde>()
 
   constructor(private readonly teto: number) {}
@@ -157,13 +179,15 @@ export class LimitadorDeReserva implements Limitador {
 
     const balde = this.baldes.get(chave)
     if (balde === undefined || this.venceu(balde, agora)) {
-      this.baldes.set(chave, { abertoEm: agora, contagem: 1 })
+      this.tocar(chave, { abertoEm: agora, contagem: 1 })
       return LIBERADO
     }
 
     const contagem = balde.contagem + 1
-    this.baldes.set(chave, { abertoEm: balde.abertoEm, contagem })
+    this.tocar(chave, { abertoEm: balde.abertoEm, contagem })
 
+    // Trava de RL-01: a tentativa seguinte ao teto dentro da janela e recusada,
+    // e e este `>` que vira o `429 muitas_tentativas` la na rota.
     if (contagem > this.teto) {
       return { permitido: false, esperarSegundos: this.faltam(balde, agora) }
     }
@@ -177,6 +201,11 @@ export class LimitadorDeReserva implements Limitador {
   /** Esquece todos os baldes. Existe para o isolamento entre testes (§8.10). */
   esquecerTudo(): void {
     this.baldes.clear()
+  }
+
+  /** Quantos baldes o isolate guarda agora. Existe para o teste do despejo. */
+  get baldesGuardados(): number {
+    return this.baldes.size
   }
 
   /**
@@ -197,7 +226,27 @@ export class LimitadorDeReserva implements Limitador {
     return Math.min(JANELA_EM_SEGUNDOS, Math.max(1, Math.ceil(restante / 1000)))
   }
 
-  /** Vencidos primeiro; se ainda estourar o teto, os mais antigos vao junto. */
+  /**
+   * Grava o balde e o move para o FIM da ordem do `Map`.
+   *
+   * O `delete` antes do `set` nao e enfeite: um `set` numa chave que ja existe
+   * mantem a posicao original, e sem a remocao a ordem do `Map` seria a de
+   * INSERCAO, nunca a de recencia. E a ordem do `Map` e exatamente o que
+   * `podar()` usa para escolher quem sai.
+   */
+  private tocar(chave: string, balde: Balde): void {
+    this.baldes.delete(chave)
+    this.baldes.set(chave, balde)
+  }
+
+  /**
+   * Vencidos primeiro; se ainda estourar o teto, sai o menos recentemente
+   * tocado — que e o primeiro da ordem do `Map`, mantida por `tocar()`.
+   *
+   * Quem esta martelando o painel toca o proprio balde a cada tentativa, entao
+   * ele e o ultimo candidato ao despejo: encher a memoria do isolate deixou de
+   * ser o jeito barato de zerar o proprio contador.
+   */
   private podar(agora: number): void {
     if (this.baldes.size < TETO_DE_BALDES) return
 
@@ -226,6 +275,17 @@ export class LimitadorDeReserva implements Limitador {
  * na rota que existe justamente para o dia em que tudo o mais falhou.
  */
 export class LimitadorDeBinding implements Limitador {
+  /**
+   * Se a queda do binding ja virou linha de log NESTA invocacao.
+   *
+   * Esta instancia nasce e morre dentro de uma invocacao, entao o campo limita
+   * o log a UMA linha por invocacao, e nao uma por chamada: a escada de §11.3
+   * pode consultar o limitador mais de uma vez, e a segunda linha nao
+   * acrescentaria informacao nenhuma — so volume nos Workers Logs do dono,
+   * pago por ele, no exato momento em que alguem esta martelando a rota.
+   */
+  private jaRegistrou = false
+
   constructor(
     private readonly binding: RateLimit,
     private readonly reserva: Limitador,
@@ -237,11 +297,31 @@ export class LimitadorDeBinding implements Limitador {
       if (success) return LIBERADO
       return { permitido: false, esperarSegundos: JANELA_EM_SEGUNDOS }
     } catch (cause) {
-      // Mesmo padrao do resto do painel: o codigo vai para o log, o valor
-      // nunca. A chave carrega um IP e por isso nao entra na linha.
-      console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
+      this.registrarQueda(cause)
       return this.reserva.permitir(chave, agora)
     }
+  }
+
+  /**
+   * A queda do binding no log, uma vez so por invocacao.
+   *
+   * O codigo e `limitador_indisponivel`, e nao o `indisponivel` da tabela de
+   * §11.4: aquele e o codigo do `503`, e esta rota nao responde `503` aqui —
+   * ela cai no limitador de reserva e segue. Usar a mesma grafia para as duas
+   * coisas faria o log dizer "o servico caiu" toda vez que uma camada
+   * OPCIONAL falhou. A grafia nova sobe para a tabela de §11.4 na Task 16.
+   *
+   * Mesmo padrao do resto do painel: o codigo vai para o log, o valor nunca. A
+   * chave carrega um IP e por isso nao entra na linha (§11.7).
+   */
+  private registrarQueda(cause: unknown): void {
+    if (this.jaRegistrou) return
+    this.jaRegistrou = true
+    console.error(
+      'painel:',
+      'limitador_indisponivel',
+      cause instanceof Error ? cause.message : cause,
+    )
   }
 
   /**
