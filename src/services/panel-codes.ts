@@ -66,6 +66,19 @@ const SO_DO_ALFABETO = /^[0-9ABCDEFGHJKMNPQRSTVWXYZ]+$/
 const SEPARADORES = /[\s-]+/g
 
 /**
+ * O comparador de PRODUCAO, exportado para que um teste possa afirmar QUAL e.
+ *
+ * Trava de STOP-10, a metade que o comparador duble nao alcanca. O duble prova
+ * que nao existe um segundo caminho de comparacao escondido na rota; ele nao
+ * consegue provar que o padrao e `timingSafeEqual`, porque comparacao em tempo
+ * constante e, por construcao, funcionalmente IDENTICA a `===` — nenhum teste
+ * de caixa-preta separa as duas. Sobra a identidade: este binding e o unico
+ * lugar do projeto que nomeia o comparador do caminho dos codigos, e
+ * `expect(COMPARADOR_PADRAO).toBe(timingSafeEqual)` e o que o congela.
+ */
+export const COMPARADOR_PADRAO: (a: string, b: string) => boolean = timingSafeEqual
+
+/**
  * Sorteia UM codigo do tipo pedido.
  *
  * `256 % 32 === 0`, entao `byte % 32` e uniforme: nao ha vies de modulo a
@@ -167,10 +180,12 @@ export async function hashDoCodigo(
 /**
  * O codigo normalizado casa com algum dos hashes vivos?
  *
- * Trava de STOP-10: a comparacao passa SEMPRE por `timingSafeEqual`, nunca por
- * `===`. `comparar` e parametro com o padrao de producao exatamente para que o
- * teste consiga injetar um duble e provar que nao existe um segundo caminho de
- * comparacao escondido — e nao para que alguem troque a funcao em producao.
+ * Trava de STOP-10: a comparacao passa SEMPRE por `COMPARADOR_PADRAO`, que e
+ * `timingSafeEqual`, nunca por `===`. `comparar` e parametro com esse padrao
+ * exatamente para que o teste consiga injetar um duble e provar que nao existe
+ * um segundo caminho de comparacao escondido — e nao para que alguem troque a
+ * funcao em producao. Que valor o padrao tem e afirmado a parte, pela
+ * identidade de `COMPARADOR_PADRAO`.
  *
  * O laco NAO sai no primeiro acerto: sair cedo faria o tempo de resposta
  * contar a posicao da linha na tabela. Sao no maximo sete hashes.
@@ -180,7 +195,7 @@ export async function conferirCodigo(
   tipo: TipoDeCodigo,
   chaveDosCodigos: Uint8Array,
   hashesVivos: readonly string[],
-  comparar: (a: string, b: string) => boolean = timingSafeEqual,
+  comparar: (a: string, b: string) => boolean = COMPARADOR_PADRAO,
 ): Promise<boolean> {
   const esperado = await hashDoCodigo(chaveDosCodigos, tipo, normalizado)
 

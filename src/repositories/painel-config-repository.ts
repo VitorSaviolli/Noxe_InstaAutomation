@@ -179,6 +179,17 @@ export class PainelConfigRepository {
    * colateral: quem estava com o formulario aberto e obrigado a recarregar e
    * ver que a automacao foi parada (§8.8).
    *
+   * O `WHERE painel_config.enabled = 1` do `DO UPDATE` e o que impede a
+   * RAJADA de contar errado. A rota ja evita a segunda parada lendo o estado
+   * antes (STOP-08), mas essa leitura e uma decisao fora do banco: cinco POSTs
+   * simultaneos com o codigo certo leem `enabled = 1` os cinco e mandam cinco
+   * `UPDATE`, e a versao pularia de 1 para 6 — quebrando o carimbo de "versao
+   * resultante" de §8.8, que e a chave do log de auditoria. Com a clausula, so
+   * o primeiro muda a linha; os outros quatro sao no-op de zero linha alterada.
+   * A direcao continua segura nos dois casos (o resultado e `enabled = 0`), e
+   * ela nao toca o ramo `INSERT`: um fork que nunca abriu o painel continua
+   * materializando a linha ja desligada.
+   *
    * Devolve statement, e nao grava: ele vai no MESMO lote da linha de
    * auditoria. Sem log, sem mudanca.
    */
@@ -195,7 +206,8 @@ export class PainelConfigRepository {
            enabled              = 0,
            parado_por_codigo_em = excluded.parado_por_codigo_em,
            versao               = painel_config.versao + 1,
-           atualizado_em        = excluded.atualizado_em`,
+           atualizado_em        = excluded.atualizado_em
+         WHERE painel_config.enabled = 1`,
       )
       .bind(
         SINGLETON_ID,

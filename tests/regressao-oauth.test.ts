@@ -5,7 +5,15 @@ import { decrypt } from '../src/security/encryption'
 import { createState, STATE_TTL_MS, validateState } from '../src/security/oauth-state'
 import { storeAccessToken } from '../src/services/token-manager'
 import { limparBanco } from './fixtures/banco'
-import { AGORA, IG_USER_ID, pedir, RAIZ, responder, USERNAME_CONTA } from './fixtures/dubles'
+import {
+  AGORA,
+  capturarConsole,
+  IG_USER_ID,
+  pedir,
+  RAIZ,
+  responder,
+  USERNAME_CONTA,
+} from './fixtures/dubles'
 
 /**
  * REG — regressao do fluxo OAuth de instalacao.
@@ -308,33 +316,4 @@ async function contarCodigos(): Promise<number> {
     total: number
   }>()
   return linha?.total ?? -1
-}
-
-/**
- * Captura o que sai pelo `console` enquanto um trecho roda.
- *
- * Troca as tres funcoes por versoes que guardam o texto e devolve `parar()`
- * para restaurar — nao e mock de modulo, e o unico jeito de transformar "o
- * corpo desta rota nunca e logado" (§10.11) numa afirmacao verificavel.
- */
-function capturarConsole(): { linhas: string[]; parar: () => void } {
-  const linhas: string[] = []
-  const originais = { log: console.log, warn: console.warn, error: console.error }
-
-  const guardar = (...partes: unknown[]) => {
-    linhas.push(partes.map((parte) => String(parte)).join(' '))
-  }
-
-  console.log = guardar
-  console.warn = guardar
-  console.error = guardar
-
-  return {
-    linhas,
-    parar: () => {
-      console.log = originais.log
-      console.warn = originais.warn
-      console.error = originais.error
-    },
-  }
 }

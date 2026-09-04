@@ -10,16 +10,19 @@ import {
 import {
   CAMINHO_DA_PARADA,
   CAMINHO_DO_FORMULARIO,
+  handleFormularioDeParada,
   handleGerarCodigos,
   handleParada,
   PAGINA_DO_FORMULARIO,
   TETO_DO_CORPO_DA_PARADA,
 } from '../src/routes/painel/parada'
+import { timingSafeEqual } from '../src/security/constant-time'
 import { evaluateComment } from '../src/services/automation'
 import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../src/services/config-store'
 import {
   ALFABETO_DOS_CODIGOS,
   CODIGOS_DE_RECUPERACAO,
+  COMPARADOR_PADRAO,
   formatarCodigo,
   normalizarCodigo,
   sortearCodigo,
@@ -28,7 +31,16 @@ import {
 import type { Env } from '../src/types/env'
 import type { CommentEvent } from '../src/types/meta'
 import { gravarConfig, LINHA_DE_CONFIG_VALIDA, limparBanco } from './fixtures/banco'
-import { AGORA, comoD1, D1BatchQuebrado, D1Contador, IG_USER_ID, RAIZ } from './fixtures/dubles'
+import {
+  AGORA,
+  capturarConsole,
+  comoD1,
+  D1BatchQuebrado,
+  D1Contador,
+  D1SegundoBatchQuebrado,
+  IG_USER_ID,
+  RAIZ,
+} from './fixtures/dubles'
 
 /**
  * STOP — a parada de emergencia (§13.2, 14 garantias).
@@ -148,6 +160,71 @@ class D1ForaDoAr {
   }
 }
 
+/**
+ * Corpo `chunked` que entrega pedacos sob demanda e CONTA quantos entregou.
+ *
+ * A contagem e a prova de que o teto de 1 KB corta durante a leitura: um
+ * leitor que bufferiza o corpo inteiro antes de medir puxa os 40 pedacos, um
+ * que corta no caminho puxa meia duzia.
+ */
+class CorpoEmPedacos {
+  entregues = 0
+
+  constructor(
+    private readonly pedacos: number,
+    private readonly tamanho: number,
+  ) {}
+
+  stream(): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      pull: (controlador) => {
+        if (this.entregues >= this.pedacos) {
+          controlador.close()
+          return
+        }
+        this.entregues++
+        controlador.enqueue(new Uint8Array(this.tamanho).fill(0x78))
+      },
+    })
+  }
+}
+
+/**
+ * Os cabecalhos de pagina de §11.5, escritos AQUI de novo, valor a valor.
+ *
+ * A duplicacao e o teste, pelo mesmo motivo das tres paginas: importar a
+ * constante de `parada.ts` provaria apenas que o arquivo e igual a ele mesmo.
+ * `form-action 'self'` e a linha que mais importa — a pagina do formulario e
+ * onde a pessoa digita o codigo, e e ela que impede um `action` reescrito de
+ * postar o codigo para fora. A etapa 9 move isto para `html.ts`; este mapa e o
+ * que torna aquele refactor visivel.
+ */
+const CABECALHOS_DE_PAGINA: Record<string, string> = {
+  'cache-control': 'private, no-store',
+  'content-security-policy':
+    "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; " +
+    "script-src 'self'; style-src 'self'; " +
+    "img-src 'self' data: https://*.cdninstagram.com https://*.fbcdn.net; " +
+    "connect-src 'self'; font-src 'self'; object-src 'none'; media-src 'none'; " +
+    "require-trusted-types-for 'script'; upgrade-insecure-requests",
+  'content-type': 'text/html; charset=utf-8',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'permissions-policy':
+    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), ' +
+    'payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)',
+  'referrer-policy': 'no-referrer',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  vary: 'Cookie',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+}
+
+/** O mapa de cabecalhos de uma resposta, em minusculas, como o teste compara. */
+function cabecalhosDe(resposta: Response): Record<string, string> {
+  return Object.fromEntries(resposta.headers)
+}
+
 /** Comparador duble: registra o que foi comparado e responde o que mandarem. */
 class ComparadorFalso {
   readonly comparacoes: Array<[string, string]> = []
@@ -187,18 +264,57 @@ describe('STOP — a parada de emergencia', () => {
     const requisicao = postDaParada(comOCodigo(parada))
     expect(requisicao.headers.get('cookie')).toBeNull()
 
-    const resposta = await handleParada(requisicao, env, AGORA)
+    const contador = new D1Contador(env.DB)
+    const resposta = await handleParada(requisicao, { ...env, DB: comoD1(contador) }, AGORA)
 
     expect(resposta.status).toBe(200)
     expect(await resposta.text()).toBe(PAGINA_PARADA)
     // E nao emite sessao nenhuma de volta: parar nao e entrar.
     expect(resposta.headers.get('set-cookie')).toBeNull()
 
+    // A contabilidade do caminho de SUCESSO, que e a que faltava (§9.10):
+    // duas leituras (hashes vivos, estado da automacao) e duas escritas (o
+    // `UPDATE` e a linha de auditoria) dentro de UM unico `db.batch()`.
+    expect({
+      prepares: contador.prepares,
+      escritas: contador.escritas,
+      batches: contador.batches,
+    }).toEqual({ prepares: 4, escritas: 2, batches: 1 })
+
     expect(await linhaDeConfig()).toEqual({
       enabled: 0,
       versao: 2,
       parado_por_codigo_em: AGORA,
     })
+  })
+
+  test('STOP-01: a parada grava em UM lote so — o segundo batch() nao existe', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    const { parada } = await gerarCodigos()
+
+    // O contador acima diz `batches: 1`, mas contagem sozinha nao separa "um
+    // lote" de "dois lotes que gravam a mesma coisa" quando alguem olha so o
+    // estado final. Este duble separa: o segundo `db.batch()` estoura. Quebrar
+    // §8.8 no sentido "grava a config, DEPOIS tenta logar" deixa de passar
+    // verde — a resposta vira a terceira frase em vez de "Pronto".
+    const banco = new D1SegundoBatchQuebrado(env.DB)
+    const resposta = await handleParada(
+      postDaParada(comOCodigo(parada)),
+      { ...env, DB: banco as unknown as D1Database },
+      AGORA,
+    )
+
+    expect(resposta.status).toBe(200)
+    expect(await resposta.text()).toBe(PAGINA_PARADA)
+    expect(banco.batches).toBe(1)
+
+    // E as duas metades foram gravadas juntas, nao uma de cada vez.
+    expect(await linhaDeConfig()).toEqual({
+      enabled: 0,
+      versao: 2,
+      parado_por_codigo_em: AGORA,
+    })
+    expect(await linhasDeAuditoria()).toHaveLength(2)
   })
 
   test('STOP-01: sem linha de configuracao, a parada materializa a linha desligada', async () => {
@@ -284,15 +400,27 @@ describe('STOP — a parada de emergencia', () => {
     await gerarCodigos()
 
     const contador = new D1Contador(env.DB)
-    const resposta = await handleParada(
-      // Bem formado — 16 caracteres do alfabeto —, so que nao e o codigo.
-      postDaParada(comOCodigo('0000000000000000')),
-      { ...env, DB: comoD1(contador) },
-      AGORA,
-    )
+    const registrado = capturarConsole()
+    let resposta: Response
+    try {
+      resposta = await handleParada(
+        // Bem formado — 16 caracteres do alfabeto —, so que nao e o codigo.
+        postDaParada(comOCodigo('0000000000000000')),
+        { ...env, DB: comoD1(contador) },
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
 
     expect(resposta.status).toBe(403)
     expect(await resposta.text()).toBe(PAGINA_CODIGO_INCORRETO)
+
+    // O NOME deste teste promete `codigo_incorreto`, entao o teste confere o
+    // codigo que foi registrado — e nao so o status. `credencial_invalida` NAO
+    // se aplica a esta rota (§10.12, ultimo paragrafo), e §11.4 se declara a
+    // unica tabela: uma grafia de fora dela nao pode passar verde aqui.
+    expect(registrado.linhas).toEqual([`painel: POST ${CAMINHO_DA_PARADA} 403 codigo_incorreto`])
 
     expect(contador.escritas).toBe(0)
     expect(contador.batches).toBe(0)
@@ -427,7 +555,45 @@ describe('STOP — a parada de emergencia', () => {
     expect(await linhasDeAuditoria()).toHaveLength(2)
   })
 
-  test('STOP-09: o codigo de parada nao serve para logar, ler nem editar', async () => {
+  test('STOP-08: em rajada, cinco POSTs simultaneos param a automacao UMA vez', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    const { parada } = await gerarCodigos()
+
+    // A leitura de `lerEstadoDaAutomacao` e uma decisao fora do banco: cinco
+    // requisicoes simultaneas leem `enabled = 1` as cinco e mandam cinco
+    // `UPDATE`. Sem o `WHERE painel_config.enabled = 1` do `DO UPDATE`, a
+    // versao pulava de 1 para 6 — e a versao e o carimbo que §8.8 usa como
+    // chave do log de auditoria e como trava otimista da tela.
+    const respostas = await Promise.all(
+      Array.from({ length: 5 }, () => handleParada(postDaParada(comOCodigo(parada)), env, AGORA)),
+    )
+
+    for (const [i, resposta] of respostas.entries()) {
+      expect(`${i}=${resposta.status}`).toBe(`${i}=200`)
+    }
+
+    // A direcao e segura em qualquer intercalacao, e a versao resultante e
+    // exatamente uma a mais que a anterior.
+    expect(await linhaDeConfig()).toEqual({
+      enabled: 0,
+      versao: 2,
+      parado_por_codigo_em: AGORA,
+    })
+
+    // E nenhuma linha de auditoria carimba uma versao que nunca existiu.
+    const acionamentos = (await linhasDeAuditoria()).filter((l) => l.acao === 'parada_acionada')
+    for (const [i, linha] of acionamentos.entries()) {
+      expect(`${i}=${linha.versao}`).toBe(`${i}=2`)
+    }
+  })
+
+  test('STOP-09: o codigo de parada nao emite sessao e so muda enabled', async () => {
+    // O nome antigo prometia "nao serve para logar, ler nem editar", e o corpo
+    // so prova a metade "editar" (mais a ausencia de cookie). As outras duas so
+    // ganham significado quando as rotas de sessao existirem: e com a etapa 9
+    // que este teste ganha a metade "logar" — tentar `POST /painel/sessao` com
+    // o codigo de parada — e a metade "ler" — tentar `GET /painel` com ele.
+    // Nome que promete mais do que o corpo prova e pior que teste ausente.
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada, recuperacao } = await gerarCodigos()
 
@@ -459,6 +625,14 @@ describe('STOP — a parada de emergencia', () => {
   test('STOP-10: a comparacao passa por timingSafeEqual (comparador duble)', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada } = await gerarCodigos()
+
+    // A metade que o duble NAO alcanca. Comparacao em tempo constante e, por
+    // construcao, funcionalmente identica a `===`: nenhum teste de caixa-preta
+    // separa as duas, e sem esta linha trocar o padrao por `(a, b) => a === b`
+    // passava verde com o nome do teste dizendo `timingSafeEqual`. O binding
+    // exportado e o unico lugar do projeto que nomeia o comparador deste
+    // caminho, e e ele que fica congelado aqui.
+    expect(COMPARADOR_PADRAO).toBe(timingSafeEqual)
 
     // Um comparador que sempre diz "nao" recusa ATE o codigo certo: nao existe
     // um segundo caminho de comparacao escondido na rota.
@@ -510,6 +684,46 @@ describe('STOP — a parada de emergencia', () => {
     expect([falha.status, errado.status, certo.status]).toEqual([503, 403, 200])
   })
 
+  test('STOP-11: as tres respostas e o formulario carregam os cabecalhos de §11.5', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    const { parada } = await gerarCodigos()
+
+    const falha = await handleParada(
+      postDaParada(comOCodigo(parada)),
+      { ...env, DB: new D1ForaDoAr() as unknown as D1Database },
+      AGORA,
+    )
+    const errado = await handleParada(postDaParada(comOCodigo('0000000000000000')), env, AGORA)
+    const certo = await handleParada(postDaParada(comOCodigo(parada)), env, AGORA)
+    const formulario = handleFormularioDeParada(new Request(`${RAIZ}${CAMINHO_DO_FORMULARIO}`))
+
+    // O mapa INTEIRO, e nao "contem CSP": `toEqual` pega tanto a linha apagada
+    // quanto a linha acrescentada. Sem isto, apagar CSP, HSTS, X-Frame-Options,
+    // Referrer-Policy, COOP/CORP e Permissions-Policy das quatro respostas
+    // passava verde na suite inteira.
+    for (const [nome, resposta] of [
+      ['503', falha],
+      ['403', errado],
+      ['200', certo],
+      ['formulario', formulario],
+    ] as const) {
+      expect(`${nome}=${JSON.stringify(cabecalhosDe(resposta))}`).toBe(
+        `${nome}=${JSON.stringify(CABECALHOS_DE_PAGINA)}`,
+      )
+    }
+
+    // Duas ausencias que a igualdade acima ja garante, escritas por extenso
+    // porque sao proibicoes, e nao valores: `Cross-Origin-Embedder-Policy:
+    // require-corp` quebraria as miniaturas do `fbcdn.net` (§11.5), e
+    // `Access-Control-*` nao pode existir em hipotese nenhuma.
+    for (const resposta of [falha, errado, certo, formulario]) {
+      expect(resposta.headers.get('cross-origin-embedder-policy')).toBeNull()
+      for (const [nome] of resposta.headers) {
+        expect(nome.startsWith('access-control-')).toBe(false)
+      }
+    }
+  })
+
   test('STOP-12: a pagina nao informa se existe codigo cadastrado', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
 
@@ -553,7 +767,7 @@ describe('STOP — a parada de emergencia', () => {
     expect(await linhasDeAuditoria()).toHaveLength(1)
   })
 
-  test('STOP-14: PANEL_RP_ID ausente derruba o painel mas nao a parada', async () => {
+  test('STOP-14: PANEL_RP_ID ausente nao derruba a parada (o 503 do painel chega com a etapa 9)', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada } = await gerarCodigos()
 
@@ -621,13 +835,79 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
 
     const enchimento = 'x'.repeat(TETO_DO_CORPO_DA_PARADA + 1)
     const contador = new D1Contador(env.DB)
+    const registrado = capturarConsole()
+    let resposta: Response
+    try {
+      resposta = await handleParada(
+        postDaParada(`${comOCodigo(parada)}&sobra=${enchimento}`),
+        { ...env, DB: comoD1(contador) },
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    expect(resposta.status).toBe(413)
+    expect(contador.prepares).toBe(0)
+    expect((await linhaDeConfig())?.enabled).toBe(1)
+    // O status vem de §11.4 e a frase de §10.12 — e o codigo registrado tem
+    // que ser o da tabela, nao um sinonimo qualquer.
+    expect(registrado.linhas).toEqual([`painel: POST ${CAMINHO_DA_PARADA} 413 corpo_grande_demais`])
+  })
+
+  test('STOP: corpo chunked sem content-length e cortado DURANTE a leitura', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    await gerarCodigos()
+
+    // Um POST `chunked` nao tem `content-length`: o portao barato nao vale, e
+    // e este o caminho em que "capado em 1 KB" precisa ser teto de verdade. O
+    // contador de pedacos e a prova de que o corte acontece DURANTE a leitura
+    // — com `arrayBuffer()` o corpo inteiro (10 KB) seria bufferizado na
+    // memoria do isolate primeiro, e os 40 pedacos sairiam todos.
+    const corpo = new CorpoEmPedacos(40, 256)
+    const contador = new D1Contador(env.DB)
     const resposta = await handleParada(
-      postDaParada(`${comOCodigo(parada)}&sobra=${enchimento}`),
+      new Request(`${RAIZ}${CAMINHO_DA_PARADA}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: corpo.stream(),
+      }),
       { ...env, DB: comoD1(contador) },
       AGORA,
     )
 
     expect(resposta.status).toBe(413)
+    expect(await resposta.text()).toBe(PAGINA_CODIGO_INCORRETO)
+    expect(contador.prepares).toBe(0)
+    // Parou perto do teto, e nao no fim do corpo.
+    expect(corpo.entregues).toBeLessThan(10)
+  })
+
+  test('STOP: a conexao que cai no meio do corpo devolve a terceira frase, nunca 500', async () => {
+    await gravarConfig(env.DB, { enabled: 1 })
+    await gerarCodigos()
+
+    // 3G que cai no meio do POST — o celular com sinal ruim e exatamente o
+    // cenario que §10.12 nomeia. A leitura do corpo tem que morar dentro do
+    // `try`: fora dele isto virava `500 Internal Server Error`, e o dono ficava
+    // sem saber se a automacao parou.
+    const contador = new D1Contador(env.DB)
+    const resposta = await handleParada(
+      new Request(`${RAIZ}${CAMINHO_DA_PARADA}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new ReadableStream({
+          start(controlador) {
+            controlador.error(new Error('conexao caiu'))
+          },
+        }),
+      }),
+      { ...env, DB: comoD1(contador) },
+      AGORA,
+    )
+
+    expect(resposta.status).toBe(503)
+    expect(await resposta.text()).toBe(PAGINA_INDISPONIVEL)
     expect(contador.prepares).toBe(0)
     expect((await linhaDeConfig())?.enabled).toBe(1)
   })
@@ -654,19 +934,127 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
     const { parada } = await gerarCodigos()
 
     const contador = new D1Contador(env.DB)
-    const resposta = await handleParada(
-      new Request(`${RAIZ}${CAMINHO_DA_PARADA}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ codigo: parada }),
-      }),
-      { ...env, DB: comoD1(contador) },
-      AGORA,
-    )
+    const registrado = capturarConsole()
+    let resposta: Response
+    try {
+      resposta = await handleParada(
+        new Request(`${RAIZ}${CAMINHO_DA_PARADA}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ codigo: parada }),
+        }),
+        { ...env, DB: comoD1(contador) },
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
 
     expect(resposta.status).toBe(415)
     expect(contador.prepares).toBe(0)
     expect((await linhaDeConfig())?.enabled).toBe(1)
+    expect(registrado.linhas).toEqual([`painel: POST ${CAMINHO_DA_PARADA} 415 tipo_nao_suportado`])
+  })
+
+  test('STOP: o content-type e comparado sem caixa, como manda a RFC 9110', async () => {
+    // Media type e case-INSENSITIVE. Recusar `Application/...` mostraria "Esse
+    // codigo nao confere" para um codigo que confere — a mentira que o
+    // argumento (c) de §10.12 existe para impedir.
+    for (const grafia of [
+      'application/x-www-form-urlencoded',
+      'Application/x-www-form-urlencoded',
+      'APPLICATION/X-WWW-FORM-URLENCODED',
+      ' application/x-www-form-urlencoded; charset=UTF-8',
+    ]) {
+      await limparBanco(env.DB)
+      invalidarCacheDeConfig()
+      await gravarConfig(env.DB, { enabled: 1 })
+      const { parada } = await gerarCodigos()
+
+      const resposta = await handleParada(
+        postDaParada(comOCodigo(parada), { 'content-type': grafia }),
+        env,
+        AGORA,
+      )
+
+      expect(`${grafia}=${resposta.status}`).toBe(`${grafia}=200`)
+      expect(`${grafia}=${(await linhaDeConfig())?.enabled}`).toBe(`${grafia}=0`)
+    }
+
+    // E o que continua de fora e o tipo ERRADO, nao a caixa dele.
+    const recusado = await handleParada(
+      postDaParada('codigo=0000000000000000', { 'content-type': 'Application/JSON' }),
+      env,
+      AGORA,
+    )
+    expect(recusado.status).toBe(415)
+  })
+
+  test('STOP: o 405 do painel registra metodo_nao_permitido', async () => {
+    const registrado = capturarConsole()
+    let resposta: Response
+    try {
+      resposta = await handleParada(
+        new Request(`${RAIZ}${CAMINHO_DA_PARADA}`, { method: 'DELETE' }),
+        env,
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    expect(resposta.status).toBe(405)
+    expect(resposta.headers.get('allow')).toBe('GET, POST')
+    // §11.4 tem a linha `405 metodo_nao_permitido`, e ate agora esta rota
+    // devolvia o status sem registrar o codigo.
+    expect(registrado.linhas).toEqual([
+      `painel: DELETE ${CAMINHO_DA_PARADA} 405 metodo_nao_permitido`,
+    ])
+
+    const noFormulario = capturarConsole()
+    let doAsset: Response
+    try {
+      doAsset = handleFormularioDeParada(
+        new Request(`${RAIZ}${CAMINHO_DO_FORMULARIO}`, { method: 'POST' }),
+      )
+    } finally {
+      noFormulario.parar()
+    }
+
+    expect(doAsset.status).toBe(405)
+    expect(noFormulario.linhas).toEqual([
+      `painel: POST ${CAMINHO_DO_FORMULARIO} 405 metodo_nao_permitido`,
+    ])
+  })
+
+  test('STOP: /setup/painel/codigos nao se anuncia como painel no log (Ruling 19)', async () => {
+    const registrado = capturarConsole()
+    let semBearer: Response
+    let metodoErrado: Response
+    try {
+      semBearer = await handleGerarCodigos(
+        new Request(`${RAIZ}/setup/painel/codigos`, { method: 'POST' }),
+        env,
+        AGORA,
+      )
+      metodoErrado = await handleGerarCodigos(
+        new Request(`${RAIZ}/setup/painel/codigos`, { method: 'GET' }),
+        env,
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    // A resposta em texto + 401 casa com as irmas `/setup/*` (`oauth.ts:52`).
+    expect(semBearer.status).toBe(401)
+    expect(await semBearer.text()).toBe('Nao autorizado')
+    expect(metodoErrado.status).toBe(405)
+
+    // E, como elas, esta rota NAO loga: §11.4 e a tabela do painel, e a grafia
+    // `nao_autorizado` nao existe nela. Quem nao e painel nao se anuncia como
+    // `painel:` (Ruling 19).
+    expect(registrado.linhas).toEqual([])
   })
 
   test('STOP: OPTIONS cai em 405 com Allow, e nunca em Access-Control-*', async () => {
@@ -913,11 +1301,23 @@ describe('AUDITORIA — a poda de 500 linhas no cron', () => {
     await encherAuditoria(503)
 
     const contador = new D1Contador(env.DB)
-    await runScheduledTasks({ ...env, DB: comoD1(contador) }, AGORA)
+    const registrado = capturarConsole()
+    try {
+      await runScheduledTasks({ ...env, DB: comoD1(contador) }, AGORA)
+    } finally {
+      registrado.parar()
+    }
 
     expect(await contarAuditoria()).toBe(500)
     // A poda escreve so quando ha o que apagar.
     expect(contador.escritas).toBe(1)
+
+    // §11.7: argumentos separados, SEM template string com dado variavel
+    // dentro. O numero de linhas e inofensivo — o que a regra impede e o
+    // precedente de existir um `console` do painel que interpola valor.
+    expect(registrado.linhas.filter((linha) => linha.startsWith('painel:'))).toEqual([
+      'painel: auditoria_podada 3',
+    ])
 
     const segunda = new D1Contador(env.DB)
     await runScheduledTasks({ ...env, DB: comoD1(segunda) }, AGORA)

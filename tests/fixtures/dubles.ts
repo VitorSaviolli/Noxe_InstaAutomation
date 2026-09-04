@@ -212,6 +212,74 @@ export class D1BatchQuebrado {
   }
 }
 
+/**
+ * D1 que deixa o PRIMEIRO `batch()` passar e estoura no segundo.
+ *
+ * Existe para provar que uma rota grava em UM lote so. "Grava a config,
+ * depois tenta logar" — a variante que §8.8 proibe em letras grandes — passa
+ * verde por qualquer contagem que olhe so o resultado final, porque os dois
+ * lotes gravam a mesma coisa. Aqui o segundo lote nao existe, e se alguem o
+ * criar a rota devolve erro em vez de sucesso.
+ */
+export class D1SegundoBatchQuebrado {
+  batches = 0
+
+  constructor(private readonly real: D1Database) {}
+
+  prepare(sql: string): D1PreparedStatement {
+    return this.real.prepare(sql)
+  }
+
+  batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    this.batches++
+    if (this.batches > 1) {
+      return Promise.reject(new Error('segundo db.batch() nao pode existir'))
+    }
+    return this.real.batch<T>(statements)
+  }
+
+  exec(query: string): Promise<D1ExecResult> {
+    return this.real.exec(query)
+  }
+
+  dump(): Promise<ArrayBuffer> {
+    return this.real.dump()
+  }
+}
+
+/**
+ * Captura tudo o que passa pelo `console` durante um trecho de teste.
+ *
+ * Mora no fixture porque duas suites precisam da MESMA captura: a de OAuth
+ * prova que o corpo dos codigos nunca vai para o log, e a da parada prova que
+ * o codigo de erro registrado e exatamente o de §11.4. Duas copias
+ * divergiriam na primeira vez que uma delas ganhasse um nivel novo.
+ *
+ * Sempre com `try/finally`: um `expect` que falha no meio deixaria o console
+ * do processo trocado para todas as suites seguintes.
+ */
+export function capturarConsole(): { linhas: string[]; parar: () => void } {
+  const linhas: string[] = []
+  const originais = { log: console.log, warn: console.warn, error: console.error }
+
+  const guardar = (...partes: unknown[]) => {
+    linhas.push(partes.map((parte) => String(parte)).join(' '))
+  }
+
+  console.log = guardar
+  console.warn = guardar
+  console.error = guardar
+
+  return {
+    linhas,
+    parar: () => {
+      console.log = originais.log
+      console.warn = originais.warn
+      console.error = originais.error
+    },
+  }
+}
+
 /** Roda o Worker de verdade e espera o `waitUntil` terminar. */
 export async function responder(request: Request, env: Env): Promise<Response> {
   const ctx = createExecutionContext()

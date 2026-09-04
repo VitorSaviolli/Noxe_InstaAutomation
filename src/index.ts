@@ -379,18 +379,21 @@ export async function runScheduledTasks(
  *
  * Por ultimo, e num `try` proprio: a poda e higiene de armazenamento, e uma
  * falha nela nao pode derrubar a renovacao do token nem a fila de pendentes.
+ *
+ * Os dois `console` daqui seguem o formato de §11.7 — argumentos separados,
+ * **sem template string com dado variavel dentro**. O numero de linhas
+ * apagadas e inofensivo; o que a regra impede e o PRECEDENTE: enquanto nao
+ * existir no painel um `console` que interpole valor, nao existe o caminho em
+ * que alguem interpola por engano um `destinationUrl` ou um username.
  */
 async function podarAuditoria(env: Env): Promise<void> {
   try {
     const apagadas = await new PainelAuditoriaRepository(env.DB).podar()
     if (apagadas > 0) {
-      console.log(`Auditoria podada: ${apagadas} linha(s) antiga(s) removida(s)`)
+      console.log('painel:', 'auditoria_podada', apagadas)
     }
   } catch (cause) {
-    console.error(
-      'Falha ao podar a auditoria do painel:',
-      cause instanceof Error ? cause.message : cause,
-    )
+    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
   }
 }
 

@@ -125,6 +125,11 @@ const FRASES = {
  * Nenhuma delas contem campo de configuracao, link, contagem ou estado da
  * conta — e nenhuma delas diz se existe codigo cadastrado. Trava de STOP-05,
  * STOP-11 e STOP-12.
+ *
+ * Trava de STOP-01 e de STOP-09: a `Response` sai SEM `set-cookie`, em todas
+ * as tres. Parar nao e entrar — o codigo de parada nao vira sessao, e por isso
+ * ele nao serve para logar, ler nem editar. A ausencia do cabecalho e a trava,
+ * e ela mora aqui porque este e o unico construtor de resposta desta rota.
  */
 function pagina(frase: string, status: number): Response {
   const corpo = `<!doctype html>
@@ -185,6 +190,7 @@ function cabecalhosDePagina(): HeadersInit {
  */
 export function handleFormularioDeParada(request: Request): Response {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
+    console.warn('painel:', request.method, CAMINHO_DO_FORMULARIO, 405, 'metodo_nao_permitido')
     return metodoNaoPermitido('GET')
   }
 
@@ -212,7 +218,7 @@ export interface DepsDaParada {
  *
  *   1. metodo — `GET` redireciona, o resto que nao e `POST` vira `405`  (0 D1)
  *   2. `content-type` de formulario                                     (0 D1)
- *   3. teto de 1 KB, conferido no `content-length` E relido na leitura   (0 D1)
+ *   3. teto de 1 KB: `content-length` antes, e corte DURANTE a leitura (0 D1)
  *   4. normalizacao e formato exato do codigo                           (0 D1)
  *   5. hashes vivos do tipo 'parada'                            (1 leitura)
  *   6. `timingSafeEqual` contra cada hash; nao bateu, acabou   (0 escritas)
@@ -220,8 +226,11 @@ export interface DepsDaParada {
  *   8. ja desligada? "Pronto", sem gravar                       (0 escritas)
  *   9. senao: 1 lote com o `UPDATE` e a linha de auditoria       (2 escritas)
  *
- * Nunca lanca: a entrada vem de qualquer pessoa na internet, e uma excecao
- * aqui viraria `500` numa rota cuja terceira resposta ja existe para isso.
+ * Nunca lanca — e a promessa vale porque TUDO o que pode estourar mora dentro
+ * do `try`, inclusive a leitura do corpo. A entrada vem de qualquer pessoa na
+ * internet, por uma rede que pode cair no meio do POST, e uma excecao aqui
+ * viraria `500` numa rota cuja terceira resposta ja existe exatamente para
+ * dizer "nao deu para confirmar".
  */
 export async function handleParada(
   request: Request,
@@ -235,8 +244,20 @@ export async function handleParada(
   if (request.method === 'GET' || request.method === 'HEAD') {
     return new Response(null, { status: 303, headers: { location: CAMINHO_DO_FORMULARIO } })
   }
-  if (request.method !== 'POST') return metodoNaoPermitido('GET, POST')
+  if (request.method !== 'POST') {
+    console.warn('painel:', request.method, CAMINHO_DA_PARADA, 405, 'metodo_nao_permitido')
+    return metodoNaoPermitido('GET, POST')
+  }
 
+  // Ruling 20 — o TERCEIRO caso de "a frase de §10.12 vence a letra de §11.4",
+  // declarado como os outros dois em vez de decidido em silencio.
+  //
+  // O status e o codigo de log sao os exatos de `painel_desativado`, mas a
+  // FRASE na tela e a terceira, e nao a mensagem daquela linha da tabela: §10.12
+  // diz "as tres respostas, e nada alem disso", e a lista e exaustiva — nao
+  // existe quarta pagina nesta rota. E e a frase certa pelo conteudo tambem:
+  // sem a raiz de `k_codigos` a rota nao consegue confirmar coisa nenhuma, que
+  // e literalmente o que ela diz. Decisao silenciosa nao vira precedente.
   if (!chaveDeSessaoPresente(env)) {
     console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 503, 'painel_desativado')
     return pagina(FRASES.indisponivel, 503)
@@ -247,29 +268,44 @@ export async function handleParada(
   // segunda linha de §10.12, que cobre "codigo incorreto **ou malformado**".
   // Esta rota mostra tres frases e nada alem disso, e um corpo que nao pode ser
   // lido e, para quem esta do outro lado, exatamente um envio que nao conferiu.
-  const tipo = request.headers.get('content-type') ?? ''
+  //
+  // `toLowerCase()` porque media type e case-INSENSITIVE por RFC 9110:
+  // `Application/x-www-form-urlencoded` e o mesmo tipo que o minusculo, e
+  // recusa-lo mostraria "Esse codigo nao confere" para um codigo que confere —
+  // a mentira que o argumento (c) de §10.12 existe para impedir. O
+  // `trimStart()` cobre o espaco a esquerda que um cliente pode mandar antes do
+  // tipo.
+  const tipo = (request.headers.get('content-type') ?? '').toLowerCase().trimStart()
   if (!tipo.startsWith(FORMULARIO)) {
     console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 415, 'tipo_nao_suportado')
     return pagina(FRASES.codigoIncorreto, 415)
   }
 
-  const corpo = await lerCorpoCapado(request)
-  if (corpo === null) {
-    console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 413, 'corpo_grande_demais')
-    return pagina(FRASES.codigoIncorreto, 413)
-  }
-
-  // Trava de STOP-03: o codigo sai do CORPO, e a `url` nem e parametro desta
-  // funcao. Query string vaza em log de proxy, historico e `Referer`, e um
-  // `GET` com o codigo na URL e exatamente o que §10.12 proibe.
-  const digitado = new URLSearchParams(corpo).get('codigo')
-  const normalizado = digitado === null ? null : normalizarCodigo(digitado, 'parada')
-
-  // Formato errado nao custa consulta nenhuma: e o que faz um bot mandando
-  // lixo sair daqui com zero leitura no D1 (§10.12, passo 2).
-  if (normalizado === null) return recusa()
-
   try {
+    // A LEITURA DO CORPO MORA AQUI DENTRO, e nao antes do `try`.
+    //
+    // `lerCorpoCapado` nao lanca por conta propria, mas o corpo chega pela rede:
+    // um 3G que cai no meio do POST estoura no `ReadableStream`, e fora do
+    // `try` isso virava `500 Internal Server Error`. Celular com sinal ruim e
+    // justamente o cenario que §10.12 nomeia — o dono precisa ler a terceira
+    // frase, que diz o que aconteceu, e nao um erro de servidor que nao diz se
+    // a automacao parou.
+    const corpo = await lerCorpoCapado(request)
+    if (corpo === null) {
+      console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 413, 'corpo_grande_demais')
+      return pagina(FRASES.codigoIncorreto, 413)
+    }
+
+    // Trava de STOP-03: o codigo sai do CORPO, e a `url` nem e parametro desta
+    // funcao. Query string vaza em log de proxy, historico e `Referer`, e um
+    // `GET` com o codigo na URL e exatamente o que §10.12 proibe.
+    const digitado = new URLSearchParams(corpo).get('codigo')
+    const normalizado = digitado === null ? null : normalizarCodigo(digitado, 'parada')
+
+    // Formato errado nao custa consulta nenhuma: e o que faz um bot mandando
+    // lixo sair daqui com zero leitura no D1 (§10.12, passo 2).
+    if (normalizado === null) return recusa()
+
     return await conferirEParar(normalizado, env, now, deps)
   } catch (cause) {
     // Mesmo padrao de `oauth.ts`: o codigo vai para o log, o valor nunca.
@@ -278,7 +314,13 @@ export async function handleParada(
   }
 }
 
-/** A recusa, com o codigo exclusivo desta rota (§11.4). Zero escritas, sempre. */
+/**
+ * A recusa, com o codigo exclusivo desta rota (§11.4). Zero escritas, sempre.
+ *
+ * Trava de STOP-04: `codigo_incorreto` e o codigo desta rota e so dela.
+ * `credencial_invalida` NAO se aplica aqui — a convencao de erro generico existe
+ * onde ha credencial a enumerar, e um codigo de parada nao enumera nada.
+ */
 function recusa(): Response {
   console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 403, 'codigo_incorreto')
   return pagina(FRASES.codigoIncorreto, 403)
@@ -294,6 +336,11 @@ async function conferirEParar(
   const chaveDosCodigos = await derivarSubchave(env.PANEL_SESSION_KEY, 'codigos')
   const codigos = new PainelCodigosRepository(env.DB)
 
+  // Trava de STOP-06: `hashesVivos` vem ANTES de `lerEstadoDaAutomacao`, e o
+  // `return` do meio e o que fixa o preco. Codigo errado custa 1 leitura e 0
+  // escrita porque quem nao confere sai daqui sem nunca chegar a segunda
+  // consulta; inverter as duas linhas faria todo palpite errado da internet
+  // custar duas leituras na cota do dono, sem mudar uma unica resposta (§9.10).
   const vivos = await codigos.hashesVivos('parada')
   // Trava de STOP-10 e de STOP-12: a comparacao passa por `timingSafeEqual`, e
   // a lista vazia percorre o mesmo caminho de uma lista cheia que nao bate — a
@@ -316,9 +363,12 @@ async function conferirEParar(
   const auditoria = new PainelAuditoriaRepository(env.DB)
   const versaoResultante = estado === null ? 1 : estado.versao + 1
 
-  // Sem log, sem mudanca (§8.8): o `UPDATE` e a linha de auditoria vao no
-  // MESMO lote, e nesta ordem. Se a auditoria falhar, a parada falha junto e a
-  // pessoa ve a terceira resposta em vez de um sucesso silencioso.
+  // Trava de STOP-13, e a regra de ouro de §8.8: sem log, sem mudanca.
+  //
+  // UM `db.batch()` so, com o `UPDATE` e a linha de auditoria dentro, nesta
+  // ordem. Se qualquer metade falhar, as duas falham e a pessoa ve a terceira
+  // resposta — nunca um sucesso silencioso, e nunca a variante "grava a config,
+  // depois tenta logar", que e o que um segundo `batch()` aqui significaria.
   await env.DB.batch([
     config.statementDeParada(now, fabricaDaConfig(automationConfig)),
     auditoria.statementDeRegistro({
@@ -368,8 +418,13 @@ export async function handleGerarCodigos(
 
   // Bearer, nunca cookie e nunca query string — a mesma porta das outras
   // rotas `/setup/*`, com o mesmo comparador em tempo constante.
+  //
+  // Ruling 19: esta rota e da familia `/setup/*`, e nao do painel. Ela responde
+  // texto e `401` como as irmas (`oauth.ts:52`, `oauth.ts:149`) e, como elas,
+  // NAO registra nada em log — §11.4 e a tabela do painel, e quem nao e painel
+  // nao se anuncia como `painel:`. A grafia `nao_autorizado`, que nao existe em
+  // §11.4, saiu daqui por isso.
   if (!isAdmin(request, env)) {
-    console.warn('painel:', 'POST', '/setup/painel/codigos', 401, 'nao_autorizado')
     return new Response('Nao autorizado', {
       status: 401,
       headers: {
@@ -461,7 +516,14 @@ function chaveDeSessaoPresente(env: Env): boolean {
   )
 }
 
-/** `405` com `Allow`. `OPTIONS` cai aqui de proposito, e nunca em CORS. */
+/**
+ * `405` com `Allow`. `OPTIONS` cai aqui de proposito, e nunca em CORS.
+ *
+ * Nao registra nada: o `console.warn('painel:', ...)` de `metodo_nao_permitido`
+ * fica nos DOIS chamadores do painel, e nao aqui. `/setup/painel/codigos` usa a
+ * mesma resposta e nao loga, porque ela e da familia `/setup/*` (Ruling 19) —
+ * um log dentro desta funcao daria prefixo de painel a uma rota que nao e.
+ */
 function metodoNaoPermitido(permitidos: string): Response {
   return new Response('Metodo nao permitido', {
     status: 405,
@@ -477,9 +539,24 @@ function metodoNaoPermitido(permitidos: string): Response {
 /**
  * Le o corpo com o teto de 1 KB. Devolve `null` quando estoura.
  *
- * O `content-length` e conferido E o texto e remedido depois da leitura: o
- * cabecalho vem de quem chama e pode mentir, e um teto que confia nele nao e
- * teto. Nenhuma das duas conferencias toca o D1.
+ * Dois portoes, e o segundo e que e o teto de verdade:
+ *
+ * 1. O `content-length`, quando vem, corta antes de ler um unico byte. Ele e
+ *    barato, mas vem de quem chama e pode mentir para os dois lados — um teto
+ *    que confia nele nao e teto.
+ * 2. A leitura CORTA DURANTE o `ReadableStream`, pedaco a pedaco. Um POST
+ *    `chunked` nao tem `content-length`, e `arrayBuffer()` sobre ele
+ *    bufferizaria o corpo inteiro na memoria do isolate ANTES de qualquer
+ *    conferencia: "capado em 1 KB" viraria "medido depois de aceitar tudo".
+ *    Aqui o primeiro pedaco que passa do teto encerra a leitura e cancela o
+ *    resto do stream.
+ *
+ * Mede BYTES, e nao caracteres: `content-length` conta bytes, e recontar sobre
+ * a string decodificada seria uma segunda conta, com outro resultado em
+ * acentos. Nenhuma das duas conferencias toca o D1.
+ *
+ * Nao lanca por conta propria — mas o stream lanca quando a conexao cai, e por
+ * isso quem chama a mantem dentro do `try`.
  */
 async function lerCorpoCapado(request: Request): Promise<string | null> {
   const declarado = request.headers.get('content-length')
@@ -488,12 +565,32 @@ async function lerCorpoCapado(request: Request): Promise<string | null> {
     if (!Number.isFinite(tamanho) || tamanho > TETO_DO_CORPO_DA_PARADA) return null
   }
 
-  // `arrayBuffer()` e nao `text()`: o corpo de um formulario nao e texto para o
-  // workerd, e `text()` sobre ele imprime um aviso no console a cada
-  // requisicao. Medir os BYTES tambem e a medida certa — `content-length` conta
-  // bytes, e uma remedicao sobre a string reencodada seria uma segunda conta.
-  const bytes = await request.arrayBuffer()
-  if (bytes.byteLength > TETO_DO_CORPO_DA_PARADA) return null
+  if (request.body === null) return ''
+
+  const leitor = request.body.getReader()
+  const pedacos: Uint8Array[] = []
+  let lidos = 0
+
+  while (true) {
+    const { done, value } = await leitor.read()
+    if (done) break
+
+    lidos += value.byteLength
+    if (lidos > TETO_DO_CORPO_DA_PARADA) {
+      // O resto do corpo nao interessa e nao vai ocupar memoria nenhuma.
+      await leitor.cancel().catch(() => undefined)
+      return null
+    }
+
+    pedacos.push(value)
+  }
+
+  const bytes = new Uint8Array(lidos)
+  let escritos = 0
+  for (const pedaco of pedacos) {
+    bytes.set(pedaco, escritos)
+    escritos += pedaco.byteLength
+  }
 
   return decoder.decode(bytes)
 }
