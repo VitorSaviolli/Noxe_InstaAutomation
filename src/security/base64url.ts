@@ -35,10 +35,20 @@ const ALFABETO_BASE64URL = /^[A-Za-z0-9_-]*$/
  * corpo de requisicao, isto e, de qualquer pessoa na internet. Uma excecao
  * aqui viraria 500 numa rota que deveria responder "credencial invalida".
  *
- * E estrito de proposito — recusa `+`, `/` e o padding `=` — para que so
- * volte o que o `bytesToBase64Url` daqui seria capaz de emitir. Base64 aceita
- * varias grafias do mesmo valor; aceitar todas daria ao atacante mais de um
- * texto para o mesmo conteudo.
+ * E CANONICO: um conteudo tem exatamente um texto que o representa, e o texto
+ * de volta e sempre o que o `bytesToBase64Url` daqui emitiria. Sao tres
+ * recusas, e a terceira e a que nao e obvia:
+ *
+ * 1. fora do alfabeto base64url (`+`, `/`, `=` e o resto);
+ * 2. comprimento `% 4 === 1`, que nao existe em base64;
+ * 3. **bits residuais diferentes de zero.** O `atob` implementa o
+ *    *forgiving-base64* do WHATWG e IGNORA os bits sobrando do ultimo grupo:
+ *    `atob('AQ')` e `atob('AR')` devolvem o MESMO byte. Sem a reconferencia
+ *    abaixo, dois textos representariam o mesmo conteudo — e uma etapa
+ *    seguinte que compare textos (codigo de recuperacao, `credential_id`)
+ *    herdaria um jeito de escrever o mesmo segredo de duas formas.
+ *
+ * O preco e uma recodificacao por leitura, sobre entradas de dezenas de bytes.
  */
 export function decodeBase64Url(texto: string): Uint8Array | null {
   if (!ALFABETO_BASE64URL.test(texto)) return null
@@ -50,12 +60,18 @@ export function decodeBase64Url(texto: string): Uint8Array | null {
   const padrao =
     texto.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat(sobra === 0 ? 0 : 4 - sobra)
 
+  let bytes: Uint8Array
   try {
     const binario = atob(padrao)
-    const bytes = new Uint8Array(binario.length)
+    bytes = new Uint8Array(binario.length)
     for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i)
-    return bytes
   } catch {
     return null
   }
+
+  // Trava de SES-10. A recodificacao e o que TORNA a canonicidade verdadeira,
+  // em vez de prometida: se o texto nao for o unico que representa estes
+  // bytes, some. Tirar esta linha "por desempenho" derruba o teste da grafia
+  // unica, e nao o do circulo fechado — o round trip continuaria passando.
+  return bytesToBase64Url(bytes) === texto ? bytes : null
 }

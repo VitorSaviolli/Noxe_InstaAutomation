@@ -121,7 +121,12 @@ Os cinco segredos deste projeto são `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOK
 
 O `PANEL_SESSION_KEY` é a raiz das subchaves do painel administrativo. Ele **nunca** repete o valor de outro segredo: rotacionar o `SETUP_ADMIN_TOKEN` não pode derrubar as sessões do painel, e vazar um dos dois não pode entregar o que o outro protege.
 
-Todo binding novo — segredo ou `var` pública — é propagado por cinco lugares, nesta ordem: `src/types/env.ts`, `wrangler.jsonc`, `.dev.vars.example`, os bindings de teste do `vitest.config.ts` e a documentação. Os valores no `vitest.config.ts` são fictícios e existem só para o teste; o metateste `META-04` falha se um binding obrigatório não chegar lá.
+Todo binding novo é propagado, e quantos lugares dependem de ele ser segredo ou não:
+
+- **Segredo** (vai por `wrangler secret put`): cinco lugares — `src/types/env.ts`, `wrangler.jsonc` em `secrets.required`, `.dev.vars.example`, os bindings de teste do `vitest.config.ts` e a documentação.
+- **`var` pública** (fica no `wrangler.jsonc`, versionada): quatro — os mesmos, **menos** o `.dev.vars.example`, que só existe para segredos. É o que já vale para `META_APP_ID` e `META_IG_USER_ID`.
+
+Os valores no `vitest.config.ts` são fictícios e existem só para o teste; o metateste `META-04` falha se um binding obrigatório não chegar lá.
 
 Os arquivos onde segredos reais podem existir na sua máquina são:
 

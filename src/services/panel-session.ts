@@ -35,6 +35,8 @@ const SID_BYTES = 32
  * Prazo absoluto da sessao (§7.6). NUNCA estendido: forca uma biometria por
  * dia de uso. O prazo ocioso e a gravacao de `vista_em` moram na linha do D1 e
  * chegam com a etapa que cria a tabela.
+ *
+ * Trava de SES-01.
  */
 export const PRAZO_ABSOLUTO_DE_SESSAO_MS = 12 * 60 * 60 * 1000
 
@@ -66,6 +68,9 @@ export interface SessaoEmitida {
  * `SETUP_ADMIN_TOKEN`, e nao do `PANEL_SESSION_KEY`. Dentro deste modulo a
  * raiz e sempre `env.PANEL_SESSION_KEY`, para que nenhum chamador precise
  * escolher — escolher e onde o erro acontece.
+ *
+ * Trava de SES-02: o rotulo entra no texto do HMAC. Tirar o rotulo, ou repetir
+ * um, faria duas subchaves coincidirem e derruba o teste da separacao.
  */
 export function derivarSubchave(chaveRaiz: string, rotulo: RotuloDeSubchave): Promise<Uint8Array> {
   return hmacSha256(chaveRaiz, PREFIXO_DE_ROTULO + rotulo)
@@ -78,6 +83,9 @@ export function derivarSubchave(chaveRaiz: string, rotulo: RotuloDeSubchave): Pr
  * E a segunda das tres defesas contra confusao de proposito: cada cerimonia
  * assina com uma chave diferente, entao um envelope de registro nao fecha a
  * assinatura de um step-up nem se o campo do proposito for reescrito.
+ *
+ * Trava de SES-04: tirar o `proposito` do texto derivado faz as tres chaves
+ * virarem uma so, e o envelope disfarcado passa a fechar a assinatura.
  */
 export async function chaveDeEnvelope(
   env: Env,
@@ -162,6 +170,9 @@ export function painelHabilitado(env: Env): { ok: true } | { ok: false; motivo: 
  * `sha256(sid)` para quem for gravar.
  */
 export async function emitirSessao(env: Env, now: number): Promise<SessaoEmitida> {
+  // Trava de SES-11: 32 bytes sorteados a CADA emissao. Derivar o `sid` do
+  // relogio, do `credential_id` ou de qualquer coisa estavel faria duas
+  // sessoes do mesmo milissegundo coincidirem.
   const sid = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(SID_BYTES)))
   const expiraEm = now + PRAZO_ABSOLUTO_DE_SESSAO_MS
   const assinatura = await assinarSessao(env, sid, String(expiraEm))
@@ -189,8 +200,13 @@ export async function validarSessao(
   if (partes.length !== PARTES_DA_SESSAO) return { valida: false, motivo: 'malformado' }
 
   const [versao, sid, expiraEmCru, assinatura] = partes as [string, string, string, string]
+  // Trava de SES-10: `assinarSessao` embute o "s1" como CONSTANTE, entao um
+  // cookie "s2" com um MAC calculado sobre o texto "s1" fecharia a assinatura.
+  // Esta linha e a unica coisa que o recusa.
   if (versao !== VERSAO_DE_SESSAO) return { valida: false, motivo: 'malformado' }
 
+  // Travas de SES-05 e SES-03: assinatura ANTES do prazo, e sobre o
+  // `expira_em` cru. Inverter estas duas linhas derruba os dois testes.
   const esperada = await assinarSessao(env, sid, expiraEmCru)
   if (!timingSafeEqual(esperada, assinatura)) {
     return { valida: false, motivo: 'assinatura_invalida' }
@@ -204,6 +220,7 @@ export async function validarSessao(
 }
 
 async function assinarSessao(env: Env, sid: string, expiraEm: string): Promise<string> {
+  // Trava de SES-02: e `k_sessao`, nunca a raiz e nunca outra subchave.
   const kSessao = await derivarSubchave(env.PANEL_SESSION_KEY, 'sessao')
   const mac = await hmacSha256(kSessao, `${VERSAO_DE_SESSAO}|${sid}|${expiraEm}`)
   return bytesToBase64Url(mac)

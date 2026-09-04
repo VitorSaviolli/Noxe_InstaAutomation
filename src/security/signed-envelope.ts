@@ -43,6 +43,9 @@ export type PropositoDeEnvelope = 'entrar' | 'registrar' | 'stepup'
  * um apelido, encara o primeiro dialogo do sistema operacional que ja viu e as
  * vezes aprova num segundo aparelho. Como o envelope carrega o prazo por
  * proposito, nao existe uma segunda constante para alguem esquecer de mudar.
+ *
+ * Trava de SES-04: mudar um destes numeros derruba o teste do prazo por
+ * proposito em `tests/painel-sessao.test.ts`.
  */
 export const PRAZO_DE_ENVELOPE_MS: Record<PropositoDeEnvelope, number> = {
   entrar: 120_000,
@@ -139,10 +142,16 @@ export async function abrirEnvelope(
     string,
     string,
   ]
+  // Trava de SES-10: `textoAssinado` embute a versao como CONSTANTE, entao um
+  // envelope "v2" com um MAC calculado sobre o texto "v1" fecharia a
+  // assinatura. Esta linha e a unica coisa que o recusa.
   if (versao !== VERSAO) return { valido: false, motivo: 'malformado' }
   // Primeira das tres defesas contra confusao de proposito (§10.3).
+  // Trava de SES-04.
   if (propositoRecebido !== proposito) return { valido: false, motivo: 'malformado' }
 
+  // Travas de SES-05 e SES-03: a assinatura vem ANTES do prazo, e cobre o
+  // `expira_em` cru. Inverter estas duas linhas derruba os dois testes.
   const esperada = bytesToBase64Url(
     await hmacSha256(chave, textoAssinado(proposito, claimsB64, expiraEmCru)),
   )

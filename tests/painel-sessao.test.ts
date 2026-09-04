@@ -52,7 +52,15 @@ function trocarParte(valor: string, indice: number, nova: string): string {
   return partes.join('.')
 }
 
-/** Entradas que qualquer pessoa na internet consegue mandar num cookie. */
+/**
+ * Entradas que qualquer pessoa na internet consegue mandar num cookie.
+ *
+ * A lista tem, de proposito, entradas das DUAS aridades: 4 partes (a da
+ * sessao) e 5 partes (a do envelope). Assim cada verificador recebe tanto
+ * lixo que morre na contagem de partes quanto lixo que passa dela e chega a
+ * guarda de versao e ao HMAC — uma bateria que so exercita a aridade nao
+ * prova que o resto nao lanca.
+ */
 const LIXO = [
   '',
   '.',
@@ -66,6 +74,14 @@ const LIXO = [
   'null',
   '__proto__',
   `s1.${'x'.repeat(5000)}.1700000000000.y`,
+  // 4 partes com versao errada: guarda de versao da sessao, aridade do envelope.
+  's2.AAAA.1700000000000.BBBB',
+  // 5 partes com versao errada: guarda de versao do envelope, aridade da sessao.
+  'v2.stepup.AAAA.1700000000000.BBBB',
+  // 5 partes com versao e proposito certos: chega ao HMAC do envelope.
+  'v1.stepup.AAAA.1700000000000.BBBB',
+  // 5 partes com claims que nem sao base64url, para o caso de a ordem mudar.
+  'v1.stepup.###.1700000000000.BBBB',
 ]
 
 describe('SES — o envelope assinado carrega proposito, claims e prazo', () => {
@@ -171,6 +187,19 @@ describe('SES — o envelope assinado carrega proposito, claims e prazo', () => 
     }
   })
 
+  test('SES-10: prefixo de versao errado e recusado mesmo com um MAC que fecha', async () => {
+    // `textoAssinado` embute a versao como CONSTANTE: trocar so o primeiro
+    // campo do valor nao invalida a assinatura. A guarda de versao e a unica
+    // coisa entre um "v2" forjado e o envelope aceito.
+    const envelope = await emitirEnvelope(env, 'entrar', { c: 'desafio-de-teste' }, AGORA)
+    expect(await lerEnvelope(env, 'entrar', envelope, AGORA)).toMatchObject({ valido: true })
+
+    expect(await lerEnvelope(env, 'entrar', trocarParte(envelope, 0, 'v2'), AGORA)).toEqual({
+      valido: false,
+      motivo: 'malformado',
+    })
+  })
+
   test('SES-10: claims que nao sao um mapa de texto sao recusadas', async () => {
     const chave = await chaveDeEnvelope(env, 'entrar')
     const expiraEm = String(AGORA + 120_000)
@@ -274,6 +303,18 @@ describe('SES — a sessao assinada', () => {
     }
   })
 
+  test('SES-10: prefixo de versao errado e recusado mesmo com um MAC que fecha', async () => {
+    // `assinarSessao` embute o "s1" como CONSTANTE: um cookie "s2" com o
+    // mesmo MAC fecharia a assinatura, e so a guarda de versao o recusa.
+    const { valor } = await emitirSessao(env, AGORA)
+    expect(await validarSessao(env, valor, AGORA)).toMatchObject({ valida: true })
+
+    expect(await validarSessao(env, trocarParte(valor, 0, 's2'), AGORA)).toEqual({
+      valida: false,
+      motivo: 'malformado',
+    })
+  })
+
   test('SES-11: dois sid emitidos no mesmo milissegundo diferem', async () => {
     const emitidas = await Promise.all(Array.from({ length: 200 }, () => emitirSessao(env, AGORA)))
 
@@ -325,6 +366,33 @@ describe('SES — base64url', () => {
     // ao atacante mais de um texto para o mesmo conteudo.
     for (const entrada of ['a+b', 'a/b', 'AAA=', 'A', 'á', ' AA', 'AA AA', '.']) {
       expect(decodeBase64Url(entrada)).toBeNull()
+    }
+  })
+
+  test('SES-10: um conteudo tem exatamente UMA grafia aceita', () => {
+    // `atob` implementa o forgiving-base64 e ignora os bits residuais do
+    // ultimo grupo: 'AQ' e 'AR' devolvem o mesmo byte. Quem garante que so a
+    // grafia canonica passa e a recodificacao dentro do decode.
+    expect(Array.from(decodeBase64Url('AQ') ?? [])).toEqual([1])
+    expect(decodeBase64Url('AR')).toBeNull()
+
+    const ALFABETO = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+    // So tamanhos que NAO sao multiplo de 3 tem bits residuais no ultimo
+    // caractere; com multiplo de 3 nao existe grafia alternativa para testar.
+    for (const tamanho of [1, 2, 4, 5, 7, 8]) {
+      const bytes = crypto.getRandomValues(new Uint8Array(tamanho))
+      const canonica = bytesToBase64Url(bytes)
+      const esperado = Array.from(bytes).join(',')
+
+      const grafiasDoMesmoConteudo = [...ALFABETO]
+        .map((caractere) => canonica.slice(0, -1) + caractere)
+        .filter((texto) => {
+          const lido = decodeBase64Url(texto)
+          return lido !== null && Array.from(lido).join(',') === esperado
+        })
+
+      expect(grafiasDoMesmoConteudo).toEqual([canonica])
     }
   })
 
