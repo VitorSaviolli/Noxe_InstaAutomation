@@ -1,9 +1,4 @@
-import {
-  type AutomationConfig,
-  isDestinationUrlConfigured,
-  isMediaAllowed,
-  resolveConfigForMedia,
-} from '../config'
+import { type AutomationConfig, isDestinationUrlConfigured, isMediaAllowed } from '../config'
 import type { CommentsRepository } from '../repositories/comments-repository'
 import type { CommentEvent } from '../types/meta'
 import { sha256Hex } from '../utils/hash'
@@ -112,6 +107,18 @@ export function evaluateComment(
 }
 
 /**
+ * Confirma o Reel com o que veio no proprio webhook, sem tocar a rede.
+ *
+ * `null` significa "o webhook nao informou" — quem chama decide se paga uma
+ * consulta a Meta para saber ou se desiste. Separado de `isReel` porque o
+ * reagendamento do excedente do lote (§16.1) so pode usar o caminho gratuito.
+ */
+export function isReelFromEvent(event: CommentEvent): boolean | null {
+  if (event.mediaProductType === null) return null
+  return event.mediaProductType.toUpperCase() === REELS_PRODUCT_TYPE
+}
+
+/**
  * Confirma que a midia e um Reel.
  *
  * O webhook as vezes traz `media_product_type`; quando nao traz, consultamos
@@ -119,9 +126,8 @@ export function evaluateComment(
  * perder um acionamento do que responder na publicacao errada.
  */
 async function isReel(event: CommentEvent, api: MetaApiClient): Promise<boolean> {
-  if (event.mediaProductType !== null) {
-    return event.mediaProductType.toUpperCase() === REELS_PRODUCT_TYPE
-  }
+  const doWebhook = isReelFromEvent(event)
+  if (doWebhook !== null) return doWebhook
 
   const info = await api.getMediaInfo(event.mediaId)
   if (!info.ok) {
@@ -234,9 +240,4 @@ async function deliver(event: CommentEvent, deps: ProcessDeps): Promise<ProcessO
 
   await repo.markCompleted(event.commentId, resposta.data.id, now)
   return { kind: 'completed', privateMessageId, publicReplyId: resposta.data.id }
-}
-
-/** Resolve a config aplicavel a midia do evento. */
-export function configForEvent(event: CommentEvent): AutomationConfig {
-  return resolveConfigForMedia(event.mediaId)
 }

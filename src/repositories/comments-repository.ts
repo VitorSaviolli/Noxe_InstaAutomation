@@ -33,6 +33,33 @@ export interface CommentRecord {
   updated_at: number
 }
 
+/** Comentario que ficou fora da fatia da invocacao e vai esperar o cron. (§16.1) */
+export interface DeferredComment {
+  commentId: string
+  mediaId: string
+  commenterHash: string
+  /** Inicio da janela de cooldown do autor. Varia por midia. */
+  cooldownSince: number
+}
+
+/**
+ * INSERT do reagendamento, com os dois portoes embutidos. (§16.1)
+ *
+ * `ON CONFLICT DO NOTHING` cobre o dedup por `comment_id`; o `WHERE NOT EXISTS`
+ * cobre o cooldown do autor. Os dois de graca, dentro da mesma escrita — o
+ * caminho normal paga uma consulta por cada.
+ */
+const SQL_REAGENDAR = `INSERT INTO processed_comments
+     (comment_id, media_id, commenter_scoped_id_hash, status,
+      attempt_count, next_retry_at, created_at, updated_at)
+   SELECT ?, ?, ?, 'retry_pending', 0, ?, ?, ?
+    WHERE NOT EXISTS (
+          SELECT 1 FROM processed_comments
+           WHERE commenter_scoped_id_hash = ?
+             AND created_at >= ?
+             AND status IN ('private_sent', 'completed', 'processing', 'uncertain'))
+   ON CONFLICT (comment_id) DO NOTHING`
+
 export class CommentsRepository {
   constructor(private readonly db: D1Database) {}
 
@@ -60,6 +87,40 @@ export class CommentsRepository {
       .run()
 
     return (result.meta.changes ?? 0) > 0
+  }
+
+  /**
+   * Enfileira o excedente do lote para a varredura do cron. (§16.1)
+   *
+   * Um unico `db.batch()` — transacao implicita e UM subrequest — grava o
+   * excedente inteiro. Cada INSERT carrega dentro de si os dois portoes que o
+   * caminho normal pagaria com uma consulta cada: o `ON CONFLICT DO NOTHING`
+   * cobre o dedup e o `WHERE NOT EXISTS` cobre o cooldown do autor. Sem isso o
+   * excedente furaria as duas regras justamente no lote grande.
+   *
+   * Devolve quantas linhas foram realmente criadas.
+   */
+  async deferForRetry(items: readonly DeferredComment[], now: number): Promise<number> {
+    if (items.length === 0) return 0
+
+    const resultados = await this.db.batch(
+      items.map((item) =>
+        this.db
+          .prepare(SQL_REAGENDAR)
+          .bind(
+            item.commentId,
+            item.mediaId,
+            item.commenterHash,
+            now,
+            now,
+            now,
+            item.commenterHash,
+            item.cooldownSince,
+          ),
+      ),
+    )
+
+    return resultados.reduce((total, resultado) => total + (resultado.meta.changes ?? 0), 0)
   }
 
   async findByCommentId(commentId: string): Promise<CommentRecord | null> {

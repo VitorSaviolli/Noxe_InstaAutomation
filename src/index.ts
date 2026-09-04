@@ -25,8 +25,8 @@
  * Licenca MIT — veja o arquivo LICENSE.
  * ============================================================
  */
-import { automationConfig, resolveConfigForMedia } from './config'
-import { CommentsRepository } from './repositories/comments-repository'
+import { type AutomationConfig, automationConfig, resolveConfigForMedia } from './config'
+import { CommentsRepository, type DeferredComment } from './repositories/comments-repository'
 import { TokensRepository } from './repositories/tokens-repository'
 import { handleHealth } from './routes/health'
 import { handleDataDeletion, handlePrivacyPolicy } from './routes/legal'
@@ -37,7 +37,7 @@ import {
   handleSubscribe,
 } from './routes/oauth'
 import { handleWebhookVerification, readWebhookRequest } from './routes/webhook'
-import { processComment } from './services/automation'
+import { evaluateComment, isReelFromEvent, processComment } from './services/automation'
 import { MetaApiClient } from './services/meta-api'
 import {
   loadAccessToken,
@@ -47,11 +47,57 @@ import {
 } from './services/token-manager'
 import type { Env } from './types/env'
 import type { CommentEvent } from './types/meta'
+import { sha256Hex } from './utils/hash'
+import { renderTemplate } from './utils/templates'
 
 const WEBHOOK_PATH = '/webhooks/instagram'
 
-/** Quantos registros o cron tenta reprocessar por execucao. */
-const RETRY_BATCH_SIZE = 20
+/**
+ * Teto de comentarios ENTREGUES por invocacao do webhook. (§16.1)
+ *
+ * Cada comentario entregue custa 5 consultas ao D1 (`findByCommentId`,
+ * `isUserInCooldown`, `claimComment`, `markPrivateSent`, `markCompleted`) mais
+ * 2 chamadas a Meta (Direct e resposta publica), e o lote inteiro custa outras
+ * 2 consultas (token da conta e credencial). Consulta ao D1 e chamada de rede
+ * contam no MESMO teto de 50 subrequests por invocacao, entao:
+ *
+ *   5 x (5 + 2) + 2 + 1 (reagendamento em lote) = 38  <= 50
+ *
+ * Sobram 12, e o pior caso gasta 5 deles: um `getMediaInfo` de fallback por
+ * comentario, quando o webhook nao informa o tipo da midia. Com 6 seriam
+ * `6 x 8 + 3 = 51` e o teto ja estouraria — 5 e o maior valor que cabe, e e o
+ * numero que a spec cita de exemplo.
+ */
+const MAX_COMENTARIOS_POR_INVOCACAO = 5
+
+/**
+ * Quantos registros o cron tenta reprocessar por execucao.
+ *
+ * O mesmo teto de 50 subrequests vale aqui, e a retentativa custa 4 por
+ * registro (Direct + `markPrivateSent` + resposta publica + `markCompleted`)
+ * mais ate 7 fixos da renovacao do token. Com 10: 10 x 4 + 7 = 47 <= 50. Era
+ * 20 — o que ja estourava o teto hoje, e estouraria sempre agora que o
+ * excedente do webhook e drenado por aqui. (§16.1)
+ */
+const RETRY_BATCH_SIZE = 10
+
+/**
+ * O que o pipeline de entrega busca fora de si mesmo.
+ *
+ * Existe para o teste injetar dubles por parametro — o projeto nao usa mock de
+ * modulo. Os valores padrao sao exatamente o que roda em producao.
+ */
+export interface BatchDeps {
+  /** Fabrica do cliente da Meta, para o teste nao tocar a rede. */
+  createApi: (apiVersion: string, token: string) => MetaApiClient
+  /** Origem da configuracao. Hoje o modulo; adiante, o banco. */
+  resolveConfig: (mediaId: string) => AutomationConfig
+}
+
+const DEFAULT_BATCH_DEPS: BatchDeps = {
+  createApi: (apiVersion, token) => new MetaApiClient(apiVersion, token),
+  resolveConfig: (mediaId) => resolveConfigForMedia(mediaId),
+}
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -126,6 +172,7 @@ export async function processEvents(
   events: readonly CommentEvent[],
   env: Env,
   now: number,
+  deps: BatchDeps = DEFAULT_BATCH_DEPS,
 ): Promise<void> {
   const conta = await new TokensRepository(env.DB).get()
   if (!conta) {
@@ -136,17 +183,18 @@ export async function processEvents(
   const credencial = await loadAccessToken(env)
   if (!credencial) return
 
-  const api = new MetaApiClient(env.META_API_VERSION, credencial.token)
+  const api = deps.createApi(env.META_API_VERSION, credencial.token)
   const repo = new CommentsRepository(env.DB)
+  const accountUsername = conta.username ?? ''
 
-  for (const event of events) {
+  for (const event of events.slice(0, MAX_COMENTARIOS_POR_INVOCACAO)) {
     try {
       const resultado = await processComment(event, {
         api,
         repo,
         igUserId: credencial.igUserId,
-        accountUsername: conta.username ?? '',
-        config: resolveConfigForMedia(event.mediaId),
+        accountUsername,
+        config: deps.resolveConfig(event.mediaId),
         now,
       })
       console.log(`Comentario ${event.commentId}: ${resultado.kind}`)
@@ -157,12 +205,84 @@ export async function processEvents(
       )
     }
   }
+
+  await reagendarExcedente(events.slice(MAX_COMENTARIOS_POR_INVOCACAO), {
+    repo,
+    igUserId: credencial.igUserId,
+    accountUsername,
+    now,
+    resolveConfig: deps.resolveConfig,
+  })
+}
+
+/**
+ * Passa o que sobrou da fatia para a fila que o cron ja varre. (§16.1)
+ *
+ * Reagendar so pode acontecer para o comentario que HOJE seria entregue, senao
+ * o cron mandaria Direct para quem nunca digitou a palavra-gatilho. Os portoes
+ * gratuitos ficam aqui: o veredito de `evaluateComment` e a confirmacao de Reel
+ * que veio no proprio webhook. Os dois que custam consulta — dedup e cooldown —
+ * viajam dentro do proprio INSERT, em `deferForRetry`.
+ *
+ * A unica confirmacao que NAO e refeita e a do tipo da midia quando o webhook
+ * nao o informou: perguntar a Meta custaria uma chamada por comentario, que e
+ * exatamente o gasto que a fatia existe para evitar. Na pratica o webhook de
+ * comentarios da Meta sempre traz `media_product_type`.
+ */
+async function reagendarExcedente(
+  events: readonly CommentEvent[],
+  deps: {
+    repo: CommentsRepository
+    igUserId: string
+    accountUsername: string
+    now: number
+    resolveConfig: (mediaId: string) => AutomationConfig
+  },
+): Promise<void> {
+  if (events.length === 0) return
+
+  const pendentes: DeferredComment[] = []
+  /** Autores ja reagendados neste lote, para o cooldown valer dentro dele. */
+  const jaReagendados = new Set<string>()
+
+  for (const event of events) {
+    const config = deps.resolveConfig(event.mediaId)
+
+    const veredito = evaluateComment(event, config, deps.igUserId, deps.accountUsername)
+    if (!veredito.process) continue
+
+    if (config.processOnlyReels && isReelFromEvent(event) === false) continue
+
+    // O `WHERE NOT EXISTS` do INSERT enxerga o que ja esta gravado, mas nao o
+    // que entra no MESMO lote: dois comentarios do mesmo autor no excedente
+    // renderiam dois Directs. Hoje o segundo cai em `usuario_em_cooldown` e nao
+    // vira linha nenhuma, e e isso que precisa continuar acontecendo.
+    const commenterHash = await sha256Hex(event.fromId)
+    if (jaReagendados.has(commenterHash)) continue
+    jaReagendados.add(commenterHash)
+
+    pendentes.push({
+      commentId: event.commentId,
+      mediaId: event.mediaId,
+      commenterHash,
+      cooldownSince: deps.now - config.userCooldownHours * 60 * 60 * 1000,
+    })
+  }
+
+  const reagendados = await deps.repo.deferForRetry(pendentes, deps.now)
+  if (reagendados > 0) {
+    console.log(`Lote fatiado: ${reagendados} comentario(s) reagendado(s) para o cron`)
+  }
 }
 
 /** Tarefas do cron: renovacao do token e reprocessamento de pendentes. */
-export async function runScheduledTasks(env: Env, now: number): Promise<void> {
+export async function runScheduledTasks(
+  env: Env,
+  now: number,
+  deps: BatchDeps = DEFAULT_BATCH_DEPS,
+): Promise<void> {
   await maybeRefreshToken(env, now)
-  await retryPending(env, now)
+  await retryPending(env, now, deps)
 }
 
 async function maybeRefreshToken(env: Env, now: number): Promise<void> {
@@ -191,7 +311,7 @@ async function maybeRefreshToken(env: Env, now: number): Promise<void> {
   }
 }
 
-async function retryPending(env: Env, now: number): Promise<void> {
+async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<void> {
   const repo = new CommentsRepository(env.DB)
   const pendentes = await repo.findRetryPending(now, RETRY_BATCH_SIZE)
   if (pendentes.length === 0) return
@@ -202,17 +322,20 @@ async function retryPending(env: Env, now: number): Promise<void> {
   const credencial = await loadAccessToken(env)
   if (!conta || !credencial) return
 
-  const api = new MetaApiClient(env.META_API_VERSION, credencial.token)
+  const api = deps.createApi(env.META_API_VERSION, credencial.token)
 
   for (const registro of pendentes) {
     // O texto do comentario nao e guardado (coleta minima), entao a nova
     // tentativa reenvia apenas o Direct, que e a etapa que falhou.
-    const config = resolveConfigForMedia(registro.media_id)
-    const envio = await api.sendPrivateReply(
-      credencial.igUserId,
-      registro.comment_id,
-      config.privateReplyText.replace('{link}', config.destinationUrl).replace('{username}', ''),
-    )
+    const config = deps.resolveConfig(registro.media_id)
+    // O `.replace()` cru daqui trocava so a PRIMEIRA ocorrencia e nao passava
+    // pela sanitizacao. `renderTemplate` usa `replaceAll` e limpa caracteres
+    // de controle — e e o unico ponto de renderizacao do projeto. (§16.3)
+    const texto = renderTemplate(config.privateReplyText, {
+      username: '',
+      link: config.destinationUrl,
+    })
+    const envio = await api.sendPrivateReply(credencial.igUserId, registro.comment_id, texto)
 
     if (envio.ok) {
       await repo.markPrivateSent(registro.comment_id, envio.data.message_id ?? null, now)

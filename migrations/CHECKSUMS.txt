@@ -1,0 +1,17 @@
+# SHA-256 de cada migration ja publicada.
+#
+# Migration entregue NUNCA e editada: os testes aplicam as mesmas migrations de
+# producao, e `CREATE TABLE IF NOT EXISTS` transforma "a tabela ja existe com
+# outra forma" num no-op silencioso que so quebra la na frente, com
+# `no such column`. Este arquivo e a prova de que o arquivo nao mudou.
+#
+# Mudanca de schema em tabela existente e sempre `ALTER TABLE` numa migration
+# NOVA, com a linha nova acrescentada aqui embaixo.
+#
+# Formato: o de `sha256sum`, para conferir a mao sem depender de script:
+#
+#   sha256sum -c migrations/CHECKSUMS.txt
+#
+# Os fins de linha sao LF em qualquer sistema (`.gitattributes`, `eol=lf`),
+# entao o hash e o mesmo no Windows, no Mac e no Linux.
+867e781ea4d1a55cd8d033a4fb76e89fed2d00d7e4f617bf110035c9f73e1cb8  migrations/0001_initial.sql
