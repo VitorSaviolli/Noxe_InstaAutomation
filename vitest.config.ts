@@ -1,5 +1,6 @@
 import { cloudflareTest, readD1Migrations } from '@cloudflare/vitest-pool-workers'
 import { defineConfig } from 'vitest/config'
+import { unstable_readConfig } from 'wrangler'
 
 /**
  * Testes rodam no runtime real do Workers (workerd) via Miniflare, com um D1
@@ -11,12 +12,36 @@ import { defineConfig } from 'vitest/config'
  */
 const migrations = await readD1Migrations('./migrations')
 
+/**
+ * O `wrangler.jsonc` continua sendo a fonte da verdade, e este arquivo le dele
+ * o que o ambiente de teste precisa: entrada, data de compatibilidade, banco e
+ * as `vars` publicas.
+ *
+ * O que ele NAO herda sao os tres bindings `ratelimits` — a excecao declarada
+ * de §7.4. Passar `wrangler: { configPath }` faria o pool derivar TODOS os
+ * bindings do arquivo, os tres limitadores inclusive, e nao existe forma de
+ * remover um binding depois que o pool o leu (a fusao de opcoes do Miniflare
+ * so acrescenta). Com os limitadores presentes aqui, o `LimitadorDeBinding`
+ * assumiria em todos os testes e a suite deixaria de provar exatamente o que
+ * §7.4 manda provar: **ausentes os bindings, o painel funciona sem a camada**.
+ * Por isso a leitura e explicita, campo a campo.
+ */
+const producao = unstable_readConfig({ config: './wrangler.jsonc' })
+
 export default defineConfig({
   plugins: [
     cloudflareTest({
-      wrangler: { configPath: './wrangler.jsonc' },
+      main: producao.main,
       miniflare: {
+        compatibilityDate: producao.compatibility_date,
+        compatibilityFlags: producao.compatibility_flags,
+        // D1 em memoria, com o mesmo NOME de binding de producao. O id nao
+        // importa: o Miniflare nao fala com a Cloudflare nos testes.
+        d1Databases: ['DB'],
         bindings: {
+          // As `vars` publicas vem do wrangler.jsonc, exatamente como chegam
+          // ao Worker publicado. As duas do painel sao sobrescritas abaixo.
+          ...producao.vars,
           META_APP_SECRET: 'segredo-de-teste',
           META_WEBHOOK_VERIFY_TOKEN: 'verify-token-de-teste',
           // base64 de exatamente 32 bytes

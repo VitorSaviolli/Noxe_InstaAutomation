@@ -247,6 +247,79 @@ export class D1SegundoBatchQuebrado {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Os dubles do limitador de taxa (§13.4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Duble do binding `ratelimits` da Cloudflare.
+ *
+ * Guarda a ORDEM e o TEXTO de cada chave recebida — e o que prova que a chave
+ * enviada e exatamente a de §7.4, e que cada familia de rota fala com o binding
+ * dela e com mais nenhum.
+ */
+export class BindingDeLimiteFalso {
+  readonly chaves: string[] = []
+
+  /** `Number.POSITIVE_INFINITY` = sempre libera; util quando o teto nao importa. */
+  constructor(private readonly teto: number = Number.POSITIVE_INFINITY) {}
+
+  async limit({ key }: { key: string }): Promise<{ success: boolean }> {
+    this.chaves.push(key)
+    const usadas = this.chaves.filter((guardada) => guardada === key).length
+    return { success: usadas <= this.teto }
+  }
+
+  /** Quantas vezes ESTE binding foi consultado, com qualquer chave. */
+  get total(): number {
+    return this.chaves.length
+  }
+}
+
+/** Binding que estoura. Prova que a excecao nao abre nem tranca a rota. */
+export class BindingDeLimiteQuebrado {
+  chamadas = 0
+
+  async limit(_opcoes: { key: string }): Promise<{ success: boolean }> {
+    this.chamadas++
+    throw new Error('limitador fora do ar')
+  }
+}
+
+/** Entrega o duble onde o codigo de producao espera um binding `ratelimits`. */
+export function comoBindingDeLimite(
+  falso: BindingDeLimiteFalso | BindingDeLimiteQuebrado,
+): RateLimit {
+  return falso as unknown as RateLimit
+}
+
+/**
+ * Duble da porta `Limitador`, injetado por parametro (§13.4).
+ *
+ * Existe para o teste de rota forcar a recusa sem depender de contagem: uma
+ * afirmacao sobre o `429` nao pode nascer presa ao teto de outra afirmacao.
+ */
+export class LimitadorFalso {
+  readonly chaves: string[] = []
+  readonly zerados: string[] = []
+
+  constructor(
+    private readonly veredito: { permitido: boolean; esperarSegundos: number } = {
+      permitido: true,
+      esperarSegundos: 0,
+    },
+  ) {}
+
+  async permitir(chave: string, _agora: number) {
+    this.chaves.push(chave)
+    return this.veredito
+  }
+
+  zerar(chave: string): void {
+    this.zerados.push(chave)
+  }
+}
+
 /**
  * Captura tudo o que passa pelo `console` durante um trecho de teste.
  *

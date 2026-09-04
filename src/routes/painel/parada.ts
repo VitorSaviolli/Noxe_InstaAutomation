@@ -45,6 +45,7 @@ import {
 import { derivarSubchave } from '../../services/panel-session'
 import type { Env } from '../../types/env'
 import { isAdmin } from '../oauth'
+import { type Limitador, limitar } from './guardas'
 
 /** Caminho do formulario. Difere do da acao por uma letra, e de proposito (§11.6). */
 export const CAMINHO_DO_FORMULARIO = '/painel/parar'
@@ -131,7 +132,7 @@ const FRASES = {
  * ele nao serve para logar, ler nem editar. A ausencia do cabecalho e a trava,
  * e ela mora aqui porque este e o unico construtor de resposta desta rota.
  */
-function pagina(frase: string, status: number): Response {
+function pagina(frase: string, status: number, extras: Record<string, string> = {}): Response {
   const corpo = `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -145,7 +146,7 @@ function pagina(frase: string, status: number): Response {
 </html>
 `
 
-  return new Response(corpo, { status, headers: cabecalhosDePagina() })
+  return new Response(corpo, { status, headers: { ...cabecalhosDePagina(), ...extras } })
 }
 
 /**
@@ -157,7 +158,7 @@ function pagina(frase: string, status: number): Response {
  * Worker, sem excecao por rota, mesmo numa rota que nao le cookie: uma regra
  * sem excecao vale mais que a economia de um cabecalho.
  */
-function cabecalhosDePagina(): HeadersInit {
+function cabecalhosDePagina(): Record<string, string> {
   return {
     'content-type': 'text/html; charset=utf-8',
     'content-security-policy':
@@ -209,6 +210,12 @@ export interface DepsDaParada {
    * provar que nao ha um segundo caminho de comparacao escondido na rota.
    */
   comparar?: (a: string, b: string) => boolean
+  /**
+   * Limitador de taxa. O padrao e o da familia `parada` — o binding
+   * `PANEL_LIMITER_STOP` quando ele existe, a janela por isolate quando nao.
+   * O parametro existe para o teste forcar a recusa sem depender de contagem.
+   */
+  limitador?: Limitador
 }
 
 /**
@@ -219,12 +226,13 @@ export interface DepsDaParada {
  *   1. metodo — `GET` redireciona, o resto que nao e `POST` vira `405`  (0 D1)
  *   2. `content-type` de formulario                                     (0 D1)
  *   3. teto de 1 KB: `content-length` antes, e corte DURANTE a leitura (0 D1)
- *   4. normalizacao e formato exato do codigo                           (0 D1)
- *   5. hashes vivos do tipo 'parada'                            (1 leitura)
- *   6. `timingSafeEqual` contra cada hash; nao bateu, acabou   (0 escritas)
- *   7. estado da automacao                                      (1 leitura)
- *   8. ja desligada? "Pronto", sem gravar                       (0 escritas)
- *   9. senao: 1 lote com o `UPDATE` e a linha de auditoria       (2 escritas)
+ *   4. limitador de taxa por IP, se o binding existir                   (0 D1)
+ *   5. normalizacao e formato exato do codigo                           (0 D1)
+ *   6. hashes vivos do tipo 'parada'                            (1 leitura)
+ *   7. `timingSafeEqual` contra cada hash; nao bateu, acabou   (0 escritas)
+ *   8. estado da automacao                                      (1 leitura)
+ *   9. ja desligada? "Pronto", sem gravar                       (0 escritas)
+ *  10. senao: 1 lote com o `UPDATE` e a linha de auditoria       (2 escritas)
  *
  * Nunca lanca — e a promessa vale porque TUDO o que pode estourar mora dentro
  * do `try`, inclusive a leitura do corpo. A entrada vem de qualquer pessoa na
@@ -294,6 +302,33 @@ export async function handleParada(
     if (corpo === null) {
       console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 413, 'corpo_grande_demais')
       return pagina(FRASES.codigoIncorreto, 413)
+    }
+
+    // O limitador entra AQUI, e a posicao e das duas pontas: depois do teto do
+    // corpo (§11.3, passos 4 e 5) e antes da normalizacao (§10.12, passo 1).
+    // Nenhuma consulta ao D1 aconteceu ate esta linha, entao uma tentativa
+    // recusada custa zero banco — trava de RL-05.
+    //
+    // O QUARTO caso de "a frase de §10.12 vence a letra de §11.4", declarado
+    // como os tres anteriores em vez de decidido em silencio. O status e o
+    // codigo de log sao os exatos de `muitas_tentativas`, com o `Retry-After`
+    // que §11.3 manda; a FRASE na tela e a terceira, e nao a "Muitas
+    // tentativas" da tabela, porque §10.12 diz "as tres respostas, e nada alem
+    // disso" e a lista e exaustiva. E e a frase certa pelo conteudo: o que
+    // aconteceu foi que nao deu para confirmar agora, e a automacao para
+    // sozinha em caso de erro, que e literalmente o que ela diz.
+    //
+    // Por que o botao de panico e limitado: §10.12 poe o limitador no passo 1 e
+    // §13.2 escreve "a parada tem limite proprio, mais generoso". O balde e so
+    // dela (`parada:`) com teto de 30/60 s, entao nenhum bot martelando o login
+    // consome a cota de que o dono precisa; e uma falha do binding cai no
+    // limitador de reserva (§13.4), nunca em porta trancada.
+    const veredito = await limitar(request, env, 'parada', now, deps.limitador)
+    if (!veredito.permitido) {
+      console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 429, 'muitas_tentativas')
+      return pagina(FRASES.indisponivel, 429, {
+        'retry-after': String(veredito.esperarSegundos),
+      })
     }
 
     // Trava de STOP-03: o codigo sai do CORPO, e a `url` nem e parametro desta

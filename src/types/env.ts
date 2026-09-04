@@ -59,4 +59,25 @@ export interface Env {
    * sessoes. Ausente, o painel inteiro responde 503.
    */
   PANEL_SESSION_KEY: string
+
+  // --- Limitadores de tentativa (wrangler.jsonc "ratelimits") ---
+  //
+  // Os TRES sao OPCIONAIS, e o `?` aqui e a parte do contrato que importa:
+  // ausentes os bindings, o painel funciona sem a camada e continua correto
+  // (§7.4). Um limitador de reserva — janela por isolate, dentro do proprio
+  // Worker — assume no lugar, e nada do desenho depende deles.
+  //
+  // Sao tres e nao um porque na Cloudflare o `limit` e fixo por binding e o
+  // `period` so aceita 10 ou 60: um binding sozinho nao consegue dar ao login
+  // um teto diferente do da parada de emergencia.
+  //
+  // Excecao declarada ao checklist de propagacao: os tres NAO entram nos
+  // bindings do ambiente de teste, de proposito — a ausencia deles la e o que
+  // prova que o painel funciona sem a camada.
+  /** Entrar e registrar por convite. `{ limit: 10, period: 60 }`. */
+  PANEL_LIMITER_LOGIN?: RateLimit
+  /** Codigo de recuperacao digitado. `{ limit: 30, period: 60 }`. */
+  PANEL_LIMITER_CODIGO?: RateLimit
+  /** So `POST /painel/parada`. `{ limit: 30, period: 60 }`. */
+  PANEL_LIMITER_STOP?: RateLimit
 }
