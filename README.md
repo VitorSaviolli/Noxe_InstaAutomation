@@ -181,7 +181,7 @@ O projeto vem com marcadores no lugar dos dados pessoais. Enquanto eles não for
 |---|---|---|
 | `database_id` | `wrangler.jsonc` | O identificador do **seu** banco D1. Vem como `COLE_AQUI_O_ID_DO_SEU_BANCO_D1`. O comando `npx wrangler d1 create noxe-insta-automation` cria o banco e devolve esse valor na tela. Passo a passo em [SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md). |
 | `META_APP_ID` | `wrangler.jsonc`, bloco `vars` | O **ID do app do Instagram** que você criou no Meta for Developers. Vem como `COLE_AQUI_O_ID_DO_SEU_APP_META`. Cuidado: não é o ID do app do Facebook — veja o aviso logo abaixo. |
-| `destinationUrl` | `src/config.ts` | O link que será entregue no Direct. Vem como `[COLOQUE_O_SEU_LINK_AQUI]`. |
+| `destinationUrl` | `src/config.ts` | O link que será entregue no Direct. Vem como `[COLOQUE_O_SEU_LINK_AQUI]` — **mas se você clonou o repositório de alguém que já publicou a própria configuração, aqui vai estar o link dessa pessoa.** Confira sempre. |
 | `triggerKeywords` e os textos | `src/config.ts` | A palavra que dispara a automação, o texto do Direct e o texto da resposta pública. Detalhes na [seção 8](#8-como-configurar-o-gatilho). |
 | `CONTATO_EMAIL` e `NOME_RESPONSAVEL` | `src/routes/legal.ts` | O e-mail real de contato e o nome de quem responde pelo tratamento dos dados. Vêm como `[SEU_EMAIL_DE_CONTATO]` e `[NOME_DO_RESPONSAVEL]`. |
 | Os 4 segredos | **nenhum arquivo** | Nunca vão para dentro do projeto. São cadastrados um a um com `npx wrangler secret put NOME`. Veja a [seção 5](#5-segredos-e-git-o-que-nunca-pode-ir-para-o-github). |
@@ -199,6 +199,21 @@ destinationUrl: 'https://seusite.com.br/a-pagina-que-voce-quer',
 ```
 
 O projeto reconhece o marcador de fábrica: qualquer valor vazio ou começando com `[` é tratado como "ainda não configurado".
+
+> ⚠️ **Essa trava só protege quem ainda está com o marcador.** Se o repositório que você baixou já vier com um link real preenchido (o link do dono da instalação original), a automação vai funcionar — entregando o link **dele**. Abra o `src/config.ts` e confirme que o `destinationUrl` é o seu antes do primeiro deploy.
+
+### O que você configura fora do código (no painel da Meta)
+
+Nem tudo mora em arquivo. Estes quatro itens são preenchidos **no painel do Meta for Developers** e não têm equivalente no repositório — quem instala o projeto precisa fazer isso à mão. O passo a passo com as telas está no [SETUP_META.md](SETUP_META.md).
+
+| Item | Onde no painel | O que colocar |
+|---|---|---|
+| **Ícone do app** (a "foto") | Configurações → Básico | Imagem quadrada **1024 × 1024 px**, PNG, fundo sólido, com a **sua** marca. Não pode usar logo do Instagram/Meta. É o ícone que aparece na tela de "Permitir" que a pessoa vê. Detalhes na [etapa 15.3 do SETUP_META.md](SETUP_META.md). |
+| **URI de redirecionamento OAuth** | Casos de uso → Instagram → Personalizar (*Set up Instagram business login*) | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/oauth/callback` — um campo só, sem barra no final. |
+| **URL da Política de Privacidade** | Configurações → Básico | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/privacy-policy` |
+| **Instruções de exclusão de dados** | Configurações → Básico | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/data-deletion` |
+
+> As duas últimas só funcionam de verdade depois que você preencher os dados de contato logo abaixo — senão as páginas abrem dizendo que o contato não foi informado.
 
 ### Os dados de contato (`src/routes/legal.ts`)
 
@@ -419,6 +434,8 @@ O projeto **não pede** `instagram_business_content_publish`, porque ele não pu
 
 Se o objetivo é a sua conta, pare no Standard Access.
 
+O painel da Meta mostra "Complete app review" como um passo numerado do assistente, mas para a sua própria conta ele é **opcional**. Se você quiser (ou precisar) submeter mesmo assim, o roteiro completo — ícone obrigatório, páginas legais, screencast e a justificativa de cada permissão — está na [etapa 15 do SETUP_META.md](SETUP_META.md).
+
 ### Webhook tem DOIS níveis — e os dois são necessários
 
 Este é o ponto onde a maioria das configurações trava. Ligar um só dos dois não funciona.
@@ -608,6 +625,8 @@ export const mediaAutomations: MediaAutomation[] = [
 ```
 
 Deixe o array vazio (`[]`) para usar apenas a configuração global — é como o projeto vem de fábrica.
+
+**Para testar em um único post**, o caminho é outro: em vez de `mediaAutomations`, troque `allowedMediaIds: ['*']` pelo ID do Reel de teste. Assim nenhum outro post dispara nada enquanto você testa. Como descobrir o ID da mídia (três formas, uma delas sem precisar de token) está na [etapa 12 do SETUP_META.md](SETUP_META.md).
 
 ---
 

@@ -622,6 +622,79 @@ Você precisa de um comentário **real** para testar o fluxo completo, mas não
 quer que a automação responda gente que não pediu nada. A técnica abaixo usa só
 recursos nativos do Instagram.
 
+### Trave a automação em UM único post (o jeito seguro de testar)
+
+De fábrica a automação vale para **todos** os Reels da conta
+(`allowedMediaIds: ['*']`). Para testar, troque o `*` pelo ID do Reel de teste:
+assim, mesmo que alguém comente a palavra-gatilho em outro post antigo, **nada
+acontece**.
+
+Em `src/config.ts`:
+
+```ts
+// de fábrica: qualquer Reel dispara
+allowedMediaIds: ['*'],
+
+// durante o teste: SÓ este Reel dispara
+allowedMediaIds: ['17912345678901234'],
+```
+
+Depois do teste, volte para `['*']` (ou deixe travado, se você só quer automatizar
+posts escolhidos a dedo). **Toda mudança em `src/config.ts` só vale depois de
+`npm run deploy`** — o arquivo é lido pelo Worker publicado, não pela sua máquina.
+
+#### Como descobrir o ID do Reel
+
+O ID da mídia **não** é o código que aparece na URL do post
+(`instagram.com/reel/ABC123...`). É um número longo, e há três formas de obtê-lo:
+
+**1. Pelo painel da Meta (não precisa de token — mais fácil)**
+
+Comente a palavra-gatilho no Reel e vá em **Casos de uso → Instagram →
+Personalizar → Webhooks → Entregas recentes**. Abra a última entrega e procure no
+corpo JSON:
+
+```json
+{ "field": "comments", "value": { "media": { "id": "17912345678901234" } } }
+```
+
+Esse `media.id` é o que você cola em `allowedMediaIds`.
+
+**2. Pelo banco D1 (depois que algum comentário já foi processado)**
+
+```bash
+npx wrangler d1 execute noxe-insta-automation --remote \
+  --command "SELECT media_id, created_at FROM processed_comments ORDER BY created_at DESC LIMIT 5"
+```
+
+**3. Pela Graph API (exige um token do Instagram em mãos)**
+
+O Worker guarda o token dele **cifrado** e não devolve para ninguém, então isto só
+serve se você tiver obtido um token manualmente:
+
+```bash
+curl -s "https://graph.instagram.com/v25.0/me/media?fields=id,media_type,permalink&access_token=SEU_TOKEN"
+```
+
+#### Mensagem diferente por post
+
+Se você quer **vários** posts ativos, cada um entregando um link diferente, não
+use `allowedMediaIds` — use `mediaAutomations`, no mesmo `src/config.ts`. Cada
+entrada sobrepõe a configuração global só para os IDs listados:
+
+```ts
+export const mediaAutomations: MediaAutomation[] = [
+  {
+    mediaIds: ['17912345678901234'],
+    triggerKeywords: ['cardápio'],
+    privateReplyText: 'Segue o cardápio como prometido😊 {link}',
+    destinationUrl: 'https://seusite.com.br/cardapio',
+  },
+]
+```
+
+O que você não citar na entrada continua vindo da configuração global.
+
 ### Receita concreta
 
 1. **Publique um Reel novo, exclusivo para teste.**
@@ -722,9 +795,11 @@ curl -X POST "https://graph.instagram.com/v25.0/{ig-user-id}/messages" \
   -d '{"recipient":{"comment_id":"COMMENT_ID"},"message":{"text":"texto do direct"}}'
 ```
 
-> **Pendência do projeto:** o campo `destinationUrl` em `src/config.ts` vem como
-> `[COLOQUE_O_SEU_LINK_AQUI]`. Preencha antes do teste, senão o Direct sai com
-> esse texto de exemplo no lugar do link.
+> **Confira antes do teste:** o campo `destinationUrl` em `src/config.ts` precisa
+> ser o **seu** link. Se ele ainda estiver com um marcador entre colchetes, a
+> automação recusa o acionamento com o motivo `link_nao_configurado` e ninguém
+> recebe nada. E se o repositório veio com o link de outra pessoa, troque —
+> senão o Direct entrega o link errado.
 
 ---
 
@@ -824,28 +899,198 @@ Interpretação rápida das entregas recentes:
 
 ---
 
-## 15. Quando App Review e Advanced Access passam a ser necessários
+## 15. App Review, Acesso Avançado e o ícone do app
+
+### 15.1 Antes de tudo: você precisa mesmo de App Review?
 
 | Cenário | O que basta |
 |---|---|
 | Automatizar **a sua própria** conta profissional | **Standard Access** — **não exige App Review** |
 | Atender contas de **terceiros / clientes** | **Advanced Access**, que exige **App Review** + **Verificação Comercial** (Business Verification) |
 
-Em outras palavras: enquanto o projeto só mexe na sua conta (com ela adicionada
-como testador, etapa 5), você **não precisa** submeter nada para revisão. Isso
-só muda no dia em que outra empresa/pessoa for conectar a conta dela ao seu app.
+Enquanto o projeto só mexe na **sua** conta (com ela adicionada como testadora,
+etapa 5), você **não precisa** submeter nada para revisão. Isso só muda no dia em
+que outra empresa ou pessoa for conectar a conta dela ao seu app.
 
-Quando esse dia chegar, prepare-se para:
+> **Por que o painel insiste em pedir, então?** O assistente do Instagram no
+> painel da Meta mostra "Complete app review" como um dos passos numerados da
+> lista. Ele é uma **sugestão do assistente**, não um bloqueio: com Standard
+> Access e a sua conta como testadora, a automação funciona sem revisão nenhuma.
+> Você pode submeter mesmo assim — só saiba que é opcional no seu caso, e que a
+> análise leva semanas.
 
-- ter as páginas de **política de privacidade** e **exclusão de dados** válidas
-  e acessíveis (as rotas já existem, faltam os dados de contato reais);
-- **justificar cada permissão** solicitada — motivo a mais para não pedir
-  `instagram_business_content_publish`, que o projeto não usa;
-- gravar um **screencast** demonstrando o fluxo completo;
-- concluir a **verificação do negócio** no Portfólio Empresarial.
+Se você **vai** submeter (ou vai atender clientes), o resto desta etapa é o
+roteiro completo.
 
-Os requisitos exatos de App Review mudam com frequência; confirme a lista
-vigente na documentação oficial da Meta antes de submeter.
+---
+
+### 15.2 Os 4 campos obrigatórios antes de conseguir submeter
+
+A Meta **não deixa** você abrir a submissão enquanto estes quatro itens não
+estiverem preenchidos. Todos ficam em **Configurações → Básico** (menu lateral do
+app), exceto onde indicado:
+
+| Campo | O que é | Valor para este projeto |
+|---|---|---|
+| **Ícone do app** | Imagem quadrada de **1024 × 1024** px | Sua logo. Veja a 15.3 — é o item que mais gente esquece. |
+| **URL da Política de Privacidade** | Página pública que explica o tratamento dos dados | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/privacy-policy` |
+| **Categoria do app** | A categoria que melhor descreve o que o app faz | *Empresa e páginas* / *Utilitários* costumam servir. Escolha a mais honesta. |
+| **E-mail comercial** | Fica em **Configurações do desenvolvedor**, não em Básico | É para onde a Meta manda o **resultado da revisão** e os alertas. Use um e-mail que você lê de verdade. |
+
+Preencha também, se a tela pedir:
+
+| Campo | Valor |
+|---|---|
+| Instruções de exclusão de dados do usuário | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/data-deletion` |
+| URL dos Termos de Serviço | Opcional para o Instagram Platform. Só preencha se você tiver uma página real. |
+
+> **Não confunda com a etapa 4.** O campo de **URI de redirecionamento** (aquele
+> único campo de "redirect URL" do *Set up Instagram business login*) recebe
+> **só** `.../oauth/callback`. As URLs de privacidade e de exclusão de dados são
+> outra tela — esta aqui, **Configurações → Básico**.
+
+---
+
+### 15.3 O ícone do app (a "foto") — obrigatório
+
+Este é um requisito real e fácil de esquecer, porque ele não aparece na lista de
+passos do assistente do Instagram: ele mora em **Configurações → Básico**.
+
+**Especificação:**
+
+| Item | Regra |
+|---|---|
+| Dimensões | **1024 × 1024 px** — quadrado exato |
+| Formato | PNG (JPG também é aceito) |
+| Fundo | Use fundo **sólido**. Transparência costuma virar preto ou branco dependendo de onde a imagem é exibida. |
+| Cantos | Envie **quadrado**, sem cantos arredondados desenhados. A Meta arredonda sozinha na exibição. |
+| Peso | Mantenha abaixo de ~5 MB. Uma logo em PNG raramente passa disso. |
+
+**Onde subir:** menu lateral → **Configurações → Básico** → campo **Ícone do
+app** → *Carregar/Editar*. Salve no rodapé da página.
+
+**Onde ele aparece:** não é decoração. Esse ícone é o que a pessoa vê na **tela
+de consentimento do Instagram**, na hora de clicar em "Permitir" (etapa 8.3), e é
+o que o revisor da Meta vê. Um ícone genérico ou vazio piora a taxa de aprovação.
+
+**Regras de conteúdo que reprovam o app:**
+
+- ❌ **Não** use o logo do Instagram, da Meta, do Facebook, a câmera colorida, nem
+  nada derivado das marcas deles. É violação de marca e é motivo de reprovação.
+- ❌ **Não** sugira que a Meta patrocina, aprova ou faz parte do seu app.
+- ❌ **Não** use a palavra "Instagram" (nem "insta", "gram") como elemento
+  principal do ícone.
+- ✅ Use a **sua** logo, ou uma marca própria simples: uma letra, um símbolo, uma
+  forma. Precisa ficar legível reduzido a ~40 px.
+
+> **Não tem logo?** Serve qualquer imagem quadrada própria e legível — inclusive
+> uma feita num editor gratuito (Canva, Figma, GIMP). O que não pode é ficar
+> vazio nem usar marca alheia.
+
+---
+
+### 15.4 As páginas legais precisam estar de verdade preenchidas
+
+As rotas `/privacy-policy` e `/data-deletion` já existem e já estão no ar. Mas
+elas nascem com **placeholders**: enquanto `CONTATO_EMAIL` e `NOME_RESPONSAVEL`
+não forem preenchidos em `src/routes/legal.ts`, as páginas exibem um aviso
+dizendo que os dados de contato ainda não foram informados.
+
+O revisor **abre essas páginas**. Uma página dizendo "dados de contato ainda não
+preenchidos" é reprovação na primeira olhada.
+
+1. Abra `src/routes/legal.ts`.
+2. Troque `[SEU_EMAIL_DE_CONTATO]` por um e-mail real que você lê.
+3. Troque `[NOME_DO_RESPONSAVEL]` pelo seu nome ou o da sua empresa.
+4. Publique:
+
+   ```bash
+   npm run check
+   npm run deploy
+   ```
+
+5. Abra as duas URLs no navegador e confira que o aviso sumiu, **antes** de colar
+   as URLs no painel.
+
+---
+
+### 15.5 O screencast (vídeo da demonstração)
+
+A Meta exige um vídeo mostrando o **fluxo completo, de ponta a ponta**, para cada
+permissão pedida. É a parte que mais reprova gente por preguiça.
+
+Regras da própria Meta:
+
+- Use o **inglês** como idioma da interface quando possível. Se a sua interface
+  estiver em português, **coloque legendas** explicando o que está acontecendo.
+- **Explique o que cada botão faz** se não for óbvio na tela.
+- Mostre a experiência **completa** — não pedaços soltos.
+
+**Roteiro sugerido para este projeto** (grave a tela do computador + a tela do
+celular, ou use o celular filmado):
+
+1. Mostre a tela de consentimento abrindo (a URL do `/setup/authorize`), com o
+   nome e o **ícone** do seu app visíveis, e clique em **Permitir**.
+   → cobre `instagram_business_basic`
+2. Mostre o Reel publicado na conta.
+3. De uma **segunda** conta, comente a palavra-gatilho no Reel.
+4. Mostre a **resposta pública** aparecendo embaixo do comentário.
+   → cobre `instagram_business_manage_comments`
+5. Mostre o **Direct chegando** na segunda conta, com o link.
+   → cobre `instagram_business_manage_messages`
+6. Feche mostrando que só quem comentou a palavra-gatilho recebeu algo.
+
+Grave em uma tomada só, sem cortes, se conseguir. Corte dá impressão de
+encenação e gera pedido de novo vídeo.
+
+---
+
+### 15.6 Justificativa de cada permissão
+
+A Meta pede um texto explicando **por que** o app precisa de cada permissão.
+Escreva em inglês. Modelos para copiar e adaptar:
+
+| Permissão | Justificativa (adapte ao seu caso) |
+|---|---|
+| `instagram_business_basic` | *"Required to identify the connected professional account (user_id and username) after login, so the app knows which account it is automating. No media is published and no other profile data is read."* |
+| `instagram_business_manage_comments` | *"The app reads incoming comments on the account's own Reels to detect a keyword the account owner configured, and posts a single public reply telling the commenter that a direct message was sent. It only reads and replies on media owned by the connected account."* |
+| `instagram_business_manage_messages` | *"When a comment matches the configured keyword, the app sends one private reply (direct message) to that commenter containing the link the account owner configured. It is a one-time reply per comment, triggered only by an explicit user action (the comment)."* |
+
+> **NÃO peça `instagram_business_content_publish`.** Este projeto não publica
+> mídia nenhuma. Pedir permissão que você não usa é a pergunta mais chata que a
+> revisão faz — e você não vai ter o que responder.
+
+---
+
+### 15.7 Verificação Comercial (Business Verification)
+
+Se o seu app for atender **terceiros**, além da revisão das permissões a Meta
+exige a **verificação do negócio** dentro do Portfólio Empresarial (Business
+Manager): documento da empresa, comprovante de endereço, telefone ou site do
+domínio. É um processo separado e mais demorado que a revisão das permissões.
+
+Para automatizar **só a sua conta**, isso não é exigido.
+
+---
+
+### 15.8 Checklist antes de clicar em "Enviar para análise"
+
+- [ ] **Ícone 1024 × 1024** carregado em Configurações → Básico (15.3)
+- [ ] URL da **Política de Privacidade** preenchida e a página abrindo sem o aviso de placeholder
+- [ ] URL de **exclusão de dados** preenchida e abrindo
+- [ ] `CONTATO_EMAIL` e `NOME_RESPONSAVEL` preenchidos em `src/routes/legal.ts` e **deploy feito** (15.4)
+- [ ] **Categoria** do app escolhida
+- [ ] **E-mail comercial** configurado nas Configurações do desenvolvedor
+- [ ] Screencast gravado cobrindo as **3** permissões, com legendas se não estiver em inglês (15.5)
+- [ ] Justificativa escrita para **cada** permissão (15.6)
+- [ ] `instagram_business_content_publish` **não** está na lista de permissões pedidas
+- [ ] A automação está **funcionando de verdade** — o revisor vai tentar reproduzir
+
+> Os requisitos exatos de App Review mudam com frequência. Os quatro campos
+> obrigatórios, a especificação do ícone e as regras do screencast desta seção
+> vieram da documentação oficial da Meta ([Instagram Platform → App
+> Review](https://developers.facebook.com/docs/instagram-platform/app-review)).
+> Confirme a lista vigente lá antes de submeter.
 
 ---
 
@@ -867,6 +1112,9 @@ vigente na documentação oficial da Meta antes de submeter.
 - [ ] Teste com Reel restrito + conta secundária feito e Reel arquivado (etapa 12)
 - [ ] `destinationUrl` em `src/config.ts` preenchido
 - [ ] `CONTATO_EMAIL` e `NOME_RESPONSAVEL` em `src/routes/legal.ts` preenchidos
+- [ ] **Ícone 1024 × 1024 do app** carregado em Configurações → Básico (etapa 15.3)
+- [ ] URLs de `/privacy-policy` e `/data-deletion` coladas em Configurações → Básico (etapa 15.2)
+- [ ] Só faça App Review se for atender **terceiros** — para a sua própria conta não é exigido (etapa 15.1)
 
 ## Apêndice B — Comandos do projeto
 

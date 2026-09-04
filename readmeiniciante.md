@@ -487,6 +487,16 @@ O que vai acontecer, em ordem:
 7. **Assinar o evento de comentários** — em **dois lugares diferentes**, e os dois são obrigatórios.
 8. **Fazer o login** (aquela tela de "Permitir?") para conectar a sua conta.
 
+### A foto do app — quase todo mundo esquece
+
+O painel da Meta pede uma **foto do app** (o "ícone"), e ela **não** aparece na lista de passos do assistente: fica escondida em **Configurações → Básico**.
+
+- Tamanho: **1024 × 1024 pixels**, quadrada, PNG.
+- Use a **sua** marca ou uma imagem sua. **Não pode** usar o logo do Instagram, da Meta ou do Facebook — isso reprova o app.
+- Não tem logo? Serve qualquer imagem quadrada própria, feita no Canva ou em qualquer editor gratuito.
+
+Isso importa mesmo: essa foto é o que aparece na tela de "Permitir?" que você (e depois qualquer pessoa) vê ao conectar a conta. Um app sem foto passa impressão de coisa quebrada.
+
 ### O alerta que mais derruba gente aqui
 
 **A Meta te mostra DOIS pares de "App ID + App Secret":** um do app do Facebook e outro do Instagram. **Eles são diferentes, e o errado não funciona.** O `SETUP_META.md` tem uma seção inteira só sobre isso, com o alerta em destaque — leia com calma quando chegar lá. Se a automação depois não responder, este é o primeiro lugar para conferir.
@@ -538,6 +548,15 @@ Grave essa regra: **editou → deploy.** Toda vez. Ela responde 90% dos "mudei e
 ### O teste de verdade
 
 O único teste que vale é o real. Comente a sua palavra-gatilho em um Reel seu e veja o Direct chegar.
+
+**Dica para não incomodar ninguém:** dá para travar a automação em **um único post** enquanto você testa. No `src/config.ts`, troque:
+
+```ts
+allowedMediaIds: ['*'],            // todos os Reels
+allowedMediaIds: ['1791234...'],   // só este
+```
+
+Assim, se alguém comentar a palavra-gatilho num post antigo, não acontece nada. Como descobrir esse número está na etapa 12 do [SETUP_META.md](SETUP_META.md). Terminado o teste, volte para `['*']` — e lembre: **editou → deploy**.
 
 Para acompanhar ao vivo o que está acontecendo por dentro, deixe isto rodando em outro terminal enquanto comenta:
 

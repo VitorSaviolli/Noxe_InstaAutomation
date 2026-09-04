@@ -320,11 +320,13 @@ describe('processComment (fluxo completo)', () => {
 
   test('substitui {username} e {link} na mensagem privada', async () => {
     const api = new ApiFalsa()
-    await processComment(evento({ fromUsername: 'maria' }), deps(api))
+    // Template proprio: o teste cobre a substituicao, nao o texto que o dono
+    // da instalacao escolheu em src/config.ts.
+    const config = configTeste({ privateReplyText: 'Olá, {username}! Link: {link}' })
 
-    expect(api.textosEnviados[0]).toBe(
-      'Olá, maria! Aqui está o link que você pediu: https://exemplo.com/link',
-    )
+    await processComment(evento({ fromUsername: 'maria' }), deps(api, config))
+
+    expect(api.textosEnviados[0]).toBe('Olá, maria! Link: https://exemplo.com/link')
   })
 
   test('sem resposta publica quando publicReplyEnabled e false', async () => {
