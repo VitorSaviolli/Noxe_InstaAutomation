@@ -44,7 +44,17 @@
     // barra no fim (ex.: "meu-worker.minha-conta.workers.dev"). E o mesmo host
     // que o navegador mostra na barra de endereco. Nasce VAZIO de proposito:
     // enquanto estiver vazio, o painel responde 503 e nao existe.
-    "PANEL_RP_ID": ""
+    "PANEL_RP_ID": "",
+    // Dominios para os quais o painel pode apontar o link do Direct, separados
+    // por virgula, em minusculas e sem "https://" (ex.: "meusite.com.br,
+    // www.meusite.com.br"). Um item que comeca com ponto (".meusite.com.br")
+    // tambem libera os subdominios.
+    // Este bloco e SOBRESCRITO a cada deploy, e aqui isso e a protecao: mudar
+    // esta lista exige o repositorio e a credencial de deploy, que e o que um
+    // painel invadido nao tem. Nasce VAZIA de proposito: enquanto estiver
+    // vazia, o painel NAO altera link nem texto do Direct, e a entrega segue
+    // com o link que ja esta valendo.
+    "ALLOWED_LINK_DOMAINS": ""
   },
 
   // Lista dos segredos que o Worker espera encontrar. O wrangler usa essa
