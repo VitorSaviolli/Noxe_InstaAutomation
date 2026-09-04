@@ -27,6 +27,12 @@ export default defineConfig({
           // de teste. Em wrangler.jsonc este var nasce VAZIO: o endereco e de
           // quem instala, nunca do repositorio.
           PANEL_RP_ID: 'exemplo.workers.dev',
+          // Allowlist de dominios VAZIA, igual ao wrangler.jsonc: e o estado
+          // em que a entrega continua funcionando e o painel nao altera link
+          // nem texto (§9.8). Cada teste que exercita a trava declara a
+          // propria lista, do mesmo jeito que `now` e sempre injetado — uma
+          // lista fixa aqui esconderia qual regra cada teste esta provando.
+          ALLOWED_LINK_DOMAINS: '',
           // Raiz das quatro subchaves do painel. Ficticia, e DIFERENTE do
           // SETUP_ADMIN_TOKEN e do TOKEN_ENCRYPTION_KEY de proposito — o
           // metateste META-05 falha se alguem repetir um valor aqui.

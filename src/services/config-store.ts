@@ -37,7 +37,8 @@ import {
   type PainelMidiaRecord,
 } from '../repositories/painel-config-repository'
 import type { Env } from '../types/env'
-import { type Achado, ehMediaIdValido, type Validacao, validarConfig } from './config-validation'
+import { type Achado, ehMediaIdValido, type Validacao } from './config-validation'
+import { type Allowlist, lerAllowlist, validarConfigComAllowlist } from './link-allowlist'
 
 /** De onde a configuracao servida neste instante veio. */
 export type OrigemConfig = 'arquivo' | 'banco' | 'parado_por_erro'
@@ -134,12 +135,17 @@ async function lerEValidar(env: Env): Promise<SnapshotConfig> {
     return daFabrica('arquivo', 0, avisos)
   }
 
-  const global = lerGlobal(leitura.config, leitura.midias)
+  // A allowlist e lida UMA vez por preenchimento de cache, nunca por
+  // comentario (§9.8). Ela nunca fica velha aqui: muda-la exige deploy, e
+  // deploy descarta os isolates com o cache dentro.
+  const allowlist = lerAllowlist(env.ALLOWED_LINK_DOMAINS)
+
+  const global = lerGlobal(leitura.config, leitura.midias, allowlist)
   if (!global.ok) return doValidadorReprovado(leitura.config, global.achados)
 
   return {
     global: global.valor,
-    overrides: leitura.midias.map((midia) => sobreposicaoDaLinha(midia, global.valor)),
+    overrides: leitura.midias.map((midia) => sobreposicaoDaLinha(midia, global.valor, allowlist)),
     origem: 'banco',
     versao: leitura.config.versao,
     avisos: [],
@@ -347,7 +353,8 @@ type BooleanosDaConfig = Pick<
 >
 
 /**
- * Monta a config global a partir da linha, e a submete ao validador unico.
+ * Monta a config global a partir da linha, e a submete ao validador unico com
+ * a allowlist por cima — nunca a `validarConfig` sozinha (§9.8, LNK-13).
  *
  * `allowedMediaIds` e DERIVADO aqui (§9.4): `'todas'` vira `['*']`,
  * `'selecionadas'` vira a uniao dos `media_id` ativos. Nao existe campo
@@ -361,6 +368,7 @@ type BooleanosDaConfig = Pick<
 function lerGlobal(
   linha: PainelConfigRecord,
   midias: readonly PainelMidiaRecord[],
+  allowlist: Allowlist,
 ): Validacao<AutomationConfig> {
   const gatilhos = lerListaJson(linha.trigger_keywords)
   if (gatilhos === null) {
@@ -388,17 +396,20 @@ function lerGlobal(
     )
   }
 
-  return validarConfig({
-    ...booleanos.valor,
-    triggerKeywords: gatilhos as string[],
-    matchMode: linha.match_mode as AutomationConfig['matchMode'],
-    allowedMediaIds:
-      linha.media_scope === 'todas' ? [CURINGA] : midias.map((midia) => midia.media_id),
-    publicReplyText: linha.public_reply_text,
-    privateReplyText: linha.private_reply_text,
-    destinationUrl: linha.destination_url,
-    userCooldownHours: linha.user_cooldown_hours,
-  })
+  return validarConfigComAllowlist(
+    {
+      ...booleanos.valor,
+      triggerKeywords: gatilhos as string[],
+      matchMode: linha.match_mode as AutomationConfig['matchMode'],
+      allowedMediaIds:
+        linha.media_scope === 'todas' ? [CURINGA] : midias.map((midia) => midia.media_id),
+      publicReplyText: linha.public_reply_text,
+      privateReplyText: linha.private_reply_text,
+      destinationUrl: linha.destination_url,
+      userCooldownHours: linha.user_cooldown_hours,
+    },
+    allowlist,
+  )
 }
 
 function recusa(campo: string, codigo: string, mensagem: string): Validacao<AutomationConfig> {
@@ -414,9 +425,14 @@ function recusa(campo: string, codigo: string, mensagem: string): Validacao<Auto
  *
  * Linha invalida NAO e descartada: descartar ALARGARIA, porque a linha podia
  * ser justamente o que estreitava. Ela vira `{ enabled: false }`, que pausa
- * aquela midia e deixa as outras seguirem.
+ * aquela midia e deixa as outras seguirem — e e tambem o que acontece com uma
+ * midia que traz link ou texto fora da allowlist (LNK-15).
  */
-function sobreposicaoDaLinha(linha: PainelMidiaRecord, global: AutomationConfig): MediaAutomation {
+function sobreposicaoDaLinha(
+  linha: PainelMidiaRecord,
+  global: AutomationConfig,
+  allowlist: Allowlist,
+): MediaAutomation {
   const pausada: MediaAutomation = { mediaIds: [linha.media_id], enabled: false }
 
   if (!ehMediaIdValido(linha.media_id)) return pausada
@@ -427,7 +443,7 @@ function sobreposicaoDaLinha(linha: PainelMidiaRecord, global: AutomationConfig)
   // A sobreposicao e julgada JA MESCLADA sobre a global: e a config mesclada
   // que decide o comportamento, e um `contains` com gatilho curto so aparece
   // depois da mesclagem.
-  if (!validarConfig({ ...global, ...patch }).ok) return pausada
+  if (!validarConfigComAllowlist({ ...global, ...patch }, allowlist).ok) return pausada
 
   return { mediaIds: [linha.media_id], ...patch }
 }

@@ -412,10 +412,18 @@ function validarLink(valores: AutomationConfig, achados: Achado[]): void {
     })
   }
 
-  // `new URL` ja normaliza o host para minusculo e punycode. Se o que veio
-  // nao bate com o normalizado, o texto guardado nao e o endereco que o
-  // navegador visitaria — e essa diferenca e a base do ataque de homografo.
-  if (!bruto.includes(url.host)) {
+  // `new URL` ja normaliza esquema e host para minusculo e punycode. Se o
+  // comeco do texto guardado nao e IGUAL a origem normalizada, o que esta
+  // gravado nao e o endereco que o navegador visitaria — e essa diferenca e a
+  // base do ataque de homografo.
+  //
+  // A comparacao e do pedaco inteiro, e nao um `includes`: com `includes`,
+  // `https://EXEMPLO.com/?r=exemplo.com` passava, porque o host normalizado
+  // aparecia na query. Comparar so a origem, e nao o `url.href`, e o que evita
+  // recusar `https://exemplo.com` por causa da barra final que o `href`
+  // acrescenta — um link legitimo que a pessoa escreve sem barra.
+  const origemNormalizada = `${url.protocol}//${url.host}`
+  if (bruto.slice(0, origemNormalizada.length) !== origemNormalizada) {
     achados.push({
       campo: 'destinationUrl',
       codigo: 'link_nao_normalizado',

@@ -26,6 +26,20 @@ export interface Env {
    * significa painel em 503, que e o padrao seguro e nao um defeito.
    */
   PANEL_RP_ID: string
+  /**
+   * Dominios para os quais o painel pode apontar o link do Direct.
+   *
+   * Separados por virgula, em minusculas e em punycode. Um item que comeca
+   * com ponto (`.exemplo.com.br`) tambem libera os subdominios.
+   *
+   * E a trava que o painel NAO pode alterar: o bloco `vars` do wrangler.jsonc
+   * e sobrescrito a cada publicacao, entao mudar esta lista exige o
+   * repositorio mais a credencial de deploy — as duas coisas que um painel
+   * invadido nao tem. Nasce VAZIA no repositorio, porque cada instalacao tem o
+   * proprio dominio; vazia significa que o painel nao altera link nem texto do
+   * Direct, e a entrega segue com o link que ja esta valendo.
+   */
+  ALLOWED_LINK_DOMAINS: string
 
   // --- Segredos (wrangler secret put) ---
   /** Valida X-Hub-Signature-256 e assina a troca de code no OAuth. */
