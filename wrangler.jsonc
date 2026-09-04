@@ -39,7 +39,12 @@
     // Versao da Graph API. Ver README para a politica de atualizacao.
     "META_API_VERSION": "v25.0",
     // Preenchido automaticamente apos o primeiro login OAuth; deixe vazio.
-    "META_IG_USER_ID": ""
+    "META_IG_USER_ID": "",
+    // Endereco do painel administrativo, so o host: sem "https://" e sem
+    // barra no fim (ex.: "meu-worker.minha-conta.workers.dev"). E o mesmo host
+    // que o navegador mostra na barra de endereco. Nasce VAZIO de proposito:
+    // enquanto estiver vazio, o painel responde 503 e nao existe.
+    "PANEL_RP_ID": ""
   },
 
   // Lista dos segredos que o Worker espera encontrar. O wrangler usa essa
@@ -51,7 +56,8 @@
       "META_APP_SECRET",
       "META_WEBHOOK_VERIFY_TOKEN",
       "TOKEN_ENCRYPTION_KEY",
-      "SETUP_ADMIN_TOKEN"
+      "SETUP_ADMIN_TOKEN",
+      "PANEL_SESSION_KEY"
     ]
   },
 
