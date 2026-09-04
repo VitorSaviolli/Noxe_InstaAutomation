@@ -155,11 +155,12 @@ describe('REG-29 — o cron', () => {
       escritas: direto.escritas,
     })
 
-    // E o gasto e o de hoje: a leitura do token e a varredura de pendentes.
-    // Nenhuma escrita, e nada de painel — a poda da auditoria e a UNICA coisa
-    // do painel que pode entrar aqui, e ela ainda nao existe.
+    // E o gasto e o de hoje: a leitura do token, a varredura de pendentes e a
+    // leitura barata da poda de auditoria (§8.9) — a UNICA coisa do painel que
+    // pode entrar no cron, e ela entrou na etapa da parada de emergencia.
+    // Nenhuma escrita: a poda so apaga quando ha o que apagar.
     expect({ prepares: direto.prepares, escritas: direto.escritas }).toEqual({
-      prepares: 2,
+      prepares: 3,
       escritas: 0,
     })
   })

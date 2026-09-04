@@ -27,6 +27,7 @@ export const TABELAS_DO_SCHEMA = [
   // elas, mas a relacao conceitual e essa — midia sem linha global e orfa.
   'painel_midias',
   'painel_auditoria',
+  'painel_codigos',
   'painel_config',
 ] as const
 

@@ -36,6 +36,7 @@ import {
   CommentsRepository,
   type DeferredComment,
 } from './repositories/comments-repository'
+import { PainelAuditoriaRepository } from './repositories/painel-auditoria-repository'
 import { TokensRepository } from './repositories/tokens-repository'
 import { handleHealth } from './routes/health'
 import { handleDataDeletion, handlePrivacyPolicy } from './routes/legal'
@@ -45,6 +46,13 @@ import {
   handleOAuthCallback,
   handleSubscribe,
 } from './routes/oauth'
+import {
+  CAMINHO_DA_PARADA,
+  CAMINHO_DO_FORMULARIO,
+  handleFormularioDeParada,
+  handleGerarCodigos,
+  handleParada,
+} from './routes/painel/parada'
 import { handleWebhookVerification, readWebhookRequest } from './routes/webhook'
 import {
   computeNextRetry,
@@ -169,6 +177,20 @@ export default {
 
       case '/setup/subscribe':
         return handleSubscribe(request, env, () => loadAccessToken(env))
+
+      // A parada de emergencia entra por `case` proprio, e nao pelo `default:`
+      // onde o resto do painel vai morar: ela e a ultima rota que precisa
+      // funcionar e nao pode passar pelo portao de sanidade do painel, que
+      // exige `PANEL_RP_ID` — um dado do subsistema WebAuthn (§11.1).
+      case CAMINHO_DA_PARADA:
+        return handleParada(request, env, now)
+
+      case CAMINHO_DO_FORMULARIO:
+        return handleFormularioDeParada(request)
+
+      // O Worker sorteia os codigos, o assistente so imprime (§10.11).
+      case '/setup/painel/codigos':
+        return handleGerarCodigos(request, env, now)
 
       default:
         return new Response('Not Found', { status: 404 })
@@ -344,6 +366,32 @@ export async function runScheduledTasks(
 ): Promise<void> {
   await maybeRefreshToken(env, now)
   await retryPending(env, now, deps)
+  await podarAuditoria(env)
+}
+
+/**
+ * A unica poda de `painel_auditoria` do projeto (§8.9).
+ *
+ * Mora no cron para NUNCA entrar no caminho de gravacao do painel: quem salva
+ * uma tela nao pode pagar a varredura de retencao. Custa uma leitura barata de
+ * no maximo 501 linhas pelo rowid e so escreve quando ha o que apagar — sem
+ * `COUNT(*)`, que varreria a tabela inteira e contaria tudo na cota.
+ *
+ * Por ultimo, e num `try` proprio: a poda e higiene de armazenamento, e uma
+ * falha nela nao pode derrubar a renovacao do token nem a fila de pendentes.
+ */
+async function podarAuditoria(env: Env): Promise<void> {
+  try {
+    const apagadas = await new PainelAuditoriaRepository(env.DB).podar()
+    if (apagadas > 0) {
+      console.log(`Auditoria podada: ${apagadas} linha(s) antiga(s) removida(s)`)
+    }
+  } catch (cause) {
+    console.error(
+      'Falha ao podar a auditoria do painel:',
+      cause instanceof Error ? cause.message : cause,
+    )
+  }
 }
 
 async function maybeRefreshToken(env: Env, now: number): Promise<void> {

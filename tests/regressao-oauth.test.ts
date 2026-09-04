@@ -142,7 +142,56 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     expect(callback.headers.get('set-cookie')).toBeNull()
   })
 
-  test.todo('REG-21: /setup/painel/codigos exige Bearer e nunca loga o corpo (rota da etapa 4)')
+  test('REG-21: /setup/painel/codigos exige Bearer e nunca loga o corpo', async () => {
+    // Sem cabecalho, com Bearer errado e com cookie no lugar do Bearer: as tres
+    // recusas sao a mesma, e nenhuma delas grava linha nenhuma.
+    const recusas: Array<Record<string, string>> = [
+      {},
+      { authorization: 'Bearer token-errado' },
+      { cookie: `painel_sessao=${ADMIN}` },
+    ]
+
+    for (const cabecalhos of recusas) {
+      const recusada = await responderComEnv(
+        new Request(`${RAIZ}/setup/painel/codigos`, { method: 'POST', headers: cabecalhos }),
+      )
+
+      expect(recusada.status).toBe(401)
+      expect(await recusada.text()).toBe('Nao autorizado')
+      expect(recusada.headers.get('set-cookie')).toBeNull()
+      expect(await contarCodigos()).toBe(0)
+    }
+
+    // Com o Bearer certo, os codigos saem — uma unica vez, no corpo.
+    const registrado = capturarConsole()
+    let corpo: { recuperacao: string[]; parada: string }
+    try {
+      const aceita = await responderComEnv(
+        new Request(`${RAIZ}/setup/painel/codigos`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${ADMIN}` },
+        }),
+      )
+
+      expect(aceita.status).toBe(200)
+      expect(aceita.headers.get('cache-control')).toBe('private, no-store')
+      corpo = (await aceita.json()) as { recuperacao: string[]; parada: string }
+    } finally {
+      registrado.parar()
+    }
+
+    expect(corpo.recuperacao).toHaveLength(6)
+    expect(await contarCodigos()).toBe(7)
+
+    // E o corpo NUNCA foi para o log, em nivel nenhum: nem o codigo formatado,
+    // nem o codigo sem os hifens da exibicao.
+    const tudoQueFoiLogado = registrado.linhas.join(' | ')
+    for (const codigo of [...corpo.recuperacao, corpo.parada]) {
+      expect(tudoQueFoiLogado).not.toContain(codigo)
+      expect(tudoQueFoiLogado).not.toContain(codigo.replaceAll('-', ''))
+    }
+  })
+
   test.todo('REG-22: /setup/painel/zerar exige Bearer e nao toca account_tokens (etapa 7)')
 })
 
@@ -252,3 +301,40 @@ describe('REG — o `state` do OAuth continua exatamente como e hoje', () => {
     expect(STATE_TTL_MS).toBe(10 * 60 * 1000)
   })
 })
+
+/** Quantas linhas a tabela de codigos tem agora. */
+async function contarCodigos(): Promise<number> {
+  const linha = await env.DB.prepare('SELECT COUNT(*) AS total FROM painel_codigos').first<{
+    total: number
+  }>()
+  return linha?.total ?? -1
+}
+
+/**
+ * Captura o que sai pelo `console` enquanto um trecho roda.
+ *
+ * Troca as tres funcoes por versoes que guardam o texto e devolve `parar()`
+ * para restaurar — nao e mock de modulo, e o unico jeito de transformar "o
+ * corpo desta rota nunca e logado" (§10.11) numa afirmacao verificavel.
+ */
+function capturarConsole(): { linhas: string[]; parar: () => void } {
+  const linhas: string[] = []
+  const originais = { log: console.log, warn: console.warn, error: console.error }
+
+  const guardar = (...partes: unknown[]) => {
+    linhas.push(partes.map((parte) => String(parte)).join(' '))
+  }
+
+  console.log = guardar
+  console.warn = guardar
+  console.error = guardar
+
+  return {
+    linhas,
+    parar: () => {
+      console.log = originais.log
+      console.warn = originais.warn
+      console.error = originais.error
+    },
+  }
+}

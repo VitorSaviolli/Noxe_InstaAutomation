@@ -96,6 +96,7 @@ const COLUNAS_ESPERADAS: Record<string, readonly string[]> = {
     'user_cooldown_hours',
     'visto_em',
   ],
+  painel_codigos: ['criado_em', 'hash', 'invalidado_em', 'tipo', 'usado_em', 'versao_hash'],
   painel_auditoria: [
     'acao',
     'alvo',
@@ -189,6 +190,10 @@ describe('META — tabelas', () => {
       `INSERT INTO painel_auditoria
          (id, ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
        VALUES (1, 1, 1, 'migracao', 'sistema', 0, 'criou', NULL, '[]', NULL, NULL)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_codigos (hash, tipo, versao_hash, criado_em, usado_em, invalidado_em)
+       VALUES ('hash-meta', 'parada', 1, 1, NULL, NULL)`,
     ).run()
 
     // Uma linha em CADA tabela: sem isto, uma tabela nova entraria na lista e

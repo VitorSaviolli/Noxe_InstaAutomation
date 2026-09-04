@@ -75,6 +75,41 @@ export interface LeituraDeConfig {
   midias: PainelMidiaRecord[]
 }
 
+/**
+ * O que a parada de emergencia precisa saber antes de decidir se grava.
+ *
+ * `null` na leitura significa LINHA AUSENTE, e nao "automacao desligada": sem
+ * linha, quem manda e a fabrica de `src/config.ts`, que nasce ligada.
+ */
+export interface EstadoDaAutomacao {
+  enabled: number
+  versao: number
+}
+
+/**
+ * Os valores que materializam a linha quando ela ainda nao existe (§8.3).
+ *
+ * Sao as colunas `NOT NULL` de `painel_config` que a parada nao decide: ela
+ * decide `enabled`, `parado_por_codigo_em` e `versao`, e o resto vem da
+ * fabrica. A conversao de `AutomationConfig` para estas colunas e produto e
+ * mora em quem chama — aqui elas chegam prontas, ja no formato do banco.
+ */
+export interface LinhaDeFabrica {
+  trigger_keywords: string
+  match_mode: string
+  case_sensitive: number
+  normalize_accents: number
+  ignore_punctuation: number
+  process_only_reels: number
+  media_scope: string
+  public_reply_enabled: number
+  public_reply_text: string
+  private_reply_enabled: number
+  private_reply_text: string
+  destination_url: string
+  user_cooldown_hours: number
+}
+
 const SINGLETON_ID = 1
 
 export class PainelConfigRepository {
@@ -112,5 +147,74 @@ export class PainelConfigRepository {
       config: ((global.results ?? [])[0] as PainelConfigRecord | undefined) ?? null,
       midias: (midias.results ?? []) as PainelMidiaRecord[],
     }
+  }
+
+  /**
+   * A leitura barata da parada de emergencia: UMA consulta, duas colunas.
+   *
+   * `ler()` custaria duas — a linha global e as midias — e a parada nao olha
+   * midia nenhuma. `versao` vem junto porque a linha de auditoria guarda a
+   * versao RESULTANTE (§8.8) e perguntar por ela depois seria uma segunda
+   * consulta na rota que §9.10 fixa em duas leituras.
+   */
+  async lerEstadoDaAutomacao(): Promise<EstadoDaAutomacao | null> {
+    const linha = await this.db
+      .prepare('SELECT enabled, versao FROM painel_config WHERE id = ?')
+      .bind(SINGLETON_ID)
+      .first<EstadoDaAutomacao>()
+
+    return linha ?? null
+  }
+
+  /**
+   * O `UPDATE` da parada de emergencia — ou o `INSERT` que materializa a linha.
+   *
+   * Um unico statement porque §8.3 exige que a parada funcione **mesmo quando
+   * a linha ainda nao existe**: um fork que nunca abriu o painel tem a
+   * configuracao so no arquivo, e a ultima rota que precisa funcionar nao pode
+   * depender de a pessoa ter salvado alguma vez.
+   *
+   * No ramo `INSERT` a linha nasce da fabrica com `versao = 1`; no ramo
+   * `UPDATE` a versao anda +1 — e esse incremento e recurso, nao efeito
+   * colateral: quem estava com o formulario aberto e obrigado a recarregar e
+   * ver que a automacao foi parada (§8.8).
+   *
+   * Devolve statement, e nao grava: ele vai no MESMO lote da linha de
+   * auditoria. Sem log, sem mudanca.
+   */
+  statementDeParada(now: number, fabrica: LinhaDeFabrica): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT INTO painel_config
+           (id, enabled, trigger_keywords, match_mode, case_sensitive, normalize_accents,
+            ignore_punctuation, process_only_reels, media_scope, public_reply_enabled,
+            public_reply_text, private_reply_enabled, private_reply_text, destination_url,
+            user_cooldown_hours, versao, parado_por_codigo_em, criado_em, atualizado_em)
+         VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           enabled              = 0,
+           parado_por_codigo_em = excluded.parado_por_codigo_em,
+           versao               = painel_config.versao + 1,
+           atualizado_em        = excluded.atualizado_em`,
+      )
+      .bind(
+        SINGLETON_ID,
+        fabrica.trigger_keywords,
+        fabrica.match_mode,
+        fabrica.case_sensitive,
+        fabrica.normalize_accents,
+        fabrica.ignore_punctuation,
+        fabrica.process_only_reels,
+        fabrica.media_scope,
+        fabrica.public_reply_enabled,
+        fabrica.public_reply_text,
+        fabrica.private_reply_enabled,
+        fabrica.private_reply_text,
+        fabrica.destination_url,
+        fabrica.user_cooldown_hours,
+        now,
+        now,
+        now,
+      )
   }
 }
