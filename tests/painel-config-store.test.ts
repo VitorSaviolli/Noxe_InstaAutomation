@@ -21,7 +21,14 @@ import {
 import { validarConfig } from '../src/services/config-validation'
 import type { Env } from '../src/types/env'
 import type { CommentEvent } from '../src/types/meta'
-import { ligarConta, limparBanco } from './fixtures/banco'
+import {
+  gravarConfig,
+  gravarMidia,
+  LINHA_DE_CONFIG_VALIDA as LINHA_VALIDA,
+  type LinhaDeConfig,
+  ligarConta,
+  limparBanco,
+} from './fixtures/banco'
 import {
   AGORA,
   comoApi,
@@ -48,78 +55,6 @@ import {
 
 const MEDIA_A = '17900000000000001'
 const MEDIA_B = '17900000000000002'
-
-/** Uma linha de `painel_config` valida, campo a campo. */
-const LINHA_VALIDA = {
-  enabled: 1,
-  trigger_keywords: '["eu quero","quero o link"]',
-  match_mode: 'exact',
-  case_sensitive: 0,
-  normalize_accents: 1,
-  ignore_punctuation: 1,
-  process_only_reels: 1,
-  media_scope: 'todas',
-  public_reply_enabled: 1,
-  public_reply_text: 'Enviei as informacoes no seu Direct.',
-  private_reply_enabled: 1,
-  private_reply_text: 'Ola, {username}! Aqui esta o link: {link}',
-  destination_url: 'https://exemplo.com/do-banco',
-  user_cooldown_hours: 24,
-  versao: 1,
-  parado_por_codigo_em: null as number | null,
-}
-
-type LinhaDeConfig = typeof LINHA_VALIDA
-
-/** Grava a linha unica de configuracao, com os campos trocados que vierem. */
-async function gravarConfig(patch: Partial<LinhaDeConfig> = {}): Promise<void> {
-  const linha = { ...LINHA_VALIDA, ...patch }
-
-  await env.DB.prepare(
-    `INSERT INTO painel_config
-       (id, enabled, trigger_keywords, match_mode, case_sensitive, normalize_accents,
-        ignore_punctuation, process_only_reels, media_scope, public_reply_enabled,
-        public_reply_text, private_reply_enabled, private_reply_text, destination_url,
-        user_cooldown_hours, versao, parado_por_codigo_em, criado_em, atualizado_em)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(
-      linha.enabled,
-      linha.trigger_keywords,
-      linha.match_mode,
-      linha.case_sensitive,
-      linha.normalize_accents,
-      linha.ignore_punctuation,
-      linha.process_only_reels,
-      linha.media_scope,
-      linha.public_reply_enabled,
-      linha.public_reply_text,
-      linha.private_reply_enabled,
-      linha.private_reply_text,
-      linha.destination_url,
-      linha.user_cooldown_hours,
-      linha.versao,
-      linha.parado_por_codigo_em,
-      AGORA,
-      AGORA,
-    )
-    .run()
-}
-
-/** Grava uma linha de `painel_midias`. As colunas ausentes ficam `NULL`. */
-async function gravarMidia(
-  mediaId: string,
-  sobreposicao: Record<string, string | number | null> = {},
-  ativo = 1,
-): Promise<void> {
-  const colunas = Object.keys(sobreposicao)
-  const nomes = ['media_id', 'ativo', 'criado_em', 'atualizado_em', ...colunas].join(', ')
-  const marcas = new Array(4 + colunas.length).fill('?').join(', ')
-
-  await env.DB.prepare(`INSERT INTO painel_midias (${nomes}) VALUES (${marcas})`)
-    .bind(mediaId, ativo, AGORA, AGORA, ...colunas.map((coluna) => sobreposicao[coluna] ?? null))
-    .run()
-}
 
 /** Apaga a linha de configuracao. E o "caminho de volta" documentado em §9.11. */
 const SQL_APAGA_CONFIG = 'DELETE FROM painel_config'
@@ -241,7 +176,7 @@ describe('CFG — o estado inicial e o caminho normal', () => {
     const semLinha = await carregarConfigEfetiva(env, AGORA)
 
     invalidarCacheDeConfig()
-    await gravarConfig({ user_cooldown_hours: 7, versao: 3 })
+    await gravarConfig(env.DB, { user_cooldown_hours: 7, versao: 3 })
     const comLinha = await carregarConfigEfetiva(env, AGORA)
 
     expect({ origem: comLinha.origem, versao: comLinha.versao }).toEqual({
@@ -284,7 +219,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
 
   for (const caso of CORROMPIDAS) {
     test(`CFG-02: ${caso.nome} deixa a automacao parada`, async () => {
-      await gravarConfig(caso.patch)
+      await gravarConfig(env.DB, caso.patch)
 
       const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -310,7 +245,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
 
   test('CFG-08: matchMode invalido e recusado pelo schema E pelo validador', async () => {
     // Primeira barreira: o CHECK da migration nao deixa a linha entrar.
-    const erro = await erroDe(() => gravarConfig({ match_mode: 'regex' }))
+    const erro = await erroDe(() => gravarConfig(env.DB, { match_mode: 'regex' }))
     expect(erro).toContain('CHECK constraint failed')
 
     // Segunda barreira, para o dia em que a primeira nao existir: mesmo que a
@@ -325,11 +260,11 @@ describe('CFG — configuracao corrompida para a automacao', () => {
   test('CFG-09: cooldown negativo ou acima de 8760 e recusado pelo schema', async () => {
     // Cooldown negativo joga `now - horas * 3600000` para o FUTURO: a
     // comparacao vira sempre falsa e o freio some sem erro nenhum.
-    expect(await erroDe(() => gravarConfig({ user_cooldown_hours: -1 }))).toContain(
+    expect(await erroDe(() => gravarConfig(env.DB, { user_cooldown_hours: -1 }))).toContain(
       'CHECK constraint failed',
     )
     await limparBanco(env.DB)
-    expect(await erroDe(() => gravarConfig({ user_cooldown_hours: 8761 }))).toContain(
+    expect(await erroDe(() => gravarConfig(env.DB, { user_cooldown_hours: 8761 }))).toContain(
       'CHECK constraint failed',
     )
   })
@@ -350,7 +285,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
   })
 
   test('CFG-14: nenhum campo invalido e substituido por valor de fabrica com a automacao rodando', async () => {
-    await gravarConfig({ destination_url: 'http://exemplo.com', user_cooldown_hours: 99 })
+    await gravarConfig(env.DB, { destination_url: 'http://exemplo.com', user_cooldown_hours: 99 })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -370,7 +305,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
 
   test('CFG-07: processComment continua sem lancar com a config corrompida', async () => {
     await ligarConta(env, AGORA)
-    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    await gravarConfig(env.DB, { destination_url: 'nao-e-uma-url' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
     const api = new MetaFalsa()
@@ -392,8 +327,8 @@ describe('CFG — configuracao corrompida para a automacao', () => {
 
 describe('CFG — o parser: NULL e chave ausente, nunca undefined', () => {
   test('CFG-05: sobreposicao so com NULL nao produz nenhuma chave com undefined', async () => {
-    await gravarConfig()
-    await gravarMidia(MEDIA_A)
+    await gravarConfig(env.DB)
+    await gravarMidia(env.DB, MEDIA_A)
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
     const [sobreposicao] = snapshot.overrides
@@ -409,8 +344,8 @@ describe('CFG — o parser: NULL e chave ausente, nunca undefined', () => {
   })
 
   test('CFG-06: sobreposicao com campo ausente NAO zera o campo global', async () => {
-    await gravarConfig()
-    await gravarMidia(MEDIA_A, { public_reply_text: 'Texto so deste Reel.' })
+    await gravarConfig(env.DB)
+    await gravarMidia(env.DB, MEDIA_A, { public_reply_text: 'Texto so deste Reel.' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
     const efetiva = resolveConfigForMedia(MEDIA_A, snapshot.global, snapshot.overrides)
@@ -444,9 +379,9 @@ describe('CFG — o parser: NULL e chave ausente, nunca undefined', () => {
 
 describe('CFG — sobreposicoes por midia', () => {
   test('CFG-16: linha de midia invalida recebe { enabled: false } e as outras seguem', async () => {
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia(MEDIA_A, { destination_url: 'http://inseguro.example' })
-    await gravarMidia(MEDIA_B, { public_reply_text: 'Texto do Reel B.' })
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, MEDIA_A, { destination_url: 'http://inseguro.example' })
+    await gravarMidia(env.DB, MEDIA_B, { public_reply_text: 'Texto do Reel B.' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -470,9 +405,9 @@ describe('CFG — sobreposicoes por midia', () => {
   })
 
   test('CFG-16: media_id fora do formato tambem pausa so aquela midia', async () => {
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia('nao-e-um-id', {})
-    await gravarMidia(MEDIA_B, {})
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, 'nao-e-um-id', {})
+    await gravarMidia(env.DB, MEDIA_B, {})
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -486,8 +421,8 @@ describe('CFG — sobreposicoes por midia', () => {
   test('CFG-16: sobreposicao que so faz sentido mesclada e julgada JA mesclada', async () => {
     // Sozinho, `matchMode: 'contains'` e valido. Mesclado sobre uma global com
     // gatilho de 8 caracteres continua valido; com um gatilho de 2, nao.
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia(MEDIA_A, { match_mode: 'contains', trigger_keywords: '["eu"]' })
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, MEDIA_A, { match_mode: 'contains', trigger_keywords: '["eu"]' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -495,16 +430,16 @@ describe('CFG — sobreposicoes por midia', () => {
   })
 
   test('CFG-10: duas midias com o mesmo media_id sao recusadas na gravacao', async () => {
-    await gravarConfig()
-    await gravarMidia(MEDIA_A)
+    await gravarConfig(env.DB)
+    await gravarMidia(env.DB, MEDIA_A)
 
     // `media_id` e PRIMARY KEY: "duas entradas citando o mesmo Reel, a
     // primeira vence em silencio" deixa de ser representavel.
-    expect(await erroDe(() => gravarMidia(MEDIA_A))).toContain('UNIQUE constraint failed')
+    expect(await erroDe(() => gravarMidia(env.DB, MEDIA_A))).toContain('UNIQUE constraint failed')
   })
 
   test('CFG-17: linhas de midia sem linha global sao ignoradas, com aviso', async () => {
-    await gravarMidia(MEDIA_A, { destination_url: 'https://exemplo.com/orfa' })
+    await gravarMidia(env.DB, MEDIA_A, { destination_url: 'https://exemplo.com/orfa' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -516,11 +451,11 @@ describe('CFG — sobreposicoes por midia', () => {
   })
 
   test('§9.4: allowedMediaIds e DERIVADO de media_scope e das linhas ativas', async () => {
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia(MEDIA_A)
-    await gravarMidia(MEDIA_B)
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, MEDIA_A)
+    await gravarMidia(env.DB, MEDIA_B)
     // Linha inativa nao entra nem na lista nem nas sobreposicoes.
-    await gravarMidia('17900000000000003', {}, 0)
+    await gravarMidia(env.DB, '17900000000000003', {}, 0)
 
     const selecionadas = await carregarConfigEfetiva(env, AGORA)
     expect(selecionadas.global.allowedMediaIds).toEqual([MEDIA_A, MEDIA_B])
@@ -533,8 +468,8 @@ describe('CFG — sobreposicoes por midia', () => {
   })
 
   test('§9.4: media_scope "todas" vira o curinga, e nao a lista', async () => {
-    await gravarConfig({ media_scope: 'todas' })
-    await gravarMidia(MEDIA_A)
+    await gravarConfig(env.DB, { media_scope: 'todas' })
+    await gravarMidia(env.DB, MEDIA_A)
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -579,7 +514,7 @@ describe('CFG — o banco fora do ar e a migration atrasada', () => {
 
 describe('§9.6 — o cache por isolate', () => {
   test('§9.6: ligado vive 10 s; a mudanca aparece assim que a janela fecha', async () => {
-    await gravarConfig()
+    await gravarConfig(env.DB)
     expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
 
     await env.DB.prepare('DELETE FROM painel_config').run()
@@ -590,7 +525,7 @@ describe('§9.6 — o cache por isolate', () => {
   })
 
   test('§9.6: desligado vive 60 s — servir "parado" velho nunca causa dano', async () => {
-    await gravarConfig({ enabled: 0, trigger_keywords: '[]' })
+    await gravarConfig(env.DB, { enabled: 0, trigger_keywords: '[]' })
     expect((await carregarConfigEfetiva(env, AGORA)).global.enabled).toBe(false)
 
     await env.DB.prepare('DELETE FROM painel_config').run()
@@ -600,7 +535,7 @@ describe('§9.6 — o cache por isolate', () => {
   })
 
   test('§9.6: o painel nao usa o cache — ignorarCache rele do banco', async () => {
-    await gravarConfig()
+    await gravarConfig(env.DB)
     await carregarConfigEfetiva(env, AGORA)
 
     await env.DB.prepare('DELETE FROM painel_config').run()
@@ -611,8 +546,8 @@ describe('§9.6 — o cache por isolate', () => {
   })
 
   test('§9.6: o snapshot e congelado em profundidade antes de entrar no cache', async () => {
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia(MEDIA_A, { trigger_keywords: '["so deste reel"]' })
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, MEDIA_A, { trigger_keywords: '["so deste reel"]' })
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -636,7 +571,7 @@ describe('§9.6 — o cache por isolate', () => {
 describe('CFG — uma carga por lote, nunca por comentario', () => {
   beforeEach(async () => {
     await ligarConta(env, AGORA)
-    await gravarConfig()
+    await gravarConfig(env.DB)
   })
 
   test('CFG-11: um lote de 3 comentarios carrega a config UMA vez', async () => {
@@ -773,7 +708,7 @@ describe('§9.2 — a forma do snapshot', () => {
   })
 
   test('§9.2: `global` tem a mesma forma de AutomationConfig, campo a campo', async () => {
-    await gravarConfig()
+    await gravarConfig(env.DB)
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
     const forma = (valor: unknown): string => (Array.isArray(valor) ? 'array' : typeof valor)
@@ -826,7 +761,7 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   test('CFG-14: o controle — com a config valida o cron ENTREGA o pendente', async () => {
     // Sem este teste, o de baixo passaria por a fila estar vazia ou por o cron
     // nem chegar no laco.
-    await gravarConfig()
+    await gravarConfig(env.DB)
     const api = new MetaFalsa()
 
     await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
@@ -838,7 +773,7 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   })
 
   test('CFG-14: link corrompido no banco NAO vira Direct com o link de fabrica pelo cron', async () => {
-    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    await gravarConfig(env.DB, { destination_url: 'nao-e-uma-url' })
     const api = new MetaFalsa()
 
     await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
@@ -850,7 +785,7 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   })
 
   test('CFG-14: o pendente barrado fica na fila, sem gastar tentativa', async () => {
-    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    await gravarConfig(env.DB, { destination_url: 'nao-e-uma-url' })
 
     await runScheduledTasks(env, AGORA, { createApi: () => comoApi(new MetaFalsa()) })
 
@@ -863,11 +798,11 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   })
 
   test('CFG-14: consertada a config, a varredura seguinte drena a fila', async () => {
-    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    await gravarConfig(env.DB, { destination_url: 'nao-e-uma-url' })
     await runScheduledTasks(env, AGORA, { createApi: () => comoApi(new MetaFalsa()) })
 
     await apagarConfig()
-    await gravarConfig()
+    await gravarConfig(env.DB)
     invalidarCacheDeConfig()
 
     const api = new MetaFalsa()
@@ -878,7 +813,7 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   })
 
   test('CFG-02: automacao desligada no banco tambem para o cron', async () => {
-    await gravarConfig({ enabled: 0, trigger_keywords: '[]' })
+    await gravarConfig(env.DB, { enabled: 0, trigger_keywords: '[]' })
     const api = new MetaFalsa()
 
     await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
@@ -888,9 +823,9 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
   })
 
   test('CFG-16: uma midia pausada nao para as outras no cron', async () => {
-    await gravarConfig({ media_scope: 'selecionadas' })
-    await gravarMidia(MEDIA_A, { destination_url: 'http://inseguro.example' })
-    await gravarMidia(MEDIA_B)
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, MEDIA_A, { destination_url: 'http://inseguro.example' })
+    await gravarMidia(env.DB, MEDIA_B)
     await enfileirarPendente('comment-pendente-b')
     await env.DB.prepare('UPDATE processed_comments SET media_id = ? WHERE comment_id = ?')
       .bind(MEDIA_B, 'comment-pendente-b')
@@ -963,7 +898,7 @@ describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel',
 
 describe('CFG — invalidarCacheDeConfig()', () => {
   test('CFG-18: invalidarCacheDeConfig() faz a leitura seguinte reler o banco', async () => {
-    await gravarConfig()
+    await gravarConfig(env.DB)
     expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
 
     await env.DB.prepare(SQL_APAGA_CONFIG).run()

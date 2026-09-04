@@ -10,7 +10,7 @@ import {
   validarConfigComAllowlist,
 } from '../src/services/link-allowlist'
 import type { Env } from '../src/types/env'
-import { limparBanco } from './fixtures/banco'
+import { gravarConfig, gravarMidia, limparBanco } from './fixtures/banco'
 import { AGORA, configDeTeste } from './fixtures/dubles'
 
 /**
@@ -380,7 +380,7 @@ describe('LNK — na leitura', () => {
   test('LNK-13: config com link proibido no banco para a automacao', async () => {
     // A verificacao do dono desta etapa, encenada: a allowlist estreita, um
     // link de fora gravado direto no banco, e a automacao parada.
-    await gravarConfig({ destination_url: 'https://atacante.com/golpe' })
+    await gravarConfig(env.DB, { destination_url: 'https://atacante.com/golpe' })
 
     const snapshot = await carregarConfigEfetiva(envComAllowlist(PERMITIDO), AGORA)
 
@@ -389,7 +389,7 @@ describe('LNK — na leitura', () => {
   })
 
   test('LNK-01: nada da linha proibida e aproveitado, e o aviso nomeia o host', async () => {
-    await gravarConfig({ destination_url: 'https://atacante.com/golpe' })
+    await gravarConfig(env.DB, { destination_url: 'https://atacante.com/golpe' })
 
     const snapshot = await carregarConfigEfetiva(envComAllowlist(PERMITIDO), AGORA)
 
@@ -403,7 +403,7 @@ describe('LNK — na leitura', () => {
   })
 
   test('LNK-13: texto do Direct com endereco de fora tambem para a automacao', async () => {
-    await gravarConfig({ private_reply_text: 'Ola! Corre em atacante.com pelo {link}' })
+    await gravarConfig(env.DB, { private_reply_text: 'Ola! Corre em atacante.com pelo {link}' })
 
     const snapshot = await carregarConfigEfetiva(envComAllowlist(PERMITIDO), AGORA)
 
@@ -411,7 +411,7 @@ describe('LNK — na leitura', () => {
   })
 
   test('LNK-14: encolher a allowlist para a automacao que ja estava rodando', async () => {
-    await gravarConfig({ destination_url: 'https://loja.exemplo.com/promo' })
+    await gravarConfig(env.DB, { destination_url: 'https://loja.exemplo.com/promo' })
 
     const antes = await carregarConfigEfetiva(envComAllowlist(`.${PERMITIDO}`), AGORA)
     expect(antes.origem).toBe('banco')
@@ -427,9 +427,9 @@ describe('LNK — na leitura', () => {
   })
 
   test('LNK-15: midia com link proprio fora da lista e barrada, e so ela', async () => {
-    await gravarConfig()
-    await gravarMidia(MIDIA_A, { destination_url: 'https://atacante.com/golpe' })
-    await gravarMidia(MIDIA_B, { destination_url: 'https://exemplo.com/outro' })
+    await gravarConfig(env.DB)
+    await gravarMidia(env.DB, MIDIA_A, { destination_url: 'https://atacante.com/golpe' })
+    await gravarMidia(env.DB, MIDIA_B, { destination_url: 'https://exemplo.com/outro' })
 
     const snapshot = await carregarConfigEfetiva(envComAllowlist(PERMITIDO), AGORA)
 
@@ -481,73 +481,9 @@ describe('LNK — carry-forward da revisao da Task 3', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Escrita no banco: so as colunas que esta suite precisa trocar
+// Ids das midias usadas nesta suite. Escrever no banco e com `gravarConfig` e
+// `gravarMidia`, que moram em `tests/fixtures/banco.ts`.
 // ---------------------------------------------------------------------------
 
 const MIDIA_A = '17900000000000001'
 const MIDIA_B = '17900000000000002'
-
-/** Uma linha de `painel_config` valida, com os campos trocados que vierem. */
-async function gravarConfig(patch: Record<string, string | number> = {}): Promise<void> {
-  const linha = {
-    enabled: 1,
-    trigger_keywords: '["eu quero","quero o link"]',
-    match_mode: 'exact',
-    case_sensitive: 0,
-    normalize_accents: 1,
-    ignore_punctuation: 1,
-    process_only_reels: 1,
-    media_scope: 'todas',
-    public_reply_enabled: 1,
-    public_reply_text: 'Enviei as informacoes no seu Direct.',
-    private_reply_enabled: 1,
-    private_reply_text: 'Ola, {username}! Aqui esta o link: {link}',
-    destination_url: 'https://exemplo.com/do-banco',
-    user_cooldown_hours: 24,
-    versao: 1,
-    ...patch,
-  }
-
-  await env.DB.prepare(
-    `INSERT INTO painel_config
-       (id, enabled, trigger_keywords, match_mode, case_sensitive, normalize_accents,
-        ignore_punctuation, process_only_reels, media_scope, public_reply_enabled,
-        public_reply_text, private_reply_enabled, private_reply_text, destination_url,
-        user_cooldown_hours, versao, parado_por_codigo_em, criado_em, atualizado_em)
-     VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
-  )
-    .bind(
-      linha.enabled,
-      linha.trigger_keywords,
-      linha.match_mode,
-      linha.case_sensitive,
-      linha.normalize_accents,
-      linha.ignore_punctuation,
-      linha.process_only_reels,
-      linha.media_scope,
-      linha.public_reply_enabled,
-      linha.public_reply_text,
-      linha.private_reply_enabled,
-      linha.private_reply_text,
-      linha.destination_url,
-      linha.user_cooldown_hours,
-      linha.versao,
-      AGORA,
-      AGORA,
-    )
-    .run()
-}
-
-/** Uma linha de `painel_midias`. As colunas ausentes ficam `NULL`. */
-async function gravarMidia(
-  mediaId: string,
-  sobreposicao: Record<string, string | number> = {},
-): Promise<void> {
-  const colunas = Object.keys(sobreposicao)
-  const nomes = ['media_id', 'ativo', 'criado_em', 'atualizado_em', ...colunas].join(', ')
-  const marcas = new Array(4 + colunas.length).fill('?').join(', ')
-
-  await env.DB.prepare(`INSERT INTO painel_midias (${nomes}) VALUES (${marcas})`)
-    .bind(mediaId, 1, AGORA, AGORA, ...colunas.map((coluna) => sobreposicao[coluna]))
-    .run()
-}
