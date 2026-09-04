@@ -8,18 +8,14 @@
  * Formato: base64url(nonce) "." expiraEm "." base64url(hmac)
  */
 
+import { bytesToBase64Url } from './base64url'
+
 const encoder = new TextEncoder()
 const NONCE_BYTES = 16
 const SEPARATOR = '.'
 
 /** Janela de validade do state. Curta: o usuario autoriza em segundos. */
 export const STATE_TTL_MS = 10 * 60 * 1000
-
-function bytesToBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-}
 
 async function sign(payload: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(

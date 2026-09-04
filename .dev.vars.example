@@ -18,3 +18,13 @@ TOKEN_ENCRYPTION_KEY=
 # Protege as rotas administrativas (/setup/*). Enviado como Authorization: Bearer.
 # Gere com: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
 SETUP_ADMIN_TOKEN=
+
+# Raiz das quatro subchaves do painel administrativo (sessao, desafio, csrf e
+# codigos). Ela NAO pode repetir o SETUP_ADMIN_TOKEN nem o
+# TOKEN_ENCRYPTION_KEY: rotacionar o admin token nao pode derrubar as sessoes,
+# e vazar um convite nao pode entregar a chave das sessoes.
+# Minimo de 32 caracteres. Sem ela o painel responde 503 e nao existe.
+# Gere com: openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+# ATENCAO: trocar esta chave desconecta todos os aparelhos e invalida os
+# codigos de recuperacao e de parada. As passkeys nao sao afetadas.
+PANEL_SESSION_KEY=

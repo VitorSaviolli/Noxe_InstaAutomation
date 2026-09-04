@@ -17,6 +17,15 @@ export interface Env {
   META_API_VERSION: string
   /** ID da conta profissional. Preenchido apos o primeiro OAuth. */
   META_IG_USER_ID: string
+  /**
+   * Host exato do painel administrativo, sem esquema e sem barra.
+   *
+   * E o `rpId` do WebAuthn E a base da origem esperada — nao existe
+   * `PANEL_ORIGIN`, para que origem e `rpId` nao possam divergir. Nasce VAZIO
+   * no repositorio, porque cada instalacao tem o proprio endereco; vazio
+   * significa painel em 503, que e o padrao seguro e nao um defeito.
+   */
+  PANEL_RP_ID: string
 
   // --- Segredos (wrangler secret put) ---
   /** Valida X-Hub-Signature-256 e assina a troca de code no OAuth. */
@@ -27,4 +36,13 @@ export interface Env {
   TOKEN_ENCRYPTION_KEY: string
   /** Protege as rotas administrativas. Enviado como Authorization: Bearer. */
   SETUP_ADMIN_TOKEN: string
+  /**
+   * Raiz das quatro subchaves do painel: sessao, desafio, csrf e codigos.
+   *
+   * NUNCA reutilizar aqui o SETUP_ADMIN_TOKEN nem o TOKEN_ENCRYPTION_KEY.
+   * Rotacionar o admin token nao pode derrubar as sessoes, e vazar um convite
+   * — que e assinado com o admin token — nao pode entregar a chave das
+   * sessoes. Ausente, o painel inteiro responde 503.
+   */
+  PANEL_SESSION_KEY: string
 }

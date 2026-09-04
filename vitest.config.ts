@@ -22,6 +22,15 @@ export default defineConfig({
           // base64 de exatamente 32 bytes
           TOKEN_ENCRYPTION_KEY: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
           SETUP_ADMIN_TOKEN: 'admin-token-de-teste',
+          // Host ficticio do painel. Casa com o RAIZ de tests/fixtures/dubles.ts,
+          // para que origemDoPainel(env) seja exatamente a origem das requisicoes
+          // de teste. Em wrangler.jsonc este var nasce VAZIO: o endereco e de
+          // quem instala, nunca do repositorio.
+          PANEL_RP_ID: 'exemplo.workers.dev',
+          // Raiz das quatro subchaves do painel. Ficticia, e DIFERENTE do
+          // SETUP_ADMIN_TOKEN e do TOKEN_ENCRYPTION_KEY de proposito — o
+          // metateste META-05 falha se alguem repetir um valor aqui.
+          PANEL_SESSION_KEY: 'chave-de-sessao-do-painel-de-teste',
           // Consumido por tests/setup.ts para criar o schema antes dos testes.
           TEST_MIGRATIONS: migrations,
         },
