@@ -20,7 +20,15 @@ import { IG_USER_ID, USERNAME_CONTA } from './dubles'
  * Hoje nao ha nenhuma, mas a lista ja nasce ordenada para nao virar uma
  * armadilha na primeira tabela que tiver.
  */
-export const TABELAS_DO_SCHEMA = ['processed_comments', 'account_tokens'] as const
+export const TABELAS_DO_SCHEMA = [
+  'processed_comments',
+  'account_tokens',
+  // `painel_midias` antes de `painel_config`: nao ha chave estrangeira entre
+  // elas, mas a relacao conceitual e essa — midia sem linha global e orfa.
+  'painel_midias',
+  'painel_auditoria',
+  'painel_config',
+] as const
 
 /**
  * Esvazia todas as tabelas do schema.

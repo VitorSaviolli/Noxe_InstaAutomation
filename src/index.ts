@@ -48,6 +48,7 @@ import {
   MAX_ATTEMPTS,
   processComment,
 } from './services/automation'
+import { carregarConfigEfetiva } from './services/config-store'
 import { isRetryable, MetaApiClient } from './services/meta-api'
 import {
   loadAccessToken,
@@ -100,13 +101,41 @@ const RETRY_BATCH_SIZE = 10
 export interface BatchDeps {
   /** Fabrica do cliente da Meta, para o teste nao tocar a rede. */
   createApi: (apiVersion: string, token: string) => MetaApiClient
-  /** Origem da configuracao. Hoje o modulo; adiante, o banco. */
-  resolveConfig: (mediaId: string) => AutomationConfig
+  /**
+   * Resolucao da config, para o teste fixar um cenario sem passar pelo banco.
+   *
+   * Ausente — que e o caso em producao — o lote carrega o snapshot do D1 UMA
+   * vez, antes do laco, e resolve a partir dele (§9.5).
+   */
+  resolveConfig?: (mediaId: string) => AutomationConfig
 }
 
 const DEFAULT_BATCH_DEPS: BatchDeps = {
   createApi: (apiVersion, token) => new MetaApiClient(apiVersion, token),
-  resolveConfig: (mediaId) => resolveConfigForMedia(mediaId),
+}
+
+/**
+ * UMA carga de configuracao por lote, nunca por comentario.
+ *
+ * Trava de CFG-11 e de CFG-12 (§9.5).
+ *
+ * `src/index.ts` chamava `resolveConfigForMedia(event.mediaId)` DENTRO do laco
+ * de eventos. Com a config vindo do D1 isso viraria N leituras e — pior — um
+ * snapshot inconsistente no meio do lote, com os primeiros comentarios
+ * decididos por uma config e os ultimos por outra.
+ *
+ * `resolveConfigForMedia` continua pura e sincrona: o snapshot e carregado uma
+ * vez e passado a ela explicitamente.
+ */
+async function resolucaoDoLote(
+  env: Env,
+  now: number,
+  deps: BatchDeps,
+): Promise<(mediaId: string) => AutomationConfig> {
+  if (deps.resolveConfig !== undefined) return deps.resolveConfig
+
+  const snapshot = await carregarConfigEfetiva(env, now)
+  return (mediaId) => resolveConfigForMedia(mediaId, snapshot.global, snapshot.overrides)
 }
 
 export default {
@@ -197,6 +226,9 @@ export async function processEvents(
   const repo = new CommentsRepository(env.DB)
   const accountUsername = conta.username ?? ''
 
+  // UMA carga por lote, antes do laco. Do cache na maioria das invocacoes.
+  const resolveConfig = await resolucaoDoLote(env, now, deps)
+
   for (const event of events.slice(0, MAX_COMENTARIOS_POR_INVOCACAO)) {
     try {
       const resultado = await processComment(event, {
@@ -204,7 +236,7 @@ export async function processEvents(
         repo,
         igUserId: credencial.igUserId,
         accountUsername,
-        config: deps.resolveConfig(event.mediaId),
+        config: resolveConfig(event.mediaId),
         now,
       })
       console.log(`Comentario ${event.commentId}: ${resultado.kind}`)
@@ -221,7 +253,7 @@ export async function processEvents(
     igUserId: credencial.igUserId,
     accountUsername,
     now,
-    resolveConfig: deps.resolveConfig,
+    resolveConfig,
   })
 }
 
@@ -348,11 +380,15 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
 
   const api = deps.createApi(env.META_API_VERSION, credencial.token)
 
+  // Depois da saida antecipada por fila vazia, de proposito: uma varredura
+  // que nao tem o que entregar nao paga a leitura da configuracao.
+  const resolveConfig = await resolucaoDoLote(env, now, deps)
+
   for (const registro of pendentes) {
     await reentregar(registro, {
       api,
       repo,
-      config: deps.resolveConfig(registro.media_id),
+      config: resolveConfig(registro.media_id),
       igUserId: credencial.igUserId,
       now,
     })

@@ -50,7 +50,73 @@ const COLUNAS_ESPERADAS: Record<string, readonly string[]> = {
     'updated_at',
     'username',
   ],
+  painel_config: [
+    'atualizado_em',
+    'case_sensitive',
+    'criado_em',
+    'destination_url',
+    'enabled',
+    'id',
+    'ignore_punctuation',
+    'match_mode',
+    'media_scope',
+    'normalize_accents',
+    'parado_por_codigo_em',
+    'private_reply_enabled',
+    'private_reply_text',
+    'process_only_reels',
+    'public_reply_enabled',
+    'public_reply_text',
+    'trigger_keywords',
+    'user_cooldown_hours',
+    'versao',
+  ],
+  painel_midias: [
+    'ativo',
+    'atualizado_em',
+    'case_sensitive',
+    'criado_em',
+    'destination_url',
+    'enabled',
+    'ignore_punctuation',
+    'indisponivel_desde',
+    'legenda_curta',
+    'match_mode',
+    'media_id',
+    'media_product_type',
+    'normalize_accents',
+    'permalink',
+    'postado_em',
+    'private_reply_enabled',
+    'private_reply_text',
+    'process_only_reels',
+    'public_reply_enabled',
+    'public_reply_text',
+    'trigger_keywords',
+    'user_cooldown_hours',
+    'visto_em',
+  ],
+  painel_auditoria: [
+    'acao',
+    'alvo',
+    'antes',
+    'ator',
+    'campos',
+    'depois',
+    'id',
+    'ocorrido_em',
+    'origem',
+    'step_up',
+    'versao',
+  ],
 }
+
+/**
+ * Toda tabela do painel comeca com este prefixo (§7.3), e e por ele que o
+ * metateste as descobre — nunca por uma lista escrita a mao, que envelhece em
+ * silencio na primeira tabela que alguem esquecer de acrescentar.
+ */
+const PREFIXO_DO_PAINEL = /^painel_/
 
 /** Nomes das tabelas que o D1 de teste realmente tem, ja aplicadas as migrations. */
 async function tabelasAplicadas(): Promise<string[]> {
@@ -77,6 +143,20 @@ describe('META — tabelas', () => {
     expect([...TABELAS_DO_SCHEMA].sort()).toEqual((await tabelasAplicadas()).sort())
   })
 
+  test('META-03: toda tabela painel_* do schema e limpa por limparBanco()', async () => {
+    // A afirmacao mais estreita, e a que importa quando uma etapa futura cria
+    // tabela: o conjunto vem do BANCO, entao criar `painel_algo` numa
+    // migration nova e esquecer de `limparBanco()` deixa este teste vermelho
+    // sozinho, sem ninguem precisar lembrar de vir aqui.
+    const doBanco = (await tabelasAplicadas()).filter((nome) => PREFIXO_DO_PAINEL.test(nome))
+    const naLimpeza = TABELAS_DO_SCHEMA.filter((nome) => PREFIXO_DO_PAINEL.test(nome))
+
+    expect(doBanco.sort()).toEqual([...naLimpeza].sort())
+    // E o contrapositivo do proprio teste: se um dia nenhuma tabela do painel
+    // existir, a comparacao acima passaria comparando duas listas vazias.
+    expect(doBanco.length).toBeGreaterThan(0)
+  })
+
   test('META-03: limparBanco() realmente esvazia todas elas', async () => {
     await env.DB.prepare(
       `INSERT INTO processed_comments
@@ -90,6 +170,35 @@ describe('META — tabelas', () => {
           last_refreshed_at, created_at, updated_at)
        VALUES (1, 'ig-meta', 'conta', 'cifrado', 2, NULL, 1, 1)`,
     ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_config
+         (id, enabled, trigger_keywords, match_mode, case_sensitive,
+          normalize_accents, ignore_punctuation, process_only_reels, media_scope,
+          public_reply_enabled, public_reply_text, private_reply_enabled,
+          private_reply_text, destination_url, user_cooldown_hours, versao,
+          parado_por_codigo_em, criado_em, atualizado_em)
+       VALUES (1, 1, '["eu quero"]', 'exact', 0, 1, 1, 1, 'todas',
+               1, 'texto publico', 1, 'texto {link}', 'https://exemplo.com', 24, 1,
+               NULL, 1, 1)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_midias (media_id, ativo, criado_em, atualizado_em)
+       VALUES ('17900000000000001', 1, 1, 1)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_auditoria
+         (id, ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
+       VALUES (1, 1, 1, 'migracao', 'sistema', 0, 'criou', NULL, '[]', NULL, NULL)`,
+    ).run()
+
+    // Uma linha em CADA tabela: sem isto, uma tabela nova entraria na lista e
+    // o teste passaria por ela estar vazia desde o inicio.
+    for (const tabela of TABELAS_DO_SCHEMA) {
+      const antes = await env.DB.prepare(`SELECT COUNT(*) AS total FROM ${tabela}`).first<{
+        total: number
+      }>()
+      expect(`${tabela}=${antes?.total}`).toBe(`${tabela}=1`)
+    }
 
     await limparBanco(env.DB)
 

@@ -1,19 +1,14 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { type AutomationConfig, automationConfig } from '../src/config'
 import { CommentsRepository } from '../src/repositories/comments-repository'
 import { computeNextRetry, evaluateComment, processComment } from '../src/services/automation'
 import type { MetaApiClient } from '../src/services/meta-api'
 import type { ApiError, CommentEvent } from '../src/types/meta'
+import { configDeTeste } from './fixtures/dubles'
 
 const AGORA = 1_700_000_000_000
 const IG_USER_ID = '17841400000000000'
 const USERNAME_CONTA = 'conta_de_teste'
-
-/** Config de teste: o link precisa estar preenchido para a automacao rodar. */
-function configTeste(patch: Partial<AutomationConfig> = {}): AutomationConfig {
-  return { ...automationConfig, destinationUrl: 'https://exemplo.com/link', ...patch }
-}
 
 function evento(patch: Partial<CommentEvent> = {}): CommentEvent {
   return {
@@ -86,19 +81,24 @@ async function limpar(): Promise<void> {
 
 describe('evaluateComment (decisao pura)', () => {
   test('aceita comentario com a palavra exata', () => {
-    const r = evaluateComment(evento(), configTeste(), IG_USER_ID, USERNAME_CONTA)
+    const r = evaluateComment(evento(), configDeTeste(), IG_USER_ID, USERNAME_CONTA)
     expect(r).toEqual({ process: true, keyword: 'eu quero' })
   })
 
   test('ignora quando a automacao esta desligada', () => {
-    const r = evaluateComment(evento(), configTeste({ enabled: false }), IG_USER_ID, USERNAME_CONTA)
+    const r = evaluateComment(
+      evento(),
+      configDeTeste({ enabled: false }),
+      IG_USER_ID,
+      USERNAME_CONTA,
+    )
     expect(r).toEqual({ process: false, reason: 'automacao_desligada' })
   })
 
   test('ignora comentario da propria conta pelo fromId', () => {
     const r = evaluateComment(
       evento({ fromId: IG_USER_ID }),
-      configTeste(),
+      configDeTeste(),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -108,7 +108,7 @@ describe('evaluateComment (decisao pura)', () => {
   test('ignora comentario da propria conta pelo username', () => {
     const r = evaluateComment(
       evento({ fromUsername: USERNAME_CONTA }),
-      configTeste(),
+      configDeTeste(),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -118,7 +118,7 @@ describe('evaluateComment (decisao pura)', () => {
   test('ignora resposta dentro de uma thread', () => {
     const r = evaluateComment(
       evento({ parentId: 'comment-pai' }),
-      configTeste(),
+      configDeTeste(),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -128,7 +128,7 @@ describe('evaluateComment (decisao pura)', () => {
   test('ignora midia fora da lista permitida', () => {
     const r = evaluateComment(
       evento(),
-      configTeste({ allowedMediaIds: ['outra-midia'] }),
+      configDeTeste({ allowedMediaIds: ['outra-midia'] }),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -138,7 +138,7 @@ describe('evaluateComment (decisao pura)', () => {
   test('ignora texto que nao casa com o gatilho', () => {
     const r = evaluateComment(
       evento({ text: 'que legal!' }),
-      configTeste(),
+      configDeTeste(),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -148,7 +148,7 @@ describe('evaluateComment (decisao pura)', () => {
   test('ignora quando o link ainda esta com o placeholder', () => {
     const r = evaluateComment(
       evento(),
-      configTeste({ destinationUrl: '[COLOQUE_O_LINK_AQUI]' }),
+      configDeTeste({ destinationUrl: '[COLOQUE_O_LINK_AQUI]' }),
       IG_USER_ID,
       USERNAME_CONTA,
     )
@@ -164,7 +164,7 @@ describe('processComment (fluxo completo)', () => {
     repo = new CommentsRepository(env.DB)
   })
 
-  function deps(api: ApiFalsa, config = configTeste(), extra: Record<string, unknown> = {}) {
+  function deps(api: ApiFalsa, config = configDeTeste(), extra: Record<string, unknown> = {}) {
     return {
       api: comoApi(api),
       repo,
@@ -281,7 +281,7 @@ describe('processComment (fluxo completo)', () => {
     const api = new ApiFalsa()
     const r = await processComment(
       evento({ mediaProductType: 'FEED' }),
-      deps(api, configTeste({ processOnlyReels: false })),
+      deps(api, configDeTeste({ processOnlyReels: false })),
     )
     expect(r.kind).toBe('completed')
   })
@@ -311,7 +311,7 @@ describe('processComment (fluxo completo)', () => {
     const oitoDias = AGORA - 8 * 24 * 60 * 60 * 1000
     const r = await processComment(
       evento(),
-      deps(api, configTeste(), { commentCreatedAt: oitoDias }),
+      deps(api, configDeTeste(), { commentCreatedAt: oitoDias }),
     )
 
     expect(r).toEqual({ kind: 'skipped', reason: 'fora_da_janela' })
@@ -322,7 +322,7 @@ describe('processComment (fluxo completo)', () => {
     const api = new ApiFalsa()
     // Template proprio: o teste cobre a substituicao, nao o texto que o dono
     // da instalacao escolheu em src/config.ts.
-    const config = configTeste({ privateReplyText: 'Olá, {username}! Link: {link}' })
+    const config = configDeTeste({ privateReplyText: 'Olá, {username}! Link: {link}' })
 
     await processComment(evento({ fromUsername: 'maria' }), deps(api, config))
 
@@ -331,7 +331,10 @@ describe('processComment (fluxo completo)', () => {
 
   test('sem resposta publica quando publicReplyEnabled e false', async () => {
     const api = new ApiFalsa()
-    const r = await processComment(evento(), deps(api, configTeste({ publicReplyEnabled: false })))
+    const r = await processComment(
+      evento(),
+      deps(api, configDeTeste({ publicReplyEnabled: false })),
+    )
 
     expect(r.kind).toBe('private_sent_only')
     expect(api.chamadas).toEqual(['private'])
