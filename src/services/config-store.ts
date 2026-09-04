@@ -24,7 +24,12 @@
  * | linha de midia invalida    | aquela midia recebe `{ enabled: false }`      |
  * | linhas de midia orfas      | ignoradas, com aviso                          |
  */
-import { type AutomationConfig, automationConfig, type MediaAutomation } from '../config'
+import {
+  type AutomationConfig,
+  automationConfig,
+  type MediaAutomation,
+  mediaAutomations,
+} from '../config'
 import {
   type LeituraDeConfig,
   type PainelConfigRecord,
@@ -164,11 +169,53 @@ function daFabrica(
       allowedMediaIds: [...automationConfig.allowedMediaIds],
       ...(origem === 'parado_por_erro' ? { enabled: false } : {}),
     },
-    overrides: [],
+    overrides: sobreposicoesDaFabrica(origem),
     origem,
     versao,
     avisos,
   }
+}
+
+/**
+ * As sobreposicoes por Reel quando a configuracao NAO vem do banco.
+ *
+ * **Ruling do controlador na rodada 1 de revisao: §9.11 vence a letra de
+ * §9.2.** A tabela de §9.2 manda `overrides: []` para "linha ausente", mas a
+ * frase que abre §9.11 e mais forte — *"atualizar o codigo e fazer deploy nao
+ * pode mudar comportamento nenhum"*. Antes desta etapa, o padrao de
+ * `resolveConfigForMedia` era `mediaAutomations` de `src/config.ts`: devolver
+ * `[]` aqui apagaria, sem aviso e sem log, as automacoes por Reel de todo
+ * mundo que ja usa a funcionalidade documentada no README. Num template que
+ * outras pessoas instalam, perder a configuracao de quem ja usa e pior que
+ * divergir de uma tabela.
+ *
+ * **Nao "corrija" isto de volta para `[]` lendo §9.2.**
+ *
+ * `parado_por_erro` continua `[]`, e nao e inconsistencia: no arquivo nada
+ * impede um cartao com `enabled: true`, e o estado de erro tem de parar tudo.
+ *
+ * As copias sao profundas porque o snapshot e congelado antes de entrar no
+ * cache, e congelar as listas de `src/config.ts` mexeria num modulo que a spec
+ * manda deixar intacto.
+ *
+ * `doArquivo` e parametro — com o default de producao — pelo mesmo motivo de
+ * `resolveConfigForMedia`: num template publico o array nasce vazio, e sem
+ * poder injetar cartoes nenhum teste conseguiria distinguir este ramo de um
+ * `[]` escrito a mao.
+ */
+export function sobreposicoesDaFabrica(
+  origem: OrigemConfig,
+  doArquivo: readonly MediaAutomation[] = mediaAutomations,
+): MediaAutomation[] {
+  if (origem !== 'arquivo') return []
+
+  return doArquivo.map((cartao) => {
+    const copia: MediaAutomation = { ...cartao, mediaIds: [...cartao.mediaIds] }
+    // Atribuicao condicional: `{ triggerKeywords: undefined }` seria uma CHAVE
+    // com `undefined`, o mesmo defeito que §9.3 mata no parser do banco.
+    if (cartao.triggerKeywords !== undefined) copia.triggerKeywords = [...cartao.triggerKeywords]
+    return copia
+  })
 }
 
 /**

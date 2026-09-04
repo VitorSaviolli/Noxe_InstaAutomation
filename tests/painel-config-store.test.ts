@@ -4,15 +4,17 @@ import {
   type AutomationConfig,
   automationConfig,
   isDestinationUrlConfigured,
+  type MediaAutomation,
   resolveConfigForMedia,
 } from '../src/config'
-import { processEvents } from '../src/index'
+import { processEvents, runScheduledTasks } from '../src/index'
 import { CommentsRepository } from '../src/repositories/comments-repository'
 import { evaluateComment, processComment } from '../src/services/automation'
 import {
   carregarConfigEfetiva,
   invalidarCacheDeConfig,
   type SnapshotConfig,
+  sobreposicoesDaFabrica,
   TTL_DESLIGADO_MS,
   TTL_LIGADO_MS,
 } from '../src/services/config-store'
@@ -119,6 +121,9 @@ async function gravarMidia(
     .run()
 }
 
+/** Apaga a linha de configuracao. E o "caminho de volta" documentado em §9.11. */
+const SQL_APAGA_CONFIG = 'DELETE FROM painel_config'
+
 /** A mensagem literal do erro, sem depender do formato do objeto de erro. */
 async function erroDe(acao: () => Promise<unknown>): Promise<string> {
   try {
@@ -151,6 +156,20 @@ class D1DeLinhasFabricadas {
     return Promise.resolve([
       { results: this.config === null ? [] : [this.config], success: true },
       { results: this.midias, success: true },
+    ] as unknown as D1Result<T>[])
+  }
+}
+
+/** D1 cujo `batch` responde SEM rejeitar, mas reportando falha. */
+class D1QueNaoReportaSucesso {
+  prepare(_sql: string): D1PreparedStatement {
+    return { bind: () => this } as unknown as D1PreparedStatement
+  }
+
+  batch<T = unknown>(_statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    return Promise.resolve([
+      { results: [], success: false },
+      { results: [], success: false },
     ] as unknown as D1Result<T>[])
   }
 }
@@ -217,19 +236,26 @@ describe('CFG — o estado inicial e o caminho normal', () => {
   })
 
   test('CFG-01: linha presente e valida vem do banco, e nao do arquivo', async () => {
+    // A verificacao do dono desta etapa, encenada: o comportamento ANTES da
+    // linha e DEPOIS dela, sem nenhum redeploy no meio.
+    const semLinha = await carregarConfigEfetiva(env, AGORA)
+
+    invalidarCacheDeConfig()
     await gravarConfig({ user_cooldown_hours: 7, versao: 3 })
+    const comLinha = await carregarConfigEfetiva(env, AGORA)
 
-    const snapshot = await carregarConfigEfetiva(env, AGORA)
-
-    expect({ origem: snapshot.origem, versao: snapshot.versao }).toEqual({
+    expect({ origem: comLinha.origem, versao: comLinha.versao }).toEqual({
       origem: 'banco',
       versao: 3,
     })
-    expect(snapshot.global.userCooldownHours).toBe(7)
-    expect(snapshot.global.destinationUrl).toBe(LINHA_VALIDA.destination_url)
-    // O dono trocou a linha por `wrangler d1 execute` e o comportamento mudou
-    // sem redeploy: e esta a verificacao da etapa.
-    expect(snapshot.global.destinationUrl).not.toBe(automationConfig.destinationUrl)
+    expect(comLinha.global.userCooldownHours).toBe(7)
+    expect(comLinha.global.destinationUrl).toBe(LINHA_VALIDA.destination_url)
+
+    // A comparacao e entre os DOIS snapshots, e nao contra um valor lido de
+    // `src/config.ts`: num template publico cada clone tem o proprio link, e
+    // um teste preso a esse valor fica vermelho na maquina de quem instala.
+    expect(comLinha.global.destinationUrl).not.toBe(semLinha.global.destinationUrl)
+    expect(semLinha.origem).toBe('arquivo')
   })
 })
 
@@ -756,5 +782,220 @@ describe('§9.2 — a forma do snapshot', () => {
         [chave]: forma(automationConfig[chave]),
       })
     }
+  })
+})
+
+/**
+ * O cron e a OUTRA ponta da entrega, e desde §16.1 ele drena todo comentario a
+ * partir do sexto de cada lote. Um portao que so exista em `processEvents` nao
+ * para a automacao — para metade dela.
+ */
+describe('CFG — a configuracao parada tambem para o cron', () => {
+  /** Um pendente na fila, pronto para a proxima varredura. */
+  async function enfileirarPendente(commentId = 'comment-pendente'): Promise<void> {
+    await env.DB.prepare(
+      `INSERT INTO processed_comments
+         (comment_id, media_id, commenter_scoped_id_hash, status,
+          attempt_count, next_retry_at, created_at, updated_at)
+       VALUES (?, ?, 'hash-pendente', 'retry_pending', 1, ?, ?, ?)`,
+    )
+      .bind(commentId, MEDIA_A, AGORA, AGORA, AGORA)
+      .run()
+  }
+
+  async function registroDe(commentId: string): Promise<{ status: string; tentativas: number }> {
+    const linha = await env.DB.prepare(
+      'SELECT status, attempt_count FROM processed_comments WHERE comment_id = ?',
+    )
+      .bind(commentId)
+      .first<{ status: string; attempt_count: number }>()
+
+    return { status: linha?.status ?? 'sumiu', tentativas: linha?.attempt_count ?? -1 }
+  }
+
+  /** O dono conserta a linha a mao, por `wrangler d1 execute`. Sem redeploy. */
+  async function apagarConfig(): Promise<void> {
+    await env.DB.prepare(SQL_APAGA_CONFIG).run()
+  }
+
+  beforeEach(async () => {
+    await ligarConta(env, AGORA)
+    await enfileirarPendente()
+  })
+
+  test('CFG-14: o controle — com a config valida o cron ENTREGA o pendente', async () => {
+    // Sem este teste, o de baixo passaria por a fila estar vazia ou por o cron
+    // nem chegar no laco.
+    await gravarConfig()
+    const api = new MetaFalsa()
+
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
+
+    expect(api.chamadas).toEqual(['private', 'public'])
+    expect(await registroDe('comment-pendente')).toEqual({ status: 'completed', tentativas: 1 })
+    // E o link entregue e o do BANCO.
+    expect(api.textosEnviados[0]).toContain(LINHA_VALIDA.destination_url)
+  })
+
+  test('CFG-14: link corrompido no banco NAO vira Direct com o link de fabrica pelo cron', async () => {
+    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    const api = new MetaFalsa()
+
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
+
+    // A automacao esta parada: nenhuma das duas metades da restricao pode ser
+    // furada aqui. Nem entregar, nem entregar com o valor de fabrica.
+    expect(api.chamadas).toEqual([])
+    expect(api.textosEnviados).toEqual([])
+  })
+
+  test('CFG-14: o pendente barrado fica na fila, sem gastar tentativa', async () => {
+    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(new MetaFalsa()) })
+
+    // Parar e REVERSIVEL: marcar `ignored` apagaria, por um erro nosso, o
+    // comentario de quem digitou a palavra-gatilho.
+    expect(await registroDe('comment-pendente')).toEqual({
+      status: 'retry_pending',
+      tentativas: 1,
+    })
+  })
+
+  test('CFG-14: consertada a config, a varredura seguinte drena a fila', async () => {
+    await gravarConfig({ destination_url: 'nao-e-uma-url' })
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(new MetaFalsa()) })
+
+    await apagarConfig()
+    await gravarConfig()
+    invalidarCacheDeConfig()
+
+    const api = new MetaFalsa()
+    await runScheduledTasks(env, AGORA + 1, { createApi: () => comoApi(api) })
+
+    expect(api.chamadas).toEqual(['private', 'public'])
+    expect((await registroDe('comment-pendente')).status).toBe('completed')
+  })
+
+  test('CFG-02: automacao desligada no banco tambem para o cron', async () => {
+    await gravarConfig({ enabled: 0, trigger_keywords: '[]' })
+    const api = new MetaFalsa()
+
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
+
+    expect(api.chamadas).toEqual([])
+    expect((await registroDe('comment-pendente')).status).toBe('retry_pending')
+  })
+
+  test('CFG-16: uma midia pausada nao para as outras no cron', async () => {
+    await gravarConfig({ media_scope: 'selecionadas' })
+    await gravarMidia(MEDIA_A, { destination_url: 'http://inseguro.example' })
+    await gravarMidia(MEDIA_B)
+    await enfileirarPendente('comment-pendente-b')
+    await env.DB.prepare('UPDATE processed_comments SET media_id = ? WHERE comment_id = ?')
+      .bind(MEDIA_B, 'comment-pendente-b')
+      .run()
+
+    const api = new MetaFalsa()
+    await runScheduledTasks(env, AGORA, { createApi: () => comoApi(api) })
+
+    // So o Reel B foi entregue: o portao e por midia, e nao do lote inteiro.
+    expect(api.chamadas).toEqual(['private', 'public'])
+    expect((await registroDe('comment-pendente')).status).toBe('retry_pending')
+    expect((await registroDe('comment-pendente-b')).status).toBe('completed')
+  })
+})
+
+/**
+ * §9.11 vence a letra de §9.2 — ruling do controlador na rodada 1.
+ *
+ * `mediaAutomations` nasce `[]` neste template, entao o ramo so e distinguivel
+ * de um `[]` escrito a mao se o teste puder injetar cartoes. E por isso que
+ * `sobreposicoesDaFabrica` recebe a lista por parametro.
+ */
+describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel', () => {
+  const CARTAO: MediaAutomation = {
+    mediaIds: [MEDIA_A, MEDIA_B],
+    triggerKeywords: ['cardapio'],
+    destinationUrl: 'https://exemplo.com/cardapio',
+  }
+
+  test('§9.11: origem "arquivo" HERDA mediaAutomations, em vez de apagar', () => {
+    expect(sobreposicoesDaFabrica('arquivo', [CARTAO])).toEqual([CARTAO])
+  })
+
+  test('§9.11: a heranca e copia PROFUNDA — congelar o cache nao congela o arquivo', () => {
+    const [copia] = sobreposicoesDaFabrica('arquivo', [CARTAO])
+    if (copia === undefined) throw new Error('a copia deveria existir')
+
+    expect(copia).not.toBe(CARTAO)
+    expect(copia.mediaIds).not.toBe(CARTAO.mediaIds)
+    expect(copia.triggerKeywords).not.toBe(CARTAO.triggerKeywords)
+
+    Object.freeze(copia.mediaIds)
+    expect(Object.isFrozen(CARTAO.mediaIds)).toBe(false)
+  })
+
+  test('§9.11: a copia nao inventa chave com undefined para campo ausente', () => {
+    const [copia] = sobreposicoesDaFabrica('arquivo', [{ mediaIds: [MEDIA_A] }])
+    if (copia === undefined) throw new Error('a copia deveria existir')
+
+    // Mesmo defeito que §9.3 mata no parser do banco: `{ triggerKeywords:
+    // undefined }` num spread zera o campo global.
+    expect('triggerKeywords' in copia).toBe(false)
+    expect(Object.values(copia).every((valor) => valor !== undefined)).toBe(true)
+  })
+
+  test('§9.11: parado_por_erro NAO herda — no arquivo nada impede enabled: true', () => {
+    // O estado de erro tem de parar tudo, e um cartao do arquivo poderia
+    // religar a midia por cima da global desligada.
+    expect(sobreposicoesDaFabrica('parado_por_erro', [CARTAO])).toEqual([])
+    expect(sobreposicoesDaFabrica('banco', [CARTAO])).toEqual([])
+  })
+
+  test('§9.11: a linha ausente serve exatamente o que a fabrica manda', async () => {
+    const snapshot = await carregarConfigEfetiva(env, AGORA)
+
+    expect(snapshot.origem).toBe('arquivo')
+    expect(snapshot.overrides).toEqual(sobreposicoesDaFabrica('arquivo'))
+  })
+})
+
+describe('CFG — invalidarCacheDeConfig()', () => {
+  test('CFG-18: invalidarCacheDeConfig() faz a leitura seguinte reler o banco', async () => {
+    await gravarConfig()
+    expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
+
+    await env.DB.prepare(SQL_APAGA_CONFIG).run()
+    // Dentro da janela dos 10 s o cache ainda responderia "banco"...
+    expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
+
+    invalidarCacheDeConfig()
+
+    // ...e e exatamente isso que toda rota que grava precisa desfazer, no MESMO
+    // instante, sem esperar TTL nenhum.
+    expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('arquivo')
+  })
+
+  test('CFG-18: invalidarCacheDeConfig() e segura com o cache ja vazio', async () => {
+    // A rota de gravacao chama sem saber se este isolate ja carregou alguma
+    // coisa; chamar duas vezes seguidas tambem nao pode explodir.
+    invalidarCacheDeConfig()
+    invalidarCacheDeConfig()
+
+    await expect(carregarConfigEfetiva(env, AGORA)).resolves.toMatchObject({ origem: 'arquivo' })
+  })
+})
+
+describe('CFG — o batch que falha sem rejeitar', () => {
+  test('CFG-14: batch sem sucesso vira parado_por_erro, e nunca a fabrica LIGADA', async () => {
+    const snapshot = await carregarConfigEfetiva(comBanco(new D1QueNaoReportaSucesso()), AGORA)
+
+    // Dois resultados vazios seriam lidos como "linha ausente" — a fabrica
+    // LIGADA. Seria o unico ponto do modulo em que um erro ALARGA.
+    expect({ origem: snapshot.origem, enabled: snapshot.global.enabled }).toEqual({
+      origem: 'parado_por_erro',
+      enabled: false,
+    })
   })
 })

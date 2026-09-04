@@ -99,9 +99,18 @@ export class PainelConfigRepository {
       this.db.prepare('SELECT * FROM painel_midias WHERE ativo = 1 ORDER BY media_id'),
     ])
 
+    // Um `batch` que reporte falha SEM rejeitar entregaria dois resultados
+    // vazios, e vazio aqui significa "linha ausente" — ou seja, a fabrica
+    // LIGADA. Seria o unico ponto do modulo em que um erro ALARGA em vez de
+    // parar. Lancar aqui devolve o caso para a falha segura do `config-store`,
+    // que o transforma em `parado_por_erro`. (CFG-14, CFG-18)
+    if (global?.success !== true || midias?.success !== true) {
+      throw new Error('D1_ERROR: a leitura da configuracao do painel nao reportou sucesso')
+    }
+
     return {
-      config: ((global?.results ?? [])[0] as PainelConfigRecord | undefined) ?? null,
-      midias: (midias?.results ?? []) as PainelMidiaRecord[],
+      config: ((global.results ?? [])[0] as PainelConfigRecord | undefined) ?? null,
+      midias: (midias.results ?? []) as PainelMidiaRecord[],
     }
   }
 }

@@ -25,7 +25,12 @@
  * Licenca MIT — veja o arquivo LICENSE.
  * ============================================================
  */
-import { type AutomationConfig, automationConfig, resolveConfigForMedia } from './config'
+import {
+  type AutomationConfig,
+  automationConfig,
+  isDestinationUrlConfigured,
+  resolveConfigForMedia,
+} from './config'
 import {
   type CommentRecord,
   CommentsRepository,
@@ -384,14 +389,45 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
   // que nao tem o que entregar nao paga a leitura da configuracao.
   const resolveConfig = await resolucaoDoLote(env, now, deps)
 
+  let barrados = 0
+
   for (const registro of pendentes) {
+    const config = resolveConfig(registro.media_id)
+
+    // Trava de CFG-02 e CFG-14: "em nenhum caminho".
+    //
+    // `reentregar` renderiza e envia SEM consultar a config — e o cron drena,
+    // desde §16.1, todo comentario a partir do sexto de cada lote. Sem este
+    // portao, o dono corromperia `destination_url` a mao, veria `processEvents`
+    // parar como prometido, e cinco minutos depois o cron entregaria os
+    // pendentes com o texto e o link DE FABRICA. A automacao rodando em vez de
+    // parar, e o valor de fabrica no lugar do campo invalido: as duas metades
+    // da restricao furadas de uma vez.
+    //
+    // O registro fica exatamente como esta — `retry_pending`, sem gastar
+    // tentativa e sem custar consulta. Parar e REVERSIVEL: o dono conserta o
+    // link e a fila drena na varredura seguinte. Marcar `ignored` seria
+    // irreversivel e apagaria, por um erro NOSSO, o comentario de quem digitou
+    // a palavra-gatilho.
+    if (!config.enabled || !isDestinationUrlConfigured(config)) {
+      barrados++
+      continue
+    }
+
     await reentregar(registro, {
       api,
       repo,
-      config: resolveConfig(registro.media_id),
+      config,
       igUserId: credencial.igUserId,
       now,
     })
+  }
+
+  if (barrados > 0) {
+    console.warn(
+      `${barrados} pendente(s) nao entregue(s): a configuracao esta parada ou sem link. ` +
+        'Eles continuam na fila e saem quando a configuracao voltar a ser valida.',
+    )
   }
 }
 
