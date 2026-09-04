@@ -272,21 +272,20 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
     expect(contador.prepares + doCron.chamadas).toBeLessThan(TETO_DE_SUBREQUESTS)
   })
 
-  test('§16.1: uma varredura cheia (RETRY_BATCH_SIZE) cabe no teto de 50', async () => {
-    // Duas invocacoes de webhook enchem a fila com 10 pendentes, que e
-    // exatamente o teto por varredura.
-    const doWebhook = new ApiDoCron()
-    for (const bloco of [0, 1]) {
-      await processEvents(
-        Array.from({ length: 10 }, (_, i) => comentario(bloco * 10 + i)),
-        env,
-        AGORA,
-        { createApi: () => comoApi(doWebhook), resolveConfig: () => config() },
-      )
-    }
-    expect(
-      Object.values(await statusPorComentario()).filter((s) => s === 'retry_pending'),
-    ).toHaveLength(10)
+  test('§16.1: uma varredura cheia cabe no teto de 50, com fila maior que o lote', async () => {
+    // Fila de 30 pendentes: mais do que qualquer varredura pode drenar. Assim
+    // a conta abaixo mede o LOTE do cron, e nao o tamanho da fila — se alguem
+    // dobrar RETRY_BATCH_SIZE, este teste vermelha.
+    await env.DB.batch(
+      Array.from({ length: 30 }, (_, i) =>
+        env.DB.prepare(
+          `INSERT INTO processed_comments
+             (comment_id, media_id, commenter_scoped_id_hash, status,
+              attempt_count, next_retry_at, created_at, updated_at)
+           VALUES (?, 'media-1', ?, 'retry_pending', 0, ?, ?, ?)`,
+        ).bind(`comment-fila-${i}`, `hash-${i}`, AGORA, AGORA, AGORA),
+      ),
+    )
 
     const doCron = new ApiDoCron()
     const contador = new D1Contador(env.DB)
@@ -295,7 +294,13 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
       resolveConfig: () => config(),
     })
 
+    // Consultas ao D1 e chamadas a Meta dividem os mesmos 50 subrequests.
     expect(contador.prepares + doCron.chamadas).toBeLessThan(TETO_DE_SUBREQUESTS)
+
+    // E a varredura drenou de verdade — nao passou raspando por estar vazia.
+    const status = await statusPorComentario()
+    expect(Object.values(status).filter((s) => s === 'completed').length).toBeGreaterThan(0)
+    expect(Object.values(status).filter((s) => s === 'retry_pending').length).toBeGreaterThan(0)
   })
 })
 
