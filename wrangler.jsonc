@@ -71,6 +71,60 @@
     ]
   },
 
+  // ---------------------------------------------------------------------
+  // Limitadores de tentativa do painel. Camada de defesa OPCIONAL: apagar
+  // este bloco inteiro nao quebra nada — o painel continua correto e o
+  // limitador de reserva (uma janela por isolate, dentro do proprio Worker)
+  // assume no lugar. O que estes bindings compram e cota; a seguranca dos
+  // codigos vem da entropia deles, nunca daqui.
+  //
+  // Sao TRES e nao um porque o `limit` e fixo por binding e o `period` so
+  // aceita 10 ou 60: um binding sozinho nao consegue dar ao login um teto
+  // diferente do da parada de emergencia. Baldes separados tambem garantem
+  // que um bot martelando a tela de entrar NAO consuma a cota de que voce
+  // precisa para digitar o codigo de parada numa emergencia.
+  //
+  // O `namespace_id` e um numero SEU, unico dentro deste Worker. Ele nao vem
+  // de lugar nenhum da Cloudflare e nao precisa ser trocado.
+  //
+  // LEIA ISTO ANTES DE APAGAR O BLOCO. Sem estes tres bindings cadastrados, o
+  // que resta e o limitador de reserva, e ele conta dentro de UM servidor so
+  // (um "isolate") e por endereco de IP. Contra uma pessoa tentando de um
+  // endereco so, ele segura. Contra trafego distribuido — muitos enderecos ao
+  // mesmo tempo, que e o que um ataque de verdade faz — a protecao de cota e
+  // praticamente NULA: o teto de 10 por minuto vira 10 vezes o numero de
+  // enderecos vezes o numero de servidores. Nao existe teto global sem estes
+  // bindings, e isso nao e um defeito escondido: e o preco de a camada ser
+  // opcional.
+  //
+  // O que cadastrar os tres compra e exatamente isso, e nao seguranca: o
+  // contador passa a ser da Cloudflare, aplicado antes de a sua cota ser
+  // gasta. A cota do plano gratuito e de 100.000 requisicoes por dia, e ela e
+  // o maior risco residual deste projeto — o dia em que ela acaba e o dia em
+  // que a automacao para de responder. A seguranca dos codigos continua vindo
+  // do tamanho deles, nunca daqui.
+  // ---------------------------------------------------------------------
+  "ratelimits": [
+    // Entrar e registrar por convite: 10 tentativas por minuto, por IP.
+    {
+      "name": "PANEL_LIMITER_LOGIN",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    // Codigo de recuperacao digitado: 30 por minuto, por IP.
+    {
+      "name": "PANEL_LIMITER_CODIGO",
+      "namespace_id": "1002",
+      "simple": { "limit": 30, "period": 60 }
+    },
+    // Parada de emergencia: 30 por minuto, por IP, num balde so dela.
+    {
+      "name": "PANEL_LIMITER_STOP",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
+
   "observability": {
     "enabled": true
   }
