@@ -60,8 +60,32 @@ const MAX_CARACTERES_DO_ROTULO = 63
  * Detector conservador DE PROPOSITO (§9.8): qualquer coisa com cara de
  * dominio conta. Falso positivo num texto que a pessoa escreve uma vez e
  * aceitavel; falso negativo e um link de golpe entregue.
+ *
+ * **Esta expressao e UNICODE, e a de §9.8 e ASCII. E emenda a spec, decidida
+ * pelo controlador na rodada 1 de revisao — nao "corrija" de volta lendo a
+ * §9.8.** A regra escrita la (`[a-z0-9-]`) contradiz o proposito declarado ao
+ * lado dela: `atacantе.com` com um "e" cirilico — a tecnica de homografo que a
+ * propria §9.8 nomeia como ameaca — nao casava NENHUM caractere da classe
+ * ASCII e passava inteiro pelo caminho do texto. A assimetria decide: falso
+ * positivo aqui PARA a automacao, que e falha segura; falso negativo ENTREGA
+ * link de golpe.
+ *
+ * O ultimo rotulo aceita digito e traco depois da primeira letra, para caber
+ * TLD em punycode (`xn--p1ai`) inteiro: cortado no `xn`, o aviso nomearia um
+ * host que nao existe e uma instalacao com esse TLD nao conseguiria citar o
+ * proprio dominio.
  */
-const CANDIDATO_HOST = /(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})/gi
+const CANDIDATO_HOST = /(?:[\p{L}\p{N}\p{M}-]+\.)+\p{L}[\p{L}\p{N}-]+/gu
+
+/**
+ * Voltas de `decodeURIComponent` antes de varrer.
+ *
+ * `?u=https%3A%2F%2Fatacante%2Ecom` nao tem ponto nenhum para o detector ver,
+ * e um redirecionador de verdade decodifica o parametro antes de redirecionar
+ * — o contorno funciona de ponta a ponta. Tres voltas cobrem o encode simples
+ * e o duplo sem virar laco aberto.
+ */
+const MAX_VOLTAS_DE_DECODE = 3
 
 /** O codigo unico de §11.4. A grafia `link_nao_permitido` esta deletada (§15.3). */
 const CODIGO_DA_RECUSA = 'dominio_nao_permitido'
@@ -246,21 +270,73 @@ function achadosDoTexto(
 }
 
 /**
- * Os candidatos a host dentro de um texto qualquer.
+ * Os candidatos a host dentro de um texto qualquer, ja canonizados.
  *
- * A limpeza vem antes de procurar, e e a mesma do validador: NFKC mata os
- * caracteres de largura total e os confundiveis, e a remocao de `\p{Cc}\p{Cf}`
- * mata o zero-width usado para partir um dominio no meio.
+ * Duas limpezas antes de procurar, porque as duas escondem dominio:
+ *
+ * 1. `limparTexto` — NFKC mata a largura total e a remocao de `\p{Cc}\p{Cf}`
+ *    mata o zero-width usado para partir um dominio no meio.
+ * 2. As voltas de percent-decode, varridas ALEM do texto cru: o cru continua
+ *    valendo porque decodificar pode juntar o que estava separado, e nunca
+ *    pode fazer sumir o que ja estava visivel.
  */
 function hostsNoTexto(bruto: string): string[] {
-  const texto = limparTexto(bruto)
-  // O grupo 1 e o host sem o `https://` da frente, e ele existe em todo
-  // casamento desta expressao. O `?? ''` esta ai so porque o TypeScript nao
-  // sabe disso, e o `filter` garante que essa impossibilidade nunca vire um
-  // achado sobre o "endereco vazio".
-  return [...texto.matchAll(CANDIDATO_HOST)]
-    .map((achado) => (achado[1] ?? '').toLowerCase())
+  const candidatos = variantesDecodificadas(bruto).flatMap(procurarCandidatos)
+  return [...new Set(candidatos)]
+}
+
+function procurarCandidatos(texto: string): string[] {
+  return [...limparTexto(texto).matchAll(CANDIDATO_HOST)]
+    .map((achado) => canonizarHost(achado[0]))
     .filter((host) => host.length > 0)
+}
+
+/**
+ * O texto cru e o que ele vira depois de ate tres percent-decodes.
+ *
+ * Para quando a volta nao muda nada e quando `decodeURIComponent` estoura —
+ * um `%` solto numa frase ("50% de desconto") e texto legitimo, nao motivo
+ * para recusar a configuracao inteira.
+ */
+function variantesDecodificadas(bruto: string): string[] {
+  const variantes = [bruto]
+  let atual = bruto
+
+  for (let volta = 0; volta < MAX_VOLTAS_DE_DECODE; volta++) {
+    let proxima: string
+    try {
+      proxima = decodeURIComponent(atual)
+    } catch {
+      break
+    }
+    if (proxima === atual) break
+
+    variantes.push(proxima)
+    atual = proxima
+  }
+
+  return variantes
+}
+
+/**
+ * O candidato do texto vira o host que o navegador visitaria.
+ *
+ * E a MESMA canonizacao que o campo do link ganha de graca do `new URL`:
+ * minusculas e punycode. Sem ela, `atacantе.com` com "e" cirilico seria
+ * comparado letra a letra com a lista e nunca casaria nada — mas tambem nunca
+ * seria reconhecido como o endereco que ele e.
+ *
+ * Candidato que nem como host parseia fica como esta, em minusculas: ele nao
+ * vai estar em lista nenhuma, que e o lado seguro do erro.
+ */
+function canonizarHost(candidato: string): string {
+  try {
+    const host = new URL(`https://${candidato}`).host
+    if (host.length > 0) return host
+  } catch {
+    // Cai no retorno de baixo.
+  }
+  return candidato.toLowerCase()
 }
 
 /** Um achado por host reprovado, sem repetir o mesmo host duas vezes. */

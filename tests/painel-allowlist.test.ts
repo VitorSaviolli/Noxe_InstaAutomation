@@ -170,6 +170,34 @@ describe('LNK — a lista e a regra de casamento', () => {
     // dominio para o detector, e recusar isso quebraria link legitimo.
     expect(comLink('https://exemplo.com/guias/index.html')).toEqual([])
   })
+
+  test('LNK-09: ponto percent-encoded na query nao atravessa a varredura', () => {
+    // `%2E` no lugar do ponto some do detector, e um redirecionador de verdade
+    // decodifica o parametro antes de redirecionar — o contorno funciona de
+    // ponta a ponta. Por isso a query e varrida tambem decodificada.
+    expect(comLink('https://exemplo.com/ir?u=https%3A%2F%2Fatacante%2Ecom')).toEqual([
+      RECUSA_DO_DOMINIO,
+    ])
+    // Duplo encode: `%252E` vira `%2E` na primeira volta e `.` na segunda.
+    expect(comLink('https://exemplo.com/ir?u=https%253A%252F%252Fatacante%252Ecom')).toEqual([
+      RECUSA_DO_DOMINIO,
+    ])
+  })
+
+  test('LNK-06: barra invertida, espaco unicode e controle nao enganam o parser', () => {
+    // O olho le "@exemplo.com" e pensa em usuario e senha; o parser WHATWG
+    // trata a barra invertida como barra normal, entao a autoridade termina
+    // ali e o host de verdade e `atacante.com`.
+    expect(comLink('https://atacante.com\\@exemplo.com')).toContain(RECUSA_DO_DOMINIO)
+    // Espaco ideografico e caractere de controle antes do `@`: o host continua
+    // sendo o que vem DEPOIS do `@`, e a lista responde sobre ele.
+    expect(comLink('https://exemplo.com　@atacante.com')).toContain(RECUSA_DO_DOMINIO)
+    expect(comLink('https://exemplo.com\t@atacante.com')).toContain(RECUSA_DO_DOMINIO)
+    // O espelho do primeiro caso, para o teste nao virar "recusa tudo que tem
+    // barra invertida": aqui o navegador VAI para `exemplo.com` e o resto e
+    // caminho, entao passar e o comportamento certo.
+    expect(comLink('https://exemplo.com\\@atacante.com')).toEqual([])
+  })
 })
 
 describe('LNK — o texto', () => {
@@ -215,6 +243,62 @@ describe('LNK — o texto', () => {
       'O endereco atacante.com nao esta na lista liberada no deploy.',
     ])
     expect(achadosDe(comLarguraTotal, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
+      'O endereco atacante.com nao esta na lista liberada no deploy.',
+    ])
+  })
+
+  test('LNK-09: homografo dentro do TEXTO e recusado', () => {
+    // O contorno que fecha o circulo do golpe: o campo do link fica em paz e o
+    // domínio de golpe vai na mensagem, escrito com um "e" cirilico. NFKC nao
+    // toca alfabeto cirilico — quem resolve e a canonizacao do candidato pelo
+    // mesmo `new URL` que o campo do link ja usa.
+    const valores = configDeTeste({
+      privateReplyText: 'Ola, {username}! Corre em atacantе.com antes de {link}',
+    })
+
+    // A frase nomeia o PUNYCODE, que e o endereco que o navegador visitaria —
+    // sem isso o aviso mostraria dois textos identicos ao olho do dono.
+    expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
+      'O endereco xn--atacant-ehg.com nao esta na lista liberada no deploy.',
+    ])
+  })
+
+  test('LNK-09: dominio em outro alfabeto dentro do texto e recusado', () => {
+    const valores = configDeTeste({ publicReplyText: 'Corre em пример.com' })
+
+    expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
+      'O endereco xn--e1afmkfd.com nao esta na lista liberada no deploy.',
+    ])
+  })
+
+  test('LNK-09: dominio liberado com TLD em punycode pode ser citado no texto', () => {
+    // O contrapositivo do teste acima, e o que impede a trava de virar "recusa
+    // qualquer coisa que nao seja ASCII": uma instalacao com TLD em punycode
+    // precisa conseguir citar o proprio dominio na mensagem.
+    const lista = lerAllowlist('exemplo.xn--p1ai')
+    const valores = configDeTeste({
+      destinationUrl: 'https://exemplo.xn--p1ai/promo',
+      privateReplyText: 'Ola, {username}! Tudo em exemplo.xn--p1ai: {link}',
+    })
+
+    expect(codigos(valores, lista)).toEqual([])
+  })
+
+  test('LNK-10: host em maiuscula no texto e recusado', () => {
+    const valores = configDeTeste({ publicReplyText: 'Ver em ATACANTE.COM' })
+
+    expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
+      'O endereco atacante.com nao esta na lista liberada no deploy.',
+    ])
+  })
+
+  test('LNK-10: porta citada no texto nao esconde o host', () => {
+    // No texto a pergunta e sobre o DOMINIO: `atacante.com:8080` e recusado
+    // pelo host, sem a porta atrapalhar. (No campo do link a porta entra na
+    // comparacao, porque la `url.host` a carrega — e recusar e o lado seguro.)
+    const valores = configDeTeste({ publicReplyText: 'Ver em atacante.com:8080' })
+
+    expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
       'O endereco atacante.com nao esta na lista liberada no deploy.',
     ])
   })
