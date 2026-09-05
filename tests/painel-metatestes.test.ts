@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { ROTAS } from '../src/routes/painel/rotas'
+import { PREFIXO_DA_API, ROTAS } from '../src/routes/painel/rotas'
 import { painelHabilitado } from '../src/services/panel-session'
 import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
 import { pedir, responder } from './fixtures/dubles'
@@ -20,6 +20,7 @@ import { pedir, responder } from './fixtures/dubles'
  * META-07: o painel entra pelo `default:` e nao engole `/painelzinho` nem o 404.
  * META-08: `PRAGMA table_info` confere o conjunto EXATO de colunas.
  * META-09: todo caminho da tabela e string exata, sob `/painel`, sem variavel.
+ * META-10: rota de pagina so com GET declara `csrf: false` e `escreve: false`.
  */
 
 /** Tabelas de infraestrutura do D1/Miniflare, que nao sao do projeto. */
@@ -440,6 +441,31 @@ describe('META — rotas', () => {
     // uma mudanca: sem sessao nao existe o que reautenticar, e uma linha
     // `stepUp: true, sessao: false` so pode ser erro de quem escreveu a tabela.
     expect(ROTAS.filter((rota) => rota.stepUp && !rota.sessao)).toEqual([])
+  })
+
+  test('META-10: rota de PAGINA so com GET declara `csrf: false` e `escreve: false`', () => {
+    // Os dois campos sao DECLARATIVOS: nada no roteador confere se eles batem
+    // com o que o handler faz. Um `escreve: true` errado e pior que inofensivo
+    // — ele REMOVE a rota do laco de "toda rota com `escreve: false` executa
+    // zero escritas no D1". Um rotulo errado desligaria uma garantia em vez de
+    // derrubar um teste, que e a forma mais silenciosa de perder cobertura.
+    //
+    // A regra so vale para rota de PAGINA sem `POST`: `GET` nao muda estado e
+    // nao carrega ficha (um link nao tem como calcular uma), e sem `POST` nao
+    // ha caminho de gravacao. As rotas com `POST` continuam sob META-02.
+    const soDeLeitura = ROTAS.filter(
+      (rota) =>
+        !rota.caminho.startsWith(PREFIXO_DA_API) &&
+        rota.metodos.length === 1 &&
+        rota.metodos[0] === 'GET',
+    )
+
+    // Contrapositivo: uma tabela sem rota de leitura faria o laco passar calado.
+    expect(soDeLeitura.length).toBeGreaterThan(0)
+
+    expect(
+      soDeLeitura.filter((rota) => rota.csrf || rota.escreve).map((rota) => rota.caminho),
+    ).toEqual([])
   })
 
   test('META-09: todo caminho da tabela e string exata, comeca por /painel e nao tem segmento variavel', () => {

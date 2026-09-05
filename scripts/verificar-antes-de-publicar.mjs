@@ -575,6 +575,71 @@ function checagem7(arquivos) {
 }
 
 // ---------------------------------------------------------------------------
+// Checagem 20 - o painel.css nao cresce sozinho nem busca nada de fora
+// ---------------------------------------------------------------------------
+//
+// **Por que aqui, e nao num teste.** A garantia e sobre um ARQUIVO, e de dentro
+// do workerd nao existe sistema de arquivos: sob `vitest-pool-workers` o
+// `?raw` de um `.css` devolve string VAZIA — conferido no `import` direto e no
+// `import.meta.glob`. Um teste escrito assim passa sempre, inclusive com a
+// folha dobrando de tamanho e com um `@import` de outro host dentro. E a mesma
+// razao que §13.5 escreve para a checagem 19 morar aqui: "uma garantia que pode
+// nascer quebrada por detalhe de bundler ensina a equipe a ignora-la".
+//
+// **O numero 20 vem depois do bloco 8..19 que §13.5 reserva**, de proposito:
+// renumerar faria "checagem 13" e "checagem 19" significarem coisas diferentes
+// em partes diferentes do projeto.
+
+/** O teto do `painel.css`, em bytes. §12.9 orca "~6 KB"; ver o texto abaixo. */
+const TETO_DO_CSS_DO_PAINEL = 9 * 1024
+
+/** Fonte, imagem ou folha buscada de outro host. */
+const BUSCA_EXTERNA = /@import|url\(\s*["']?(https?:)?\/\//
+
+function checagem20() {
+  secao('20. O painel.css cabe no orcamento e nao busca nada de fora')
+  const caminho = join(RAIZ, 'public/painel/painel.css')
+  const conteudo = lerTexto(caminho)
+
+  if (conteudo === null) {
+    falha('Nao consegui ler public/painel/painel.css.', [
+      'Ele e a folha de estilo do painel e precisa existir: a CSP nao permite',
+      '<style> inline, entao sem este arquivo o painel abre sem estilo nenhum.',
+    ])
+    return
+  }
+
+  const bytes = Buffer.byteLength(conteudo, 'utf8')
+  if (bytes > TETO_DO_CSS_DO_PAINEL) {
+    falha(`public/painel/painel.css esta com ${Math.round(bytes / 1024)} KB.`, [
+      `O teto deste projeto e ${TETO_DO_CSS_DO_PAINEL / 1024} KB.`,
+      'A secao 12.9 do desenho orca "~6 KB" pensando em conexao ruim; o arquivo',
+      'passa disso porque quase todo o excedente e comentario explicando por que',
+      'cada trava existe (area segura, alvo de 44px, foco de 2px, estado que',
+      'nunca e so cor) — e neste projeto o comentario e o motivo de a trava',
+      'sobreviver a proxima etapa. O arquivo nao passa por build, entao o',
+      'comentario viaja junto; ele viaja comprimido.',
+      'Se voce chegou aqui, a folha cresceu ALEM disso. Confira se o bloco novo',
+      'e mesmo necessario antes de subir o teto.',
+    ])
+  } else {
+    ok(`public/painel/painel.css tem ${Math.round(bytes / 1024)} KB, dentro do teto.`)
+  }
+
+  if (BUSCA_EXTERNA.test(conteudo)) {
+    falha('public/painel/painel.css busca alguma coisa de outro endereco.', [
+      'A secao 12.9 pede "sem fonte externa, sem imagem alem das miniaturas":',
+      'num celular com conexao ruim cada pedido a mais e uma tela em branco a',
+      'mais. E a CSP do painel nao libera outro host, entao o pedido falharia',
+      'em silencio em producao — a folha carregaria sem a fonte.',
+      'Use as fontes do proprio sistema, como o resto do arquivo ja faz.',
+    ])
+  } else {
+    ok('Nenhuma fonte, imagem ou folha buscada de fora.')
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Execucao
 // ---------------------------------------------------------------------------
 
@@ -617,6 +682,7 @@ function principal() {
   checagem5()
   checagem6()
   checagem7(arquivos)
+  checagem20()
 
   imprimirResumo()
   process.exit(relatorio.falhou > 0 ? 1 : 0)

@@ -88,6 +88,13 @@ export const ORIGEM_DOS_AJUSTES: Record<OrigemConfig, string> = {
   parado_por_erro: 'os de segurança, porque os salvos não puderam ser lidos',
 }
 
+/** Os quatro campos booleanos que a tela explica com uma frase inteira. */
+export type CampoDeComparacao =
+  | 'caseSensitive'
+  | 'normalizeAccents'
+  | 'ignorePunctuation'
+  | 'processOnlyReels'
+
 /**
  * A frase que descreve o valor ATUAL de cada chave de comparacao.
  *
@@ -96,27 +103,48 @@ export const ORIGEM_DOS_AJUSTES: Record<OrigemConfig, string> = {
  * lado de "maiusculas e minusculas" deixaria a pessoa adivinhando o que fica
  * desligado. Estado NUNCA so por cor, e tambem nunca so por um sim/nao que
  * exige interpretar o nome do campo (§12.9).
+ *
+ * **As chaves sao `verdadeiro` e `falso`, e nao `sim` e `nao`.** A primeira
+ * grafia deste dicionario usava `sim`/`nao` com um significado que MUDAVA de
+ * campo para campo: em `caseSensitive`, `sim` era a frase de `true`; em
+ * `normalizeAccents` e `ignorePunctuation`, era a de `false`, e cada tela
+ * compensava com um ternario invertido. A saida saia certa e a FORMA era uma
+ * armadilha — quem escrevesse o obvio, `config.X ? sim : nao`, imprimiria o
+ * contrario da verdade em dois dos quatro campos. Numa tela que existe para
+ * explicar a automacao, "uma explicacao que mente e pior do que nenhuma".
+ * Agora a chave e o proprio booleano, e o ternario sumiu de todas as telas:
+ * quem le usa `fraseDoAjuste(campo, config)`.
  */
 export const FRASE_DO_AJUSTE: Record<
-  'caseSensitive' | 'normalizeAccents' | 'ignorePunctuation' | 'processOnlyReels',
-  { readonly sim: string; readonly nao: string }
+  CampoDeComparacao,
+  { readonly verdadeiro: string; readonly falso: string }
 > = {
   caseSensitive: {
-    sim: 'A automação diferencia maiúscula de minúscula.',
-    nao: 'Tanto faz escrever com maiúscula ou com minúscula.',
+    verdadeiro: 'A automação diferencia maiúscula de minúscula.',
+    falso: 'Tanto faz escrever com maiúscula ou com minúscula.',
   },
   normalizeAccents: {
-    sim: 'Um comentário sem acento não conta como um com acento.',
-    nao: 'Escrever sem acento conta igual: “querô” vale por “quero”.',
+    verdadeiro: 'Escrever sem acento conta igual: “querô” vale por “quero”.',
+    falso: 'Um comentário sem acento não conta como um com acento.',
   },
   ignorePunctuation: {
-    sim: 'A pontuação e os emojis contam na comparação.',
-    nao: 'Pontuação e emojis são ignorados na comparação.',
+    verdadeiro: 'Pontuação e emojis são ignorados na comparação.',
+    falso: 'A pontuação e os emojis contam na comparação.',
   },
   processOnlyReels: {
-    sim: 'A automação responde só nos Reels.',
-    nao: 'A automação responde em qualquer publicação.',
+    verdadeiro: 'A automação responde só nos Reels.',
+    falso: 'A automação responde em qualquer publicação.',
   },
+}
+
+/**
+ * A frase daquele campo, para a configuracao que esta valendo.
+ *
+ * Existe para que NENHUMA tela escreva o ternario: um ternario por chamada e
+ * uma chance por chamada de inverter, e foi exatamente o que aconteceu antes.
+ */
+export function fraseDoAjuste(campo: CampoDeComparacao, config: AutomationConfig): string {
+  return config[campo] ? FRASE_DO_AJUSTE[campo].verdadeiro : FRASE_DO_AJUSTE[campo].falso
 }
 
 /**

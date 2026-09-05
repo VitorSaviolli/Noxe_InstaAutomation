@@ -29,6 +29,14 @@ const ESCRITA = /^\s*(insert|update|delete|replace)/i
  * e conservador: ele nunca subestima o gasto real.
  */
 export class D1Contador {
+  /**
+   * O SQL de cada statement preparado, na ordem.
+   *
+   * Existe para as afirmacoes de NAO-consulta: "a tela nunca toca
+   * `processed_comments`" so e uma afirmacao se alguem olhar o SQL. Contar
+   * quantos statements passaram nao diz QUAIS passaram.
+   */
+  readonly sqls: string[] = []
   prepares = 0
   escritas = 0
   batches = 0
@@ -38,6 +46,7 @@ export class D1Contador {
   constructor(private readonly real: D1Database) {}
 
   prepare(sql: string): D1PreparedStatement {
+    this.sqls.push(sql)
     this.prepares++
     if (ESCRITA.test(sql)) this.escritas++
     return this.real.prepare(sql)
@@ -60,6 +69,7 @@ export class D1Contador {
 
   /** Zera os contadores sem trocar o banco por baixo. */
   zerar(): void {
+    this.sqls.length = 0
     this.prepares = 0
     this.escritas = 0
     this.batches = 0

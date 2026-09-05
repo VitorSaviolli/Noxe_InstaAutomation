@@ -14,7 +14,7 @@ import type { AutomationConfig } from '../../config'
 import {
   ESCOPO_DE_MIDIAS,
   escopoDeMidias,
-  FRASE_DO_AJUSTE,
+  fraseDoAjuste,
   MODO_DE_COMPARACAO,
   ORIGEM_DOS_AJUSTES,
 } from './dicionario'
@@ -76,34 +76,16 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
   const corpo = html`<h1>Ajustes finos</h1>
 <section>
 <h2>Onde a automa&ccedil;&atilde;o responde</h2>
-${linha(
-  'Tipo de publicação',
-  global.processOnlyReels
-    ? FRASE_DO_AJUSTE.processOnlyReels.sim
-    : FRASE_DO_AJUSTE.processOnlyReels.nao,
-)}
+${linha('Tipo de publicação', fraseDoAjuste('processOnlyReels', global))}
 ${linha('Quais Reels', ESCOPO_DE_MIDIAS[escopoDeMidias(global)])}
 ${linha('Intervalo por pessoa', frasedoIntervalo(global.userCooldownHours))}
 </section>
 <section>
 <h2>Como o coment&aacute;rio &eacute; comparado</h2>
 ${linha('Modo', MODO_DE_COMPARACAO[global.matchMode])}
-${linha(
-  'Maiúsculas e minúsculas',
-  global.caseSensitive ? FRASE_DO_AJUSTE.caseSensitive.sim : FRASE_DO_AJUSTE.caseSensitive.nao,
-)}
-${linha(
-  'Acentos',
-  global.normalizeAccents
-    ? FRASE_DO_AJUSTE.normalizeAccents.nao
-    : FRASE_DO_AJUSTE.normalizeAccents.sim,
-)}
-${linha(
-  'Pontuação e emojis',
-  global.ignorePunctuation
-    ? FRASE_DO_AJUSTE.ignorePunctuation.nao
-    : FRASE_DO_AJUSTE.ignorePunctuation.sim,
-)}
+${linha('Maiúsculas e minúsculas', fraseDoAjuste('caseSensitive', global))}
+${linha('Acentos', fraseDoAjuste('normalizeAccents', global))}
+${linha('Pontuação e emojis', fraseDoAjuste('ignorePunctuation', global))}
 </section>
 ${blocoDeCanais(global)}
 <footer>

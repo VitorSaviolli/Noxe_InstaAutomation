@@ -21,7 +21,7 @@
  */
 import type { AutomationConfig } from '../../config'
 import { matchKeyword, normalizeOptionsFrom } from '../../utils/normalize'
-import { FRASE_DO_AJUSTE, MODO_DE_COMPARACAO } from './dicionario'
+import { fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
 import { type HtmlSeguro, html } from './html'
 import { configDaTela, contaConectada, molduraCom, panorama } from './inicio'
 import type { EntradaDaRota } from './router'
@@ -91,17 +91,9 @@ function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
 <h2>Como o coment&aacute;rio &eacute; comparado</h2>
 <p><strong>${MODO_DE_COMPARACAO[config.matchMode]}</strong></p>
 <ul>
-<li>${config.caseSensitive ? FRASE_DO_AJUSTE.caseSensitive.sim : FRASE_DO_AJUSTE.caseSensitive.nao}</li>
-<li>${
-    config.normalizeAccents
-      ? FRASE_DO_AJUSTE.normalizeAccents.nao
-      : FRASE_DO_AJUSTE.normalizeAccents.sim
-  }</li>
-<li>${
-    config.ignorePunctuation
-      ? FRASE_DO_AJUSTE.ignorePunctuation.nao
-      : FRASE_DO_AJUSTE.ignorePunctuation.sim
-  }</li>
+<li>${fraseDoAjuste('caseSensitive', config)}</li>
+<li>${fraseDoAjuste('normalizeAccents', config)}</li>
+<li>${fraseDoAjuste('ignorePunctuation', config)}</li>
 </ul>
 </section>`
 }

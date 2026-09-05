@@ -68,6 +68,13 @@ export interface Panorama {
  * A falha e tratada como "nao conectada", e a direcao e a segura: dizer
  * "conectada" quando nao da para saber e exatamente a promessa que §12.1
  * regra 3 proibe.
+ *
+ * **O `catch` NAO e silencioso, e o `console.warn` e o que o torna honesto.**
+ * Sem ele, um D1 fora do ar virava a frase "A conta do Instagram nao esta
+ * conectada", afirmada ao dono como FATO, sem rastro em lugar nenhum — e o
+ * dono passaria a tarde reconectando uma conta que nunca desconectou. §12.7 e
+ * literal: detalhe tecnico vai para o `console`, nunca para a tela. Uma linha
+ * so, no formato de `despachar`, para nao amplificar log.
  */
 export async function contaConectada(db: D1Database): Promise<boolean> {
   try {
@@ -75,7 +82,13 @@ export async function contaConectada(db: D1Database): Promise<boolean> {
       .prepare('SELECT 1 AS ligada FROM account_tokens WHERE id = 1')
       .first<{ ligada: number }>()
     return linha !== null
-  } catch {
+  } catch (cause) {
+    console.warn(
+      'painel:',
+      'indisponivel',
+      'conta_nao_verificada',
+      cause instanceof Error ? cause.message : cause,
+    )
     return false
   }
 }
