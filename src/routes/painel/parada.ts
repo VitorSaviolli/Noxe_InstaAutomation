@@ -57,6 +57,11 @@ export const CAMINHO_DA_PARADA = '/painel/parada'
  *
  * Um codigo de parada tem 16 caracteres. 1 KB e folga de sobra e mantem o
  * custo de um corpo gigante em zero consulta ao D1.
+ *
+ * Trava de WA-29 (§13.2): este e o teto de corpo do painel que ja existe, e o
+ * unico que uma cerimonia WebAuthn nunca alcanca. Os irmaos dele — 8 KB em
+ * `/painel/api/*` e 32 KB em formulario — nascem com as rotas das etapas 7 a
+ * 11. Subir este numero derruba o teste de WA-29 e o de STOP.
  */
 export const TETO_DO_CORPO_DA_PARADA = 1024
 

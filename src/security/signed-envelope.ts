@@ -147,7 +147,9 @@ export async function abrirEnvelope(
   // assinatura. Esta linha e a unica coisa que o recusa.
   if (versao !== VERSAO) return { valido: false, motivo: 'malformado' }
   // Primeira das tres defesas contra confusao de proposito (§10.3).
-  // Trava de SES-04.
+  // Trava de SES-04 e de WA-04: e esta linha que impede um desafio de REGISTRO
+  // — que qualquer pessoa com um convite consegue — de valer como desafio de
+  // login ou de step-up.
   if (propositoRecebido !== proposito) return { valido: false, motivo: 'malformado' }
 
   // Travas de SES-05 e SES-03: a assinatura vem ANTES do prazo, e cobre o
@@ -161,6 +163,8 @@ export async function abrirEnvelope(
 
   const expiraEm = Number.parseInt(expiraEmCru, 10)
   if (!Number.isFinite(expiraEm)) return { valido: false, motivo: 'malformado' }
+  // Trava de WA-03: o desafio WebAuthn nao tem prazo proprio; o prazo dele e o
+  // deste envelope. Apagar esta linha faz um desafio de 120 s virar eterno.
   if (now > expiraEm) return { valido: false, motivo: 'expirado' }
 
   const claims = lerClaims(claimsB64)
