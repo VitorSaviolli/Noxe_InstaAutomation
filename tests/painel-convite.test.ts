@@ -9,13 +9,22 @@ import {
   handlePaginaDeConvite,
   handleVerificarRegistro,
   PRAZO_DO_CONVITE_MS,
+  TAMANHO_DO_APELIDO,
+  TETO_DE_CREDENCIAIS,
   TETO_DO_CORPO_DA_API,
 } from '../src/routes/painel/registrar'
 import { emitirEnvelope, emitirSessao, fichaCsrf } from '../src/services/panel-session'
 import type { Env } from '../src/types/env'
 import { AutenticadorFalso, cerimonia, paraBase64Url, semUv } from './fixtures/autenticador'
 import { limparBanco } from './fixtures/banco'
-import { AGORA, comoD1, D1Contador, RAIZ } from './fixtures/dubles'
+import {
+  AGORA,
+  capturarConsole,
+  comoD1,
+  D1BatchQuebrado,
+  D1Contador,
+  RAIZ,
+} from './fixtures/dubles'
 
 /**
  * CONV — convite de uso unico e registro da primeira passkey (§13.2, 12
@@ -161,6 +170,67 @@ async function gerarCodigosDeRecuperacao(): Promise<string[]> {
 const CREDENCIAL_INVALIDA = {
   erro: 'credencial_invalida',
   mensagem: 'Não foi possível confirmar. Tente de novo.',
+}
+
+/**
+ * Registra com um autenticador JA CRIADO, em vez de sortear um novo.
+ *
+ * `registrarComConvite` cria o aparelho por dentro, e por isso nao serve aos
+ * testes em que o MESMO `credential_id` precisa aparecer duas vezes, nem
+ * aqueles em que o corpo do POST precisa ser outro.
+ */
+async function registrarComAparelho(
+  aparelho: AutenticadorFalso,
+  token: string,
+  corpo: Record<string, unknown> = { apelido: 'Meu celular' },
+  ambiente: Env = env,
+): Promise<Response> {
+  const opcoes = await handleOpcoesDeRegistro(
+    postar(CAMINHO_DAS_OPCOES, { tipo: 'convite', convite: token }),
+    env,
+    AGORA,
+  )
+  if (opcoes.status !== 200) return opcoes
+
+  const resposta = await aparelho.registrar(
+    cerimonia({
+      rpId: env.PANEL_RP_ID,
+      origem: RAIZ,
+      desafio: await desafioDe(opcoes),
+      tipo: 'webauthn.create',
+    }),
+  )
+
+  return await handleVerificarRegistro(
+    postar(
+      CAMINHO_DA_VERIFICACAO,
+      { ...corpo, credencial: resposta },
+      { cookie: `__Host-painel_desafio=${bilhete(opcoes)}` },
+    ),
+    ambiente,
+    AGORA,
+  )
+}
+
+/** A unica linha de `painel_credenciais`, nos campos que o saneamento decide. */
+async function linhaGravada(): Promise<{ apelido: string; transportes: string | null } | null> {
+  return await env.DB.prepare(
+    'SELECT apelido, transportes FROM painel_credenciais ORDER BY rowid DESC LIMIT 1',
+  ).first<{ apelido: string; transportes: string | null }>()
+}
+
+/** Enche a tabela com `quantas` credenciais do `rp_id` deste deploy. */
+async function encherAsCredenciais(quantas: number): Promise<void> {
+  for (let i = 0; i < quantas; i++) {
+    await env.DB.prepare(
+      `INSERT INTO painel_credenciais
+         (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
+          sign_count, backup_eligible, backup_state, apelido, origem_registro, criado_em, usado_em)
+       VALUES (?, ?, 'handle', '{}', -7, NULL, 0, 0, 0, 'aparelho', 'convite', ?, NULL)`,
+    )
+      .bind(`cred-${i}`, env.PANEL_RP_ID, AGORA)
+      .run()
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -975,6 +1045,301 @@ describe('CONV — o modo sessao, e a ficha CSRF que §15.4 exige', () => {
   })
 })
 
+describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4', () => {
+  beforeEach(async () => {
+    await limparBanco(env.DB)
+  })
+
+  test('§11.4: excecao que escapa do lote e `500 falha_interna`, e nunca `503`', async () => {
+    // A tabela canonica de §11.4 da `indisponivel` (503) a "D1 indisponivel ou
+    // cota estourada" e `falha_interna` (500) a "qualquer excecao nao
+    // prevista", e diz que o `try/catch` generico devolve a segunda. Um
+    // `catch` que pega TUDO nao sabe qual dos dois aconteceu: anunciar 503
+    // mandaria o dono conferir o status da Cloudflare por um defeito nosso.
+    const { token } = await montarConvite()
+
+    const registrado = capturarConsole()
+    let verificacao: Response
+    try {
+      verificacao = await registrarComAparelho(
+        await AutenticadorFalso.criar(),
+        token,
+        {},
+        comAmbiente({ DB: new D1BatchQuebrado(env.DB) }),
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    expect(verificacao.status).toBe(500)
+    expect(await verificacao.json()).toEqual({
+      erro: 'falha_interna',
+      mensagem: 'Algo deu errado. Tente de novo.',
+    })
+    // Nunca `detalhe`, `stack` nem mensagem de excecao no corpo — e no log, o
+    // mesmo codigo canonico que o corpo carrega, e nao outro.
+    expect(registrado.linhas.join('\n')).toContain('falha_interna')
+    expect(registrado.linhas.join('\n')).not.toContain('indisponivel')
+    expect(await contarCredenciais()).toBe(0)
+  })
+
+  test('§10.5 passo 8: `credential_id` repetido e recusa GENERICA, e nao `503`', async () => {
+    // O `INSERT` vai sem `ON CONFLICT`, e o tombo do lote E a verificacao do
+    // passo 8. Sem ler essa excecao ela virava `503` — com o convite ja
+    // queimado, porque o consumo do nonce sai sozinho e ANTES do lote.
+    const aparelho = await AutenticadorFalso.criar()
+
+    const primeiro = await montarConvite()
+    expect((await registrarComAparelho(aparelho, primeiro.token)).status).toBe(200)
+
+    // `pre=q` porque `pre=0` ja nao valeria com uma passkey cadastrada
+    // (CONV-07): o que este teste exercita e o conflito, e nao a precondicao.
+    const segundo = await montarConvite({ pre: 'q' })
+
+    const registrado = capturarConsole()
+    let verificacao: Response
+    try {
+      verificacao = await registrarComAparelho(aparelho, segundo.token)
+    } finally {
+      registrado.parar()
+    }
+
+    // A recusa e a MESMA de assinatura invalida: distinguir "este
+    // `credential_id` ja existe" daria um oraculo de enumeracao (§11.4).
+    expect(verificacao.status).toBe(401)
+    expect(await verificacao.json()).toEqual(CREDENCIAL_INVALIDA)
+    // E o valor nunca vai para o log, em nenhuma das linhas (§10.13, §11.7).
+    expect(registrado.linhas.join('\n')).not.toContain(aparelho.credentialId)
+
+    // O lote inteiro caiu: nem credencial nova, nem linha de auditoria.
+    expect(await contarCredenciais()).toBe(1)
+    const auditoria = await env.DB.prepare('SELECT COUNT(*) AS n FROM painel_auditoria').first<{
+      n: number
+    }>()
+    expect(auditoria?.n).toBe(1)
+
+    // O convite do segundo aparelho FOI queimado, e §10.5 aceita esse preco de
+    // proposito: a ordem inversa abriria a corrida em que duas requisicoes com
+    // o mesmo convite inserem duas credenciais.
+    const convites = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM painel_convites_usados',
+    ).first<{ n: number }>()
+    expect(convites?.n).toBe(2)
+  })
+
+  test('§10.5 passo 9: com 10 credenciais, as options nem saem', async () => {
+    // O numero vai LITERAL aqui e no `encherAsCredenciais` de proposito: um
+    // teste escrito com `TETO_DE_CREDENCIAIS` acompanharia qualquer valor novo
+    // e ficaria verde provando nada. §10.5 diz **10**, e mudar isso tem de
+    // custar uma decisao consciente, com tres asserts vermelhos no caminho.
+    expect(TETO_DE_CREDENCIAIS).toBe(10)
+
+    await encherAsCredenciais(10)
+    const { token } = await montarConvite({ pre: 'q' })
+
+    const resposta = await handleOpcoesDeRegistro(
+      postar(CAMINHO_DAS_OPCOES, { tipo: 'convite', convite: token }),
+      env,
+      AGORA,
+    )
+
+    // Conferido ja na primeira metade: uma cerimonia que so pudesse ser
+    // recusada no fim gastaria uma biometria do dono para nada.
+    expect(resposta.status).toBe(401)
+    expect(await resposta.json()).toEqual(CREDENCIAL_INVALIDA)
+    expect(resposta.headers.get('set-cookie')).toBeNull()
+  })
+
+  test('§10.5 passo 9: o teto tambem vale na GRAVACAO, e nao so nas options', async () => {
+    // "Um teto que so vale na primeira metade nao e teto": entre uma
+    // requisicao e outra o dono pode ter cadastrado por outro caminho. Aqui a
+    // decima credencial nasce DEPOIS das options e ANTES da verificacao.
+    await encherAsCredenciais(9)
+    const { token } = await montarConvite({ pre: 'q' })
+
+    const opcoes = await handleOpcoesDeRegistro(
+      postar(CAMINHO_DAS_OPCOES, { tipo: 'convite', convite: token }),
+      env,
+      AGORA,
+    )
+    expect(opcoes.status).toBe(200)
+
+    await env.DB.prepare(
+      `INSERT INTO painel_credenciais
+         (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
+          sign_count, backup_eligible, backup_state, apelido, origem_registro, criado_em, usado_em)
+       VALUES ('decima', ?, 'handle', '{}', -7, NULL, 0, 0, 0, 'aparelho', 'convite', ?, NULL)`,
+    )
+      .bind(env.PANEL_RP_ID, AGORA)
+      .run()
+
+    const aparelho = await AutenticadorFalso.criar()
+    const resposta = await aparelho.registrar(
+      cerimonia({
+        rpId: env.PANEL_RP_ID,
+        origem: RAIZ,
+        desafio: await desafioDe(opcoes),
+        tipo: 'webauthn.create',
+      }),
+    )
+    const verificacao = await handleVerificarRegistro(
+      postar(
+        CAMINHO_DA_VERIFICACAO,
+        { apelido: 'Decimo primeiro', credencial: resposta },
+        { cookie: `__Host-painel_desafio=${bilhete(opcoes)}` },
+      ),
+      env,
+      AGORA,
+    )
+
+    expect(verificacao.status).toBe(401)
+    expect(await verificacao.json()).toEqual(CREDENCIAL_INVALIDA)
+    expect(await contarCredenciais()).toBe(10)
+    // O teto barra ANTES de consumir: o convite continua inteiro.
+    const convites = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM painel_convites_usados',
+    ).first<{ n: number }>()
+    expect(convites?.n).toBe(0)
+  })
+
+  test('WA-05 na ROTA: o desafio do corpo nao substitui o do bilhete', async () => {
+    // Substituicao de desafio, e nao questao de estilo: se o
+    // `desafioEsperado` virasse `corpo.desafio ?? bilhete.desafio`, quem envia
+    // escolheria o que assina e o cookie viraria enfeite. WA-05 prende a regra
+    // dentro do verificador; nenhum teste a prendia AQUI, onde o
+    // `desafioEsperado` e escolhido.
+    const { token } = await montarConvite()
+
+    const opcoes = await handleOpcoesDeRegistro(
+      postar(CAMINHO_DAS_OPCOES, { tipo: 'convite', convite: token }),
+      env,
+      AGORA,
+    )
+    expect(opcoes.status).toBe(200)
+
+    // O desafio que o atacante escolheu — assinado por um autenticador honesto,
+    // e diferente do que o bilhete carrega.
+    const escolhido = paraBase64Url(crypto.getRandomValues(new Uint8Array(32)))
+    expect(escolhido).not.toBe(await desafioDe(opcoes))
+
+    const aparelho = await AutenticadorFalso.criar()
+    const resposta = await aparelho.registrar(
+      cerimonia({
+        rpId: env.PANEL_RP_ID,
+        origem: RAIZ,
+        desafio: escolhido,
+        tipo: 'webauthn.create',
+      }),
+    )
+
+    const registrado = capturarConsole()
+    let verificacao: Response
+    try {
+      verificacao = await handleVerificarRegistro(
+        postar(
+          CAMINHO_DA_VERIFICACAO,
+          // As duas grafias no corpo, na esperanca de que uma delas seja lida.
+          { apelido: 'x', desafio: escolhido, challenge: escolhido, credencial: resposta },
+          { cookie: `__Host-painel_desafio=${bilhete(opcoes)}` },
+        ),
+        env,
+        AGORA,
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    expect(verificacao.status).toBe(401)
+    expect(await verificacao.json()).toEqual(CREDENCIAL_INVALIDA)
+    expect(registrado.linhas.join('\n')).toContain('desafio_diferente')
+    expect(await contarCredenciais()).toBe(0)
+  })
+
+  test('§10.5 passo 10: o apelido e SANEADO, e nunca motivo de recusa', async () => {
+    // "Saneado", e nao "recusado": um apelido longo ou esquisito digitado num
+    // celular nao pode custar a cerimonia de biometria do dono — no limite,
+    // trancaria quem instala para fora do proprio painel.
+    const { token } = await montarConvite()
+    const comLixo = `  Celular\u0000 do\u200b João${'!'.repeat(80)}  `
+
+    expect(
+      (await registrarComAparelho(await AutenticadorFalso.criar(), token, { apelido: comLixo }))
+        .status,
+    ).toBe(200)
+
+    const linha = await linhaGravada()
+    // Sem caracteres de controle nem de formatacao, cortado em 40, sem espaco
+    // nas pontas — e o texto util sobreviveu.
+    expect(linha?.apelido).toBe(`Celular do João${'!'.repeat(25)}`)
+    expect(linha?.apelido).toHaveLength(TAMANHO_DO_APELIDO)
+    expect(linha?.apelido).not.toMatch(/[\p{Cc}\p{Cf}]/u)
+  })
+
+  test('§10.5 passo 10: apelido ausente, vazio ou de outro tipo vira o padrao', async () => {
+    for (const [i, apelido] of [undefined, '   ', '\u0000\u200b', 42, { a: 1 }].entries()) {
+      await limparBanco(env.DB)
+      const { token } = await montarConvite()
+      const corpo = apelido === undefined ? {} : { apelido }
+
+      expect(
+        (await registrarComAparelho(await AutenticadorFalso.criar(), token, corpo)).status,
+      ).toBe(200)
+      expect(`${i}=${(await linhaGravada())?.apelido}`).toBe(`${i}=Aparelho`)
+    }
+  })
+
+  test('§10.5 passo 10: o apelido NAO e escapado na gravacao', async () => {
+    // Ele e escapado na RENDERIZACAO, automaticamente. Escapar aqui gravaria
+    // `&amp;` no banco e o dono veria a propria escapatoria na tela.
+    const { token } = await montarConvite()
+
+    expect(
+      (
+        await registrarComAparelho(await AutenticadorFalso.criar(), token, {
+          apelido: '<b>Zé & Cia</b>',
+        })
+      ).status,
+    ).toBe(200)
+
+    expect((await linhaGravada())?.apelido).toBe('<b>Zé & Cia</b>')
+  })
+
+  test('§8.6: `transportes` guarda so o vocabulario da WebAuthn, e nada alem', async () => {
+    // O campo vem de um corpo NAO confiavel e e so dica de interface: nenhuma
+    // decisao do painel olha para ele. O que o protege e a allowlist.
+    const { token } = await montarConvite()
+
+    expect(
+      (
+        await registrarComAparelho(await AutenticadorFalso.criar(), token, {
+          transportes: ['internal', '<script>', 'hybrid', 42, null, 'usb'],
+        })
+      ).status,
+    ).toBe(200)
+
+    expect((await linhaGravada())?.transportes).toBe('["internal","hybrid","usb"]')
+  })
+
+  test('§8.6: `transportes` que nao e lista, ou so tem lixo, vira NULL', async () => {
+    for (const [i, transportes] of [
+      undefined,
+      'internal',
+      [],
+      ['bluetooth', 'wifi'],
+      { 0: 'usb' },
+    ].entries()) {
+      await limparBanco(env.DB)
+      const { token } = await montarConvite()
+      const corpo = transportes === undefined ? {} : { transportes }
+
+      expect(
+        (await registrarComAparelho(await AutenticadorFalso.criar(), token, corpo)).status,
+      ).toBe(200)
+      expect(`${i}=${(await linhaGravada())?.transportes}`).toBe(`${i}=null`)
+    }
+  })
+})
+
 describe('CONV — a escada de §11.3 e a pagina do convite', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
@@ -993,6 +1358,31 @@ describe('CONV — a escada de §11.3 e a pagina do convite', () => {
       // `Access-Control-*`, em nenhuma hipotese (§10.9, camada 5).
       expect(resposta.headers.get('access-control-allow-origin')).toBeNull()
     }
+  })
+
+  test('§11.3: o passo 0 vem ANTES do passo 1, e `OPTIONS` sem `PANEL_RP_ID` e 503', async () => {
+    // A ordem da escada e artefato de especificacao, e `router.ts` a copia:
+    // la o portao de sanidade roda antes do `switch` de caminhos. Se o metodo
+    // fosse conferido primeiro AQUI, a mesma requisicao teria duas respostas
+    // conforme quem chamasse o handler — 405 pelo handler, 503 pelo roteador.
+    const desligado = comAmbiente({ PANEL_RP_ID: '' })
+
+    for (const metodo of ['OPTIONS', 'GET', 'PUT']) {
+      const resposta = await handleOpcoesDeRegistro(
+        new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, { method: metodo, headers: { origin: RAIZ } }),
+        desligado,
+        AGORA,
+      )
+      expect(`${metodo}=${resposta.status}`).toBe(`${metodo}=503`)
+      expect(resposta.headers.get('allow')).toBeNull()
+    }
+
+    // Na pagina do convite vale a mesma ordem, e pelo mesmo motivo.
+    const pagina = handlePaginaDeConvite(
+      new Request(`${RAIZ}${CAMINHO_DO_CONVITE}`, { method: 'POST' }),
+      desligado,
+    )
+    expect(pagina.status).toBe(503)
   })
 
   test('sem `PANEL_RP_ID` o painel responde 503, e nao adivinha o endereco', async () => {
@@ -1104,6 +1494,28 @@ describe('CONV — a escada de §11.3 e a pagina do convite', () => {
     expect(html).toContain('sem PIN n&atilde;o entra')
     expect(resposta.headers.get('content-security-policy')).toContain("default-src 'none'")
     expect(resposta.headers.get('cache-control')).toBe('private, no-store')
+  })
+
+  test('a pagina do convite aceita `HEAD`, e o `Allow` do 405 diz os dois metodos', async () => {
+    const cabeca = handlePaginaDeConvite(
+      new Request(`${RAIZ}${CAMINHO_DO_CONVITE}`, { method: 'HEAD' }),
+      env,
+    )
+    expect(cabeca.status).toBe(200)
+
+    const recusado = handlePaginaDeConvite(
+      new Request(`${RAIZ}${CAMINHO_DO_CONVITE}`, { method: 'POST' }),
+      env,
+    )
+
+    expect(recusado.status).toBe(405)
+    // `Allow` existe justamente para nao mentir: `GET` sozinho omitia o `HEAD`
+    // que a linha acima acabou de provar que o handler atende.
+    expect(recusado.headers.get('allow')).toBe('GET, HEAD')
+    // E o corpo e HTML, como o `content-type` promete — com a frase canonica
+    // de §11.4 para `metodo_nao_permitido`, e nao um texto solto.
+    expect(recusado.headers.get('content-type')).toBe('text/html; charset=utf-8')
+    expect(await recusado.text()).toContain('<h1>M&eacute;todo n&atilde;o permitido.</h1>')
   })
 
   test('sem o painel ativado, a pagina do convite responde 503', async () => {

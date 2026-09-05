@@ -1475,6 +1475,53 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
     expect(contador.prepares).toBe(0)
   })
 
+  test('WA-25: corpo em `ReadableStream`, sem `content-length`, tambem e recusado', async () => {
+    // O teto de §11.3 passo 4 tem DUAS metades — "`content-length` conferido
+    // **e** relido na leitura" — e o teste acima so exercita a primeira: um
+    // corpo montado de uma string JS sempre chega com `content-length`, entao o
+    // portao de cima dispara e o corte dentro do `ReadableStream` nunca roda.
+    // Apagar esse corte deixava a suite inteira verde.
+    //
+    // Aqui o corpo vai em pedacos, `content-length` nao existe, e a unica coisa
+    // entre o painel e um POST `chunked` de tamanho arbitrario e a segunda
+    // metade. `prepares === 0` e a afirmacao que importa: nada chega ao D1.
+    const contador = new D1Contador(env.DB)
+    const pedaco = new TextEncoder().encode('x'.repeat(4096))
+    let restantes = 4
+
+    const corpo = new ReadableStream<Uint8Array>({
+      pull(controlador) {
+        if (restantes === 0) {
+          controlador.close()
+          return
+        }
+        restantes -= 1
+        controlador.enqueue(pedaco)
+      },
+    })
+
+    const pedido = new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: RAIZ },
+      body: corpo,
+      // Exigido pelo fetch quando o corpo e um stream. Sem ele o Request nem
+      // e construido — e e por isso que nenhum teste tinha chegado aqui.
+      duplex: 'half',
+    } as RequestInit & { duplex: 'half' })
+
+    // O `content-length` REALMENTE nao existe: sem isto o teste voltaria a
+    // provar so a primeira metade, com mais cerimonia.
+    expect(pedido.headers.get('content-length')).toBeNull()
+
+    const resposta = await handleOpcoesDeRegistro(pedido, { ...env, DB: comoD1(contador) }, AGORA)
+
+    expect(resposta.status).toBe(413)
+    expect(contador.prepares).toBe(0)
+    // E o corpo nao foi bufferizado inteiro antes de medir: o leitor foi
+    // cancelado no primeiro pedaco que estourou o teto, com pedacos por enviar.
+    expect(restantes).toBeGreaterThan(0)
+  })
+
   test.todo(
     'WA-28: corpo de formulario acima de 32 KB e recusado — as rotas de formulario do ' +
       'painel nascem nas Etapas 9 a 11 (Tasks 10 a 12). Mesmo motivo de WA-25.',

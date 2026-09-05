@@ -466,6 +466,12 @@ export async function lerCorpoCapado(request: Request, teto: number): Promise<st
 
     lidos += value.byteLength
     if (lidos > teto) {
+      // WA-25, segunda metade: este corte e o teto de verdade, e o teste que o
+      // prende manda um `ReadableStream` SEM `content-length` — a unica forma
+      // de fazer o portao de cima nao disparar antes. Sem ele, apagar estas
+      // quatro linhas deixaria a suite inteira verde e "capado em 8 KB" viraria
+      // "medido depois de aceitar tudo".
+      //
       // O resto do corpo nao interessa e nao vai ocupar memoria nenhuma.
       await leitor.cancel().catch(() => undefined)
       return null

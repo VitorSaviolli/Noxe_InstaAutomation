@@ -192,6 +192,59 @@ function metodoNaoPermitido(request: Request, caminho: string, permitidos: strin
   return erro('metodo_nao_permitido', request, caminho, { allow: permitidos })
 }
 
+/**
+ * A excecao nao prevista: `500 falha_interna`, e nunca `503 indisponivel`.
+ *
+ * §11.4 separa os dois de proposito, e a separacao e sobre O QUE O DONO FAZ ao
+ * ler a frase: `indisponivel` e "D1 indisponivel ou cota estourada" e manda
+ * conferir o status da Cloudflare; `falha_interna` e "qualquer excecao nao
+ * prevista" e e o padrao de todo `try/catch` do projeto. Um `TypeError` em
+ * `gravarCredencial` anunciado como "Servico temporariamente indisponivel"
+ * mandaria o dono investigar a Cloudflare por um defeito NOSSO.
+ *
+ * Um `catch` que pega TUDO nao sabe qual dos dois aconteceu, e §11.4 ja decidiu
+ * o desempate: o `try/catch` generico devolve `falha_interna`. Quem quiser
+ * responder `indisponivel` precisa saber que estava falando com o D1 — e ai o
+ * `catch` e estreito, em volta da chamada, como o da parada.
+ *
+ * **Por que o `catch` mora aqui, e nao so no roteador.** `router.ts` tem o
+ * `catch` canonico, mas ele esta dentro de `despachar()`, e as tres rotas do
+ * registro NAO passam por `despachar` — `portaDaApi` ja consome o
+ * `ReadableStream` do corpo, e um `despachar` por cima entregaria corpo vazio
+ * ao handler. `routePainel` as chama direto, `src/index.ts` nao tem `try` em
+ * volta do `fetch`, e sem este `catch` a excecao escaparia ate o workerd: um
+ * `500` cru, sem o envelope `{erro, mensagem}` de §11.4 e sem a linha de log.
+ * Ele fica, entao, mas devolvendo o MESMO codigo que o roteador devolveria.
+ */
+function falhaInterna(cause: unknown, request: Request, caminho: string): Response {
+  console.error('painel:', 'falha_interna', cause instanceof Error ? cause.message : cause)
+  return erro('falha_interna', request, caminho)
+}
+
+/**
+ * O conflito de chave primaria do passo 8 de §10.5.
+ *
+ * O `INSERT` da credencial vai sem `ON CONFLICT`, e um `credential_id` repetido
+ * derruba o lote inteiro — e essa derrubada E a verificacao do passo 8. Sem
+ * esta leitura da excecao ela virava `503`, com o convite ja queimado (o
+ * consumo do nonce vai sozinho e ANTES do lote, de proposito).
+ *
+ * **A recusa e a generica**, `credencial_invalida`, pelo motivo de sempre
+ * (§11.4): distinguir "esta credencial ja existe" de "assinatura invalida"
+ * daria um oraculo de enumeracao de `credential_id`. Mesmo status, mesma frase,
+ * mesmo lugar no fluxo — e nada do valor vai para o log.
+ *
+ * A unica restricao de unicidade alcancavel neste lote e a PK da credencial: os
+ * demais statements sao `UPDATE` e `DELETE`, e o `INSERT` do convite ja saiu
+ * antes, com `ON CONFLICT DO NOTHING`. Por isso basta reconhecer a violacao de
+ * restricao, sem casar o nome da tabela numa mensagem que e do D1 e nao nossa.
+ */
+const CONFLITO_DE_CHAVE = /constraint failed|SQLITE_CONSTRAINT/i
+
+function ehConflitoDeChave(cause: unknown): boolean {
+  return cause instanceof Error && CONFLITO_DE_CHAVE.test(cause.message)
+}
+
 // ---------------------------------------------------------------------------
 // GET /painel/convite — a pagina, com 0 consulta ao D1
 // ---------------------------------------------------------------------------
@@ -246,6 +299,20 @@ sess&atilde;o antes do primeiro acesso.</p>
 </html>
 `
 
+/** A frase de `metodo_nao_permitido` de §11.4, na tela e sem interpolacao. */
+const PAGINA_DE_METODO = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metodo nao permitido</title>
+</head>
+<body>
+<h1>M&eacute;todo n&atilde;o permitido.</h1>
+</body>
+</html>
+`
+
 /**
  * A pagina que o link do convite abre.
  *
@@ -263,18 +330,25 @@ sess&atilde;o antes do primeiro acesso.</p>
  * obrigatorio sempre.
  */
 export function handlePaginaDeConvite(request: Request, env: Env): Response {
-  if (request.method !== 'GET' && request.method !== 'HEAD') {
-    console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 405, 'metodo_nao_permitido')
-    return new Response('Metodo nao permitido', {
-      status: 405,
-      headers: { allow: 'GET', ...cabecalhos('pagina') },
-    })
-  }
-
+  // Passo 0 ANTES do passo 1, pela mesma razao de `portaDaApi`: e a ordem que
+  // §11.3 numera e a que `router.ts` executa antes de chegar aqui.
   const sanidade = painelHabilitado(env)
   if (!sanidade.ok) {
     console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 503, 'painel_desativado')
     return new Response(PAGINA_DESATIVADA, { status: 503, headers: cabecalhos('pagina') })
+  }
+
+  // Passo 1. O `Allow` lista os DOIS metodos que a linha acima aceita: um
+  // `Allow: GET` num handler que atende `HEAD` e um cabecalho que mente, e
+  // `Allow` e exatamente o cabecalho que existe para nao mentir. E o corpo e
+  // HTML, como o `content-type` de `cabecalhos('pagina')` promete — a frase e a
+  // canonica de §11.4 para `metodo_nao_permitido`.
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 405, 'metodo_nao_permitido')
+    return new Response(PAGINA_DE_METODO, {
+      status: 405,
+      headers: { allow: 'GET, HEAD', ...cabecalhos('pagina') },
+    })
   }
 
   return new Response(PAGINA_DO_CONVITE, { status: 200, headers: cabecalhos('pagina') })
@@ -356,8 +430,7 @@ export async function handleOpcoesDeRegistro(
 
     return await montarOpcoes(autorizacao.autorizacao, request, env, now, credenciais)
   } catch (cause) {
-    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
-    return erro('indisponivel', request, CAMINHO_DAS_OPCOES)
+    return falhaInterna(cause, request, CAMINHO_DAS_OPCOES)
   }
 }
 
@@ -694,7 +767,12 @@ export async function handleVerificarRegistro(
       resposta,
       rpId: env.PANEL_RP_ID,
       origem: origemDoPainel(env),
-      // O desafio vem do BILHETE, nunca do corpo (§10.5, passo 4).
+      // O desafio vem do BILHETE, nunca do corpo (§10.5, passo 4; WA-05).
+      // Trocar esta linha por `(corpo as any).desafio ?? bilhete.desafio` e
+      // substituicao de desafio: quem envia passaria a escolher o que assina, e
+      // o cookie viraria enfeite. WA-05 prova a regra dentro do verificador; o
+      // teste homonimo de `painel-convite.test.ts` a prova nesta ROTA, que e
+      // onde o `desafioEsperado` e escolhido.
       desafioEsperado: bilhete.desafio,
     })
     if (!verificada.ok) {
@@ -705,8 +783,7 @@ export async function handleVerificarRegistro(
 
     return await gravarCredencial(bilhete, verificada.credencial, porta.corpo, request, env, now)
   } catch (cause) {
-    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
-    return erro('indisponivel', request, CAMINHO_DA_VERIFICACAO)
+    return falhaInterna(cause, request, CAMINHO_DA_VERIFICACAO)
   }
 }
 
@@ -747,7 +824,7 @@ async function gravarCredencial(
   // o `INSERT` da credencial sem `ON CONFLICT` — um `credential_id` repetido
   // derruba o lote inteiro e nao deixa nem a linha de auditoria para tras
   // (§10.5, passo 8). Trava de CONV-08: registro recusado nao deixa linha.
-  await env.DB.batch([
+  const lote = [
     ...consumo.statements,
     repositorio.statementDeInsercao({
       credentialId: credencial.credentialId,
@@ -785,7 +862,18 @@ async function gravarCredencial(
       antes: null,
       depois: null,
     }),
-  ])
+  ]
+
+  try {
+    await env.DB.batch(lote)
+  } catch (cause) {
+    // Passo 8 de §10.5: `credential_id` ja presente e recusa GENERICA, e nao o
+    // `503` que este `catch` nao existia para impedir. Qualquer outra excecao
+    // segue sendo excecao nao prevista e sobe para o `catch` do handler.
+    if (!ehConflitoDeChave(cause)) throw cause
+    console.warn('painel:', 'registro_recusado', 'credencial_duplicada')
+    return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+  }
 
   // Trava de §15.3, decisao 5: a resposta sai SEM cookie de sessao. O bilhete e
   // expirado aqui porque ja cumpriu o papel — um bilhete que sobrevive ao
@@ -872,12 +960,20 @@ async function portaDaApi(
   caminho: string,
   metodo: string,
 ): Promise<PortaDaApi> {
-  if (request.method !== metodo) return { erro: metodoNaoPermitido(request, caminho, metodo) }
-
-  // Passo 0: falha fechada. Sem `PANEL_RP_ID` nao ha `rpId` nem origem, e uma
-  // credencial criada com `rpId` errado e IRRECUPERAVEL (§10.14).
+  // Passo 0, e ele vem ANTES do metodo porque e assim que §11.3 numera a
+  // escada — e porque `router.ts` copia essa ordem: la o portao de sanidade
+  // roda antes do `switch` de caminhos, entao um `OPTIONS` contra um deploy sem
+  // `PANEL_RP_ID` ja responde `503` pelo roteador. Se aqui fosse `405`, a mesma
+  // requisicao teria duas respostas conforme quem chamasse o handler, e a
+  // ordem da escada e artefato de especificacao, nao detalhe de implementacao.
+  //
+  // Falha FECHADA: sem `PANEL_RP_ID` nao ha `rpId` nem origem, e uma credencial
+  // criada com `rpId` errado e IRRECUPERAVEL (§10.14).
   const sanidade = painelHabilitado(env)
   if (!sanidade.ok) return { erro: erro('painel_desativado', request, caminho) }
+
+  // Passo 1.
+  if (request.method !== metodo) return { erro: metodoNaoPermitido(request, caminho, metodo) }
 
   if (!origemConfere(request, env)) return { erro: erro('origem_invalida', request, caminho) }
 
