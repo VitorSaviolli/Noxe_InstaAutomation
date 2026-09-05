@@ -415,7 +415,10 @@ describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
 
     const dentro = await despachar(pedir('/painel', cookie), env, AGORA, ROTA_INICIO, handleInicio)
     expect(dentro.status).toBe(200)
-    expect(await dentro.text()).toContain('Voc&ecirc; est&aacute; no painel')
+    // O titulo da tela de Inicio, e nao um trecho do corpo dela: o assunto
+    // deste teste e o PORTAO de sessao, e prende-lo a uma frase da tela faria
+    // toda mudanca de texto quebrar um teste que nao fala sobre texto.
+    expect(await dentro.text()).toContain('<h1>In&iacute;cio</h1>')
 
     // Dentro das 12 h absolutas, mas parada ha mais de 2 h: e o celular
     // esquecido na mesa, e ele expira sozinho.

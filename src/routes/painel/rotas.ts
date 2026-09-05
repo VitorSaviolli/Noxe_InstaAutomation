@@ -87,10 +87,63 @@ export function tetoDoCorpo(rota: RotaDoPainel): number {
   return formatoDaRota(rota) === 'json' ? TETO_DO_CORPO_DA_API : TETO_DO_CORPO_DE_FORMULARIO
 }
 
-// Inicio. A unica rota autenticada de hoje, e a que o `painel.js` abre depois
-// do login. Ainda nao edita nada: as telas de leitura chegam na etapa 9.
+// Inicio. E a rota que o `painel.js` abre depois do login, e a primeira das
+// cinco telas de leitura.
 export const ROTA_INICIO: RotaDoPainel = {
   caminho: '/painel',
+  metodos: ['GET'],
+  sessao: true,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+}
+
+/**
+ * As quatro telas de leitura que acompanham o Inicio.
+ *
+ * §7.1 declara `GET, POST` em `/painel/palavras`, `/painel/mensagem` e
+ * `/painel/ajustes`. Aqui elas nascem **so com `GET`**, e a diferenca e a
+ * regra que abre este arquivo: a tabela declara apenas o que o handler ja
+ * faz. Um `POST` declarado antes de existir a gravacao passaria pela escada,
+ * chegaria ao handler de leitura e devolveria a pagina inteira com `200` — a
+ * forma exata do "POST que so renderiza" de §7.1, que estas telas NAO sao. O
+ * `POST` entra em cada linha na etapa que grava aquele campo, junto do
+ * `csrf: true` e do `escreve: true` que ele exige.
+ *
+ * `stepUp: false` nas quatro, como nas sete anteriores: o verificador de
+ * step-up nasce na etapa dele, e `despachar` TRANCA — nao abre — uma rota que
+ * declare `stepUp: true` antes disso.
+ */
+export const ROTA_PALAVRAS: RotaDoPainel = {
+  caminho: '/painel/palavras',
+  metodos: ['GET'],
+  sessao: true,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+}
+
+export const ROTA_MENSAGEM: RotaDoPainel = {
+  caminho: '/painel/mensagem',
+  metodos: ['GET'],
+  sessao: true,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+}
+
+export const ROTA_AJUSTES: RotaDoPainel = {
+  caminho: '/painel/ajustes',
+  metodos: ['GET'],
+  sessao: true,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+}
+
+/** "O que aconteceu". `GET` unico, hoje e sempre: ela so le (§7.1). */
+export const ROTA_ATIVIDADE: RotaDoPainel = {
+  caminho: '/painel/atividade',
   metodos: ['GET'],
   sessao: true,
   csrf: false,
@@ -178,6 +231,10 @@ export const ROTA_VERIFICAR_REGISTRO: RotaDoPainel = {
  */
 export const ROTAS: readonly RotaDoPainel[] = [
   ROTA_INICIO,
+  ROTA_PALAVRAS,
+  ROTA_MENSAGEM,
+  ROTA_AJUSTES,
+  ROTA_ATIVIDADE,
   ROTA_ENTRAR,
   ROTA_CONVITE,
   ROTA_OPCOES_DE_ENTRAR,

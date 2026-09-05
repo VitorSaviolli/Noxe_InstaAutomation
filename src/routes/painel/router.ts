@@ -26,6 +26,8 @@
 import type { LinhaDeSessao } from '../../repositories/painel-sessoes-repository'
 import { painelHabilitado } from '../../services/panel-session'
 import type { Env } from '../../types/env'
+import { handleAjustes } from './ajustes'
+import { handleAtividade } from './atividade'
 import { handleOpcoesDeEntrar, handlePaginaDeEntrar, handleVerificarEntrada } from './entrar'
 import {
   CORPO_VAZIO,
@@ -40,6 +42,8 @@ import {
   limitar,
 } from './guardas'
 import { handleInicio } from './inicio'
+import { handleMensagem } from './mensagem'
+import { handlePalavras } from './palavras'
 import {
   CAMINHO_DA_VERIFICACAO,
   CAMINHO_DAS_OPCOES,
@@ -52,9 +56,13 @@ import { type ContextoDoErro, erro } from './resposta'
 import {
   formatoDaRota,
   PREFIXO_DA_API,
+  ROTA_AJUSTES,
+  ROTA_ATIVIDADE,
   ROTA_ENTRAR,
   ROTA_INICIO,
+  ROTA_MENSAGEM,
   ROTA_OPCOES_DE_ENTRAR,
+  ROTA_PALAVRAS,
   ROTA_VERIFICAR_ENTRADA,
   type RotaDoPainel,
   tetoDoCorpo,
@@ -122,6 +130,18 @@ export async function routePainel(
   switch (url.pathname) {
     case ROTA_INICIO.caminho:
       return despachar(request, env, now, ROTA_INICIO, handleInicio)
+
+    case ROTA_PALAVRAS.caminho:
+      return despachar(request, env, now, ROTA_PALAVRAS, handlePalavras)
+
+    case ROTA_MENSAGEM.caminho:
+      return despachar(request, env, now, ROTA_MENSAGEM, handleMensagem)
+
+    case ROTA_AJUSTES.caminho:
+      return despachar(request, env, now, ROTA_AJUSTES, handleAjustes)
+
+    case ROTA_ATIVIDADE.caminho:
+      return despachar(request, env, now, ROTA_ATIVIDADE, handleAtividade)
 
     case ROTA_ENTRAR.caminho:
       return despachar(request, env, now, ROTA_ENTRAR, handlePaginaDeEntrar)
