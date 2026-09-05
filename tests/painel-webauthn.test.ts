@@ -5,6 +5,11 @@ import {
   handleParada,
   TETO_DO_CORPO_DA_PARADA,
 } from '../src/routes/painel/parada'
+import {
+  CAMINHO_DAS_OPCOES,
+  handleOpcoesDeRegistro,
+  TETO_DO_CORPO_DA_API,
+} from '../src/routes/painel/registrar'
 import { bytesToBase64Url, decodeBase64Url } from '../src/security/base64url'
 import { PRAZO_DE_ENVELOPE_MS, type PropositoDeEnvelope } from '../src/security/signed-envelope'
 import { emitirEnvelope, lerEnvelope, origemDoPainel } from '../src/services/panel-session'
@@ -81,13 +86,15 @@ import {
  * `test.todo` que NOMEIA o vetor que falta — a promessa vira alarme em vez de
  * bilhete esquecido. Ver o cabecalho de `vetores-webauthn.ts`.
  *
- * Duas garantias tambem ficam em `test.todo` por outro motivo, escrito no lugar
- * de cada uma: WA-25 e WA-28 falam de tetos de corpo em rotas que ainda **nao
- * existem** (Etapas 7 a 11). Afirma-las aqui seria empurrar uma afirmacao da
- * linha dela para outra, que e exatamente o que §13.1 proibe.
+ * Uma garantia ainda fica em `test.todo` por outro motivo, escrito no lugar
+ * dela: WA-28 fala do teto de corpo de FORMULARIO, e as rotas de formulario do
+ * painel nascem nas Etapas 9 a 11. Afirma-la aqui seria empurrar uma afirmacao
+ * da linha dela para outra, que e exatamente o que §13.1 proibe. WA-25 esteve
+ * nesse mesmo estado ate a Etapa 7 criar a familia `/painel/api/*`.
  *
  * `now` e sempre injetado (`AGORA`), sem fake timers. Nenhum teste desta suite
- * toca o D1 — salvo o de WA-29, que prova o contrario disso numa rota.
+ * toca o D1 — salvo os de WA-25 e WA-29, que provam o contrario disso em duas
+ * rotas.
  */
 
 // ---------------------------------------------------------------------------
@@ -1447,11 +1454,26 @@ describe('CBOR — o decodificador de producao (§10.5)', () => {
 // ---------------------------------------------------------------------------
 
 describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
-  test.todo(
-    'WA-25: corpo de /painel/api/* acima de 8 KB e recusado antes do parse — a familia ' +
-      '/painel/api/* nasce na Etapa 7 (Task 8). Nao existe rota para afirmar isto hoje, e ' +
-      'afirma-lo aqui seria empurrar a garantia da linha dela para outra (§13.1).',
-  )
+  test('WA-25: corpo de /painel/api/* acima de 8 KB e recusado antes do parse', async () => {
+    // A familia `/painel/api/*` nasceu na Etapa 7, e esta garantia esperava por
+    // ela: o teto pequeno e o que protege os 10 ms de CPU do parser CBOR, entao
+    // ele precisa cortar ANTES de qualquer parse — e nao depois de aceitar
+    // tudo (§11.3, passo 4).
+    const contador = new D1Contador(env.DB)
+
+    const resposta = await handleOpcoesDeRegistro(
+      new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: RAIZ },
+        body: JSON.stringify({ tipo: 'convite', convite: 'x'.repeat(TETO_DO_CORPO_DA_API + 1) }),
+      }),
+      { ...env, DB: comoD1(contador) },
+      AGORA,
+    )
+
+    expect(resposta.status).toBe(413)
+    expect(contador.prepares).toBe(0)
+  })
 
   test.todo(
     'WA-28: corpo de formulario acima de 32 KB e recusado — as rotas de formulario do ' +
