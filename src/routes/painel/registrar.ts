@@ -1,0 +1,989 @@
+/**
+ * O convite de uso unico e o registro de uma passkey:
+ * `GET /painel/convite`, `POST /painel/api/registrar/opcoes` e
+ * `POST /painel/api/registrar/verificar` (§10.4, §10.5, §10.6).
+ *
+ * **Esta rota NAO emite sessao** (§15.3, divergencia 5). Depois de cadastrar,
+ * a resposta e `{ ok: true, para: "/painel/entrar" }` e a tela diz "Aparelho
+ * cadastrado. Agora entre com ele." Tres razoes: a sessao nasce SEMPRE de uma
+ * assertion de login com `UV` conferido, num ponto unico do codigo, o que torna
+ * a garantia testavel; a rotacao obrigatoria de identificador no login fecha
+ * fixacao de sessao; e e o que faz o codigo de recuperacao nunca virar sessao,
+ * nem direta nem indiretamente. O custo e um gesto de biometria a mais, logo
+ * depois de outro — aceito, e a tela explica.
+ *
+ * **As tres — e apenas tres — autorizacoes** (§10.4). Nao existe uma quarta, e
+ * em particular NAO existe o ramo `if (credenciais.length === 0) permitir`: o
+ * "trust on first use" e exatamente o takeover de primeiro acesso que §10.6
+ * prova ser impossivel aqui. O conjunto de instantes em que o registro esta
+ * aberto a um estranho e VAZIO, e nao apenas curto, porque as tres
+ * autorizacoes dependem de segredos que existem ANTES do deploy.
+ *
+ * **O convite nao tem rota de emissao, e isso e deliberado** (§10.4): quem o
+ * assina e o assistente local, com `k_convite` derivada do `SETUP_ADMIN_TOKEN`,
+ * sem rede. Este arquivo so CONFERE. Uma rota de emissao seria um caminho a
+ * mais para o Worker produzir autorizacao de cadastro, e o desenho inteiro
+ * existe para que exista apenas um.
+ */
+import { PainelAuditoriaRepository } from '../../repositories/painel-auditoria-repository'
+import { PainelCodigosRepository } from '../../repositories/painel-codigos-repository'
+import {
+  type OrigemDeRegistro,
+  PainelCredenciaisRepository,
+} from '../../repositories/painel-credenciais-repository'
+import { PainelSessoesRepository } from '../../repositories/painel-sessoes-repository'
+import { bytesToBase64Url } from '../../security/base64url'
+import { timingSafeEqual } from '../../security/constant-time'
+import { hmacSha256 } from '../../security/signed-envelope'
+import { conferirCodigo, hashDoCodigo, normalizarCodigo } from '../../services/panel-codes'
+import {
+  derivarSubchave,
+  emitirEnvelope,
+  fichaCsrf,
+  lerEnvelope,
+  origemDoPainel,
+  painelHabilitado,
+  validarSessao,
+} from '../../services/panel-session'
+import { opcoesDeRegistro, sortearDesafio } from '../../services/webauthn/opcoes'
+import {
+  type CredencialRegistrada,
+  prefixoDeCredencial,
+  type RespostaDeRegistro,
+  verificarRegistro,
+} from '../../services/webauthn/verificar'
+import type { Env } from '../../types/env'
+import { type Limitador, lerCorpoCapado, limitar, origemConfere } from './guardas'
+import { cabecalhosDePagina } from './parada'
+
+// ---------------------------------------------------------------------------
+// Contrato
+// ---------------------------------------------------------------------------
+
+/** A pagina que o link do convite abre. Le o token do fragmento; 0 consulta. */
+export const CAMINHO_DO_CONVITE = '/painel/convite'
+/** Onde a cerimonia comeca. */
+export const CAMINHO_DAS_OPCOES = '/painel/api/registrar/opcoes'
+/** Onde ela termina, e a unica porta para `painel_credenciais`. */
+export const CAMINHO_DA_VERIFICACAO = '/painel/api/registrar/verificar'
+
+/**
+ * Teto do corpo das rotas `/painel/api/*`: **8 KB** (§7.6, §11.3 passo 4).
+ *
+ * Uma resposta WebAuthn com attestation `none` tem ~1 a 2 KB. O teto pequeno e
+ * o que protege os 10 ms de CPU do parser CBOR: o corpo do webhook continua em
+ * 512 KB e intocado, e sao numeros de mundos diferentes de proposito.
+ */
+export const TETO_DO_CORPO_DA_API = 8 * 1024
+
+/** Teto de credenciais por `rp_id` (§7.6, §10.5 passo 9). */
+export const TETO_DE_CREDENCIAIS = 10
+
+/** Apelido do aparelho: 1 a 40 caracteres (§7.6). */
+export const TAMANHO_DO_APELIDO = 40
+
+/** Validade do convite: 20 minutos (§7.6). */
+export const PRAZO_DO_CONVITE_MS = 20 * 60 * 1000
+
+/** O apelido de quem nao digitou nada que sobrevivesse ao saneamento. */
+const APELIDO_PADRAO = 'Aparelho'
+
+const JSON_TIPO = 'application/json'
+
+/** Prefixo, nonce, pre, prazo e assinatura (§10.4). */
+const PARTES_DO_CONVITE = 5
+const VERSAO_DO_CONVITE = 'cv1'
+
+/** O cookie do bilhete de registro (§7.2). `Path=/` porque `__Host-` exige. */
+const COOKIE_DO_DESAFIO = '__Host-painel_desafio'
+/** O cookie de sessao, lido — nunca emitido — por estas rotas (§7.2). */
+const COOKIE_DA_SESSAO = '__Host-painel_sessao'
+/** A ficha anti-CSRF viaja neste cabecalho nas rotas `/painel/api/*` (§7.2). */
+const CABECALHO_DA_FICHA = 'x-painel-csrf'
+
+/**
+ * As tres autorizacoes de §10.4, e a funcao que as produz tem tres ramos.
+ *
+ * Lema 4 de §10.6 esta neste tipo: `autorizar()` faz `switch` sobre ele e a
+ * exaustividade e conferida pelo compilador. Um quarto ramo exigiria um quarto
+ * membro aqui, e um quarto membro nao passa despercebido numa revisao.
+ */
+type AutorizacaoRegistro =
+  | { readonly tipo: 'convite'; readonly nonce: string }
+  | { readonly tipo: 'recuperacao'; readonly hashCodigo: string }
+  | { readonly tipo: 'sessao'; readonly credencialId: string }
+
+/** O que a rota busca fora de si mesma. Existe para o teste injetar dubles. */
+export interface DepsDoRegistro {
+  /**
+   * Limitador de taxa. O padrao e o da familia da rota — `login` no modo
+   * convite, `codigo` no modo recuperacao. O modo `sessao` nao tem limitador
+   * porque §7.4 nao lhe da binding: quem chega ali ja provou quem e.
+   */
+  limitador?: Limitador
+  /**
+   * O step-up do modo `sessao` (§10.4 passo 1, §10.10).
+   *
+   * **O padrao RECUSA, e a recusa e a resposta certa por enquanto.** O
+   * verificador de verdade — `op_hash` recalculado no servidor a partir da
+   * mudanca canonica `{ acao: "adicionar_passkey" }` — nasce com a etapa do
+   * step-up, junto de `json_canonico`; escrever aqui uma segunda versao dele
+   * criaria duas especificacoes do mesmo hash, que e exatamente o bug
+   * intermitente que §10.10 manda evitar. Ate la o ramo existe, e conferido
+   * quanto a sessao e quanto a ficha CSRF, e falha FECHADO no passo do
+   * step-up: cadastrar passkey nova pela sessao ainda nao tem tela, e uma
+   * autorizacao que nao da para verificar nao pode ser concedida.
+   */
+  conferirStepUp?: (entrada: {
+    request: Request
+    env: Env
+    sidHash: string
+    now: number
+  }) => Promise<boolean>
+}
+
+const SEM_STEP_UP_AINDA = async (): Promise<boolean> => false
+
+// ---------------------------------------------------------------------------
+// As respostas
+// ---------------------------------------------------------------------------
+
+/**
+ * A tabela canonica de §11.4, no recorte que estas rotas usam.
+ *
+ * Ela e a UNICA: `sessao_invalida`, `desafio_expirado` e `payload_muito_grande`
+ * estao deletadas do projeto. O dono definitivo desta tabela e `resposta.ts`,
+ * que nasce com a etapa do roteador; ate la ela mora aqui, e nao espalhada em
+ * literais pelas rotas.
+ */
+const ERROS = {
+  corpo_invalido: { status: 400, mensagem: 'Não foi possível ler os dados enviados.' },
+  credencial_invalida: { status: 401, mensagem: 'Não foi possível confirmar. Tente de novo.' },
+  sessao_ausente: { status: 401, mensagem: 'Sua sessão expirou. Entre de novo.' },
+  origem_invalida: { status: 403, mensagem: 'Requisição bloqueada por segurança.' },
+  csrf_invalido: { status: 403, mensagem: 'Requisição bloqueada por segurança.' },
+  step_up_necessario: { status: 403, mensagem: 'Confirme com sua passkey para continuar.' },
+  metodo_nao_permitido: { status: 405, mensagem: 'Método não permitido.' },
+  corpo_grande_demais: { status: 413, mensagem: 'Dados grandes demais.' },
+  tipo_nao_suportado: { status: 415, mensagem: 'Formato não suportado.' },
+  muitas_tentativas: { status: 429, mensagem: 'Muitas tentativas. Aguarde um minuto.' },
+  painel_desativado: { status: 503, mensagem: 'O painel ainda não foi ativado neste deploy.' },
+  indisponivel: { status: 503, mensagem: 'Serviço temporariamente indisponível.' },
+} as const
+
+type CodigoDeErro = keyof typeof ERROS
+
+/** Cabecalhos de toda resposta JSON do painel (§11.5). `Vary: Cookie` sempre. */
+function cabecalhosDeJson(): Record<string, string> {
+  return { 'cache-control': 'private, no-store', vary: 'Cookie' }
+}
+
+/**
+ * Um erro de §11.4, com o codigo no log e a frase no corpo.
+ *
+ * Nunca ha campo `detalhe`, `stack`, `cause` ou mensagem de excecao — a
+ * `mensagem` sai da tabela e nao do erro que aconteceu. O `console.warn` segue
+ * §11.7: argumentos separados, sem template string com dado variavel dentro.
+ */
+function erro(
+  codigo: CodigoDeErro,
+  request: Request,
+  caminho: string,
+  extras: Record<string, string> = {},
+): Response {
+  const { status, mensagem } = ERROS[codigo]
+  console.warn('painel:', request.method, caminho, status, codigo)
+
+  return Response.json(
+    { erro: codigo, mensagem },
+    { status, headers: { ...extras, ...cabecalhosDeJson() } },
+  )
+}
+
+/** `405` com `Allow`. `OPTIONS` cai aqui de proposito, e nunca em CORS. */
+function metodoNaoPermitido(request: Request, caminho: string, permitidos: string): Response {
+  return erro('metodo_nao_permitido', request, caminho, { allow: permitidos })
+}
+
+// ---------------------------------------------------------------------------
+// GET /painel/convite — a pagina, com 0 consulta ao D1
+// ---------------------------------------------------------------------------
+
+/** Nenhuma interpolacao: o texto e constante, e e o que o torna seguro. */
+export const PAGINA_DO_CONVITE = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cadastrar este aparelho</title>
+<link rel="stylesheet" href="/painel/painel.css">
+</head>
+<body>
+<h1>Cadastrar este aparelho</h1>
+<p>Voc&ecirc; abriu o link do convite. Ele vale por 20 minutos e s&oacute; pode ser usado uma vez.</p>
+<form id="registrar" method="dialog">
+<label for="apelido">Como voc&ecirc; chama este aparelho</label>
+<input id="apelido" name="apelido" type="text" maxlength="40" autocomplete="off" enterkeyhint="done" required>
+<button type="submit">Cadastrar este aparelho</button>
+</form>
+<h2>Antes de cadastrar, duas coisas importantes</h2>
+<p><strong>O endere&ccedil;o deste painel fica gravado dentro da sua digital.</strong> Se um dia o
+endere&ccedil;o mudar, este aparelho precisa ser cadastrado de novo &mdash; n&atilde;o d&aacute;
+para migrar, e n&atilde;o &eacute; defeito: &eacute; assim que a digital protege voc&ecirc; de um
+site falso com outro endere&ccedil;o.</p>
+<p><strong>Chave de seguran&ccedil;a sem PIN n&atilde;o entra.</strong> O painel exige
+confirma&ccedil;&atilde;o de quem voc&ecirc; &eacute; &mdash; digital, rosto ou PIN &mdash; em toda
+entrada. Uma chavinha USB que apenas "toca" e n&atilde;o pede PIN vai ser recusada.</p>
+<noscript>
+<p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Cadastrar a digital
+precisa dele. Continuam funcionando sem JavaScript: entrar com um c&oacute;digo de
+recupera&ccedil;&atilde;o e a p&aacute;gina de parada de emerg&ecirc;ncia.</p>
+</noscript>
+<script src="/painel/painel.js" defer></script>
+</body>
+</html>
+`
+
+const PAGINA_DESATIVADA = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel nao ativado</title>
+</head>
+<body>
+<h1>O painel ainda n&atilde;o foi ativado neste deploy.</h1>
+<p>Quem instalou precisa preencher o endere&ccedil;o do painel e cadastrar a chave de
+sess&atilde;o antes do primeiro acesso.</p>
+</body>
+</html>
+`
+
+/**
+ * A pagina que o link do convite abre.
+ *
+ * **O token vem no FRAGMENTO**, nunca na query string: o fragmento nao e
+ * enviado ao servidor, nao entra em log de proxy nem em `Referer` — a mesma
+ * regra que `oauth.ts` ja aplica. Quem le `location.hash`, limpa a barra de
+ * enderecos com `history.replaceState` e manda o token no CORPO do POST e o
+ * `painel.js` (§12.8, trabalho 2). Por isso esta funcao nao recebe `url`: ela
+ * nao teria o que fazer com ela, e nao poder ler o token e a garantia.
+ *
+ * Os dois avisos em portugues claro sao obrigatorios ANTES do primeiro
+ * cadastro (§10.14 item 6, §7.8): trocar o endereco do painel e RE-REGISTRO e
+ * nao migracao, porque o `rpId` fica gravado dentro da passkey e nao pode ser
+ * corrigido depois; e chave de seguranca sem PIN nao entra, porque `UV = 1` e
+ * obrigatorio sempre.
+ */
+export function handlePaginaDeConvite(request: Request, env: Env): Response {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 405, 'metodo_nao_permitido')
+    return new Response('Metodo nao permitido', {
+      status: 405,
+      headers: { allow: 'GET', ...cabecalhosDePagina() },
+    })
+  }
+
+  const sanidade = painelHabilitado(env)
+  if (!sanidade.ok) {
+    console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 503, 'painel_desativado')
+    return new Response(PAGINA_DESATIVADA, { status: 503, headers: cabecalhosDePagina() })
+  }
+
+  return new Response(PAGINA_DO_CONVITE, { status: 200, headers: cabecalhosDePagina() })
+}
+
+// ---------------------------------------------------------------------------
+// POST /painel/api/registrar/opcoes
+// ---------------------------------------------------------------------------
+
+/** O corpo aceito por `/opcoes`. Qualquer outra forma e `null`. */
+type PedidoDeOpcoes =
+  | { readonly tipo: 'convite'; readonly convite: string }
+  | { readonly tipo: 'recuperacao'; readonly codigo: string }
+  | { readonly tipo: 'sessao' }
+
+function lerPedidoDeOpcoes(corpo: unknown): PedidoDeOpcoes | null {
+  if (typeof corpo !== 'object' || corpo === null) return null
+  const lido = corpo as Record<string, unknown>
+
+  if (lido.tipo === 'convite' && typeof lido.convite === 'string') {
+    return { tipo: 'convite', convite: lido.convite }
+  }
+  if (lido.tipo === 'recuperacao' && typeof lido.codigo === 'string') {
+    return { tipo: 'recuperacao', codigo: lido.codigo }
+  }
+  if (lido.tipo === 'sessao') return { tipo: 'sessao' }
+
+  return null
+}
+
+/**
+ * Gera as options da cerimonia de registro (§10.4).
+ *
+ * A ordem e a de §11.3 e ela importa: o que custa zero vem antes do que custa
+ * CPU, e o que custa CPU vem antes do que custa D1.
+ *
+ * **A autorizacao e validada ANTES de gerar qualquer coisa** (passo 3). As
+ * options revelam o `usuario_handle` e a lista de `excludeCredentials`, isto e,
+ * os `credential_id` ja registrados: devolver isso a um estranho e enumeracao
+ * de graca.
+ *
+ * **Nada e consumido aqui** (passo 4): o convite nao e marcado e o codigo nao e
+ * queimado. Se a pessoa cancelar a biometria — o fracasso mais comum — ela
+ * tenta de novo com o mesmo convite.
+ */
+export async function handleOpcoesDeRegistro(
+  request: Request,
+  env: Env,
+  now: number,
+  deps: DepsDoRegistro = {},
+): Promise<Response> {
+  const porta = await portaDaApi(request, env, CAMINHO_DAS_OPCOES, 'POST')
+  if (porta.erro !== undefined) return porta.erro
+
+  try {
+    const pedido = lerPedidoDeOpcoes(porta.corpo)
+    // Trava de CONV-06: registro sem convite e sem codigo e recusado ANTES de
+    // gerar as options, e nao depois — e o `null` daqui e o primeiro portao.
+    if (pedido === null) return erro('credencial_invalida', request, CAMINHO_DAS_OPCOES)
+
+    // Passo 5 da escada: ZERO consulta ao D1 ate esta linha, entao uma
+    // tentativa recusada pelo limitador nao custa banco (RL-05). O modo
+    // `sessao` nao passa por aqui porque §7.4 nao lhe da binding.
+    if (pedido.tipo !== 'sessao') {
+      const familia = pedido.tipo === 'convite' ? 'login' : 'codigo'
+      const veredito = await limitar(request, env, familia, now, deps.limitador)
+      if (!veredito.permitido) {
+        return erro('muitas_tentativas', request, CAMINHO_DAS_OPCOES, {
+          'retry-after': String(veredito.esperarSegundos),
+        })
+      }
+    }
+
+    const credenciais = new PainelCredenciaisRepository(env.DB)
+    const autorizacao = await autorizar(pedido, request, env, now, credenciais, deps)
+    if (autorizacao.recusa !== undefined) {
+      return erro(autorizacao.recusa, request, CAMINHO_DAS_OPCOES)
+    }
+
+    return await montarOpcoes(autorizacao.autorizacao, request, env, now, credenciais)
+  } catch (cause) {
+    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
+    return erro('indisponivel', request, CAMINHO_DAS_OPCOES)
+  }
+}
+
+/**
+ * As options, o desafio e o bilhete (§10.4, passos 5 a 7).
+ *
+ * Duas leituras: as credenciais — que respondem `excludeCredentials`, a regra
+ * do `pre=0` e o teto de 10 de uma vez — e o `usuario_handle`. A segunda so
+ * grava na primeirissima vez da vida da instalacao.
+ */
+async function montarOpcoes(
+  autorizacao: AutorizacaoRegistro,
+  request: Request,
+  env: Env,
+  now: number,
+  credenciais: PainelCredenciaisRepository,
+): Promise<Response> {
+  const conhecidas = await credenciais.listarTodas()
+  const desteEndereco = conhecidas.filter((linha) => linha.rpId === env.PANEL_RP_ID)
+
+  // Teto de 10 por `rp_id`, conferido ja aqui: uma cerimonia que so poderia
+  // ser recusada no fim gastaria uma biometria do dono para nada.
+  if (desteEndereco.length >= TETO_DE_CREDENCIAIS) {
+    return erro('credencial_invalida', request, CAMINHO_DAS_OPCOES)
+  }
+
+  const usuarioHandle = await credenciais.lerOuCriarHandle(now)
+  const desafio = sortearDesafio()
+
+  // O bilhete: mesmo cookie de todas as cerimonias, distinguido pelo PROPOSITO
+  // — que entra no texto assinado, na derivacao da chave e no nome do cookie
+  // (§10.3). `k` carrega a autorizacao ja provada, para que a verificacao nao
+  // precise prova-la de novo nem confiar no corpo.
+  const bilhete = await emitirEnvelope(
+    env,
+    'registrar',
+    { c: desafio, a: autorizacao.tipo, k: chaveDaAutorizacao(autorizacao), h: usuarioHandle },
+    now,
+  )
+
+  const options = opcoesDeRegistro({
+    rpId: env.PANEL_RP_ID,
+    usuarioHandle,
+    nomeDeUsuario: NOME_DE_USUARIO,
+    desafio,
+    excluir: desteEndereco.map((linha) => linha.credentialId),
+  })
+
+  return Response.json(options, {
+    headers: {
+      ...cabecalhosDeJson(),
+      'set-cookie': cookieDoDesafio(bilhete, Math.floor(options.timeout / 1000)),
+    },
+  })
+}
+
+/**
+ * O `user.name` que aparece no gerenciador de senhas do celular.
+ *
+ * Constante, e nao o `@` da conta: o `@` so existe depois do OAuth e custaria
+ * uma leitura em `account_tokens` numa rota cujo orcamento e de duas. O
+ * `displayName` — "Dono da conta" — ja diz o resto, e com dono unico nao ha
+ * campo de usuario para escolher.
+ */
+const NOME_DE_USUARIO = '@painel'
+
+/** O valor de `k` no bilhete: o que cada ramo precisa levar ate a gravacao. */
+function chaveDaAutorizacao(autorizacao: AutorizacaoRegistro): string {
+  switch (autorizacao.tipo) {
+    case 'convite':
+      return autorizacao.nonce
+    case 'recuperacao':
+      return autorizacao.hashCodigo
+    case 'sessao':
+      return autorizacao.credencialId
+  }
+}
+
+/** `__Host-` exige `Secure` e `Path=/`; `SameSite=Strict` fecha CSRF (§7.2). */
+function cookieDoDesafio(valor: string, segundos: number): string {
+  return `${COOKIE_DO_DESAFIO}=${valor}; Max-Age=${segundos}; Path=/; Secure; HttpOnly; SameSite=Strict`
+}
+
+// ---------------------------------------------------------------------------
+// As tres autorizacoes, e nenhuma quarta (§10.4)
+// ---------------------------------------------------------------------------
+
+type ResultadoDaAutorizacao =
+  | { readonly autorizacao: AutorizacaoRegistro; readonly recusa?: undefined }
+  | { readonly autorizacao?: undefined; readonly recusa: CodigoDeErro }
+
+/**
+ * Lema 4 de §10.6: a funcao tem exatamente tres ramos.
+ *
+ * Lema 5: cada ramo exige um segredo — convite (MAC de 256 bits sob chave
+ * derivada do admin token), recuperacao (100 bits) e sessao (chave privada em
+ * hardware MAIS biometria). Lema 6: nao existe ramo TOFU.
+ */
+async function autorizar(
+  pedido: PedidoDeOpcoes,
+  request: Request,
+  env: Env,
+  now: number,
+  credenciais: PainelCredenciaisRepository,
+  deps: DepsDoRegistro,
+): Promise<ResultadoDaAutorizacao> {
+  switch (pedido.tipo) {
+    case 'convite':
+      return await autorizarPorConvite(pedido.convite, env, now, credenciais)
+    case 'recuperacao':
+      return await autorizarPorCodigo(pedido.codigo, env)
+    case 'sessao':
+      return await autorizarPorSessao(request, env, now, deps)
+  }
+}
+
+/**
+ * O convite: `cv1.<nonce>.<pre>.<expira_em>.<hmac>` (§10.4).
+ *
+ *   hmac = HMAC-SHA256( k_convite, "cv1|" + nonce + "|" + pre + "|" + expira_em )
+ *
+ * Ordem IDENTICA a do envelope e a do `state` do OAuth: formato -> assinatura
+ * em tempo constante -> prazo. Nunca o contrario. Conferir o prazo antes
+ * deixaria um convite forjado se distinguir de um vencido pelo tempo de
+ * resposta e pela mensagem.
+ *
+ * `pre = "0"` so vale enquanto NAO existir nenhuma credencial — defesa em
+ * profundidade barata: o convite comum, que pode acabar num print de tutorial,
+ * deixa de funcionar no instante em que a primeira passkey existe. `pre = "q"`
+ * vale em qualquer estado, e o assistente avisa que ele e mais perigoso.
+ *
+ * **O consumo NAO acontece aqui** (§10.4, passo 4): esta funcao nem pergunta ao
+ * banco se o nonce ja foi usado. Quem responde isso e o `INSERT ... ON CONFLICT
+ * DO NOTHING` de `/verificar`, que e ATOMICO — perguntar antes seria uma
+ * leitura a mais para uma resposta que a corrida pode invalidar no instante
+ * seguinte.
+ */
+async function autorizarPorConvite(
+  token: string,
+  env: Env,
+  now: number,
+  credenciais: PainelCredenciaisRepository,
+): Promise<ResultadoDaAutorizacao> {
+  const partes = token.split('.')
+  if (partes.length !== PARTES_DO_CONVITE) return { recusa: 'credencial_invalida' }
+
+  const [versao, nonce, pre, expiraEmCru, assinatura] = partes as [
+    string,
+    string,
+    string,
+    string,
+    string,
+  ]
+  if (versao !== VERSAO_DO_CONVITE) return { recusa: 'credencial_invalida' }
+  if (pre !== '0' && pre !== 'q') return { recusa: 'credencial_invalida' }
+
+  const chave = await derivarSubchave(env.SETUP_ADMIN_TOKEN, 'convite')
+  const esperada = bytesToBase64Url(
+    await hmacSha256(chave, `${VERSAO_DO_CONVITE}|${nonce}|${pre}|${expiraEmCru}`),
+  )
+  // Trava de CONV-04 e CONV-05: a assinatura cobre o `expira_em` CRU e o `pre`.
+  // Um convite assinado com outro segredo, ou com o prazo esticado a mao,
+  // morre nesta linha.
+  if (!timingSafeEqual(esperada, assinatura)) return { recusa: 'credencial_invalida' }
+
+  const expiraEm = Number.parseInt(expiraEmCru, 10)
+  if (!Number.isFinite(expiraEm)) return { recusa: 'credencial_invalida' }
+  // Trava de CONV-03: 20 minutos e o suficiente para sair do terminal e pegar
+  // o celular, e curto o bastante para que um convite esquecido num print
+  // esteja morto.
+  if (now > expiraEm) return { recusa: 'credencial_invalida' }
+
+  // Trava de CONV-07, e a PRIMEIRA consulta ao D1 desta rota — depois do HMAC
+  // fechar, como manda §11.3. `pre=0` deixa de valer no instante em que existe
+  // qualquer credencial, inclusive de um endereco antigo: ela prova que a
+  // instalacao ja teve dono, mesmo que nao sirva mais para entrar (§10.14).
+  if (pre === '0' && (await credenciais.listarTodas()).length > 0) {
+    return { recusa: 'credencial_invalida' }
+  }
+
+  return { autorizacao: { tipo: 'convite', nonce } }
+}
+
+/**
+ * O codigo de recuperacao (§10.11).
+ *
+ * Uma das tres rotas de §11.3 que recebem codigo digitado: o HMAC que fecha e
+ * o **do proprio codigo**, calculado com a pimenta `k_codigos` que o atacante
+ * nao tem. O formato exato e validado ANTES (0 consulta), e so entao vem 1
+ * leitura e 0 escrita. Nao e excecao a regra: e a regra aplicada a um segredo
+ * que nao e cookie.
+ *
+ * Trava de CONV-11: codigo errado percorre exatamente o mesmo caminho de codigo
+ * inexistente — `conferirCodigo` nao sai no primeiro acerto, e a lista vazia
+ * passa pelo mesmo laco de uma lista cheia.
+ *
+ * **Nada e consumido aqui.** O consumo, com `changes === 1`, e de `/verificar`.
+ */
+async function autorizarPorCodigo(bruto: string, env: Env): Promise<ResultadoDaAutorizacao> {
+  const normalizado = normalizarCodigo(bruto, 'recuperacao')
+  if (normalizado === null) return { recusa: 'credencial_invalida' }
+
+  const chaveDosCodigos = await derivarSubchave(env.PANEL_SESSION_KEY, 'codigos')
+  const vivos = await new PainelCodigosRepository(env.DB).hashesVivos('recuperacao')
+  if (!(await conferirCodigo(normalizado, 'recuperacao', chaveDosCodigos, vivos))) {
+    return { recusa: 'credencial_invalida' }
+  }
+
+  return {
+    autorizacao: {
+      tipo: 'recuperacao',
+      hashCodigo: await hashDoCodigo(chaveDosCodigos, 'recuperacao', normalizado),
+    },
+  }
+}
+
+/**
+ * A sessao viva com step-up recem feito (§10.4, passo 1).
+ *
+ * **Este e o unico POST autorizado por cookie de sessao cuja ficha CSRF foi
+ * decidida a parte** (§15.4): sem ela, cadastrar uma passkey nova — que e
+ * precisamente a operacao que um atacante mais gostaria de executar em nome do
+ * dono — seria a unica rota autenticada sem a camada 3 de §10.9.
+ *
+ * Ordem: sessao (1 HMAC) -> ficha (1 HMAC) -> step-up. Nenhuma consulta ao D1
+ * ate o step-up fechar, e por isso um cookie forjado nao custa banco nenhum.
+ */
+async function autorizarPorSessao(
+  request: Request,
+  env: Env,
+  now: number,
+  deps: DepsDoRegistro,
+): Promise<ResultadoDaAutorizacao> {
+  const cookie = lerCookie(request, COOKIE_DA_SESSAO)
+  if (cookie === null) return { recusa: 'sessao_ausente' }
+
+  const sessao = await validarSessao(env, cookie, now)
+  if (!sessao.valida) return { recusa: 'sessao_ausente' }
+
+  const ficha = request.headers.get(CABECALHO_DA_FICHA)
+  if (ficha === null || !timingSafeEqual(await fichaCsrf(env, sessao.sidHash), ficha)) {
+    return { recusa: 'csrf_invalido' }
+  }
+
+  const conferir = deps.conferirStepUp ?? SEM_STEP_UP_AINDA
+  if (!(await conferir({ request, env, sidHash: sessao.sidHash, now }))) {
+    return { recusa: 'step_up_necessario' }
+  }
+
+  const linha = await new PainelSessoesRepository(env.DB).buscarPorHash(sessao.sidHash)
+  // A LINHA e a autoridade, e nao o cookie: apagar a linha invalida a sessao
+  // emitida, e e por isso que "sair de todos os aparelhos" funciona (§10.13).
+  if (linha === null || now > linha.expiraEm || now > linha.ociosaAte) {
+    return { recusa: 'sessao_ausente' }
+  }
+
+  return { autorizacao: { tipo: 'sessao', credencialId: linha.credentialId } }
+}
+
+// ---------------------------------------------------------------------------
+// POST /painel/api/registrar/verificar
+// ---------------------------------------------------------------------------
+
+/** O bilhete de registro, ja autenticado pelo MAC do envelope. */
+interface BilheteDeRegistro {
+  readonly desafio: string
+  readonly tipo: OrigemDeRegistro
+  readonly chave: string
+  readonly usuarioHandle: string
+}
+
+function lerBilhete(claims: Record<string, string>): BilheteDeRegistro | null {
+  const { c, a, k, h } = claims
+  if (c === undefined || k === undefined || h === undefined) return null
+  if (a !== 'convite' && a !== 'recuperacao' && a !== 'sessao') return null
+
+  return { desafio: c, tipo: a, chave: k, usuarioHandle: h }
+}
+
+function lerRespostaDeRegistro(corpo: unknown): RespostaDeRegistro | null {
+  if (typeof corpo !== 'object' || corpo === null) return null
+  const credencial = (corpo as { credencial?: unknown }).credencial
+  if (typeof credencial !== 'object' || credencial === null) return null
+
+  const lida = credencial as Record<string, unknown>
+  if (
+    typeof lida.id !== 'string' ||
+    typeof lida.type !== 'string' ||
+    typeof lida.clientDataJSON !== 'string' ||
+    typeof lida.attestationObject !== 'string'
+  ) {
+    return null
+  }
+
+  return {
+    id: lida.id,
+    type: lida.type,
+    clientDataJSON: lida.clientDataJSON,
+    attestationObject: lida.attestationObject,
+  }
+}
+
+/**
+ * Verifica a attestation e grava a credencial (§10.5).
+ *
+ * **Ordem de gravacao, e o preco dela.** Consumir a autorizacao ANTES de
+ * inserir a credencial. Se a insercao falhar, o convite ou o codigo foi
+ * queimado por nada, e a pessoa precisa de outro — aceito de proposito. A ordem
+ * inversa abre uma corrida em que duas requisicoes com o mesmo convite inserem
+ * duas credenciais, e uma delas pode ser do atacante. Perder um convite e
+ * aborrecimento; ganhar uma credencial indevida e o fim do jogo.
+ */
+export async function handleVerificarRegistro(
+  request: Request,
+  env: Env,
+  now: number,
+): Promise<Response> {
+  const porta = await portaDaApi(request, env, CAMINHO_DA_VERIFICACAO, 'POST')
+  if (porta.erro !== undefined) return porta.erro
+
+  try {
+    // Lema 2 de §10.6: sem bilhete valido, `401` e nenhuma linha do parser CBOR
+    // chega a rodar — e o parser e o unico trabalho caro desta rota. Lema 3: o
+    // MAC e sob `k_env("registrar")`, derivada da `PANEL_SESSION_KEY`, cuja
+    // ausencia ja desligou o painel inteiro la em cima.
+    const cookie = lerCookie(request, COOKIE_DO_DESAFIO)
+    if (cookie === null) return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+
+    const envelope = await lerEnvelope(env, 'registrar', cookie, now)
+    if (!envelope.valido) return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+
+    const bilhete = lerBilhete(envelope.claims)
+    if (bilhete === null) return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+
+    const resposta = lerRespostaDeRegistro(porta.corpo)
+    if (resposta === null) return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+
+    const verificada = await verificarRegistro({
+      resposta,
+      rpId: env.PANEL_RP_ID,
+      origem: origemDoPainel(env),
+      // O desafio vem do BILHETE, nunca do corpo (§10.5, passo 4).
+      desafioEsperado: bilhete.desafio,
+    })
+    if (!verificada.ok) {
+      // O motivo vai para o log; ao cliente, sempre a mesma frase (§11.4).
+      console.warn('painel:', 'registro_recusado', verificada.motivo)
+      return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+    }
+
+    return await gravarCredencial(bilhete, verificada.credencial, porta.corpo, request, env, now)
+  } catch (cause) {
+    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
+    return erro('indisponivel', request, CAMINHO_DA_VERIFICACAO)
+  }
+}
+
+/**
+ * Consome a autorizacao, grava a credencial e registra a auditoria.
+ *
+ * A conta de escritas de §9.10, por ramo: convite = 3 (nonce + credencial +
+ * auditoria); sessao = 2 (credencial + auditoria); recuperacao = 5 (consumo +
+ * invalidacao dos demais + `DELETE` das sessoes + credencial + auditoria).
+ *
+ * A leitura do teto e a UNICA consulta desta rota, e ela e a terceira do fluxo
+ * inteiro — §9.10 orca duas. Ela existe porque o passo 9 de §10.5 manda
+ * conferir o teto na GRAVACAO, e nao so na geracao das options: entre uma
+ * requisicao e outra o dono pode ter cadastrado por outro caminho. Uma leitura
+ * a mais no caminho que uma instalacao percorre uma vez na vida e o preco de um
+ * teto que vale nas duas metades da cerimonia.
+ */
+async function gravarCredencial(
+  bilhete: BilheteDeRegistro,
+  credencial: CredencialRegistrada,
+  corpo: unknown,
+  request: Request,
+  env: Env,
+  now: number,
+): Promise<Response> {
+  const repositorio = new PainelCredenciaisRepository(env.DB)
+
+  if ((await repositorio.contarPorRpId(env.PANEL_RP_ID)) >= TETO_DE_CREDENCIAIS) {
+    return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+  }
+
+  const consumo = await consumirAutorizacao(bilhete, env, now)
+  if (!consumo.ok) return erro('credencial_invalida', request, CAMINHO_DA_VERIFICACAO)
+
+  const auditoria = new PainelAuditoriaRepository(env.DB)
+
+  // Trava de §8.8, a regra de ouro: sem log, sem mudanca. UM `db.batch()` so, e
+  // o `INSERT` da credencial sem `ON CONFLICT` — um `credential_id` repetido
+  // derruba o lote inteiro e nao deixa nem a linha de auditoria para tras
+  // (§10.5, passo 8). Trava de CONV-08: registro recusado nao deixa linha.
+  await env.DB.batch([
+    ...consumo.statements,
+    repositorio.statementDeInsercao({
+      credentialId: credencial.credentialId,
+      rpId: env.PANEL_RP_ID,
+      usuarioHandle: bilhete.usuarioHandle,
+      chavePublicaJwk: JSON.stringify(credencial.jwk),
+      algoritmo: credencial.algoritmo,
+      transportes: lerTransportes(corpo),
+      signCount: credencial.signCount,
+      backupElegivel: credencial.backupElegivel,
+      backupAtivo: credencial.backupAtivo,
+      apelido: sanearApelido(corpo),
+      origemRegistro: bilhete.tipo,
+      criadoEm: now,
+    }),
+    auditoria.statementDeRegistro({
+      ocorridoEm: now,
+      // `0` porque registrar passkey nao muda configuracao nenhuma: perguntar a
+      // versao atual custaria uma leitura que esta rota nao tem no orcamento.
+      versao: 0,
+      origem: 'painel',
+      // Nunca o `credential_id` cru, em nenhum dos tres destinos (§10.13).
+      ator: `passkey:${await prefixoDeCredencial(credencial.credentialId)}`,
+      // O gesto de biometria do REGISTRO nao e step-up: step-up e
+      // reautenticacao presa a uma mudanca, e so o ramo `sessao` a teve.
+      stepUp: bilhete.tipo === 'sessao',
+      // No ramo da recuperacao a linha e `recuperacao_usada`, que e o evento
+      // que §10.11 manda registrar — e o que a investigacao precisa ver, com a
+      // invalidacao em bloco e o fim das sessoes no mesmo lote.
+      acao: bilhete.tipo === 'recuperacao' ? 'recuperacao_usada' : 'passkey_registrada',
+      alvo: null,
+      campos: '[]',
+      // `antes` e `depois` ficam `NULL`: o evento nao muda campo de
+      // configuracao nenhum que valha historico (§9.9).
+      antes: null,
+      depois: null,
+    }),
+  ])
+
+  // Trava de §15.3, decisao 5: a resposta sai SEM cookie de sessao. O bilhete e
+  // expirado aqui porque ja cumpriu o papel — um bilhete que sobrevive ao
+  // proprio uso e uma autorizacao pendurada esperando uma segunda requisicao.
+  return Response.json(
+    { ok: true, para: '/painel/entrar' },
+    { headers: { ...cabecalhosDeJson(), 'set-cookie': cookieDoDesafio('', 0) } },
+  )
+}
+
+/** O consumo de cada ramo, na ordem que §10.5 exige. */
+async function consumirAutorizacao(
+  bilhete: BilheteDeRegistro,
+  env: Env,
+  now: number,
+): Promise<{ ok: boolean; statements: D1PreparedStatement[] }> {
+  switch (bilhete.tipo) {
+    case 'convite': {
+      // Trava de CONV-02 e de CONV-12: `ON CONFLICT DO NOTHING` mais
+      // `meta.changes` e o mesmo claim atomico do `claimComment`. Duas
+      // requisicoes simultaneas com o mesmo convite NAO podem ambas ver 1 — o
+      // D1 e SQLite com escritor unico. Vai sozinho e ANTES do lote: se
+      // viajasse dentro, uma falha na credencial devolveria o convite ao mundo.
+      const gravado = await env.DB.prepare(
+        `INSERT INTO painel_convites_usados (nonce, consumido_em, expira_em)
+         VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
+      )
+        // `expira_em` so serve a uma faxina futura do cron, e o bilhete nao
+        // carrega o prazo do convite (§10.4 fixa as claims em quatro). O teto
+        // de 20 minutos a partir de agora e sempre >= o prazo real, entao a
+        // linha nunca some antes do convite que ela bloqueia.
+        .bind(bilhete.chave, now, now + PRAZO_DO_CONVITE_MS)
+        .run()
+
+      return { ok: (gravado.meta.changes ?? 0) === 1, statements: [] }
+    }
+
+    case 'recuperacao': {
+      const codigos = new PainelCodigosRepository(env.DB)
+      // Trava de CONV-10: `usado_em IS NULL` no `WHERE` e `changes === 1` sao o
+      // uso unico, e sao atomicos pelo mesmo motivo do convite.
+      const consumido = await codigos.statementDeConsumo(bilhete.chave, now).run()
+      if ((consumido.meta.changes ?? 0) !== 1) return { ok: false, statements: [] }
+
+      // Invalidacao em bloco (§10.11): se um codigo foi usado por quem nao
+      // devia, os outros estao na mesma lista vazada — e qualquer sessao aberta
+      // pode ser dele.
+      return {
+        ok: true,
+        statements: [
+          codigos.statementDeInvalidacaoDosDemais(bilhete.chave, now),
+          new PainelSessoesRepository(env.DB).statementDeApagarTodas(),
+        ],
+      }
+    }
+
+    case 'sessao':
+      // Nada a consumir: a autorizacao ja foi o step-up, e ele e consumido na
+      // mesma requisicao em que autoriza (§10.10).
+      return { ok: true, statements: [] }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auxiliares
+// ---------------------------------------------------------------------------
+
+/** O que a porta comum devolve: ou um erro pronto, ou o corpo ja lido. */
+type PortaDaApi = { erro: Response; corpo?: undefined } | { erro?: undefined; corpo: unknown }
+
+/**
+ * Os passos 0 a 4 da escada de §11.3, iguais nas duas rotas `/painel/api/*`.
+ *
+ * Nenhuma consulta ao D1 acontece aqui: metodo, origem, `content-type` e teto
+ * de corpo custam zero banco, e e por isso que lixo de qualquer tipo sai do
+ * painel sem tocar na cota compartilhada com o webhook.
+ *
+ * `OPTIONS` cai em `405`, nunca em CORS: nenhuma rota do painel emite
+ * `Access-Control-*`, em nenhuma hipotese (§10.9, camada 5).
+ */
+async function portaDaApi(
+  request: Request,
+  env: Env,
+  caminho: string,
+  metodo: string,
+): Promise<PortaDaApi> {
+  if (request.method !== metodo) return { erro: metodoNaoPermitido(request, caminho, metodo) }
+
+  // Passo 0: falha fechada. Sem `PANEL_RP_ID` nao ha `rpId` nem origem, e uma
+  // credencial criada com `rpId` errado e IRRECUPERAVEL (§10.14).
+  const sanidade = painelHabilitado(env)
+  if (!sanidade.ok) return { erro: erro('painel_desativado', request, caminho) }
+
+  if (!origemConfere(request, env)) return { erro: erro('origem_invalida', request, caminho) }
+
+  // `toLowerCase()` porque media type e case-INSENSITIVE por RFC 9110, e
+  // `startsWith` porque o `; charset=utf-8` que os navegadores anexam e
+  // legitimo.
+  const tipo = (request.headers.get('content-type') ?? '').toLowerCase().trimStart()
+  if (!tipo.startsWith(JSON_TIPO)) return { erro: erro('tipo_nao_suportado', request, caminho) }
+
+  let cru: string | null
+  try {
+    // A leitura mora dentro do `try` porque o corpo chega pela rede: um 3G que
+    // cai no meio do POST estoura no `ReadableStream`, e fora do `try` isso
+    // viraria `500`.
+    cru = await lerCorpoCapado(request, TETO_DO_CORPO_DA_API)
+  } catch {
+    return { erro: erro('corpo_invalido', request, caminho) }
+  }
+  if (cru === null) return { erro: erro('corpo_grande_demais', request, caminho) }
+
+  try {
+    return { corpo: JSON.parse(cru) as unknown }
+  } catch {
+    return { erro: erro('corpo_invalido', request, caminho) }
+  }
+}
+
+/**
+ * O valor de um cookie, do cabecalho cru.
+ *
+ * Nao usa `startsWith` sobre o cabecalho inteiro: `__Host-painel_desafio` e
+ * `__Host-painel_desafio_falso` compartilham prefixo, e o navegador manda os
+ * dois separados por `; `.
+ */
+function lerCookie(request: Request, nome: string): string | null {
+  const cabecalho = request.headers.get('cookie')
+  if (cabecalho === null) return null
+
+  for (const pedaco of cabecalho.split(';')) {
+    const igual = pedaco.indexOf('=')
+    if (igual === -1) continue
+    if (pedaco.slice(0, igual).trim() !== nome) continue
+
+    const valor = pedaco.slice(igual + 1).trim()
+    return valor === '' ? null : valor
+  }
+
+  return null
+}
+
+/** Caracteres de controle e de formatacao, os mesmos que §7.6 manda remover. */
+const INVISIVEIS = /[\p{Cc}\p{Cf}]/gu
+
+/**
+ * O apelido saneado (§10.5, passo 10).
+ *
+ * NFKC, fora os invisiveis, sem espaco nas pontas e cortado em 40. Ele **nao**
+ * e escapado na gravacao; e escapado na renderizacao, automaticamente, pela tag
+ * `html` que nasce com a etapa do roteador — escapar aqui gravaria `&amp;` no
+ * banco e o dono veria a propria escapatoria na tela.
+ *
+ * Saneia em vez de recusar: §10.5 diz "saneado", e um apelido longo demais
+ * digitado num celular nao merece uma cerimonia de biometria perdida.
+ */
+function sanearApelido(corpo: unknown): string {
+  const bruto = (corpo as { apelido?: unknown } | null)?.apelido
+  if (typeof bruto !== 'string') return APELIDO_PADRAO
+
+  const limpo = bruto.normalize('NFKC').replace(INVISIVEIS, '').trim().slice(0, TAMANHO_DO_APELIDO)
+  return limpo === '' ? APELIDO_PADRAO : limpo
+}
+
+/**
+ * Os `transports` que o navegador informou. **So dica de interface** (§8.6).
+ *
+ * Nenhuma decisao do painel olha para este campo, e e por isso que ele pode vir
+ * de um corpo nao confiavel: guardamos no maximo uma lista curta de strings do
+ * proprio vocabulario da WebAuthn, e qualquer outra coisa vira `NULL`.
+ */
+const TRANSPORTES_CONHECIDOS = ['usb', 'nfc', 'ble', 'internal', 'hybrid', 'smart-card']
+
+function lerTransportes(corpo: unknown): string | null {
+  const lista = (corpo as { transportes?: unknown } | null)?.transportes
+  if (!Array.isArray(lista)) return null
+
+  const limpos = lista.filter(
+    (item): item is string => typeof item === 'string' && TRANSPORTES_CONHECIDOS.includes(item),
+  )
+
+  return limpos.length === 0 ? null : JSON.stringify(limpos)
+}

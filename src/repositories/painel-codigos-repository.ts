@@ -75,4 +75,47 @@ export class PainelCodigosRepository {
 
     return [this.db.prepare('DELETE FROM painel_codigos'), ...insercoes]
   }
+
+  /**
+   * Consome UM codigo de recuperacao, e so ele (§10.11).
+   *
+   * `changes === 1` e a prova do uso unico, e ela e ATOMICA: o `WHERE` carrega
+   * `usado_em IS NULL`, entao duas requisicoes com o mesmo codigo nao podem
+   * ambas ver `1` — o D1 e SQLite com escritor unico, o mesmo padrao do
+   * `claimComment` que o projeto ja usa.
+   *
+   * Statement, e nao gravacao, mas por um motivo DIFERENTE do resto do painel:
+   * este aqui vai sozinho, ANTES do lote, porque §10.5 manda consumir a
+   * autorizacao antes de inserir a credencial e aceita explicitamente o preco
+   * — se a insercao falhar, o codigo foi queimado por nada. Se ele viajasse
+   * dentro do lote, uma falha na credencial devolveria o codigo ao mundo, e ai
+   * duas requisicoes com o mesmo codigo poderiam registrar duas passkeys.
+   */
+  statementDeConsumo(hash: string, now: number): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `UPDATE painel_codigos SET usado_em = ?
+          WHERE hash = ? AND tipo = 'recuperacao'
+            AND usado_em IS NULL AND invalidado_em IS NULL`,
+      )
+      .bind(now, hash)
+  }
+
+  /**
+   * Invalida em bloco todos os OUTROS codigos de recuperacao (§10.11).
+   *
+   * Justificativa da spec, em uma linha: se um codigo foi usado por quem nao
+   * devia, os outros estao na mesma lista vazada. O codigo de PARADA nao entra
+   * — ele nao abre cadastro nenhum, e derrubar o freio de emergencia junto
+   * seria punir o dono no pior dia possivel.
+   */
+  statementDeInvalidacaoDosDemais(hash: string, now: number): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `UPDATE painel_codigos SET invalidado_em = ?
+          WHERE tipo = 'recuperacao' AND hash <> ?
+            AND usado_em IS NULL AND invalidado_em IS NULL`,
+      )
+      .bind(now, hash)
+  }
 }

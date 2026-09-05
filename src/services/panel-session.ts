@@ -41,12 +41,18 @@ const SID_BYTES = 32
 export const PRAZO_ABSOLUTO_DE_SESSAO_MS = 12 * 60 * 60 * 1000
 
 /**
- * As quatro subchaves que saem do `PANEL_SESSION_KEY` (§10.1).
+ * Os cinco rotulos de subchave de §10.1.
  *
- * `convite` nao esta aqui porque a raiz dele e outra — o `SETUP_ADMIN_TOKEN` —
- * e ele nasce com a etapa do convite.
+ * Quatro deles saem do `PANEL_SESSION_KEY`; `convite` sai do
+ * `SETUP_ADMIN_TOKEN`, porque ele e emitido OFFLINE, na maquina do dono, pelo
+ * assistente — que ja le esse token e nunca pode ler a chave de sessao. E a
+ * separacao que faz um convite vazado nao virar cookie nem desafio, e que faz
+ * rotacionar o admin token invalidar convites SEM derrubar as sessoes.
+ *
+ * Por isso a raiz e parametro de `derivarSubchave`: e o unico rotulo cuja raiz
+ * nao e `env.PANEL_SESSION_KEY`, e quem o usa passa a raiz certa na chamada.
  */
-export type RotuloDeSubchave = 'sessao' | 'desafio' | 'csrf' | 'codigos'
+export type RotuloDeSubchave = 'sessao' | 'desafio' | 'csrf' | 'codigos' | 'convite'
 
 export type LeituraDeSessao =
   | { valida: true; sidHash: string; expiraEm: number }
@@ -119,6 +125,26 @@ export async function lerEnvelope(
   now: number,
 ): Promise<LeituraDeEnvelope> {
   return abrirEnvelope(envelope, proposito, await chaveDeEnvelope(env, proposito), now)
+}
+
+/**
+ * A ficha anti-CSRF daquela sessao: camada 3 das cinco de §10.9.
+ *
+ *   ficha = base64url( HMAC-SHA256( k_csrf, "csrf|v1|" + sid_hash ) )
+ *
+ * **Derivada, e nao sorteada.** Nao precisa de coluna, nao precisa de um
+ * segundo cookie e e impossivel de dessincronizar: quem tem a sessao chega
+ * sempre a mesma ficha, e quem nao tem nao chega a nenhuma. Um valor sorteado
+ * exigiria guardar o par em algum lugar, e esse lugar seria uma escrita a mais
+ * por sessao numa cota compartilhada com o webhook.
+ *
+ * O `sid_hash` entra no texto assinado: e o que prende a ficha AQUELA sessao.
+ * Sem ele, uma ficha valida em qualquer sessao seria uma constante do deploy,
+ * e a camada inteira nao valeria nada.
+ */
+export async function fichaCsrf(env: Env, sidHash: string): Promise<string> {
+  const kCsrf = await derivarSubchave(env.PANEL_SESSION_KEY, 'csrf')
+  return bytesToBase64Url(await hmacSha256(kCsrf, `csrf|v1|${sidHash}`))
 }
 
 /**

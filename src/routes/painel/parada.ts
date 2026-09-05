@@ -45,7 +45,7 @@ import {
 import { derivarSubchave } from '../../services/panel-session'
 import type { Env } from '../../types/env'
 import { isAdmin } from '../oauth'
-import { type Limitador, limitar } from './guardas'
+import { type Limitador, lerCorpoCapado, limitar } from './guardas'
 
 /** Caminho do formulario. Difere do da acao por uma letra, e de proposito (§11.6). */
 export const CAMINHO_DO_FORMULARIO = '/painel/parar'
@@ -58,15 +58,17 @@ export const CAMINHO_DA_PARADA = '/painel/parada'
  * Um codigo de parada tem 16 caracteres. 1 KB e folga de sobra e mantem o
  * custo de um corpo gigante em zero consulta ao D1.
  *
- * Trava de WA-29 (§13.2): este e o teto de corpo do painel que ja existe, e o
- * unico que uma cerimonia WebAuthn nunca alcanca. Os irmaos dele — 8 KB em
- * `/painel/api/*` e 32 KB em formulario — nascem com as rotas das etapas 7 a
- * 11. Subir este numero derruba o teste de WA-29 e o de STOP.
+ * Trava de WA-29 (§13.2): este e o menor dos tres tetos de corpo do painel, e
+ * o unico que uma cerimonia WebAuthn nunca alcanca. O irmao de 8 KB de
+ * `/painel/api/*` nasce com a etapa do registro; o de 32 KB do formulario, com
+ * as telas. Subir este numero derruba o teste de WA-29 e o de STOP.
+ *
+ * O NUMERO mora aqui, mas quem le o corpo com ele e `lerCorpoCapado` em
+ * `guardas.ts`: uma implementacao e tres numeros, nunca tres implementacoes.
  */
 export const TETO_DO_CORPO_DA_PARADA = 1024
 
 const FORMULARIO = 'application/x-www-form-urlencoded'
-const decoder = new TextDecoder()
 
 /**
  * Piso da `PANEL_SESSION_KEY`, o mesmo de `painelHabilitado` (§10.2).
@@ -172,11 +174,13 @@ function pagina(frase: string, status: number, extras: ExtrasDaPagina = {}): Res
  *
  * Escritos aqui porque `html.ts` — o dono definitivo de `cabecalhos(perfil)` —
  * so nasce com a etapa do roteador; quando ele existir, esta funcao some e as
- * paginas daqui passam a chamar aquela. `Vary: Cookie` vai em TODA resposta do
+ * paginas passam a chamar aquela. Exportada por isso mesmo: a pagina do
+ * convite (`registrar.ts`) usa ESTA, e nao uma copia. Duas CSPs no repositorio
+ * divergiriam na primeira vez que uma delas ganhasse uma diretiva. `Vary: Cookie` vai em TODA resposta do
  * Worker, sem excecao por rota, mesmo numa rota que nao le cookie: uma regra
  * sem excecao vale mais que a economia de um cabecalho.
  */
-function cabecalhosDePagina(): Record<string, string> {
+export function cabecalhosDePagina(): Record<string, string> {
   return {
     'content-type': 'text/html; charset=utf-8',
     'content-security-policy':
@@ -316,7 +320,7 @@ export async function handleParada(
     // justamente o cenario que §10.12 nomeia — o dono precisa ler a terceira
     // frase, que diz o que aconteceu, e nao um erro de servidor que nao diz se
     // a automacao parou.
-    const corpo = await lerCorpoCapado(request)
+    const corpo = await lerCorpoCapado(request, TETO_DO_CORPO_DA_PARADA)
     if (corpo === null) {
       console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 413, 'corpo_grande_demais')
       return pagina(FRASES.codigoIncorreto, 413)
@@ -590,65 +594,6 @@ function metodoNaoPermitido(permitidos: string): Response {
       vary: 'Cookie',
     },
   })
-}
-
-/**
- * Le o corpo com o teto de 1 KB. Devolve `null` quando estoura.
- *
- * Dois portoes, e o segundo e que e o teto de verdade:
- *
- * 1. O `content-length`, quando vem, corta antes de ler um unico byte. Ele e
- *    barato, mas vem de quem chama e pode mentir para os dois lados — um teto
- *    que confia nele nao e teto.
- * 2. A leitura CORTA DURANTE o `ReadableStream`, pedaco a pedaco. Um POST
- *    `chunked` nao tem `content-length`, e `arrayBuffer()` sobre ele
- *    bufferizaria o corpo inteiro na memoria do isolate ANTES de qualquer
- *    conferencia: "capado em 1 KB" viraria "medido depois de aceitar tudo".
- *    Aqui o primeiro pedaco que passa do teto encerra a leitura e cancela o
- *    resto do stream.
- *
- * Mede BYTES, e nao caracteres: `content-length` conta bytes, e recontar sobre
- * a string decodificada seria uma segunda conta, com outro resultado em
- * acentos. Nenhuma das duas conferencias toca o D1.
- *
- * Nao lanca por conta propria — mas o stream lanca quando a conexao cai, e por
- * isso quem chama a mantem dentro do `try`.
- */
-async function lerCorpoCapado(request: Request): Promise<string | null> {
-  const declarado = request.headers.get('content-length')
-  if (declarado !== null) {
-    const tamanho = Number.parseInt(declarado, 10)
-    if (!Number.isFinite(tamanho) || tamanho > TETO_DO_CORPO_DA_PARADA) return null
-  }
-
-  if (request.body === null) return ''
-
-  const leitor = request.body.getReader()
-  const pedacos: Uint8Array[] = []
-  let lidos = 0
-
-  while (true) {
-    const { done, value } = await leitor.read()
-    if (done) break
-
-    lidos += value.byteLength
-    if (lidos > TETO_DO_CORPO_DA_PARADA) {
-      // O resto do corpo nao interessa e nao vai ocupar memoria nenhuma.
-      await leitor.cancel().catch(() => undefined)
-      return null
-    }
-
-    pedacos.push(value)
-  }
-
-  const bytes = new Uint8Array(lidos)
-  let escritos = 0
-  for (const pedaco of pedacos) {
-    bytes.set(pedaco, escritos)
-    escritos += pedaco.byteLength
-  }
-
-  return decoder.decode(bytes)
 }
 
 /**

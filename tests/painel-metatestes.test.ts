@@ -110,6 +110,33 @@ const COLUNAS_ESPERADAS: Record<string, readonly string[]> = {
     'step_up',
     'versao',
   ],
+  painel_estado: ['atualizado_em', 'criado_em', 'id', 'usuario_handle'],
+  painel_credenciais: [
+    'algoritmo',
+    'apelido',
+    'backup_eligible',
+    'backup_state',
+    'chave_publica_jwk',
+    'credential_id',
+    'criado_em',
+    'origem_registro',
+    'rp_id',
+    'sign_count',
+    'transportes',
+    'usado_em',
+    'usuario_handle',
+  ],
+  painel_sessoes: [
+    'credential_id',
+    'criada_em',
+    'expira_em',
+    'falhas_stepup',
+    'ociosa_ate',
+    'rp_id',
+    'sid_hash',
+    'vista_em',
+  ],
+  painel_convites_usados: ['consumido_em', 'expira_em', 'nonce'],
 }
 
 /**
@@ -194,6 +221,26 @@ describe('META — tabelas', () => {
     await env.DB.prepare(
       `INSERT INTO painel_codigos (hash, tipo, versao_hash, criado_em, usado_em, invalidado_em)
        VALUES ('hash-meta', 'parada', 1, 1, NULL, NULL)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_estado (id, usuario_handle, criado_em, atualizado_em)
+       VALUES (1, 'handle-meta', 1, 1)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_credenciais
+         (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
+          sign_count, backup_eligible, backup_state, apelido, origem_registro, criado_em, usado_em)
+       VALUES ('cred-meta', 'exemplo.workers.dev', 'handle-meta', '{}', -7, NULL,
+               0, 0, 0, 'aparelho', 'convite', 1, NULL)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_sessoes
+         (sid_hash, credential_id, rp_id, criada_em, expira_em, ociosa_ate, vista_em, falhas_stepup)
+       VALUES ('sid-meta', 'cred-meta', 'exemplo.workers.dev', 1, 2, 2, 1, 0)`,
+    ).run()
+    await env.DB.prepare(
+      `INSERT INTO painel_convites_usados (nonce, consumido_em, expira_em)
+       VALUES ('nonce-meta', 1, 2)`,
     ).run()
 
     // Uma linha em CADA tabela: sem isto, uma tabela nova entraria na lista e

@@ -42,7 +42,8 @@
     "check": "npm run lint && npm run typecheck && npm run test",
     "verificar": "node scripts/verificar-antes-de-publicar.mjs",
     "test:webhook": "node scripts/simular-webhook.mjs",
-    "gerar:segredos": "node scripts/gerar-segredos.mjs"
+    "gerar:segredos": "node scripts/gerar-segredos.mjs",
+    "gerar:convite": "node scripts/gerar-convite.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.11",

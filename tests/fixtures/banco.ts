@@ -29,6 +29,13 @@ export const TABELAS_DO_SCHEMA = [
   'painel_auditoria',
   'painel_codigos',
   'painel_config',
+  // `painel_sessoes` antes de `painel_credenciais`: a sessao aponta para a
+  // credencial, e apagar a mae antes da filha e a armadilha que a ordem desta
+  // lista existe para nao deixar nascer.
+  'painel_sessoes',
+  'painel_credenciais',
+  'painel_convites_usados',
+  'painel_estado',
 ] as const
 
 /**

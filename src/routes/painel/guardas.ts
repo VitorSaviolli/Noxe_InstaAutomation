@@ -19,6 +19,7 @@
  * atacante distribuido multiplica qualquer teto por trezentos. A defesa dos
  * codigos sao os bits de entropia deles (§10.11, §10.12), nunca esta camada.
  */
+import { origemDoPainel } from '../../services/panel-session'
 import type { Env } from '../../types/env'
 
 // ---------------------------------------------------------------------------
@@ -389,6 +390,91 @@ export async function limitar(
 ): Promise<Veredito> {
   const limitador = injetado ?? limitadorDaFamilia(env, familia)
   return limitador.permitir(chaveDoBalde(familia, request), agora)
+}
+
+// ---------------------------------------------------------------------------
+// As duas guardas que nao custam D1 nenhum: origem e teto de corpo
+// ---------------------------------------------------------------------------
+
+/**
+ * Passo 2 da escada de §11.3, e camada 2 das cinco de §10.9.
+ *
+ * `Origin` exato quando presente; na ausencia dele, `Sec-Fetch-Site:
+ * same-origin`; os dois ausentes, recusa. O fallback e o que impede trancar o
+ * dono para fora num navegador que nao mande `Origin` — deixou de ser
+ * pendencia de projeto e virou esta funcao.
+ *
+ * Comparacao de string INTEIRA, nunca `includes` nem `startsWith`:
+ * `https://exemplo.workers.dev.evil.com` passaria nos dois, e passaria
+ * carregando o nome do painel dentro dele.
+ */
+export function origemConfere(request: Request, env: Env): boolean {
+  const origem = request.headers.get('origin')
+  if (origem !== null) return origem === origemDoPainel(env)
+
+  return request.headers.get('sec-fetch-site') === 'same-origin'
+}
+
+/**
+ * Passo 4 da escada de §11.3: le o corpo com teto. `null` quando estoura.
+ *
+ * Mora aqui porque e guarda, custa ZERO consulta ao D1 e vale para as tres
+ * familias de §7.6 — 8 KB em `/painel/api/*`, 32 KB em formulario, 1 KB na
+ * parada. O teto entra por parametro exatamente para que exista UMA
+ * implementacao e tres numeros, e nao tres implementacoes.
+ *
+ * Dois portoes, e o segundo e que e o teto de verdade:
+ *
+ * 1. O `content-length`, quando vem, corta antes de ler um unico byte. Ele e
+ *    barato, mas vem de quem chama e pode mentir para os dois lados — um teto
+ *    que confia nele nao e teto.
+ * 2. A leitura CORTA DURANTE o `ReadableStream`, pedaco a pedaco. Um POST
+ *    `chunked` nao tem `content-length`, e `arrayBuffer()` sobre ele
+ *    bufferizaria o corpo inteiro na memoria do isolate ANTES de qualquer
+ *    conferencia: "capado em 8 KB" viraria "medido depois de aceitar tudo".
+ *
+ * Mede BYTES, e nao caracteres: `content-length` conta bytes, e recontar sobre
+ * a string decodificada seria uma segunda conta, com outro resultado em
+ * acentos.
+ *
+ * Nao lanca por conta propria — mas o stream lanca quando a conexao cai, e por
+ * isso quem chama a mantem dentro do `try`.
+ */
+export async function lerCorpoCapado(request: Request, teto: number): Promise<string | null> {
+  const declarado = request.headers.get('content-length')
+  if (declarado !== null) {
+    const tamanho = Number.parseInt(declarado, 10)
+    if (!Number.isFinite(tamanho) || tamanho > teto) return null
+  }
+
+  if (request.body === null) return ''
+
+  const leitor = request.body.getReader()
+  const pedacos: Uint8Array[] = []
+  let lidos = 0
+
+  while (true) {
+    const { done, value } = await leitor.read()
+    if (done) break
+
+    lidos += value.byteLength
+    if (lidos > teto) {
+      // O resto do corpo nao interessa e nao vai ocupar memoria nenhuma.
+      await leitor.cancel().catch(() => undefined)
+      return null
+    }
+
+    pedacos.push(value)
+  }
+
+  const bytes = new Uint8Array(lidos)
+  let escritos = 0
+  for (const pedaco of pedacos) {
+    bytes.set(pedaco, escritos)
+    escritos += pedaco.byteLength
+  }
+
+  return new TextDecoder().decode(bytes)
 }
 
 /**
