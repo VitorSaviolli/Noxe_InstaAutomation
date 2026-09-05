@@ -124,7 +124,7 @@ function inteiroDer(coordenada: Uint8Array): number[] {
   let inicio = 0
   while (inicio < coordenada.length - 1 && coordenada[inicio] === 0) inicio++
   const corpo = [...coordenada.subarray(inicio)]
-  if ((corpo[0] as number) >= 0x80) corpo.unshift(0x00)
+  if ((corpo[0] ?? 0) >= 0x80) corpo.unshift(0x00)
   return [0x02, corpo.length, ...corpo]
 }
 
@@ -482,7 +482,7 @@ export class AutenticadorFalso {
 
     for (let volta = 0; volta < 200; volta++) {
       const bruto = await this.assinar(assinado)
-      if ((bruto[0] as number) >= 0x80) {
+      if ((bruto[0] ?? 0) >= 0x80) {
         return this.montar(clientDataJSON, authData, cruParaDer(bruto), usuarioHandle)
       }
     }

@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import {
   CAMINHO_DA_PARADA,
   handleParada,
@@ -59,6 +59,7 @@ import { AGORA, capturarConsole, comoD1, D1Contador, RAIZ } from './fixtures/dub
 import {
   faltaOVetor,
   NOMES_DE_VETOR,
+  type VetorDeAssertion,
   vetorDeAssertion,
   vetorDeRegistro,
   vetoresAusentes,
@@ -627,6 +628,24 @@ describe('WA — rpIdHash, UP e UV', () => {
     // O `allowCredentials` vazio e enumeracao que NAO acontece (§10.7).
     expect(opcoesDeLogin({ rpId: RP_ID, desafio }).allowCredentials).toEqual([])
   })
+
+  test('OPCOES: `excluir` nao vazio vira excludeCredentials no formato do navegador', () => {
+    // Ate agora `excluir` so era exercitado vazio, entao o formato de cada
+    // entrada nunca foi travado. Quem filtra por `rp_id` atual e o chamador da
+    // Etapa 7 — aqui so se prova a forma, que e o que o navegador le.
+    const opcoes = opcoesDeRegistro({
+      rpId: RP_ID,
+      usuarioHandle: DONO,
+      nomeDeUsuario: '@painel',
+      desafio: sortearDesafio(),
+      excluir: ['credencial-um', 'credencial-dois'],
+    })
+
+    expect(opcoes.excludeCredentials).toEqual([
+      { type: 'public-key', id: 'credencial-um' },
+      { type: 'public-key', id: 'credencial-dois' },
+    ])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -890,6 +909,53 @@ describe('WA — a credencial guardada', () => {
     expect(motivoDe(desconhecida)).toBe('assinatura_invalida')
   })
 
+  test('WA-19: as tres recusas de credencial pagam o MESMO verify', async () => {
+    // Nao se mede relogio num teste — daria flake. Mede-se o TRABALHO: se as
+    // tres recusas passam pelo mesmo numero de `crypto.subtle.verify` que uma
+    // credencial boa, nenhuma delas se denuncia pelo tempo. Um `return`
+    // antecipado em qualquer uma faria a contagem cair para 0 aqui.
+    const dono = await AutenticadorFalso.criar()
+    const outroHandle = bytesToBase64Url(new Uint8Array(32).fill(9))
+
+    const verifysGastos = async (credencial: CredencialGuardada | null): Promise<number> => {
+      // A cerimonia e montada FORA da janela do espiao: assinar nao pode
+      // contar como conferir.
+      const { desafio, envelope } = await bilhete('entrar')
+      const resposta = await dono.autenticar(login(desafio), DONO)
+
+      const original = crypto.subtle.verify.bind(crypto.subtle)
+      let chamadas = 0
+      const espiao = vi
+        .spyOn(crypto.subtle, 'verify')
+        .mockImplementation((...args: Parameters<typeof original>) => {
+          chamadas++
+          return original(...args)
+        })
+
+      try {
+        await verificarComEnvelope({
+          proposito: 'entrar',
+          envelope,
+          resposta,
+          credencial,
+          now: AGORA,
+        })
+      } finally {
+        espiao.mockRestore()
+      }
+      return chamadas
+    }
+
+    expect({
+      desconhecida: await verifysGastos(null),
+      enderecoAntigo: await verifysGastos(
+        credencialDe(dono, { rpId: 'endereco-antigo.workers.dev' }),
+      ),
+      outroDono: await verifysGastos(credencialDe(dono, { usuarioHandle: outroHandle })),
+      boa: await verifysGastos(credencialDe(dono)),
+    }).toEqual({ desconhecida: 1, enderecoAntigo: 1, outroDono: 1, boa: 1 })
+  })
+
   test('WA-26: credencial de outro dono nao e aceita', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const outroDono = bytesToBase64Url(new Uint8Array(32).fill(9))
@@ -1021,6 +1087,10 @@ describe('WA — signCount e as flags BE/BS', () => {
       credencial: credencialDe(autenticador),
       now: AGORA,
     })
+    // O `expect` vem ANTES do `if`: sem ele, uma cerimonia que deixasse de ser
+    // aceita faria o bloco inteiro sumir e o teste continuaria verde. Os irmaos
+    // WA-20 e WA-21 ja fazem assim.
+    expect(motivoDe(simples)).toBe('aceito')
     if (simples.ok && 'assertion' in simples) {
       expect({ be: simples.assertion.backupElegivel, bs: simples.assertion.backupAtivo }).toEqual({
         be: false,
@@ -1179,6 +1249,32 @@ describe('WA — o attestationObject e a chave COSE', () => {
     }
   })
 
+  test('WA-24: o modulo RSA tem piso E teto', () => {
+    // Sem teto, o unico limite seria o `BYTES_MAXIMOS` do CBOR e caberia um
+    // modulo de ~16 mil bits. Quem tivesse convite valido poderia registrar
+    // essa chave e fazer todo login seguinte pagar um `verify`
+    // desproporcional — CPU faturada e limitada por invocacao no Worker.
+    const rsaCom = (bytesDoModulo: number): Uint8Array =>
+      codificarCbor(
+        cbMapa([
+          [cbInteiro(1), cbInteiro(3)],
+          [cbInteiro(3), cbInteiro(ALG_RS256)],
+          [cbInteiro(-1), cbBytes(new Uint8Array(bytesDoModulo).fill(1))],
+          [cbInteiro(-2), cbBytes(new Uint8Array([1, 0, 1]))],
+        ]),
+      )
+
+    // 2048 bits passa; 4096 bits, o teto, tambem — o TPM do Windows Hello
+    // entrega 2048, entao nenhum autenticador real esbarra aqui.
+    expect(coseParaJwk(rsaCom(256)).ok).toBe(true)
+    expect(coseParaJwk(rsaCom(512)).ok).toBe(true)
+
+    // Um byte abaixo do piso e um byte acima do teto: os dois recusados, com o
+    // mesmo motivo.
+    expect(coseParaJwk(rsaCom(255))).toEqual({ ok: false, motivo: 'modulo_invalido' })
+    expect(coseParaJwk(rsaCom(513))).toEqual({ ok: false, motivo: 'modulo_invalido' })
+  })
+
   test('WA-24: coseParaJwk recusa alg desconhecido, curva errada e coordenada curta', () => {
     const x = new Uint8Array(32).fill(1)
     const y = new Uint8Array(32).fill(2)
@@ -1256,6 +1352,43 @@ describe('CBOR — o decodificador de producao (§10.5)', () => {
     expect(textoDoMapa(lido.valor, 'fmt')).toBe('none')
     expect(inteiroDoMapa(lido.valor, 'numeros')).toBe(-257)
     expect(inteiroDoMapa(lido.valor, 'grande')).toBe(70000)
+  })
+
+  test('CBOR: argumento em forma nao-minima e recusado', () => {
+    // `05` e a grafia canonica do valor 5. `18 05` diz a mesma coisa gastando um
+    // byte a mais, e grafia dupla e por onde entra confusao de forma canonica —
+    // a mesma razao pela qual o comprimento indefinido nao entra. Hoje nada no
+    // painel compara ou hasheia os bytes crus do CBOR; a trava fecha a porta
+    // antes de existir um caminho que passe por ela.
+    expect(decodificarCbor(new Uint8Array([0x05]))).toEqual({
+      ok: true,
+      valor: { tipo: 'inteiro', numero: 5 },
+    })
+    expect(decodificarCbor(new Uint8Array([0x18, 0x05]))).toEqual({
+      ok: false,
+      motivo: 'forma_nao_canonica',
+    })
+
+    // O mesmo em 2 e em 4 bytes: 200 cabe em `18`, 70000 cabe em `1a`.
+    expect(decodificarCbor(new Uint8Array([0x19, 0x00, 0xc8]))).toEqual({
+      ok: false,
+      motivo: 'forma_nao_canonica',
+    })
+    expect(decodificarCbor(new Uint8Array([0x1a, 0x00, 0x00, 0x01, 0x11]))).toEqual({
+      ok: false,
+      motivo: 'forma_nao_canonica',
+    })
+
+    // E a fronteira, para a trava nao virar recusa cega: 24 e 256 sao os
+    // menores valores que cada largura tem direito de carregar.
+    expect(decodificarCbor(new Uint8Array([0x18, 0x18]))).toEqual({
+      ok: true,
+      valor: { tipo: 'inteiro', numero: 24 },
+    })
+    expect(decodificarCbor(new Uint8Array([0x19, 0x01, 0x00]))).toEqual({
+      ok: true,
+      valor: { tipo: 'inteiro', numero: 256 },
+    })
   })
 
   test('CBOR: comprimento indefinido, sobra, profundidade e byte string grande sao recusados', () => {
@@ -1385,6 +1518,59 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
 // Os vetores congelados — a outra metade do metodo T2
 // ---------------------------------------------------------------------------
 
+/**
+ * Os nomes que ainda esperam hardware, escritos A MAO.
+ *
+ * A lista existe justamente para NAO derivar de `vetoresAusentes()`: um assert
+ * que compara o conjunto com ele mesmo nunca falha. Quando um vetor chegar,
+ * esta lista deixa de casar e a suite fica vermelha ate alguem apagar o nome
+ * daqui e converter o `test.todo` correspondente num teste de verdade.
+ */
+const NOMES_EM_TODO = [
+  'registroEs256Android',
+  'registroRs256WindowsHello',
+  'loginEs256Icloud',
+  'loginEs256DerRAlto',
+  'loginEs256DerRCurto',
+  'loginSemUv',
+]
+
+/**
+ * O que CADA vetor prova, alem de simplesmente ser aceito ou recusado.
+ *
+ * Sem isto, `loginEs256DerRCurto` passaria pelo laco geral sem ninguem conferir
+ * o `r` de 31 bytes — e WA-16 continuaria nao provada mesmo com o vetor ja no
+ * repositorio, que e o pior dos mundos: cobertura aparente.
+ */
+function conferirOQueOVetorProva(
+  nome: string,
+  vetor: VetorDeAssertion,
+  resultado: ResultadoDeAssertion,
+): void {
+  if (nome === 'loginEs256DerRCurto' || nome === 'loginEs256DerRAlto') {
+    const der = decodeBase64Url(vetor.assinatura)
+    // `der[3]` e o comprimento do `r` (SEQUENCE, tamanho, INTEGER, tamanho).
+    expect({ [nome]: der?.[3] }).toEqual({ [nome]: nome === 'loginEs256DerRCurto' ? 31 : 33 })
+    return
+  }
+
+  if (nome === 'loginSemUv') {
+    // O vetor NEGATIVO tem que ser recusado pelo motivo certo, nao por acaso.
+    expect({ [nome]: motivoDe(resultado) }).toEqual({ [nome]: 'verificacao_de_usuario_ausente' })
+    return
+  }
+
+  if (nome === 'loginEs256Icloud' && resultado.ok) {
+    // A passkey sincronizada: `signCount` sempre 0 (nao conta como regressao) e
+    // as duas flags de backup ligadas.
+    expect({
+      regrediu: resultado.assertion.signCountRegrediu,
+      be: resultado.assertion.backupElegivel,
+      bs: resultado.assertion.backupAtivo,
+    }).toEqual({ regrediu: false, be: true, bs: true })
+  }
+}
+
 describe('WA — os vetores congelados de hardware real (§13.3)', () => {
   test('VETORES: o registro dos seis nomes existe e diz quais faltam', () => {
     // Este teste fica VERDE com o conjunto vazio de proposito: ele nao afirma
@@ -1446,9 +1632,40 @@ describe('WA — os vetores congelados de hardware real (§13.3)', () => {
       })
 
       expect({ [nome]: resultado.ok }).toEqual({ [nome]: daAssertion.deveSerAceito })
+      conferirOQueOVetorProva(nome, daAssertion, resultado)
     }
+  })
 
-    expect(vetoresPresentes().length).toBe(6 - vetoresAusentes().length)
+  test('VETORES: nenhum vetor presente pode ter saido do AutenticadorFalso', () => {
+    // O laco acima aceita QUALQUER vetor presente. Sozinho, ele ficaria verde
+    // com vetores fabricados — e "os vetores de hardware sao aceitos" passaria a
+    // dizer apenas que o autenticador de software concorda consigo mesmo,
+    // destruindo a independencia que o metodo T2 existe para garantir (§13.3, e
+    // o ruling 4 do plano). Este teste e a trava.
+    //
+    // A impressao digital mais barata: o `AutenticadorFalso` so sabe assinar
+    // para o `rpId` e a origem do ambiente de teste. Hardware de verdade foi
+    // capturado noutro endereco, noutro momento, por alguem que teve que
+    // escrever de onde ele veio.
+    for (const nome of vetoresPresentes()) {
+      const vetor = vetorDeRegistro(nome) ?? vetorDeAssertion(nome)
+      expect(vetor).not.toBeNull()
+      if (vetor === null) continue
+
+      expect({ [nome]: vetor.rpId }).not.toEqual({ [nome]: RP_ID })
+      expect({ [nome]: vetor.origem }).not.toEqual({ [nome]: ORIGEM })
+      expect(vetor.procedencia.trim().length).toBeGreaterThan(0)
+      expect(Number.isNaN(Date.parse(vetor.capturadoEm))).toBe(false)
+    }
+  })
+
+  test('VETORES: a lista de `test.todo` congelada casa com o que falta', () => {
+    // Substitui um assert tautologico (`presentes === 6 - ausentes`, que deriva
+    // dos dois lados do mesmo array e nunca podia falhar). Este compara com uma
+    // lista ESCRITA A MAO: quando o primeiro vetor chegar, a suite fica
+    // vermelha e obriga a converter o `test.todo` correspondente, em vez de
+    // deixar a promessa envelhecer em silencio.
+    expect([...vetoresAusentes()].sort()).toEqual([...NOMES_EM_TODO].sort())
   })
 
   test.todo(

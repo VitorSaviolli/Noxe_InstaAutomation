@@ -62,7 +62,7 @@ export function derParaBruto(der: Uint8Array): Uint8Array | null {
   if (der.length > TAMANHO_MAXIMO_DO_DER) return null
 
   // 2. Comprimento: forma curta, ou `0x81 xx`. Nada alem disso cabe em 72 bytes.
-  const marcador = der[1] as number
+  const marcador = der[1] ?? 0
   let posicao: number
   let comprimento: number
 
@@ -71,7 +71,7 @@ export function derParaBruto(der: Uint8Array): Uint8Array | null {
     posicao = 2
   } else if (marcador === FORMA_LONGA_DE_UM_OCTETO) {
     if (der.length < 3) return null
-    comprimento = der[2] as number
+    comprimento = der[2] ?? 0
     posicao = 3
   } else {
     return null
@@ -109,7 +109,7 @@ function lerInteiro(der: Uint8Array, inicio: number): Leitura | null {
   if (inicio + 2 > der.length) return null
   if (der[inicio] !== INTEGER) return null
 
-  const tamanho = der[inicio + 1] as number
+  const tamanho = der[inicio + 1] ?? 0
   // Forma longa dentro de um INTEGER de coordenada nao existe: 33 < 0x80.
   if (tamanho === 0 || tamanho >= FORMA_CURTA) return null
 

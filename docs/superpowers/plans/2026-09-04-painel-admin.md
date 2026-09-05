@@ -372,7 +372,17 @@ A maior massa de testes do projeto. **Zero dependência nova**: CBOR, COSE e DER
 - [ ] **Step 7: As 29 garantias WA.**
 - [ ] **Step 8: `npm run check` e commit.**
 
-**Garantias verdes:** WA (29).
+**Garantias verdes:** WA (26 de 29). As outras tres nao cabem nesta task, e o
+plano registra para onde elas vao em vez de deixar a conta fechada no papel:
+
+- **WA-16** (`r` de 31 bytes em DER) fica **BLOCKED com o Step 5**: §13.3 manda o
+  `r` curto vir do vetor de hardware, nao do `AutenticadorFalso`, e o conversor
+  puro ja e exercitado com `r = 31` no teste de DER. Volta a verde no dia em que
+  o vetor chegar — o laco dos vetores ja confere `der[3] === 31` por nome.
+- **WA-25** (corpo de `/painel/api/*` acima de 8 KB) migra para a **Task 8**: a
+  familia de rotas `/painel/api/` nasce la.
+- **WA-28** (corpo de formulario acima de 32 KB) migra para a **Task 9**, que ja
+  declara "corpo de 32 KB" entre as garantias verdes dela.
 
 **Verificação do dono:** ainda sem tela. `npm run check` verde, e o checklist de hardware desta etapa assinado.
 
@@ -415,7 +425,7 @@ A maior massa de testes do projeto. **Zero dependência nova**: CBOR, COSE e DER
 - [ ] **Step 8: As 12 garantias CONV + `PRAGMA table_info` completo.**
 - [ ] **Step 9: `npm run check` e commit.**
 
-**Garantias verdes:** CONV (12), `PRAGMA table_info` completo.
+**Garantias verdes:** CONV (12), **WA-25** (herdada da Task 7: corpo de `/painel/api/*` acima de 8 KB recusado antes do parse), `PRAGMA table_info` completo.
 
 **Verificação do dono:** gera o convite no terminal e registra a passkey do próprio celular; tenta de novo com o mesmo link e é **recusado**.
 

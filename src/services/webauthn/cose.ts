@@ -47,6 +47,17 @@ const COORDENADA_EC = 32
 /** Piso do modulo RSA: 2048 bits (§10.5, passo 7). */
 const MODULO_RSA_MINIMO = 256
 
+/**
+ * Teto do modulo RSA: 4096 bits.
+ *
+ * Sem ele o unico limite seria o `BYTES_MAXIMOS` do CBOR, e caberia um modulo
+ * de ~16 mil bits. Quem tivesse convite valido poderia registrar essa chave e
+ * fazer TODO login seguinte pagar um `verify` desproporcional — CPU faturada e
+ * limitada por invocacao no Worker. O TPM do Windows Hello produz 2048 bits,
+ * entao 4096 ja e o dobro do que qualquer autenticador real manda.
+ */
+const MODULO_RSA_MAXIMO = 512
+
 /** Um mapa COSE EC2 tem 5 entradas; um RSA tem 4. */
 const ENTRADAS_EC2 = 5
 const ENTRADAS_RSA = 4
@@ -126,7 +137,9 @@ function chaveRsa(
   if (tamanhoDoMapa(mapa) !== ENTRADAS_RSA) return { ok: false, motivo: 'entradas_inesperadas' }
 
   const n = bytesDoMapa(mapa, ROTULO_RSA_N)
-  if (n === null || n.length < MODULO_RSA_MINIMO) return { ok: false, motivo: 'modulo_invalido' }
+  if (n === null || n.length < MODULO_RSA_MINIMO || n.length > MODULO_RSA_MAXIMO) {
+    return { ok: false, motivo: 'modulo_invalido' }
+  }
 
   const e = bytesDoMapa(mapa, ROTULO_RSA_E)
   if (e === null || e.length === 0) return { ok: false, motivo: 'expoente_invalido' }

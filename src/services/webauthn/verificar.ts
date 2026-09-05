@@ -240,18 +240,34 @@ export async function verificarRegistro(entrada: EntradaDeRegistro): Promise<Res
     return { ok: false, motivo: 'sem_credencial_anexada' }
   }
 
-  // 7. COSE -> JWK, e `importKey` AGORA: chave que nao importa nunca vira linha.
-  const chave = coseParaJwk(dados.chaveCose)
+  // 7. COSE -> JWK, `importKey` e o confronto do `id`.
+  return await credencialDaAttestation(dados, dados.credentialId, dados.chaveCose, resposta.id)
+}
+
+/**
+ * A chave anexada vira linha de `painel_credenciais` (§10.5, passo 7).
+ *
+ * `importKey` roda AGORA: uma chave que nao importa nunca vira linha, e
+ * descobrir isso no primeiro login seria descobrir tarde demais.
+ *
+ * O `id` do corpo tem que ser o `credentialId` que o proprio `authData` carrega:
+ * sem esse confronto, o banco guardaria uma chave sob um identificador
+ * escolhido por quem enviou o corpo.
+ */
+async function credencialDaAttestation(
+  dados: DadosDoAutenticador,
+  credentialIdBytes: Uint8Array,
+  chaveCose: Uint8Array,
+  idDoCorpo: string,
+): Promise<ResultadoDeRegistro> {
+  const chave = coseParaJwk(chaveCose)
   if (!chave.ok) return { ok: false, motivo: 'chave_publica_invalida' }
   if ((await importarChaveDeVerificacao(chave.jwk, chave.alg)) === null) {
     return { ok: false, motivo: 'chave_nao_importa' }
   }
 
-  // O `id` do corpo tem que ser o `credentialId` que o proprio `authData`
-  // carrega: sem esta linha, o banco guardaria uma chave sob um identificador
-  // escolhido por quem enviou o corpo.
-  const credentialId = bytesToBase64Url(dados.credentialId)
-  if (!timingSafeEqual(credentialId, resposta.id)) {
+  const credentialId = bytesToBase64Url(credentialIdBytes)
+  if (!timingSafeEqual(credentialId, idDoCorpo)) {
     return { ok: false, motivo: 'campo_ausente' }
   }
 
@@ -298,36 +314,69 @@ export async function verificarAssertion(
   const motivoDasFlags = await conferirRpIdEFlags(dados, rpId)
   if (motivoDasFlags !== null) return { ok: false, motivo: motivoDasFlags }
 
-  // 4 e 5. A credencial e o dono.
+  // 4 e 5. A credencial e o dono. O motivo e CALCULADO aqui e nao decide nada
+  // ainda: recusar neste ponto pularia o `verify` e criaria um TERCEIRO tempo
+  // de resposta, em que "existe mas nao serve" se distingue de "nao existe" so
+  // pelo relogio (§11.4). Ele so e devolvido depois do trabalho completo.
   const motivoDaLinha = conferirCredencial(
     credencial,
     resposta.userHandle,
     rpId,
     usuarioHandleEsperado,
   )
-  if (motivoDaLinha !== null) return { ok: false, motivo: motivoDaLinha }
 
   // 8. O que e assinado: `authenticatorData || SHA-256(clientDataJSON)`, os
   // bytes CRUS concatenados — nunca o JSON (§10.7, passo 8). Errar isto e o bug
   // que faz tudo devolver `false`.
   const assinado = await concatenarComHashDoCliente(authDataBytes, clientData)
 
-  // Trava de WA-19: credencial desconhecida percorre o mesmo trabalho, com a
-  // chave descartavel, e responde `assinatura_invalida` — o MESMO motivo de uma
-  // assinatura errada.
-  const jwk = credencial === null ? CHAVE_DESCARTAVEL : credencial.jwk
-  const algoritmo =
-    credencial !== null && ehAlgoritmoSuportado(credencial.algoritmo)
-      ? credencial.algoritmo
-      : ALG_ES256
-
+  const { jwk, algoritmo } = chaveParaConferir(credencial, motivoDaLinha)
   const fechou = await conferirAssinatura(jwk, algoritmo, assinatura, assinado)
+
+  // O motivo da linha vem ANTES do da assinatura: o `verify` ja foi pago, e a
+  // tela de §10.14 precisa poder dizer "endereco antigo" a quem trocou de
+  // endereco, em vez de deixa-lo preso num `assinatura_invalida`.
+  if (motivoDaLinha !== null) return { ok: false, motivo: motivoDaLinha }
   if (!fechou.ok) return { ok: false, motivo: fechou.motivo }
   if (credencial === null) return { ok: false, motivo: 'assinatura_invalida' }
 
-  // 11. `signCount`: avisa, NUNCA recusa. Passkeys sincronizadas por iCloud
-  // Keychain e Google Password Manager devolvem 0 sempre, e recusar trancaria o
-  // dono legitimo do lado de fora. Trava de WA-20 e de WA-21.
+  return await assertionAprovada(dados, credencial)
+}
+
+/**
+ * A chave que vai para o `verify`, e o algoritmo dela.
+ *
+ * Trava de WA-19, agora nos TRES casos que precisam custar o mesmo: credencial
+ * desconhecida, credencial de endereco antigo e credencial de outro dono. Os
+ * tres percorrem um `verify` inteiro com a chave descartavel, entao nenhum
+ * deles se denuncia pelo relogio. Continua sendo mitigacao parcial — uma
+ * credencial RS256 legitima custa mais que a chave descartavel, que e ES256 — e
+ * continua escrita como parcial.
+ */
+function chaveParaConferir(
+  credencial: CredencialGuardada | null,
+  motivoDaLinha: MotivoWebauthn | null,
+): { jwk: JsonWebKey; algoritmo: AlgoritmoSuportado } {
+  if (credencial === null || motivoDaLinha !== null) {
+    return { jwk: CHAVE_DESCARTAVEL, algoritmo: ALG_ES256 }
+  }
+  return {
+    jwk: credencial.jwk,
+    algoritmo: ehAlgoritmoSuportado(credencial.algoritmo) ? credencial.algoritmo : ALG_ES256,
+  }
+}
+
+/**
+ * A assertion aceita (§10.7, passo 11).
+ *
+ * `signCount`: avisa, NUNCA recusa. Passkeys sincronizadas por iCloud Keychain
+ * e Google Password Manager devolvem 0 sempre, e recusar trancaria o dono
+ * legitimo do lado de fora. Trava de WA-20 e de WA-21.
+ */
+async function assertionAprovada(
+  dados: DadosDoAutenticador,
+  credencial: CredencialGuardada,
+): Promise<ResultadoDeAssertion> {
   const regrediu =
     dados.signCount > 0 && credencial.signCount > 0 && dados.signCount <= credencial.signCount
   if (regrediu) {
@@ -412,9 +461,9 @@ function camposDaAssertion(
  * banco e o que o autenticador devolveu. Conferir so um deixaria metade do
  * caminho aberto.
  *
- * `credencial === null` nao decide nada aqui: quem trata o desconhecido e o
- * caminho da chave descartavel, para nao criar um retorno mais cedo que sirva
- * de oraculo (§11.4).
+ * Nada e DECIDIDO aqui — nem o `null`, nem os dois motivos. Esta funcao so
+ * calcula; quem recusa e `verificarAssertion`, depois do `verify`. Um retorno
+ * mais cedo em qualquer um dos tres casos viraria um oraculo de tempo (§11.4).
  */
 function conferirCredencial(
   credencial: CredencialGuardada | null,
@@ -453,7 +502,7 @@ interface DadosDoAutenticador {
 function lerAuthData(authData: Uint8Array): DadosDoAutenticador | null {
   if (authData.length < TAMANHO_MINIMO_DO_AUTHDATA) return null
 
-  const flags = authData[POSICAO_DAS_FLAGS] as number
+  const flags = authData[POSICAO_DAS_FLAGS] ?? 0
   if ((flags & FLAG_ED) !== 0) return null
 
   const visao = new DataView(authData.buffer, authData.byteOffset, authData.byteLength)

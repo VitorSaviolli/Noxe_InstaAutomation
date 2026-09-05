@@ -3,8 +3,14 @@
  *
  * **Estado atual: NENHUM vetor foi capturado. O conjunto abaixo esta VAZIO de
  * propósito, e isso e um `BLOCKED` declarado do Step 5 da Task 7 — nao um
- * esquecimento.** A pagina de captura esta publicada e o dono a usara quando
- * puder.
+ * esquecimento.**
+ *
+ * A pagina que captura os vetores **nao mora neste repositorio** — quem procurar
+ * por ela aqui nao vai achar. Ela foi publicada a parte, fora da arvore, porque
+ * o endereco dela e da instalacao de quem captura e nao tem o que fazer num
+ * template publico. O checklist de hardware da Task 7, no diretorio de trabalho
+ * (`.superpowers/sdd/`, que nao e commitado), guarda o endereco e o estado de
+ * cada um dos seis vetores.
  *
  * ## Por que nao da para gerar estes vetores com software
  *
