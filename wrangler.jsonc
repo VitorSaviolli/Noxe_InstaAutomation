@@ -5,6 +5,28 @@
   "compatibility_date": "2025-05-01",
 
   // ---------------------------------------------------------------------
+  // Os TRES arquivos estaticos do painel, e nada alem deles.
+  //
+  //   /painel/painel.css   -> public/painel/painel.css
+  //   /painel/painel.js    -> public/painel/painel.js
+  //   /painel/parar        -> public/painel/parar/index.html
+  //
+  // SEM `binding` e SEM `run_worker_first`, e as duas ausencias sao decisao.
+  // Com `run_worker_first` as rotas casadas passariam a invocar o Worker e
+  // devolveriam 429 quando a cota estourasse — exatamente o que nao pode
+  // acontecer com o arquivo da parada de emergencia.
+  //
+  // `not_found_handling` NUNCA pode virar "single-page-application": nesse
+  // modo qualquer caminho nao encontrado devolveria o `index.html`, inclusive
+  // /webhooks/instagram. E nenhum arquivo novo em public/ pode ter o caminho
+  // de uma rota do Worker: o sequestro seria silencioso.
+  // ---------------------------------------------------------------------
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "none"
+  },
+
+  // ---------------------------------------------------------------------
   // PREENCHER: o banco D1 e SEU, o ID abaixo nao vem pronto.
   //
   // O banco guarda o cooldown por usuario, a deduplicacao de comentarios e o
