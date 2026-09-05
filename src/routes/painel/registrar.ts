@@ -53,8 +53,19 @@ import {
   verificarRegistro,
 } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
-import { type Limitador, lerCorpoCapado, limitar, origemConfere } from './guardas'
-import { cabecalhosDePagina } from './parada'
+import {
+  CABECALHO_DA_FICHA,
+  COOKIE_DA_SESSAO,
+  COOKIE_DO_DESAFIO,
+  cookieDoPainel,
+  type Limitador,
+  lerCookie,
+  lerCorpoCapado,
+  limitar,
+  origemConfere,
+} from './guardas'
+import { cabecalhos } from './html'
+import { type CodigoDeErro, ERROS } from './resposta'
 
 // ---------------------------------------------------------------------------
 // Contrato
@@ -94,12 +105,9 @@ const JSON_TIPO = 'application/json'
 const PARTES_DO_CONVITE = 5
 const VERSAO_DO_CONVITE = 'cv1'
 
-/** O cookie do bilhete de registro (§7.2). `Path=/` porque `__Host-` exige. */
-const COOKIE_DO_DESAFIO = '__Host-painel_desafio'
-/** O cookie de sessao, lido — nunca emitido — por estas rotas (§7.2). */
-const COOKIE_DA_SESSAO = '__Host-painel_sessao'
-/** A ficha anti-CSRF viaja neste cabecalho nas rotas `/painel/api/*` (§7.2). */
-const CABECALHO_DA_FICHA = 'x-painel-csrf'
+// Os dois cookies e o cabecalho da ficha vivem em `guardas.ts` desde a etapa do
+// roteador: sao o vocabulario de §7.2, e uma segunda grafia de qualquer um
+// deles seria um cookie que ninguem le ou uma ficha que ninguem confere.
 
 /**
  * As tres autorizacoes de §10.4, e a funcao que as produz tem tres ramos.
@@ -148,35 +156,13 @@ const SEM_STEP_UP_AINDA = async (): Promise<boolean> => false
 // As respostas
 // ---------------------------------------------------------------------------
 
-/**
- * A tabela canonica de §11.4, no recorte que estas rotas usam.
- *
- * Ela e a UNICA: `sessao_invalida`, `desafio_expirado` e `payload_muito_grande`
- * estao deletadas do projeto. O dono definitivo desta tabela e `resposta.ts`,
- * que nasce com a etapa do roteador; ate la ela mora aqui, e nao espalhada em
- * literais pelas rotas.
- */
-const ERROS = {
-  corpo_invalido: { status: 400, mensagem: 'Não foi possível ler os dados enviados.' },
-  credencial_invalida: { status: 401, mensagem: 'Não foi possível confirmar. Tente de novo.' },
-  sessao_ausente: { status: 401, mensagem: 'Sua sessão expirou. Entre de novo.' },
-  origem_invalida: { status: 403, mensagem: 'Requisição bloqueada por segurança.' },
-  csrf_invalido: { status: 403, mensagem: 'Requisição bloqueada por segurança.' },
-  step_up_necessario: { status: 403, mensagem: 'Confirme com sua passkey para continuar.' },
-  metodo_nao_permitido: { status: 405, mensagem: 'Método não permitido.' },
-  corpo_grande_demais: { status: 413, mensagem: 'Dados grandes demais.' },
-  tipo_nao_suportado: { status: 415, mensagem: 'Formato não suportado.' },
-  muitas_tentativas: { status: 429, mensagem: 'Muitas tentativas. Aguarde um minuto.' },
-  painel_desativado: { status: 503, mensagem: 'O painel ainda não foi ativado neste deploy.' },
-  indisponivel: { status: 503, mensagem: 'Serviço temporariamente indisponível.' },
-} as const
-
-type CodigoDeErro = keyof typeof ERROS
-
-/** Cabecalhos de toda resposta JSON do painel (§11.5). `Vary: Cookie` sempre. */
-function cabecalhosDeJson(): Record<string, string> {
-  return { 'cache-control': 'private, no-store', vary: 'Cookie' }
-}
+// A tabela canonica de §11.4 mora em `resposta.ts` desde a etapa do roteador —
+// esta rota tinha uma copia enquanto aquele arquivo nao existia, e a copia
+// morreu junto com a promessa que ela carregava no comentario. "Esta tabela e a
+// UNICA" nao admite duas grafias do mesmo `status` e da mesma frase.
+//
+// O construtor de resposta continua local porque a FORMA e outra: estas rotas
+// falam so JSON e nasceram com a assinatura `(codigo, request, caminho)`.
 
 /**
  * Um erro de §11.4, com o codigo no log e a frase no corpo.
@@ -196,7 +182,7 @@ function erro(
 
   return Response.json(
     { erro: codigo, mensagem },
-    { status, headers: { ...extras, ...cabecalhosDeJson() } },
+    { status, headers: { ...extras, ...cabecalhos('api') } },
   )
 }
 
@@ -280,17 +266,17 @@ export function handlePaginaDeConvite(request: Request, env: Env): Response {
     console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 405, 'metodo_nao_permitido')
     return new Response('Metodo nao permitido', {
       status: 405,
-      headers: { allow: 'GET', ...cabecalhosDePagina() },
+      headers: { allow: 'GET', ...cabecalhos('pagina') },
     })
   }
 
   const sanidade = painelHabilitado(env)
   if (!sanidade.ok) {
     console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 503, 'painel_desativado')
-    return new Response(PAGINA_DESATIVADA, { status: 503, headers: cabecalhosDePagina() })
+    return new Response(PAGINA_DESATIVADA, { status: 503, headers: cabecalhos('pagina') })
   }
 
-  return new Response(PAGINA_DO_CONVITE, { status: 200, headers: cabecalhosDePagina() })
+  return new Response(PAGINA_DO_CONVITE, { status: 200, headers: cabecalhos('pagina') })
 }
 
 // ---------------------------------------------------------------------------
@@ -421,8 +407,8 @@ async function montarOpcoes(
 
   return Response.json(options, {
     headers: {
-      ...cabecalhosDeJson(),
-      'set-cookie': cookieDoDesafio(bilhete, Math.floor(options.timeout / 1000)),
+      ...cabecalhos('api'),
+      'set-cookie': cookieDoPainel(COOKIE_DO_DESAFIO, bilhete, Math.floor(options.timeout / 1000)),
     },
   })
 }
@@ -447,11 +433,6 @@ function chaveDaAutorizacao(autorizacao: AutorizacaoRegistro): string {
     case 'sessao':
       return autorizacao.credencialId
   }
-}
-
-/** `__Host-` exige `Secure` e `Path=/`; `SameSite=Strict` fecha CSRF (§7.2). */
-function cookieDoDesafio(valor: string, segundos: number): string {
-  return `${COOKIE_DO_DESAFIO}=${valor}; Max-Age=${segundos}; Path=/; Secure; HttpOnly; SameSite=Strict`
 }
 
 // ---------------------------------------------------------------------------
@@ -810,7 +791,7 @@ async function gravarCredencial(
   // proprio uso e uma autorizacao pendurada esperando uma segunda requisicao.
   return Response.json(
     { ok: true, para: '/painel/entrar' },
-    { headers: { ...cabecalhosDeJson(), 'set-cookie': cookieDoDesafio('', 0) } },
+    { headers: { ...cabecalhos('api'), 'set-cookie': cookieDoPainel(COOKIE_DO_DESAFIO, '', 0) } },
   )
 }
 
@@ -921,29 +902,6 @@ async function portaDaApi(
   } catch {
     return { erro: erro('corpo_invalido', request, caminho) }
   }
-}
-
-/**
- * O valor de um cookie, do cabecalho cru.
- *
- * Nao usa `startsWith` sobre o cabecalho inteiro: `__Host-painel_desafio` e
- * `__Host-painel_desafio_falso` compartilham prefixo, e o navegador manda os
- * dois separados por `; `.
- */
-function lerCookie(request: Request, nome: string): string | null {
-  const cabecalho = request.headers.get('cookie')
-  if (cabecalho === null) return null
-
-  for (const pedaco of cabecalho.split(';')) {
-    const igual = pedaco.indexOf('=')
-    if (igual === -1) continue
-    if (pedaco.slice(0, igual).trim() !== nome) continue
-
-    const valor = pedaco.slice(igual + 1).trim()
-    return valor === '' ? null : valor
-  }
-
-  return null
 }
 
 /** Caracteres de controle e de formatacao, os mesmos que §7.6 manda remover. */

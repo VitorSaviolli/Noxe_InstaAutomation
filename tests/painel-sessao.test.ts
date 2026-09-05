@@ -19,11 +19,14 @@ import { AGORA, RAIZ } from './fixtures/dubles'
 /**
  * SES — a sessao assinada, o envelope de proposito e as subchaves do painel.
  *
- * Esta etapa nao tem HTTP de proposito: aqui mora a primitiva sobre a qual
- * todo o resto se apoia. As garantias SES que dependem de resposta HTTP
- * (SES-06 e SES-07, os atributos do cookie) e da linha em `painel_sessoes`
- * (SES-08, SES-09, SES-12 e SES-13) chegam com as etapas que criam a rota e a
- * tabela — afirmar aqui que "apagar a linha invalida a sessao" seria fingir
+ * Esta suite nao tem HTTP de proposito: aqui mora a primitiva sobre a qual todo
+ * o resto se apoia. As garantias SES que dependem de uma `Response`
+ * — **SES-06** (o cookie sai com os quatro atributos) e **SES-07** (o cookie
+ * nao aparece no corpo nem em outro cabecalho) — ficaram verdes na etapa do
+ * roteador, onde a rota que EMITE sessao nasceu: elas moram em
+ * `tests/painel-rotas.test.ts`, no bloco do login. As que dependem da linha em
+ * `painel_sessoes` (SES-08, SES-09, SES-12 e SES-13) chegam com as etapas que
+ * as usam — afirmar aqui que "apagar a linha invalida a sessao" seria fingir
  * cobertura que nao existe (§13.1).
  *
  * O portao de sanidade de §10.2 e a origem de §7.4 tambem sao conferidos

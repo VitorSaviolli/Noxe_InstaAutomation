@@ -46,6 +46,7 @@ import { derivarSubchave } from '../../services/panel-session'
 import type { Env } from '../../types/env'
 import { isAdmin } from '../oauth'
 import { type Limitador, lerCorpoCapado, limitar } from './guardas'
+import { cabecalhos } from './html'
 
 /** Caminho do formulario. Difere do da acao por uma letra, e de proposito (§11.6). */
 export const CAMINHO_DO_FORMULARIO = '/painel/parar'
@@ -166,41 +167,7 @@ function pagina(frase: string, status: number, extras: ExtrasDaPagina = {}): Res
   // o contrario, um chamador futuro sobrescreveria a CSP desta pagina passando
   // uma chave com o mesmo nome. O tipo estreito de `extras` ja impede isso; a
   // ordem impede tambem quando o tipo for alargado um dia.
-  return new Response(corpo, { status, headers: { ...extras, ...cabecalhosDePagina() } })
-}
-
-/**
- * Cabecalhos de pagina do painel (§11.5).
- *
- * Escritos aqui porque `html.ts` — o dono definitivo de `cabecalhos(perfil)` —
- * so nasce com a etapa do roteador; quando ele existir, esta funcao some e as
- * paginas passam a chamar aquela. Exportada por isso mesmo: a pagina do
- * convite (`registrar.ts`) usa ESTA, e nao uma copia. Duas CSPs no repositorio
- * divergiriam na primeira vez que uma delas ganhasse uma diretiva. `Vary: Cookie` vai em TODA resposta do
- * Worker, sem excecao por rota, mesmo numa rota que nao le cookie: uma regra
- * sem excecao vale mais que a economia de um cabecalho.
- */
-export function cabecalhosDePagina(): Record<string, string> {
-  return {
-    'content-type': 'text/html; charset=utf-8',
-    'content-security-policy':
-      "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; " +
-      "script-src 'self'; style-src 'self'; " +
-      "img-src 'self' data: https://*.cdninstagram.com https://*.fbcdn.net; " +
-      "connect-src 'self'; font-src 'self'; object-src 'none'; media-src 'none'; " +
-      "require-trusted-types-for 'script'; upgrade-insecure-requests",
-    'strict-transport-security': 'max-age=31536000; includeSubDomains',
-    'x-content-type-options': 'nosniff',
-    'x-frame-options': 'DENY',
-    'referrer-policy': 'no-referrer',
-    'cross-origin-opener-policy': 'same-origin',
-    'cross-origin-resource-policy': 'same-origin',
-    'permissions-policy':
-      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), ' +
-      'payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)',
-    'cache-control': 'private, no-store',
-    vary: 'Cookie',
-  }
+  return new Response(corpo, { status, headers: { ...extras, ...cabecalhos('pagina') } })
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +184,7 @@ export function handleFormularioDeParada(request: Request): Response {
     return metodoNaoPermitido('GET')
   }
 
-  return new Response(PAGINA_DO_FORMULARIO, { status: 200, headers: cabecalhosDePagina() })
+  return new Response(PAGINA_DO_FORMULARIO, { status: 200, headers: cabecalhos('pagina') })
 }
 
 // ---------------------------------------------------------------------------

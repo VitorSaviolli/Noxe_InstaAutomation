@@ -75,6 +75,38 @@ export class PainelSessoesRepository {
   }
 
   /**
+   * O UNICO `INSERT INTO painel_sessoes` do projeto.
+   *
+   * Devolve um statement, e nao grava: a sessao nasce no MESMO `db.batch()` da
+   * atualizacao da credencial e da linha de auditoria do login (§9.10 — 3
+   * escritas, um lote). "Grava a sessao e depois tenta logar" nao pode ser
+   * escrito por engano se a API nao oferecer (§8.8).
+   *
+   * Sem `ON CONFLICT`: o `sid` sao 32 bytes sorteados a cada emissao, entao um
+   * `sid_hash` repetido nao e colisao — e defeito no sorteio, e o lote inteiro
+   * tem de falhar em vez de sobrescrever a sessao de outra pessoa.
+   */
+  statementDeCriacao(linha: LinhaDeSessao): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT INTO painel_sessoes
+           (sid_hash, credential_id, rp_id, criada_em, expira_em, ociosa_ate,
+            vista_em, falhas_stepup)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        linha.sidHash,
+        linha.credentialId,
+        linha.rpId,
+        linha.criadaEm,
+        linha.expiraEm,
+        linha.ociosaAte,
+        linha.vistaEm,
+        linha.falhasStepup,
+      )
+  }
+
+  /**
    * Apaga TODAS as sessoes. Statement, para entrar no lote de quem decidiu.
    *
    * Usado pelo consumo de um codigo de recuperacao (§10.11): se um codigo foi

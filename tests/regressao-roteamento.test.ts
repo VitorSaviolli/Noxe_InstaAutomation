@@ -76,12 +76,29 @@ describe('REG — o roteador antes do painel', () => {
     expect(await resposta.text()).toBe(NAO_ENCONTRADO.corpo)
   })
 
-  test('REG-26: /painel e /painel/ levam ao mesmo lugar', async () => {
+  test('REG-26: /painel e /painel/ entram os dois no painel, e nenhum vira o 404 cru', async () => {
+    // Esta garantia MUDOU de forma na etapa do roteador, e a mudanca esta
+    // escrita aqui porque ela e deliberada. Antes do painel existir, os dois
+    // caminhos respondiam o mesmo 404 e o teste comparava corpo com corpo — era
+    // a forma que um roteador com `case '/painel'` e sem `/painel/` deixava
+    // vermelha. Agora `/painel` E uma rota (sem sessao, `303` para
+    // `/painel/entrar`) e `/painel/` NAO e (`404 rota_desconhecida`, da tabela
+    // de §11.4): comparar os dois passou a ser impossivel sem inventar um
+    // apelido de caminho, e §7.1 diz "um caminho por tela".
+    //
+    // O que continua sendo afirmado, e e o que importava: os DOIS sao tratados
+    // pelo painel, e nenhum deles escapa para o `default:` do Worker.
     const semBarra = await responderComEnv(pedir('/painel'))
     const comBarra = await responderComEnv(pedir('/painel/'))
 
-    expect(comBarra.status).toBe(semBarra.status)
-    expect(await comBarra.text()).toBe(await semBarra.text())
+    expect(semBarra.status).toBe(303)
+    expect(semBarra.headers.get('location')).toBe('/painel/entrar')
+
+    expect(comBarra.status).toBe(404)
+    expect(await comBarra.text()).not.toBe(NAO_ENCONTRADO.corpo)
+
+    // E a trava do apelido: `/painel/` nao pode virar sinonimo de `/painel`.
+    expect(comBarra.headers.get('location')).toBeNull()
   })
 
   test('REG-27: /health continua com o mesmo corpo', async () => {

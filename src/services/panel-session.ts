@@ -33,12 +33,25 @@ const SID_BYTES = 32
 
 /**
  * Prazo absoluto da sessao (§7.6). NUNCA estendido: forca uma biometria por
- * dia de uso. O prazo ocioso e a gravacao de `vista_em` moram na linha do D1 e
- * chegam com a etapa que cria a tabela.
+ * dia de uso.
  *
  * Trava de SES-01.
  */
 export const PRAZO_ABSOLUTO_DE_SESSAO_MS = 12 * 60 * 60 * 1000
+
+/**
+ * Prazo ocioso da sessao (§7.6, §10.8): **2 h deslizante**.
+ *
+ * Mora ao lado do irmao absoluto porque sao o mesmo conceito medido de dois
+ * jeitos, e porque a rota que EMITE (o login) e a guarda que CONFERE (o passo
+ * 9 da escada) precisam do mesmo numero — duas constantes divergiriam, e a
+ * divergencia se manifestaria como sessao que morre cedo demais ou tarde
+ * demais, que sao os dois defeitos que ninguem reporta.
+ *
+ * E o celular esquecido na mesa: dentro das 12 h absolutas, mas parado ha mais
+ * de 2 h, a sessao expira sozinha.
+ */
+export const PRAZO_OCIOSO_DE_SESSAO_MS = 2 * 60 * 60 * 1000
 
 /**
  * Os cinco rotulos de subchave de §10.1.

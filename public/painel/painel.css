@@ -1,0 +1,176 @@
+/*
+ * A folha de estilo do painel. Um arquivo, sem build, sem fonte externa.
+ *
+ * Ela e ARQUIVO, e nao `<style>` na pagina, por um motivo de seguranca e nao de
+ * organizacao: e o que permite a CSP viver sem `unsafe-inline` (§11.5). Um
+ * bloco de estilo inline obrigaria `style-src 'unsafe-inline'`, e ai a mesma
+ * brecha valeria para qualquer estilo injetado.
+ *
+ * Regras de §12.9 que estao aqui e nao podem sair:
+ *   - fonte minima de 16px em todo campo, senao o iOS da zoom sozinho;
+ *   - alvo de toque de 44x44px;
+ *   - uma coluna ate 640px;
+ *   - foco visivel de 2px, nunca `outline: none`;
+ *   - `color-scheme: light dark` e cores por `prefers-color-scheme`;
+ *   - nenhuma fonte externa e nenhuma imagem de enfeite: conexao ruim e o caso
+ *     normal, nao o excepcional.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --fundo: #fbfbfa;
+  --fundo-cartao: #ffffff;
+  --texto: #1b1b1a;
+  --texto-fraco: #55534f;
+  --borda: #d8d5cf;
+  --acento: #1c5d3a;
+  --acento-texto: #ffffff;
+  --aviso: #7a4d00;
+  --aviso-fundo: #fdf3e0;
+  --perigo: #8a1c1c;
+  --perigo-fundo: #fdecec;
+  --foco: #0b57d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #16181a;
+    --fundo-cartao: #1f2224;
+    --texto: #f2f1ee;
+    --texto-fraco: #b9b6b0;
+    --borda: #3a3e42;
+    --acento: #74d59d;
+    --acento-texto: #10231a;
+    --aviso: #f0c476;
+    --aviso-fundo: #2e2410;
+    --perigo: #f2a4a4;
+    --perigo-fundo: #331616;
+    --foco: #9cc4ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1rem 1rem 5rem;
+  background: var(--fundo);
+  color: var(--texto);
+  font: 1rem/1.55 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  /* Uma coluna ate 640px; nunca mais largo que isso, para a linha de texto nao
+     passar do confortavel em tela grande. */
+  max-width: 640px;
+  margin-inline: auto;
+}
+
+h1 {
+  font-size: 1.5rem;
+  line-height: 1.25;
+  margin: 0 0 0.75rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 1.75rem 0 0.5rem;
+}
+
+p,
+ul,
+ol {
+  margin: 0 0 1rem;
+}
+
+a {
+  color: var(--foco);
+}
+
+/* Foco SEMPRE visivel, e com 2px. `outline: none` nao existe neste arquivo. */
+:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+input,
+select,
+textarea {
+  /* 16px CRAVADOS: abaixo disso o iOS da zoom sozinho ao focar o campo. */
+  font-size: 1rem;
+  font-family: inherit;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  background: var(--fundo-cartao);
+  color: var(--texto);
+}
+
+button {
+  font-size: 1rem;
+  font-family: inherit;
+  /* Alvo de toque minimo de 44x44px (§12.9). */
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--acento);
+  color: var(--acento-texto);
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+form {
+  margin: 0 0 1.25rem;
+}
+
+/*
+ * As faixas de aviso. Estado NUNCA so por cor (§12.9): cada uma carrega texto,
+ * e a borda grossa a esquerda funciona tambem em monocromatico.
+ */
+.faixa {
+  padding: 0.75rem 0.9rem;
+  border-left: 4px solid var(--borda);
+  border-radius: 4px;
+  background: var(--fundo-cartao);
+  margin: 0 0 1rem;
+}
+
+.faixa-aviso {
+  border-left-color: var(--aviso);
+  background: var(--aviso-fundo);
+  color: var(--aviso);
+}
+
+.faixa-erro {
+  border-left-color: var(--perigo);
+  background: var(--perigo-fundo);
+  color: var(--perigo);
+}
+
+noscript p {
+  border-left: 4px solid var(--aviso);
+  background: var(--aviso-fundo);
+  color: var(--aviso);
+  padding: 0.75rem 0.9rem;
+  border-radius: 4px;
+}
+
+footer {
+  color: var(--texto-fraco);
+  font-size: 0.9rem;
+  margin-top: 2rem;
+}

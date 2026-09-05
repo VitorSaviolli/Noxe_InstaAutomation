@@ -53,14 +53,7 @@ import {
   handleGerarCodigos,
   handleParada,
 } from './routes/painel/parada'
-import {
-  CAMINHO_DA_VERIFICACAO,
-  CAMINHO_DAS_OPCOES,
-  CAMINHO_DO_CONVITE,
-  handleOpcoesDeRegistro,
-  handlePaginaDeConvite,
-  handleVerificarRegistro,
-} from './routes/painel/registrar'
+import { routePainel } from './routes/painel/router'
 import { handleWebhookVerification, readWebhookRequest } from './routes/webhook'
 import {
   computeNextRetry,
@@ -202,27 +195,26 @@ export default {
       case CAMINHO_DO_FORMULARIO:
         return handleFormularioDeParada(request)
 
-      // As tres rotas do registro entram por `case` proprio, como a parada, e
-      // pelo mesmo motivo provisorio: o roteador do painel — que passa a
-      // despachar tudo pelo `default:` deste switch, para que NENHUM caminho
-      // do painel seja avaliado antes de `case WEBHOOK_PATH` (§11.1) — nasce
-      // com a etapa seguinte. Ate la elas ficam aqui, e continuam depois do
-      // webhook na ordem lexica do arquivo.
-      case CAMINHO_DO_CONVITE:
-        return handlePaginaDeConvite(request, env)
-
-      case CAMINHO_DAS_OPCOES:
-        return handleOpcoesDeRegistro(request, env, now)
-
-      case CAMINHO_DA_VERIFICACAO:
-        return handleVerificarRegistro(request, env, now)
-
       // O Worker sorteia os codigos, o assistente so imprime (§10.11).
+      // `/setup/painel/codigos` NAO e caminho de painel: ele e do assistente
+      // local, autenticado por Bearer, e fica onde sempre esteve.
       case '/setup/painel/codigos':
         return handleGerarCodigos(request, env, now)
 
-      default:
-        return new Response('Not Found', { status: 404 })
+      // O painel inteiro entra POR AQUI, e por nenhum outro lugar (§11.1).
+      //
+      // Nao existe `startsWith('/painel')` avaliado antes deste ponto, e essa
+      // ausencia e a garantia: com o painel no `default:`, nenhum caminho dele
+      // pode ser avaliado antes de `case WEBHOOK_PATH`, cuja assinatura e
+      // calculada sobre o corpo cru e nao sobrevive a qualquer codigo que leia
+      // o corpo antes. `routePainel` devolve `null` para quem nao e do painel,
+      // e e esse `null` que preserva o 404 de hoje — `/painelzinho` continua
+      // caindo aqui, porque `/painel/` e `/painel` sao as unicas grafias que
+      // ele reconhece.
+      default: {
+        const doPainel = await routePainel(request, env, url, now)
+        return doPainel ?? new Response('Not Found', { status: 404 })
+      }
     }
   },
 

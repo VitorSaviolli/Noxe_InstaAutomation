@@ -28,6 +28,7 @@
 const HANDLE_BYTES = 32
 
 import { bytesToBase64Url } from '../security/base64url'
+import type { CredencialGuardada } from '../services/webauthn/verificar'
 
 /** Como a credencial entrou no banco (§8.6). Nao existe uma quarta origem. */
 export type OrigemDeRegistro = 'convite' | 'sessao' | 'recuperacao'
@@ -44,6 +45,19 @@ export type OrigemDeRegistro = 'convite' | 'sessao' | 'recuperacao'
 export interface CredencialConhecida {
   credentialId: string
   rpId: string
+}
+
+/**
+ * O que o login carrega numa consulta so: o dono da instalacao e a credencial.
+ *
+ * `credencial: null` significa "este `credential_id` nao existe" — e nao um
+ * erro. Quem responde igual para credencial desconhecida e para assinatura
+ * invalida e a rota, e e o que fecha o oraculo de enumeracao de §11.4.
+ */
+export interface LeituraDeLogin {
+  /** `painel_estado.usuario_handle`, o `user.id` estavel da instalacao. */
+  handleDoDono: string
+  credencial: CredencialGuardada | null
 }
 
 /** Uma linha pronta para gravar. Sai da verificacao da attestation (§10.5). */
@@ -154,6 +168,79 @@ export class PainelCredenciaisRepository {
   }
 
   /**
+   * A credencial daquele `credential_id` E o dono da instalacao, em **UMA**
+   * leitura (§10.7, passos 4 e 5).
+   *
+   * As duas coisas vem juntas porque §9.10 fixa o custo do login — bem-sucedido
+   * ou fracassado — em **1 leitura**. Duas consultas dariam a mesma resposta
+   * pelo dobro do preco numa rota nao autenticada, que e exatamente onde o
+   * preco vira alavanca de quem esta martelando.
+   *
+   * `painel_estado` do lado esquerdo do `LEFT JOIN` de proposito: a linha
+   * VOLTA mesmo quando o `credential_id` nao existe, e e isso que permite
+   * comparar o `userHandle` que o autenticador mandou sem uma segunda ida ao
+   * banco. Credencial desconhecida chega aqui como `credencial: null`, e quem
+   * decide o que fazer com isso e `verificarAssertion` — que percorre um
+   * `verify` inteiro com uma chave descartavel para nao se denunciar pelo
+   * relogio (§11.4).
+   *
+   * `chave_publica_jwk` e JSON gravado por nos, mas e lido de volta dentro de
+   * um `try`: uma linha corrompida no D1 nao pode virar excecao no login, ela
+   * vira credencial desconhecida — falha fechada.
+   */
+  async buscarParaLogin(credentialId: string): Promise<LeituraDeLogin | null> {
+    const linha = await this.db
+      .prepare(
+        `SELECT e.usuario_handle AS handle_do_dono,
+                c.credential_id, c.rp_id, c.usuario_handle,
+                c.chave_publica_jwk, c.algoritmo, c.sign_count
+           FROM painel_estado e
+           LEFT JOIN painel_credenciais c ON c.credential_id = ?
+          WHERE e.id = 1`,
+      )
+      .bind(credentialId)
+      .first<{
+        handle_do_dono: string
+        credential_id: string | null
+        rp_id: string | null
+        usuario_handle: string | null
+        chave_publica_jwk: string | null
+        algoritmo: number | null
+        sign_count: number | null
+      }>()
+
+    if (linha === null) return null
+
+    return {
+      handleDoDono: linha.handle_do_dono,
+      credencial: montarCredencial(linha),
+    }
+  }
+
+  /**
+   * O `UPDATE` do login: `sign_count`, `backup_state` e `usado_em` (§10.7,
+   * passo 12).
+   *
+   * Statement, e nao gravacao: ele viaja no MESMO lote da sessao e da
+   * auditoria. `backup_eligible` NAO entra — a elegibilidade e definida no
+   * registro e nao muda durante a vida da credencial; o que muda e o estado.
+   */
+  statementDeUsoNoLogin(uso: {
+    credentialId: string
+    signCount: number
+    backupAtivo: boolean
+    usadoEm: number
+  }): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `UPDATE painel_credenciais
+            SET sign_count = ?, backup_state = ?, usado_em = ?
+          WHERE credential_id = ?`,
+      )
+      .bind(uso.signCount, uso.backupAtivo ? 1 : 0, uso.usadoEm, uso.credentialId)
+  }
+
+  /**
    * O UNICO `INSERT INTO painel_credenciais` do projeto (Lema 1 de §10.6).
    *
    * Devolve um statement em vez de gravar, pela mesma razao dos outros
@@ -189,5 +276,43 @@ export class PainelCredenciaisRepository {
         credencial.origemRegistro,
         credencial.criadoEm,
       )
+  }
+}
+
+/**
+ * A metade direita do `LEFT JOIN` vira `CredencialGuardada`, ou `null`.
+ *
+ * Uma coluna `NULL` em qualquer campo obrigatorio significa que o `ON` nao
+ * casou — nao existe linha de credencial com campo obrigatorio nulo, porque o
+ * schema nao permite. O `JSON.parse` num `try` e a segunda metade: uma linha
+ * corrompida vira credencial desconhecida, e nunca uma excecao no login.
+ */
+function montarCredencial(linha: {
+  credential_id: string | null
+  rp_id: string | null
+  usuario_handle: string | null
+  chave_publica_jwk: string | null
+  algoritmo: number | null
+  sign_count: number | null
+}): CredencialGuardada | null {
+  const { credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo } = linha
+  if (credential_id === null || rp_id === null || usuario_handle === null) return null
+  if (chave_publica_jwk === null || algoritmo === null) return null
+
+  let jwk: JsonWebKey
+  try {
+    jwk = JSON.parse(chave_publica_jwk) as JsonWebKey
+  } catch {
+    return null
+  }
+  if (typeof jwk !== 'object' || jwk === null) return null
+
+  return {
+    credentialId: credential_id,
+    rpId: rp_id,
+    usuarioHandle: usuario_handle,
+    jwk,
+    algoritmo,
+    signCount: linha.sign_count ?? 0,
   }
 }

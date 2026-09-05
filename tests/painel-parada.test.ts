@@ -767,7 +767,7 @@ describe('STOP — a parada de emergencia', () => {
     expect(await linhasDeAuditoria()).toHaveLength(1)
   })
 
-  test('STOP-14: PANEL_RP_ID ausente nao derruba a parada (o 503 do painel chega com a etapa 9)', async () => {
+  test('STOP-14: PANEL_RP_ID ausente derruba GET /painel em 503 e a parada continua desligando', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada } = await gerarCodigos()
 
@@ -777,25 +777,25 @@ describe('STOP — a parada de emergencia', () => {
     const ambiente = semRpId as unknown as Env
     expect(ambiente.PANEL_RP_ID).toBeUndefined()
 
-    // Nenhuma linha do roteador lanca `TypeError` nesse cenario: toda rota
-    // responde, e nenhuma delas devolve 500.
-    for (const caminho of ['/painel', '/painel/', '/health', CAMINHO_DO_FORMULARIO]) {
+    // Nenhuma linha do roteador lanca `TypeError` nesse cenario: `/health` e o
+    // formulario da parada respondem normalmente, e nada devolve 500.
+    for (const caminho of ['/health', CAMINHO_DO_FORMULARIO]) {
       const ctx = createExecutionContext()
       const resposta = await worker.fetch(new Request(`${RAIZ}${caminho}`), ambiente, ctx)
       await waitOnExecutionContext(ctx)
-      expect(`${caminho}=${resposta.status < 500}`).toBe(`${caminho}=true`)
+      expect(`${caminho}=${resposta.status}`).toBe(`${caminho}=200`)
     }
 
-    // A METADE DESTA GARANTIA QUE AINDA NAO E VERDADE, escrita como teste para
-    // nao virar promessa esquecida: §13.2 exige que `PANEL_RP_ID` ausente
-    // derrube `GET /painel` em **503**. Hoje `/painel` cai no `default:` e
-    // responde 404, porque o portao de sanidade so entra com a etapa do
-    // roteador do painel. Quando ele entrar, esta linha fica vermelha e obriga
-    // a decisao consciente — que e trocar o 404 por 503 aqui.
-    const doPainel = createExecutionContext()
-    const painel = await worker.fetch(new Request(`${RAIZ}/painel`), ambiente, doPainel)
-    await waitOnExecutionContext(doPainel)
-    expect(painel.status).toBe(404)
+    // A metade que a etapa do roteador tornou verdade (§13.2, §11.1): sem
+    // `PANEL_RP_ID` o portao de sanidade fecha o painel inteiro em **503**, e
+    // nao em 404 nem em 500. `/painel/` — um caminho do painel sem rota — cai
+    // no MESMO 503, porque o portao vem antes do `switch`.
+    for (const caminho of ['/painel', '/painel/']) {
+      const doPainel = createExecutionContext()
+      const painel = await worker.fetch(new Request(`${RAIZ}${caminho}`), ambiente, doPainel)
+      await waitOnExecutionContext(doPainel)
+      expect(`${caminho}=${painel.status}`).toBe(`${caminho}=503`)
+    }
 
     // E o mais importante: a parada continua desligando a automacao.
     const resposta = await handleParada(postDaParada(comOCodigo(parada)), ambiente, AGORA)

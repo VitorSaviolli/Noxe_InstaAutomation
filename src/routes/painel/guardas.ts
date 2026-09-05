@@ -1,6 +1,7 @@
 /**
- * As guardas do painel. Nesta etapa mora aqui so o limitador de taxa; o resto
- * da escada de §11.3 (sessao, ficha CSRF, step-up) chega com o roteador.
+ * As guardas do painel: o limitador de taxa, a origem, o teto de corpo, o
+ * portao de sessao e a ficha anti-CSRF — os passos 2, 4, 5, 6, 7 e 9 da escada
+ * de §11.3. O passo 8, o step-up, chega com a etapa que sabe verifica-lo.
  *
  * **O limitador e uma camada OPCIONAL, e essa e a afirmacao mais importante
  * deste arquivo.** Ausentes os tres bindings, o painel funciona sem a camada e
@@ -19,8 +20,14 @@
  * atacante distribuido multiplica qualquer teto por trezentos. A defesa dos
  * codigos sao os bits de entropia deles (§10.11, §10.12), nunca esta camada.
  */
-import { origemDoPainel } from '../../services/panel-session'
+import {
+  type LinhaDeSessao,
+  PainelSessoesRepository,
+} from '../../repositories/painel-sessoes-repository'
+import { timingSafeEqual } from '../../security/constant-time'
+import { fichaCsrf, origemDoPainel, validarSessao } from '../../services/panel-session'
 import type { Env } from '../../types/env'
+import { type ContextoDoErro, erro, redirecionar } from './resposta'
 
 // ---------------------------------------------------------------------------
 // A porta
@@ -491,4 +498,216 @@ export function zerarLimite(
 ): void {
   const limitador = injetado ?? limitadorDaFamilia(env, familia)
   limitador.zerar(chaveDoBalde(familia, request))
+}
+
+// ---------------------------------------------------------------------------
+// Os passos 6, 7 e 2 da escada: sessao, ficha CSRF e origem
+// ---------------------------------------------------------------------------
+
+/** O cookie de sessao (§7.2). `Path=/` porque o prefixo `__Host-` exige. */
+export const COOKIE_DA_SESSAO = '__Host-painel_sessao'
+
+/** O cookie de desafio das cerimonias (§7.2). Propositos `entrar` e `registrar`. */
+export const COOKIE_DO_DESAFIO = '__Host-painel_desafio'
+
+/**
+ * O `Set-Cookie` de um dos tres cookies de §7.2.
+ *
+ * Os quatro atributos nao sao opcionais e nao tem variante: `HttpOnly` (o
+ * JavaScript da pagina nunca le), `Secure` e `Path=/` (exigidos pelo prefixo
+ * `__Host-`, que e o que impede outro Worker da mesma conta `workers.dev` de
+ * sombrear o cookie do painel com um cookie de dominio pai) e `SameSite=Strict`
+ * (camada 1 das cinco de §10.9: um POST cross-site nem chega autenticado).
+ *
+ * `Path=/painel` seria INVALIDO — o prefixo `__Host-` exige `Path=/`.
+ *
+ * Escrito num lugar so, e nos tres cookies: uma segunda grafia perderia um dos
+ * quatro atributos exatamente uma vez, e essa vez seria a que ninguem viu.
+ */
+export function cookieDoPainel(nome: string, valor: string, segundos: number): string {
+  return `${nome}=${valor}; Max-Age=${segundos}; Path=/; Secure; HttpOnly; SameSite=Strict`
+}
+
+/** A ficha viaja neste cabecalho nas rotas `/painel/api/*` (§7.2, §10.9). */
+export const CABECALHO_DA_FICHA = 'x-painel-csrf'
+
+/** E neste campo escondido nos formularios (§7.2). NUNCA na query string. */
+export const CAMPO_DA_FICHA = 'csrf'
+
+/**
+ * O valor de um cookie, do cabecalho cru.
+ *
+ * Nao usa `startsWith` sobre o cabecalho inteiro: `__Host-painel_desafio` e
+ * `__Host-painel_desafio_falso` compartilham prefixo, e o navegador manda os
+ * dois separados por `; `.
+ */
+export function lerCookie(request: Request, nome: string): string | null {
+  const cabecalho = request.headers.get('cookie')
+  if (cabecalho === null) return null
+
+  for (const pedaco of cabecalho.split(';')) {
+    const igual = pedaco.indexOf('=')
+    if (igual === -1) continue
+    if (pedaco.slice(0, igual).trim() !== nome) continue
+
+    const valor = pedaco.slice(igual + 1).trim()
+    return valor === '' ? null : valor
+  }
+
+  return null
+}
+
+/**
+ * O corpo ja lido, na forma da familia da rota.
+ *
+ * Quem le e o roteador, uma vez so: o `ReadableStream` de uma requisicao e
+ * consumivel UMA vez, e um segundo leitor receberia corpo vazio. E tambem por
+ * isso que a ficha CSRF de formulario e conferida a partir DESTE objeto, e nao
+ * relendo a requisicao.
+ */
+export type CorpoDaRota =
+  | { readonly familia: 'json'; readonly dados: unknown }
+  | { readonly familia: 'formulario'; readonly campos: URLSearchParams }
+  | { readonly familia: 'vazio' }
+
+/** O corpo de uma requisicao sem corpo — `GET` e `HEAD`. */
+export const CORPO_VAZIO: CorpoDaRota = { familia: 'vazio' }
+
+/**
+ * Passo 2 da escada, e camada 2 das cinco de §10.9.
+ *
+ * `origemConfere` e a pergunta; esta e a recusa de §11.4. Duas funcoes porque
+ * sao duas coisas: o predicado nao conhece a tabela de erros, e o passo da
+ * escada nao reimplementa a comparacao.
+ *
+ * **So em POST.** Uma navegacao `GET` vinda de fora — o link do painel colado
+ * no WhatsApp — chega com `Sec-Fetch-Site: cross-site` e sem `Origin`, e §10.8
+ * escreve o que acontece nela: o navegador nao manda o cookie e o dono cai em
+ * `GET /painel/entrar`. Exigir origem no `GET` transformaria esse caso — que e
+ * o caminho normal de quem abre o painel pela primeira vez no dia — num
+ * `403 origem_invalida` sem saida.
+ */
+export function exigirOrigem(
+  request: Request,
+  env: Env,
+  contexto: ContextoDoErro,
+): Response | null {
+  if (request.method !== 'POST') return null
+  if (origemConfere(request, env)) return null
+  return erro('origem_invalida', contexto)
+}
+
+/** O que o passo 6 devolve: o `sha256(sid)` daquele cookie, ou a recusa. */
+export type PortaDeSessao =
+  | { readonly sidHash: string; readonly expiraEm: number }
+  | { readonly recusa: Response }
+
+/**
+ * Passo 6 da escada: cookie presente **e** HMAC valido. **ZERO consulta ao D1.**
+ *
+ * O HMAC e o filtro gratis de §10.8: um bot mandando cookies aleatorios e
+ * recusado sem tocar na cota compartilhada com o webhook. A linha do banco — a
+ * autoridade — e o passo 9, e mora em `exigirSessaoViva`.
+ *
+ * A recusa tem duas formas, e a diferenca importa: `401 sessao_ausente` em
+ * JSON, porque quem chamou foi o `painel.js`; `303` para `/painel/entrar` numa
+ * pagina, porque quem chegou foi uma pessoa com o navegador aberto (§11.3).
+ */
+export async function exigirSessao(
+  request: Request,
+  env: Env,
+  now: number,
+  contexto: ContextoDoErro,
+): Promise<PortaDeSessao> {
+  const cookie = lerCookie(request, COOKIE_DA_SESSAO)
+  if (cookie !== null) {
+    const leitura = await validarSessao(env, cookie, now)
+    if (leitura.valida) return { sidHash: leitura.sidHash, expiraEm: leitura.expiraEm }
+  }
+
+  return { recusa: recusarSemSessao(contexto) }
+}
+
+/**
+ * A recusa do passo 6, na forma da familia da rota.
+ *
+ * O `303` da pagina nao carrega `?de=` nem nada parecido: um destino vindo da
+ * URL e um redirecionador aberto esperando para nascer, e o painel tem uma tela
+ * inicial so.
+ */
+function recusarSemSessao(contexto: ContextoDoErro): Response {
+  if (contexto.formato === 'json') return erro('sessao_ausente', contexto)
+
+  console.warn('painel:', contexto.request.method, contexto.caminho, 303, 'sessao_ausente')
+  return redirecionar(CAMINHO_DE_ENTRAR)
+}
+
+/** Para onde o passo 6 manda quem chegou sem sessao numa pagina (§11.3). */
+export const CAMINHO_DE_ENTRAR = '/painel/entrar'
+
+/**
+ * Passo 7 da escada, e camada 3 das cinco de §10.9: a ficha anti-CSRF.
+ *
+ *   ficha = base64url( HMAC-SHA256( k_csrf, "csrf|v1|" + sid_hash ) )
+ *
+ * **Derivada, e nao sorteada**, entao ela nao precisa de coluna nem de segundo
+ * cookie e e impossivel de dessincronizar. Comparada com `timingSafeEqual`.
+ *
+ * De onde ela pode vir: do cabecalho `X-Painel-CSRF` nas rotas
+ * `/painel/api/*`, e do campo escondido `csrf` nos formularios. **Nunca da
+ * query string** — e a ausencia de `url.searchParams` nesta funcao e a trava:
+ * uma ficha aceita na URL vazaria em `Referer`, em historico e em log de proxy,
+ * e passaria a valer num link que alguem clica.
+ */
+export async function exigirCsrf(
+  request: Request,
+  env: Env,
+  sidHash: string,
+  corpo: CorpoDaRota,
+  contexto: ContextoDoErro,
+): Promise<Response | null> {
+  const ficha =
+    corpo.familia === 'formulario'
+      ? corpo.campos.get(CAMPO_DA_FICHA)
+      : request.headers.get(CABECALHO_DA_FICHA)
+
+  if (ficha === null || ficha === '') return erro('csrf_invalido', contexto)
+  if (!timingSafeEqual(await fichaCsrf(env, sidHash), ficha)) {
+    return erro('csrf_invalido', contexto)
+  }
+
+  return null
+}
+
+/** O que o passo 9 devolve: a linha viva daquela sessao, ou a recusa. */
+export type PortaDeSessaoViva = { readonly linha: LinhaDeSessao } | { readonly recusa: Response }
+
+/**
+ * Passo 9 da escada, e o PRIMEIRO que toca o D1: a linha e a autoridade.
+ *
+ * O HMAC do cookie prova que o `sid` saiu daqui; a linha prova que ele ainda
+ * vale. E a diferenca entre as duas que faz "sair", "sair de todos os
+ * aparelhos" e "remover a passkey" derrubarem uma sessao emitida de verdade
+ * (§10.8, §10.13) — sem ela, o cookie sozinho valeria as 12 horas inteiras.
+ *
+ * Confere os dois prazos: o absoluto (`expira_em`, 12 h, nunca estendido) e o
+ * ocioso (`ociosa_ate`, 2 h deslizante). Uma sessao ociosa demais e recusada
+ * mesmo dentro das 12 h — e o celular esquecido na mesa.
+ *
+ * A gravacao de `vista_em` NAO acontece aqui: ela e no maximo 1 a cada 15 min
+ * (§10.8) e chega com a etapa que precisa dela. Uma escrita por requisicao e
+ * exatamente o que o desenho recusa.
+ */
+export async function exigirSessaoViva(
+  db: D1Database,
+  sidHash: string,
+  now: number,
+  contexto: ContextoDoErro,
+): Promise<PortaDeSessaoViva> {
+  const linha = await new PainelSessoesRepository(db).buscarPorHash(sidHash)
+  if (linha === null || now > linha.expiraEm || now > linha.ociosaAte) {
+    return { recusa: recusarSemSessao(contexto) }
+  }
+
+  return { linha }
 }

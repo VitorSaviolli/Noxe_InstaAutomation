@@ -1,19 +1,25 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
+import { ROTAS } from '../src/routes/painel/rotas'
 import { painelHabilitado } from '../src/services/panel-session'
 import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
+import { pedir, responder } from './fixtures/dubles'
 
 /**
  * META — metatestes.
  *
  * Nao testam uma funcionalidade: testam que o proprio conjunto de testes
- * continua cobrindo o que promete. Nesta etapa entram os dois que falam de
- * tabela; os outros sete chegam com as etapas que criam rota, campo e sessao.
+ * continua cobrindo o que promete. Faltam META-06 (classificacao de step-up por
+ * campo), que chega com a etapa do step-up.
  *
+ * META-01: toda rota registrada exige sessao, salvo a allowlist escrita AQUI.
+ * META-02: todo POST autenticado exige ficha CSRF, salvo as excecoes daqui.
  * META-03: toda tabela do schema aparece em `limparBanco()`.
  * META-04: todo binding do wrangler.jsonc existe no ambiente de teste.
  * META-05: `PANEL_SESSION_KEY` e diferente das outras chaves.
+ * META-07: o painel entra pelo `default:` e nao engole `/painelzinho` nem o 404.
  * META-08: `PRAGMA table_info` confere o conjunto EXATO de colunas.
+ * META-09: todo caminho da tabela e string exata, sob `/painel`, sem variavel.
  */
 
 /** Tabelas de infraestrutura do D1/Miniflare, que nao sao do projeto. */
@@ -362,5 +368,134 @@ describe('META — bindings', () => {
       env.PANEL_SESSION_KEY,
     ]
     expect(new Set(segredos).size).toBe(segredos.length)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// META — as rotas do painel
+// ---------------------------------------------------------------------------
+
+/**
+ * As rotas que NAO exigem sessao. Escrita AQUI, e copiada de §13.2 palavra por
+ * palavra — e a allowlist do metateste, e o ponto dela e obrigar quem
+ * acrescentar uma rota nova a vir editar este arquivo para pular o portao.
+ *
+ * `/painel/entrar/codigo` e `/painel/parada` estao na lista da spec e ainda nao
+ * estao na tabela: a primeira nasce com a etapa da recuperacao, e a segunda e
+ * desviada ANTES do roteador (§11.1) e por isso nunca entra em `rotas.ts`. Uma
+ * allowlist maior que a tabela e inofensiva; o contrario e que seria buraco.
+ */
+const ROTAS_SEM_SESSAO: readonly string[] = [
+  '/painel/entrar',
+  '/painel/entrar/codigo',
+  '/painel/convite',
+  '/painel/parada',
+  '/painel/api/entrar/opcoes',
+  '/painel/api/entrar/verificar',
+  '/painel/api/registrar/opcoes',
+  '/painel/api/registrar/verificar',
+]
+
+/**
+ * Os POSTs autenticados que NAO carregam ficha CSRF, com o motivo escrito.
+ *
+ * Vazia hoje, e essa e a afirmacao: nao existe POST autenticado sem ficha. O
+ * dia em que alguem precisar de um, ele passa por aqui e por uma revisao.
+ */
+const POSTS_AUTENTICADOS_SEM_FICHA: readonly string[] = []
+
+/** Caractere de segmento variavel em qualquer notacao de roteador conhecida. */
+const SEGMENTO_VARIAVEL = /[:{}*?[\]]|\/\.\.?(?:\/|$)/
+
+describe('META — rotas', () => {
+  test('META-01: toda rota registrada exige sessao, salvo a allowlist escrita no teste', () => {
+    const semSessaoENaoListadas = ROTAS.filter(
+      (rota) => !rota.sessao && !ROTAS_SEM_SESSAO.includes(rota.caminho),
+    )
+
+    expect(semSessaoENaoListadas.map((rota) => rota.caminho)).toEqual([])
+
+    // Contrapositivo, sem o qual a afirmacao acima passaria com uma tabela em
+    // que TODA rota esta na allowlist — que e uma tabela sem portao nenhum.
+    expect(ROTAS.filter((rota) => rota.sessao).length).toBeGreaterThan(0)
+  })
+
+  test('META-02: todo POST autenticado exige ficha CSRF, salvo as excecoes escritas no teste', () => {
+    const autenticadosSemFicha = ROTAS.filter(
+      (rota) =>
+        rota.sessao &&
+        rota.metodos.includes('POST') &&
+        !rota.csrf &&
+        !POSTS_AUTENTICADOS_SEM_FICHA.includes(rota.caminho),
+    )
+
+    expect(autenticadosSemFicha.map((rota) => rota.caminho)).toEqual([])
+
+    // A outra metade, e a que pega o erro oposto: ficha exigida onde nao ha
+    // sessao seria uma ficha que ninguem consegue calcular, e a rota morreria.
+    expect(ROTAS.filter((rota) => rota.csrf && !rota.sessao)).toEqual([])
+  })
+
+  test('META-09: todo caminho da tabela e string exata, comeca por /painel e nao tem segmento variavel', () => {
+    expect(ROTAS.length).toBeGreaterThan(0)
+
+    for (const rota of ROTAS) {
+      expect({
+        [rota.caminho]: rota.caminho === '/painel' || rota.caminho.startsWith('/painel/'),
+      }).toEqual({ [rota.caminho]: true })
+      expect({ [rota.caminho]: SEGMENTO_VARIAVEL.test(rota.caminho) }).toEqual({
+        [rota.caminho]: false,
+      })
+      // Sem barra final: `/painel/reels/` e `/painel/reels` seriam duas grafias
+      // do mesmo lugar, e um `switch` de string exata atende so uma delas.
+      expect({ [rota.caminho]: rota.caminho.endsWith('/') }).toEqual({ [rota.caminho]: false })
+    }
+
+    // Um caminho por tela: nenhuma grafia repetida na tabela.
+    expect(new Set(ROTAS.map((rota) => rota.caminho)).size).toBe(ROTAS.length)
+  })
+
+  test('META-09: metodo declarado e sempre GET ou POST, e OPTIONS nunca aparece', () => {
+    for (const rota of ROTAS) {
+      expect({ [rota.caminho]: rota.metodos.length }).not.toEqual({ [rota.caminho]: 0 })
+      for (const metodo of rota.metodos) {
+        expect({ [`${rota.caminho} ${metodo}`]: metodo === 'GET' || metodo === 'POST' }).toEqual({
+          [`${rota.caminho} ${metodo}`]: true,
+        })
+      }
+    }
+  })
+})
+
+describe('META — o painel entra pelo default:', () => {
+  test('META-07: /painelzinho continua caindo no 404 do Worker, e nao no painel', async () => {
+    const resposta = await responder(pedir('/painelzinho'), env)
+
+    expect(resposta.status).toBe(404)
+    // O corpo do `default:` de hoje, e nao o `rota_desconhecida` do painel: o
+    // painel nao pode capturar um caminho que apenas comeca com as letras dele.
+    expect(await resposta.text()).toBe('Not Found')
+  })
+
+  test('META-07: o painel nao engole o 404 de quem nao e do painel', async () => {
+    for (const caminho of ['/qualquer-coisa', '/', '/setup', '/painel-admin']) {
+      const resposta = await responder(pedir(caminho), env)
+
+      expect({ [caminho]: resposta.status }).toEqual({ [caminho]: 404 })
+      expect({ [caminho]: await resposta.text() }).toEqual({ [caminho]: 'Not Found' })
+    }
+  })
+
+  test('META-07: um caminho /painel/** desconhecido responde a tabela de erros, nao o 404 cru', async () => {
+    const resposta = await responder(pedir('/painel/nao-existe'), env)
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(404)
+    // A `mensagem` de `rota_desconhecida` na tabela de §11.4, e nao o corpo
+    // `Not Found` do `default:` — e o painel que atendeu, e ele atendeu pela
+    // tabela canonica. O CODIGO fica no `console.warn` e nunca no corpo.
+    expect(corpo).toContain('Página não encontrada.')
+    expect(corpo).not.toContain('rota_desconhecida')
+    expect(corpo).not.toBe('Not Found')
   })
 })
