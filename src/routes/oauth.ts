@@ -42,6 +42,13 @@ function redirectUri(url: URL): string {
 /**
  * Inicia o fluxo: gera o state assinado e manda para a tela de consentimento.
  * Protegida pelo SETUP_ADMIN_TOKEN — so o dono conecta a conta.
+ *
+ * A rota FICA como esta, sem depreciacao e sem mudanca de contrato: o primeiro
+ * OAuth acontece antes de existir passkey, e o assistente a chama por caminho e
+ * metodo fixos. A UNICA mudanca que §11.8 pede e a linha abaixo — ate a etapa do
+ * roteador do painel, o `switch` nao conferia metodo nenhum aqui, e um `PUT` com
+ * Bearer valido gerava um `state` assinado. `Allow: GET` porque e assim que o
+ * assistente sempre chamou.
  */
 export async function handleAuthorizeStart(
   request: Request,
@@ -49,6 +56,10 @@ export async function handleAuthorizeStart(
   url: URL,
   now: number,
 ): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Metodo nao permitido', { status: 405, headers: { allow: 'GET' } })
+  }
+
   if (!isAdmin(request, env)) return texto('Nao autorizado', 401)
 
   if (env.META_APP_ID.length === 0) {

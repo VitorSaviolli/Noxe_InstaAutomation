@@ -434,6 +434,12 @@ describe('META — rotas', () => {
     // A outra metade, e a que pega o erro oposto: ficha exigida onde nao ha
     // sessao seria uma ficha que ninguem consegue calcular, e a rota morreria.
     expect(ROTAS.filter((rota) => rota.csrf && !rota.sessao)).toEqual([])
+
+    // A MESMA proibicao para o step-up, e ela e a metade de tabela da trava que
+    // `despachar` faz em tempo de requisicao. Step-up e reautenticacao presa a
+    // uma mudanca: sem sessao nao existe o que reautenticar, e uma linha
+    // `stepUp: true, sessao: false` so pode ser erro de quem escreveu a tabela.
+    expect(ROTAS.filter((rota) => rota.stepUp && !rota.sessao)).toEqual([])
   })
 
   test('META-09: todo caminho da tabela e string exata, comeca por /painel e nao tem segmento variavel', () => {

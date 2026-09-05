@@ -55,6 +55,7 @@ import {
 import type { Env } from '../../types/env'
 import {
   CABECALHO_DA_FICHA,
+  CAMINHO_DE_ENTRAR,
   COOKIE_DA_SESSAO,
   COOKIE_DO_DESAFIO,
   cookieDoPainel,
@@ -790,7 +791,7 @@ async function gravarCredencial(
   // expirado aqui porque ja cumpriu o papel — um bilhete que sobrevive ao
   // proprio uso e uma autorizacao pendurada esperando uma segunda requisicao.
   return Response.json(
-    { ok: true, para: '/painel/entrar' },
+    { ok: true, para: CAMINHO_DE_ENTRAR },
     { headers: { ...cabecalhos('api'), 'set-cookie': cookieDoPainel(COOKIE_DO_DESAFIO, '', 0) } },
   )
 }

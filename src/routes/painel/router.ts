@@ -256,6 +256,25 @@ async function escada(
     }
   }
 
+  // Passo 8, e ele vem ANTES do curto-circuito de propósito.
+  //
+  // Nenhuma rota declara `stepUp: true` ainda, e o ramo FALHA FECHADO: o
+  // verificador — `op_hash` recalculado no servidor a partir da mudanca
+  // canonica — nasce com a etapa do step-up, e uma autorizacao que nao da para
+  // verificar nao pode ser concedida. Declarar `stepUp: true` numa rota antes
+  // disso tem de TRANCAR a rota, nunca abri-la em silencio.
+  //
+  // **Por que aqui e nao depois do portao de sessao.** Enquanto ele mora depois
+  // do `if (!rota.sessao)`, a trava vale so no ramo autenticado: uma linha com
+  // `stepUp: true` e `sessao: false` passava direto para o handler — que e
+  // exatamente a abertura silenciosa que este ramo existe para impedir. O
+  // metateste META-02 fecha a outra metade, proibindo a combinacao na tabela.
+  //
+  // Quando a etapa do step-up trouxer `exigirStepUp()`, esta linha vira aquela
+  // chamada e volta para a posicao 8 da escada de §11.3, depois da ficha: um
+  // verificador de verdade precisa do `sid` que o passo 6 produz.
+  if (rota.stepUp) return erro('step_up_necessario', contexto)
+
   if (!rota.sessao) {
     return await handler({ request, env, now, rota, contexto, corpo, sessao: null })
   }
@@ -270,13 +289,6 @@ async function escada(
     const recusaDeFicha = await exigirCsrf(request, env, porta.sidHash, corpo, contexto)
     if (recusaDeFicha !== null) return recusaDeFicha
   }
-
-  // Passo 8. Nenhuma rota declara `stepUp: true` ainda, e o ramo FALHA FECHADO
-  // de proposito: o verificador — `op_hash` recalculado no servidor a partir da
-  // mudanca canonica — nasce com a etapa do step-up, e uma autorizacao que nao
-  // da para verificar nao pode ser concedida. Declarar `stepUp: true` numa rota
-  // antes disso a tranca, em vez de abri-la em silencio.
-  if (rota.stepUp) return erro('step_up_necessario', contexto)
 
   // Passo 9: a PRIMEIRA consulta ao D1 do caminho autenticado.
   const viva = await exigirSessaoViva(env.DB, porta.sidHash, now, contexto)

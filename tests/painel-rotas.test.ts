@@ -14,10 +14,12 @@ import {
   ROTA_INICIO,
   ROTA_OPCOES_DE_ENTRAR,
   ROTA_VERIFICAR_ENTRADA,
+  ROTAS,
   type RotaDoPainel,
   TETO_DO_CORPO_DE_FORMULARIO,
 } from '../src/routes/painel/rotas'
 import { despachar, routePainel } from '../src/routes/painel/router'
+import { PRAZO_DE_ENVELOPE_MS } from '../src/security/signed-envelope'
 import {
   emitirSessao,
   PRAZO_ABSOLUTO_DE_SESSAO_MS,
@@ -103,6 +105,27 @@ function postDeApi(caminho: string, corpo: unknown, cabecalhosExtras: Record<str
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: RAIZ, ...cabecalhosExtras },
     body: JSON.stringify(corpo),
+  })
+}
+
+/**
+ * Uma requisicao BEM formada para qualquer linha da tabela.
+ *
+ * Ela e derivada da propria linha — metodo, familia e origem —, entao uma rota
+ * nova entra nos lacos que a percorrem sem ninguem escrever nada a mao.
+ */
+function pedirDaRota(rota: RotaDoPainel): Request {
+  const metodo = rota.metodos.includes('GET') ? 'GET' : 'POST'
+  if (metodo === 'GET') return pedir(rota.caminho)
+
+  const familia = rota.caminho.startsWith('/painel/api/')
+  return new Request(`${RAIZ}${rota.caminho}`, {
+    method: 'POST',
+    headers: {
+      'content-type': familia ? 'application/json' : 'application/x-www-form-urlencoded',
+      origin: RAIZ,
+    },
+    body: familia ? '{}' : '',
   })
 }
 
@@ -309,6 +332,52 @@ describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
     }
 
     expect(contador.prepares).toBe(0)
+  })
+
+  test('a recusa do passo 6 respeita a familia: 401 JSON na API, 303 na pagina', async () => {
+    // §11.3 fixa as duas formas, e a diferenca nao e cosmetica: o `painel.js`
+    // faz `resposta.json()` nas rotas `/painel/api/*`, e um 303 com HTML no
+    // lugar do 401 vira erro de parse no navegador do dono.
+    const daApi: RotaDoPainel = {
+      caminho: '/painel/api/stepup/opcoes',
+      metodos: ['POST'],
+      sessao: true,
+      csrf: true,
+      stepUp: false,
+      escreve: false,
+    }
+    const espiao = { chamadas: 0 }
+    const handler = () => {
+      espiao.chamadas++
+      return new Response('nao devia', { status: 200 })
+    }
+
+    const contador = new D1Contador(env.DB)
+    const semCookie = await despachar(
+      new Request(`${RAIZ}${daApi.caminho}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: RAIZ },
+        body: '{}',
+      }),
+      ambienteCom({ DB: comoD1(contador) }),
+      AGORA,
+      daApi,
+      handler,
+    )
+
+    expect(semCookie.status).toBe(401)
+    expect(await semCookie.json()).toEqual({
+      erro: 'sessao_ausente',
+      mensagem: 'Sua sessão expirou. Entre de novo.',
+    })
+    expect(semCookie.headers.get('location')).toBeNull()
+    expect(espiao.chamadas).toBe(0)
+    expect(contador.prepares).toBe(0)
+
+    // A metade de pagina, lado a lado, para que a diferenca seja a afirmacao.
+    const daPagina = await despachar(pedir('/painel'), env, AGORA, ROTA_INICIO, handleInicio)
+    expect(daPagina.status).toBe(303)
+    expect(daPagina.headers.get('location')).toBe('/painel/entrar')
   })
 
   test('cookie com MAC valido mas SEM linha no banco e recusado — a linha e a autoridade', async () => {
@@ -692,9 +761,31 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
       console.parar()
     }
 
-    const juntas = console.linhas.join('\n')
-    expect(juntas).toContain('verificacao_de_usuario_ausente')
+    const doPainel = console.linhas.filter((linha) => linha.startsWith('painel:'))
+
+    // UMA linha por tentativa recusada, carregando os DOIS codigos: o canonico
+    // que §11.4 manda registrar e o motivo interno que o dono precisa para
+    // depurar. Duas linhas seriam amplificacao de log na rota nao autenticada
+    // mais exposta do painel — mesma classe do Ruling 27 da Task 6.
+    expect(doPainel).toHaveLength(1)
+    expect(doPainel[0]).toContain('credencial_invalida')
+    expect(doPainel[0]).toContain('verificacao_de_usuario_ausente')
+    expect(doPainel[0]).toContain('401')
     expect(corpo).not.toContain('verificacao_de_usuario_ausente')
+  })
+
+  test('o `Max-Age` do cookie de desafio e DERIVADO do prazo do envelope', async () => {
+    const { cookie, resposta } = await pedirDesafio()
+
+    // Uma grafia so: subir o envelope de `entrar` para 180 s move os dois
+    // numeros juntos. Duas constantes fariam o cookie morrer antes do desafio,
+    // e o login passaria a falhar com `desafio_invalido` sem teste reclamar.
+    const segundos = Math.floor(PRAZO_DE_ENVELOPE_MS.entrar / 1000)
+    expect(resposta.headers.get('set-cookie')).toContain(`Max-Age=${segundos}`)
+    expect(cookie.startsWith('__Host-painel_desafio=')).toBe(true)
+
+    const opcoes = (await resposta.json()) as { timeout: number }
+    expect(opcoes.timeout).toBe(PRAZO_DE_ENVELOPE_MS.entrar)
   })
 
   test('RS256 tambem entra: os dois algoritmos de §10.4 fecham', async () => {
@@ -1036,20 +1127,69 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
   })
 
   test('toda rota com `escreve: false` executa ZERO escritas no D1', async () => {
-    const contador = new D1Contador(env.DB)
-    const ambiente = ambienteCom({ DB: comoD1(contador) })
+    // O laco vem da TABELA, e nao de tres handlers escritos a mao: e a metade
+    // da regra de forma de §7.1 que ja da para afirmar hoje, e uma linha nova
+    // em `rotas.ts` entra nele sozinha. Passa pelo Worker inteiro para cobrir
+    // tambem as rotas que o roteador despacha sem `despachar`.
+    const semEscrita = ROTAS.filter((rota) => !rota.escreve)
 
-    await despachar(pedir('/painel'), ambiente, AGORA, ROTA_INICIO, handleInicio)
-    await despachar(pedir('/painel/entrar'), ambiente, AGORA, ROTA_ENTRAR, handlePaginaDeEntrar)
-    await despachar(
-      postDeApi('/painel/api/entrar/opcoes', {}),
-      ambiente,
+    // Contrapositivo: uma tabela vazia faria o laco passar sem provar nada.
+    expect(semEscrita.length).toBeGreaterThan(0)
+    expect(semEscrita.map((rota) => rota.caminho)).toContain('/painel/convite')
+
+    for (const rota of semEscrita) {
+      await limparBanco(env.DB)
+      invalidarBaldesDeReserva()
+
+      const contador = new D1Contador(env.DB)
+      const resposta = await responder(pedirDaRota(rota), ambienteCom({ DB: comoD1(contador) }))
+
+      // O status nao importa aqui — importa que nada foi gravado, seja ela
+      // atendida, redirecionada ou recusada.
+      expect({ [rota.caminho]: contador.escritas, status: resposta.status < 500 }).toEqual({
+        [rota.caminho]: 0,
+        status: true,
+      })
+    }
+  })
+
+  test('a familia de FORMULARIO tambem recusa `content-type` errado com 415', async () => {
+    // A camada 4 de §10.9 e a que "sozinha ja elimina CSRF por formulario
+    // HTML", e e justamente na familia de formulario que um form cross-site
+    // consegue postar. `text/plain` e `multipart/form-data` sao os dois tipos
+    // que um `<form>` consegue emitir sem JavaScript.
+    for (const tipo of ['text/plain', 'multipart/form-data; boundary=x', 'application/json']) {
+      const resposta = await despachar(
+        new Request(`${RAIZ}/painel/ajustes`, {
+          method: 'POST',
+          headers: { 'content-type': tipo, origin: RAIZ },
+          body: 'campo=1',
+        }),
+        env,
+        AGORA,
+        ROTA_DE_FORMULARIO,
+        eco,
+      )
+
+      expect({ [tipo]: resposta.status }).toEqual({ [tipo]: 415 })
+    }
+
+    // E o contrapositivo, com o `charset` que os navegadores anexam.
+    const certo = await despachar(
+      new Request(`${RAIZ}/painel/ajustes`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'Application/X-WWW-Form-UrlEncoded; charset=utf-8',
+          origin: RAIZ,
+        },
+        body: 'campo=1',
+      }),
+      env,
       AGORA,
-      ROTA_OPCOES_DE_ENTRAR,
-      handleOpcoesDeEntrar,
+      ROTA_DE_FORMULARIO,
+      eco,
     )
-
-    expect(contador.escritas).toBe(0)
+    expect(certo.status).toBe(200)
   })
 })
 
@@ -1180,6 +1320,77 @@ describe('HDR — cabecalhos e CSP (§11.5)', () => {
       const corpo = await (await responder(request, env)).text()
       expect({ [nome]: proibido.test(corpo) }).toEqual({ [nome]: false })
     }
+  })
+
+  test('a marca de "ja seguro" e um Symbol: um corpo do cliente nao consegue forjar', async () => {
+    const { html, cru } = await import('../src/routes/painel/html')
+
+    // A razao de existir do `Symbol`: um objeto que veio de `JSON.parse` — isto
+    // e, do corpo de uma requisicao — nunca carrega um simbolo. Se a marca
+    // fosse a presenca do campo `texto`, este corpo se declararia seguro
+    // sozinho e emitiria script cru na tela do dono.
+    const forjado = JSON.parse('{"texto":"<script>alert(1)</script>"}') as unknown
+    const saida = html`<p>${forjado}</p>`
+
+    // O objeto NAO e desembrulhado: ele cai no ramo comum, vira texto e e
+    // escapado. Trocar a marca pela presenca do campo `texto` faria esta saida
+    // virar `<p><script>alert(1)</script></p>`.
+    expect(saida.texto).toBe('<p>[object Object]</p>')
+    expect(saida.texto).not.toContain('<script>')
+
+    // A mesma tentativa com a forma exata que a interface interna tem.
+    const comCampos = JSON.parse('{"texto":"<b>x</b>","seguro":true}') as unknown
+    expect(html`${comCampos}`.texto).toBe('[object Object]')
+
+    // E o contrapositivo: o que passou por `cru()` — a UNICA porta — entra como
+    // esta, senao o teste acima passaria com a tag escapando tudo sempre.
+    expect(html`${cru('<b>ok</b>')}`.texto).toBe('<b>ok</b>')
+    expect(html`${html`<i>ok</i>`}`.texto).toBe('<i>ok</i>')
+  })
+
+  test('os cabecalhos de §11.5 vencem os extras da rota, nos tres construtores', async () => {
+    // A ordem do spread e a trava, e ela precisa de teste porque o tipo estreito
+    // de `extras` e acidente de hoje: uma rota futura que passasse
+    // `content-security-policy` nos extras herdaria o buraco em toda tela.
+    const { pagina, html } = await import('../src/routes/painel/html')
+    const { json, redirecionar } = await import('../src/routes/painel/resposta')
+
+    const hostis: Record<string, string> = {
+      'content-security-policy': 'default-src *',
+      'cache-control': 'public, max-age=31536000',
+      vary: '*',
+      'x-frame-options': 'ALLOWALL',
+      'x-content-type-options': 'sniff',
+      'referrer-policy': 'unsafe-url',
+    }
+
+    const respostas: ReadonlyArray<readonly [string, Response]> = [
+      ['pagina', pagina({ titulo: 'x', corpo: html`<p>x</p>`, extras: hostis })],
+      ['json', json({ ok: true }, { extras: hostis })],
+      ['redirecionar', redirecionar('/painel', hostis)],
+    ]
+
+    for (const [nome, resposta] of respostas) {
+      expect({ [nome]: resposta.headers.get('cache-control') }).toEqual({
+        [nome]: 'private, no-store',
+      })
+      expect({ [nome]: resposta.headers.get('vary') }).toEqual({ [nome]: 'Cookie' })
+      expect({ [nome]: resposta.headers.get('x-frame-options') }).toEqual({ [nome]: 'DENY' })
+      expect({ [nome]: resposta.headers.get('x-content-type-options') }).toEqual({
+        [nome]: 'nosniff',
+      })
+      expect({ [nome]: resposta.headers.get('referrer-policy') }).toEqual({ [nome]: 'no-referrer' })
+      expect({ [nome]: resposta.headers.get('content-security-policy') }).not.toEqual({
+        [nome]: 'default-src *',
+      })
+    }
+
+    // E o extra que DEVE sobreviver, senao a trava acima teria sido escrita
+    // apagando `set-cookie`, `allow` e `location` junto.
+    expect(json({ ok: true }, { extras: { 'set-cookie': 'a=b' } }).headers.get('set-cookie')).toBe(
+      'a=b',
+    )
+    expect(redirecionar('/painel').headers.get('location')).toBe('/painel')
   })
 
   test('a tag `html` escapa por padrao, e a pagina inteira nasce dela', async () => {

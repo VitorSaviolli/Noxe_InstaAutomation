@@ -347,6 +347,34 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
     expect(contador.prepares).toBe(0)
   })
 
+  test('passo 8: `stepUp: true` tranca a rota TAMBEM quando ela nao exige sessao', async () => {
+    // O buraco que este teste fecha: enquanto a checagem de step-up morava
+    // depois do curto-circuito `if (!rota.sessao)`, uma linha com
+    // `stepUp: true` e `sessao: false` passava direto para o handler — a
+    // abertura em silencio que o ramo existe para impedir.
+    const semSessaoComStepUp: RotaDoPainel = {
+      caminho: '/painel/entrar',
+      metodos: ['GET'],
+      sessao: false,
+      csrf: false,
+      stepUp: true,
+      escreve: false,
+    }
+    const espiao = new HandlerEspiao()
+
+    const resposta = await despachar(
+      new Request(`${RAIZ}${semSessaoComStepUp.caminho}`),
+      env,
+      AGORA,
+      semSessaoComStepUp,
+      espiao.responder,
+    )
+
+    expect(resposta.status).toBe(403)
+    expect(await resposta.text()).toContain('Confirme com sua passkey para continuar.')
+    expect(espiao.chamadas).toBe(0)
+  })
+
   test('`exigirCsrf` sozinha nunca lanca com corpo vazio', async () => {
     const sessao = await abrirSessao()
     const request = new Request(`${RAIZ}/painel/ajustes`, { method: 'POST' })

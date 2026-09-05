@@ -73,6 +73,20 @@ export interface ContextoDoErro {
   readonly formato: FormatoDeRota
   /** `allow` no `405`, `retry-after` no `429`. Nunca CSP nem `set-cookie`. */
   readonly extras?: Record<string, string>
+  /**
+   * O motivo INTERNO, quando o codigo ao cliente e mais generico que ele.
+   *
+   * Existe para a fronteira do login, onde §10.3 manda colapsar todo motivo em
+   * `credencial_invalida` e o dono ainda precisa saber qual foi. Ele entra na
+   * MESMA linha de `console.warn` — nunca numa segunda: duas linhas por
+   * tentativa recusada sao amplificacao de log na rota nao autenticada mais
+   * exposta do painel, e quem paga os Workers Logs e o dono (mesma classe do
+   * Ruling 27).
+   *
+   * E um codigo de vocabulario fechado, em snake_case, como todo o resto que
+   * §11.7 permite. Nunca um valor, nunca um pedaco do corpo.
+   */
+  readonly motivoInterno?: string
 }
 
 /**
@@ -84,7 +98,18 @@ export interface ContextoDoErro {
  */
 export function erro(codigo: CodigoDeErro, contexto: ContextoDoErro): Response {
   const { status, mensagem } = ERROS[codigo]
-  console.warn('painel:', contexto.request.method, contexto.caminho, status, codigo)
+  if (contexto.motivoInterno === undefined) {
+    console.warn('painel:', contexto.request.method, contexto.caminho, status, codigo)
+  } else {
+    console.warn(
+      'painel:',
+      contexto.request.method,
+      contexto.caminho,
+      status,
+      codigo,
+      contexto.motivoInterno,
+    )
+  }
 
   if (contexto.formato === 'json') {
     return Response.json(

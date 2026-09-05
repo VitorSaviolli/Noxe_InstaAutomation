@@ -1,0 +1,34 @@
+# O terceiro perfil de cabecalhos de §11.5: o dos TRES assets.
+#
+# Os outros dois perfis — pagina do Worker e API JSON — moram em codigo, em
+# `src/routes/painel/html.ts`, porque quem os aplica e o Worker. Este nao pode
+# morar la: quem serve `/painel/painel.css`, `/painel/painel.js` e
+# `/painel/parar` e o CDN, e o Worker nem e invocado (`assets` sem
+# `run_worker_first`, §11.2). Sem este arquivo os tres saem sem CSP e sem
+# `nosniff` — inclusive a pagina da parada de emergencia.
+#
+# `_headers` NAO e servido como asset: e metadado que a Cloudflare le no
+# deploy. Os tres arquivos de `public/` continuam sendo tres.
+#
+# **Se ele nao funcionar, nada quebra** (§11.5): ele cobre um CSS, um JS e uma
+# pagina sem script e sem interpolacao nenhuma. E reforco, e nao a defesa.
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: https://*.cdninstagram.com https://*.fbcdn.net; connect-src 'self'; font-src 'self'; object-src 'none'; media-src 'none'; require-trusted-types-for 'script'; upgrade-insecure-requests
+  Cache-Control: no-cache
+
+# `no-cache` quer dizer "revalide sempre", e nao "nao guarde": a revalidacao de
+# asset e gratuita e elimina a classe de bug "JS velho no cache depois do
+# deploy" — que, num painel que le digital, apareceria como login que nao
+# funciona sem ninguem entender por que. `max-age` longo aqui trocaria uma
+# economia que nao precisamos por essa classe de bug.
+#
+# `Cross-Origin-Embedder-Policy: require-corp` NAO entra, aqui como nos outros
+# dois perfis: ele quebraria as miniaturas do `fbcdn.net`.

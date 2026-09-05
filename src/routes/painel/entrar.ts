@@ -20,6 +20,7 @@
 import { PainelAuditoriaRepository } from '../../repositories/painel-auditoria-repository'
 import { PainelCredenciaisRepository } from '../../repositories/painel-credenciais-repository'
 import { PainelSessoesRepository } from '../../repositories/painel-sessoes-repository'
+import { PRAZO_DE_ENVELOPE_MS } from '../../security/signed-envelope'
 import {
   emitirEnvelope,
   emitirSessao,
@@ -56,8 +57,16 @@ import type { EntradaDaRota } from './router'
  */
 const DESTINO_DEPOIS_DO_LOGIN = ROTA_INICIO.caminho
 
-/** O desafio de `entrar` vale 120 s (§7.6). O cookie acompanha, em segundos. */
-const SEGUNDOS_DO_DESAFIO = 120
+/**
+ * O `Max-Age` do cookie de desafio, DERIVADO do prazo do envelope.
+ *
+ * O prazo mora em `PRAZO_DE_ENVELOPE_MS`, indexado pelo proposito, e e de la
+ * que `opcoesDeLogin` tira o `timeout` que o navegador recebe. Escrever `120`
+ * aqui seria a segunda grafia de um numero so, e a falha seria SILENCIOSA:
+ * subir o envelope para 180 s faria o cookie morrer aos 120 e o login passar a
+ * falhar com `desafio_invalido` sem nenhum teste reclamar.
+ */
+const SEGUNDOS_DO_DESAFIO = Math.floor(PRAZO_DE_ENVELOPE_MS.entrar / 1000)
 
 /**
  * **O limitador NAO mora aqui.** As duas rotas de `entrar` correm sob a familia
@@ -250,10 +259,14 @@ async function desafioDoCookie(request: Request, env: Env, now: number): Promise
  *
  * O `motivo` entra no `console.warn` e **nunca** no corpo. Ele e um codigo
  * curto de vocabulario fechado — nunca um valor, nunca um pedaco do corpo.
+ *
+ * **UMA linha de log por tentativa recusada**, com o codigo canonico e o motivo
+ * interno lado a lado. Duas linhas — uma do motivo e outra do `erro()` — dariam
+ * ao atacante o dobro de volume nos Workers Logs do dono a cada tentativa, na
+ * rota nao autenticada mais exposta do painel.
  */
 function recusar(motivo: string, contexto: ContextoDoErro): Response {
-  console.warn('painel:', contexto.request.method, contexto.caminho, 401, motivo)
-  return erro('credencial_invalida', contexto)
+  return erro('credencial_invalida', { ...contexto, motivoInterno: motivo })
 }
 
 /**

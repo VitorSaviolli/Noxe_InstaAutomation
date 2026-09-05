@@ -47,6 +47,36 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     expect(await resposta.text()).toBe('Nao autorizado')
   })
 
+  test('§11.8: /setup/authorize recusa outro metodo com 405 e `Allow: GET`', async () => {
+    // A UNICA mudanca que §11.8 pede nas rotas de instalacao, e ela e uma
+    // subtracao: ate a etapa do roteador do painel, o `switch` nao conferia
+    // metodo nenhum aqui, e um `PUT` com Bearer valido gerava um `state`
+    // assinado — um `state` de verdade, emitido por um metodo que o assistente
+    // nunca usa. `Allow: GET` porque e assim que ele sempre chamou.
+    for (const metodo of ['POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
+      const resposta = await responderComEnv(
+        new Request(`${RAIZ}/setup/authorize`, {
+          method: metodo,
+          headers: { authorization: `Bearer ${ADMIN}` },
+        }),
+      )
+
+      expect({ [metodo]: resposta.status }).toEqual({ [metodo]: 405 })
+      expect({ [metodo]: resposta.headers.get('allow') }).toEqual({ [metodo]: 'GET' })
+      // O corpo nao carrega `state` nenhum: a recusa vem ANTES do `isAdmin` e
+      // antes de qualquer assinatura.
+      expect({ [metodo]: (await resposta.text()).includes('authorizationUrl') }).toEqual({
+        [metodo]: false,
+      })
+    }
+
+    // O contrato do assistente NAO muda: `GET` com Bearer continua respondendo.
+    const comGet = await responderComEnv(
+      pedir('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
+    )
+    expect(comGet.status).toBe(200)
+  })
+
   test('REG-12: /setup/authorize com Bearer continua devolvendo authorizationUrl', async () => {
     const resposta = await responderComEnv(
       pedir('/setup/authorize', { authorization: `Bearer ${ADMIN}` }),
