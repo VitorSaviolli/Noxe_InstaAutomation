@@ -448,6 +448,12 @@ export function origemConfere(request: Request, env: Env): boolean {
  * isso quem chama a mantem dentro do `try`.
  */
 export async function lerCorpoCapado(request: Request, teto: number): Promise<string | null> {
+  // WA-25, primeira metade: o `content-length` DECLARADO, conferido ANTES de
+  // ler qualquer byte. So dispara quando o cabecalho existe e mente PARA CIMA
+  // — por isso o teste que a prende sozinha tem de SETAR o cabecalho a mao
+  // (`@cloudflare/vitest-pool-workers` nao o preenche por conta propria nem
+  // para corpo string nem para `ReadableStream`; sem o valor manual, todo
+  // corpo grande cai direto na segunda metade, e este `if` nunca dispara).
   const declarado = request.headers.get('content-length')
   if (declarado !== null) {
     const tamanho = Number.parseInt(declarado, 10)

@@ -212,6 +212,45 @@ async function registrarComAparelho(
   )
 }
 
+/**
+ * D1 cujo `batch()` IGNORA o lote de verdade e forca, no D1 real por baixo,
+ * uma violacao `NOT NULL` em `painel_credenciais.apelido` — para provar que
+ * `ehConflitoDeChave` (registrar.ts) distingue essa classe da violacao de
+ * UNIQUE/PK do passo 8, e nao trata as duas como o mesmo `credencial_invalida`
+ * generico.
+ *
+ * Nao alcancavel pelos caminhos tipados de hoje: e por isso que o "e se"
+ * precisa vir de um duble, e nao de um corpo malicioso.
+ */
+class D1QuebradoPorNotNull {
+  constructor(private readonly real: D1Database) {}
+
+  prepare(sql: string): D1PreparedStatement {
+    return this.real.prepare(sql)
+  }
+
+  batch<T = unknown>(_statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
+    return this.real.batch<T>([
+      this.real
+        .prepare(
+          `INSERT INTO painel_credenciais
+             (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
+              sign_count, backup_eligible, backup_state, apelido, origem_registro, criado_em, usado_em)
+           VALUES (?, ?, ?, ?, ?, NULL, 0, 0, 0, NULL, 'convite', ?, NULL)`,
+        )
+        .bind('credencial-de-outro-lote', 'rp', 'handle', '{}', -7, AGORA),
+    ])
+  }
+
+  exec(query: string): Promise<D1ExecResult> {
+    return this.real.exec(query)
+  }
+
+  dump(): Promise<ArrayBuffer> {
+    return this.real.dump()
+  }
+}
+
 /** A unica linha de `painel_credenciais`, nos campos que o saneamento decide. */
 async function linhaGravada(): Promise<{ apelido: string; transportes: string | null } | null> {
   return await env.DB.prepare(
@@ -1125,6 +1164,44 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
       'SELECT COUNT(*) AS n FROM painel_convites_usados',
     ).first<{ n: number }>()
     expect(convites?.n).toBe(2)
+  })
+
+  test('§10.5 passo 8: uma violacao `NOT NULL` no mesmo lote NAO e confundida com PK', async () => {
+    // Robustez e observabilidade, nao um bug ao vivo (nenhum caminho tipado
+    // hoje deixa uma das dez colunas `NOT NULL` de `painel_credenciais`
+    // chegar nula neste INSERT): se o regex de `ehConflitoDeChave` casasse
+    // QUALQUER `constraint failed`/`SQLITE_CONSTRAINT` — como casava antes —,
+    // este "e se" sairia como `401 credencial_invalida`, a mesma recusa
+    // generica do passo 8, escondendo um defeito NOSSO atras da mesma frase de
+    // "assinatura invalida". A tabela de §11.4 nao admite isso: excecao nao
+    // prevista e `falha_interna`.
+    const aparelho = await AutenticadorFalso.criar()
+    const { token } = await montarConvite()
+
+    const registrado = capturarConsole()
+    let verificacao: Response
+    try {
+      verificacao = await registrarComAparelho(
+        aparelho,
+        token,
+        {},
+        comAmbiente({ DB: new D1QuebradoPorNotNull(env.DB) }),
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    expect(verificacao.status).toBe(500)
+    expect(await verificacao.json()).toEqual({
+      erro: 'falha_interna',
+      mensagem: 'Algo deu errado. Tente de novo.',
+    })
+    expect(registrado.linhas.join('\n')).toContain('falha_interna')
+    expect(registrado.linhas.join('\n')).not.toContain('credencial_invalida')
+    // A credencial de verdade (a do aparelho autenticado) tambem nao entrou: o
+    // duble substitui o lote inteiro pelo INSERT quebrado, entao nem ELA
+    // deveria existir.
+    expect(await contarCredenciais()).toBe(0)
   })
 
   test('§10.5 passo 9: com 10 credenciais, as options nem saem', async () => {

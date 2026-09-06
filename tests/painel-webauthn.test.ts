@@ -1477,14 +1477,20 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
 
   test('WA-25: corpo em `ReadableStream`, sem `content-length`, tambem e recusado', async () => {
     // O teto de §11.3 passo 4 tem DUAS metades — "`content-length` conferido
-    // **e** relido na leitura" — e o teste acima so exercita a primeira: um
-    // corpo montado de uma string JS sempre chega com `content-length`, entao o
-    // portao de cima dispara e o corte dentro do `ReadableStream` nunca roda.
-    // Apagar esse corte deixava a suite inteira verde.
+    // **e** relido na leitura." Neste runtime (`@cloudflare/vitest-pool-workers`)
+    // o cabecalho NAO nasce sozinho: um `Request` construido com corpo STRING ou
+    // `ReadableStream` chega com `content-length` igual a `null`, sempre — entao
+    // o teste ACIMA (a string gigante) tambem passa so pela segunda metade,
+    // nunca pela primeira. "Um corpo montado de string sempre chega com
+    // content-length" e exatamente a premissa falsa que este comentario tinha
+    // antes: quem prende a primeira metade de proposito, com o cabecalho SETADO
+    // A MAO, e o teste seguinte, "WA-25: content-length mentiroso...".
     //
-    // Aqui o corpo vai em pedacos, `content-length` nao existe, e a unica coisa
-    // entre o painel e um POST `chunked` de tamanho arbitrario e a segunda
-    // metade. `prepares === 0` e a afirmacao que importa: nada chega ao D1.
+    // Este teste aqui prende a SEGUNDA metade para a familia de 8 KB, com o
+    // corpo chegando em pedacos DE VERDADE — um `pull()` por vez, do jeito que
+    // um POST `chunked` de conexao lenta chegaria, e nao uma string unica que o
+    // runtime pode entregar num `read()` so. `prepares === 0` e a afirmacao que
+    // importa: nada chega ao D1.
     const contador = new D1Contador(env.DB)
     const pedaco = new TextEncoder().encode('x'.repeat(4096))
     let restantes = 4
@@ -1520,6 +1526,39 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
     // E o corpo nao foi bufferizado inteiro antes de medir: o leitor foi
     // cancelado no primeiro pedaco que estourou o teto, com pedacos por enviar.
     expect(restantes).toBeGreaterThan(0)
+  })
+
+  test('WA-25: content-length mentiroso acima de 8 KB e recusado antes de qualquer leitura', async () => {
+    // A PRIMEIRA metade de verdade do teto de §11.3 passo 4 — o precheck do
+    // `content-length` DECLARADO, que nao existe sozinho neste runtime (ver os
+    // dois testes acima): para provar que ele funciona por conta propria, o
+    // cabecalho precisa ser SETADO A MAO, do jeito que
+    // `tests/painel-parada.test.ts:915` e `tests/regressao-webhook.test.ts:110`
+    // ja fazem para as outras duas familias de teto.
+    //
+    // A forma mais afiada: um `content-length` MENTIROSO, acima do teto, sobre
+    // um corpo REAL pequeno. Se a segunda metade (o corte dentro do stream)
+    // fosse a unica coisa rodando, um corpo pequeno passaria batido e a rota
+    // devolveria outra coisa que nao `413` — e e exatamente essa diferenca que
+    // prova que o portao de CIMA disparou sozinho, sem ler nenhum byte.
+    const contador = new D1Contador(env.DB)
+    const pedido = new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: RAIZ,
+        'content-length': String(TETO_DO_CORPO_DA_API + 1),
+      },
+      body: JSON.stringify({ tipo: 'sessao' }),
+    })
+
+    const resposta = await handleOpcoesDeRegistro(pedido, { ...env, DB: comoD1(contador) }, AGORA)
+
+    expect(resposta.status).toBe(413)
+    expect(contador.prepares).toBe(0)
+    // A prova de que o corte veio ANTES de ler: o corpo real, pequeno, nunca
+    // chegou a ser tocado (mesma afirmacao de REG-04 para o webhook).
+    expect(pedido.bodyUsed).toBe(false)
   })
 
   test.todo(

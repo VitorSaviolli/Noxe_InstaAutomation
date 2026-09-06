@@ -205,7 +205,14 @@ function metodoNaoPermitido(request: Request, caminho: string, permitidos: strin
  * Um `catch` que pega TUDO nao sabe qual dos dois aconteceu, e §11.4 ja decidiu
  * o desempate: o `try/catch` generico devolve `falha_interna`. Quem quiser
  * responder `indisponivel` precisa saber que estava falando com o D1 — e ai o
- * `catch` e estreito, em volta da chamada, como o da parada.
+ * `catch` fica estreito, em volta so da chamada que toca o banco, nunca em
+ * volta do handler inteiro. (`parada.ts:281-341` NAO e esse exemplo, mesmo
+ * parecendo um candidato obvio por ser o outro `catch` largo do painel: o dela
+ * e um `catch` de HANDLER inteiro — corpo, limitador e a cadeia de
+ * `conferirEParar` por baixo —, devolvendo `503` para qualquer excecao de
+ * proposito, como divergencia documentada da regra das tres telas canonicas de
+ * §10.12. Seguir aquele como modelo de "catch estreito de D1" copiaria a
+ * forma errada.)
  *
  * **Por que o `catch` mora aqui, e nao so no roteador.** `router.ts` tem o
  * `catch` canonico, mas ele esta dentro de `despachar()`, e as tres rotas do
@@ -236,10 +243,28 @@ function falhaInterna(cause: unknown, request: Request, caminho: string): Respon
  *
  * A unica restricao de unicidade alcancavel neste lote e a PK da credencial: os
  * demais statements sao `UPDATE` e `DELETE`, e o `INSERT` do convite ja saiu
- * antes, com `ON CONFLICT DO NOTHING`. Por isso basta reconhecer a violacao de
- * restricao, sem casar o nome da tabela numa mensagem que e do D1 e nao nossa.
+ * antes, com `ON CONFLICT DO NOTHING`. Por isso o regex casa so a CLASSE
+ * unicidade/PK — nunca `NOT NULL`, `CHECK` ou `FOREIGN KEY` — sem casar o nome
+ * da tabela ou da coluna numa mensagem que e do D1 e nao nossa.
+ *
+ * **Por que o regex nao e so `/constraint failed/i`.** Confirmado empiricamente
+ * neste runtime (`@cloudflare/vitest-pool-workers`): um `credential_id`
+ * repetido lanca `D1_ERROR: UNIQUE constraint failed:
+ * painel_credenciais.credential_id: SQLITE_CONSTRAINT (extended:
+ * SQLITE_CONSTRAINT_PRIMARYKEY)` — mas uma violacao `NOT NULL` lanca
+ * `D1_ERROR: NOT NULL constraint failed: painel_credenciais.<coluna>:
+ * SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_NOTNULL)`, e AS DUAS mensagens
+ * contem tanto `constraint failed` quanto `SQLITE_CONSTRAINT` — a bare palavra
+ * `SQLITE_CONSTRAINT` e o COARSE result code do SQLite, comum a toda classe de
+ * violacao. `painel_credenciais` tem DEZ colunas `NOT NULL` (`migrations/
+ * 0004_painel_acesso.sql`); hoje nenhum caminho tipado deixa uma chegar nula
+ * neste `INSERT` — isto e robustez e observabilidade, nao um bug ao vivo —,
+ * mas o regex antigo teria classificado esse "e se" como `credencial_duplicada`
+ * (401, generico) em vez de `falha_interna` (500, com o `cause.message` real no
+ * log do dono). So a palavra INICIAL do texto ("UNIQUE" / "PRIMARY KEY") ou o
+ * result code ESTENDIDO (nao o coarse) distingue as classes.
  */
-const CONFLITO_DE_CHAVE = /constraint failed|SQLITE_CONSTRAINT/i
+const CONFLITO_DE_CHAVE = /\b(?:UNIQUE|PRIMARY KEY) constraint failed\b/i
 
 function ehConflitoDeChave(cause: unknown): boolean {
   return cause instanceof Error && CONFLITO_DE_CHAVE.test(cause.message)

@@ -40,6 +40,7 @@ import {
   AGORA,
   capturarConsole,
   comoD1,
+  D1BatchQuebrado,
   D1Contador,
   LimitadorFalso,
   pedir,
@@ -575,6 +576,47 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
       'SELECT acao, origem, step_up, alvo FROM painel_auditoria',
     ).all<Record<string, unknown>>()
     expect(auditoria.results).toEqual([{ acao: 'login', origem: 'painel', step_up: 0, alvo: null }])
+  })
+
+  test('§11.4: excecao inesperada no login e `500 falha_interna`, e nunca `503`', async () => {
+    // Mesmo defeito, mesma prova, que o de `registrar.ts` (commit `75a5312`,
+    // coberto em `painel-convite.test.ts`): a tabela canonica de §11.4 da
+    // `indisponivel` (503) a "D1 indisponivel ou cota estourada" e
+    // `falha_interna` (500) a "qualquer excecao nao prevista". Uma assertion
+    // GENUINA e valida — a leitura da credencial e a verificacao da assinatura
+    // fecham as duas — e so o `db.batch()` final de `abrirSessao` que estoura,
+    // exatamente como um D1 fora do ar quebraria no meio da escrita.
+    const aparelho = await AutenticadorFalso.criar('ES256')
+    await cadastrarAparelho(aparelho)
+
+    const registrado = capturarConsole()
+    let resposta: Response
+    try {
+      resposta = await entrar(aparelho, {
+        ambiente: ambienteCom({ DB: new D1BatchQuebrado(env.DB) }),
+      })
+    } finally {
+      registrado.parar()
+    }
+
+    expect(resposta.status).toBe(500)
+    expect(await resposta.json()).toEqual({
+      erro: 'falha_interna',
+      mensagem: 'Algo deu errado. Tente de novo.',
+    })
+    expect(registrado.linhas.join('\n')).toContain('falha_interna')
+    expect(registrado.linhas.join('\n')).not.toContain('indisponivel')
+    // Nunca `credencial_invalida`: uma excecao nao e um motivo de `recusar()`,
+    // e colapsa-la ali seria o MESMO oraculo generico aplicado a um bug nosso.
+    expect(registrado.linhas.join('\n')).not.toContain('credencial_invalida')
+    // A sessao nunca nasceu: sem `set-cookie`, e sem alterar a forma da recusa
+    // de um login que falhou.
+    expect(resposta.headers.get('set-cookie')).toBeNull()
+
+    const sessoes = await env.DB.prepare('SELECT COUNT(*) AS n FROM painel_sessoes').first<{
+      n: number
+    }>()
+    expect(sessoes?.n).toBe(0)
   })
 
   test('SES-06: o cookie de sessao sai com os QUATRO atributos', async () => {

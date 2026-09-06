@@ -230,8 +230,7 @@ export async function handleVerificarEntrada(entrada: EntradaDaRota): Promise<Re
 
     return await abrirSessao(resultado.assertion, request, env, now)
   } catch (cause) {
-    console.error('painel:', 'indisponivel', cause instanceof Error ? cause.message : cause)
-    return erro('indisponivel', contexto)
+    return falhaInterna(cause, contexto)
   }
 }
 
@@ -267,6 +266,43 @@ async function desafioDoCookie(request: Request, env: Env, now: number): Promise
  */
 function recusar(motivo: string, contexto: ContextoDoErro): Response {
   return erro('credencial_invalida', { ...contexto, motivoInterno: motivo })
+}
+
+/**
+ * A excecao nao prevista da fronteira: `500 falha_interna`, nunca `503
+ * indisponivel` e nunca `401 credencial_invalida` (§11.4).
+ *
+ * Mesmo defeito corrigido em `registrar.ts` (commit `75a5312`): §11.4 separa
+ * `indisponivel` ("D1 indisponivel ou cota estourada", que manda o dono
+ * conferir o status da Cloudflare) de `falha_interna` ("qualquer excecao nao
+ * prevista", o padrao de todo `try/catch` do projeto). Um `catch` que pega
+ * TUDO nao sabe qual dos dois aconteceu — um `TypeError` em `buscarParaLogin`
+ * ou no lote de `abrirSessao` anunciado como "Servico temporariamente
+ * indisponivel" mandaria o dono investigar a Cloudflare por um defeito NOSSO.
+ *
+ * **Nunca `recusar()`.** `recusar()` e o oraculo fechado de `credencial_invalida`
+ * (Ruling 33, §10.3): existe para os motivos CONHECIDOS de fracasso da
+ * assertion, um vocabulario fechado que vira `motivoInterno` na MESMA linha de
+ * log, para nao dobrar o log por tentativa na rota nao autenticada mais
+ * exposta do painel. Uma excecao nao e um desses motivos. Chamar
+ * `recusar('falha_interna', contexto)` pareceria certo e erraria em dois
+ * sentidos: o cliente receberia `credencial_invalida` para um bug nosso, e a
+ * mensagem da excecao arriscaria vazar por `motivoInterno`, que so deveria
+ * carregar os codigos curtos e fechados de `resultado.motivo`.
+ *
+ * **Por que este `catch` continua aqui, com `despachar` por cima.** Diferente
+ * das rotas de `registrar.ts` — que respondem direto ao roteador e por isso
+ * SAO a ultima linha de defesa contra uma excecao crua —, `handleVerificarEntrada`
+ * roda dentro de `despachar()` (`router.ts`), cujo proprio `catch` ja devolve o
+ * mesmo `falha_interna` com o mesmo `contexto`. A rede aqui e proposital, nao
+ * a unica: os testes desta rota chamam `despachar` diretamente, nunca
+ * `SELF.fetch` (convencao da suite), e manter a garantia local, ao lado de
+ * `recusar()`, deixa visivel NESTA fronteira — e nao emprestado do chamador —
+ * que uma excecao jamais vira `credencial_invalida`.
+ */
+function falhaInterna(cause: unknown, contexto: ContextoDoErro): Response {
+  console.error('painel:', 'falha_interna', cause instanceof Error ? cause.message : cause)
+  return erro('falha_interna', contexto)
 }
 
 /**
