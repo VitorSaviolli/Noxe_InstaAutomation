@@ -41,7 +41,7 @@ import {
   lerCorpoCapado,
   limitar,
 } from './guardas'
-import { handleInicio } from './inicio'
+import { handleChave, handleInicio } from './inicio'
 import { handleMensagem } from './mensagem'
 import { handlePalavras } from './palavras'
 import {
@@ -58,6 +58,7 @@ import {
   PREFIXO_DA_API,
   ROTA_AJUSTES,
   ROTA_ATIVIDADE,
+  ROTA_CHAVE,
   ROTA_ENTRAR,
   ROTA_INICIO,
   ROTA_MENSAGEM,
@@ -130,6 +131,11 @@ export async function routePainel(
   switch (url.pathname) {
     case ROTA_INICIO.caminho:
       return despachar(request, env, now, ROTA_INICIO, handleInicio)
+
+    // A chave liga/desliga. Ela nao tem tela propria: o `303` dela aponta para
+    // `/painel?ok=<codigo>`, que e a tela que a acao mudou (§7.1).
+    case ROTA_CHAVE.caminho:
+      return despachar(request, env, now, ROTA_CHAVE, handleChave)
 
     case ROTA_PALAVRAS.caminho:
       return despachar(request, env, now, ROTA_PALAVRAS, handlePalavras)

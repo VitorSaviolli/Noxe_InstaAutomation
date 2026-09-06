@@ -88,7 +88,15 @@ const CANDIDATO_HOST = /(?:[\p{L}\p{N}\p{M}-]+\.)+\p{L}[\p{L}\p{N}-]+/gu
 const MAX_VOLTAS_DE_DECODE = 3
 
 /** O codigo unico de §11.4. A grafia `link_nao_permitido` esta deletada (§15.3). */
-const CODIGO_DA_RECUSA = 'dominio_nao_permitido'
+/**
+ * O codigo de achado da allowlist.
+ *
+ * E a MESMA grafia da chave `dominio_nao_permitido` da tabela `ERROS`, e a
+ * coincidencia e proposital: a rota de gravacao separa "endereco fora da lista"
+ * (403) de "campo invalido" (400) olhando este codigo, e duas grafias fariam a
+ * separacao falhar em silencio, devolvendo 400 para um problema de dominio.
+ */
+export const CODIGO_DA_RECUSA = 'dominio_nao_permitido'
 
 /**
  * Interpreta `ALLOWED_LINK_DOMAINS`.

@@ -60,12 +60,15 @@ export interface Moldura {
 /**
  * A barra do topo: o estado global e o caminho para parar.
  *
- * §3 pede um botao vermelho e grande de **DESLIGAR TUDO**. Ele e um `POST
- * /painel/chave`, que nasce com a etapa da escrita; enquanto ele nao existe, o
- * caminho que DESLIGA de verdade hoje e `/painel/parar`, com o codigo anotado
- * no papel — e e para la que este link vai. Um botao que postasse para uma
- * rota inexistente seria o freio quebrado exatamente na tela que promete o
- * freio.
+ * §3 pede um botao vermelho e grande de **DESLIGAR TUDO**. Ele existe, e um
+ * `POST /painel/chave`, e mora na tela de Inicio — que e a tela que o estado
+ * dele muda e para onde o `303` dele volta.
+ *
+ * **O link daqui continua sendo `/painel/parar`, e nao e duplicata.** Um `POST`
+ * na barra do topo obrigaria as cinco telas a carregar a ficha CSRF so para
+ * pintar um botao, e ainda assim so funcionaria com sessao viva. `/painel/parar`
+ * e o freio que funciona SEM sessao, com o codigo anotado no papel — que e o
+ * caso em que a barra do topo precisa mesmo estar em toda tela (§12.1).
  */
 function barraDoTopo(moldura: Moldura): HtmlSeguro {
   return html`<header class="topo">

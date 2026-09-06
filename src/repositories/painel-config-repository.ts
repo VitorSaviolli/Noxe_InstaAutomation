@@ -87,14 +87,18 @@ export interface EstadoDaAutomacao {
 }
 
 /**
- * Os valores que materializam a linha quando ela ainda nao existe (§8.3).
+ * As colunas de COMPORTAMENTO de `painel_config`, no formato do banco.
  *
- * Sao as colunas `NOT NULL` de `painel_config` que a parada nao decide: ela
- * decide `enabled`, `parado_por_codigo_em` e `versao`, e o resto vem da
- * fabrica. A conversao de `AutomationConfig` para estas colunas e produto e
- * mora em quem chama — aqui elas chegam prontas, ja no formato do banco.
+ * Sao as colunas que o dono decide: de `enabled` a `user_cooldown_hours`.
+ * Ficam de fora `versao`, `parado_por_codigo_em`, `criado_em` e
+ * `atualizado_em`, que sao carimbo e nao ajuste — a mesma fronteira que §9.9
+ * usa para dizer o que entra em `antes`/`depois`.
+ *
+ * A conversao de `AutomationConfig` para estas colunas e produto e mora em
+ * quem chama: aqui elas chegam prontas, ja no formato do banco.
  */
-export interface LinhaDeFabrica {
+export interface LinhaGravavel {
+  enabled: number
   trigger_keywords: string
   match_mode: string
   case_sensitive: number
@@ -110,7 +114,26 @@ export interface LinhaDeFabrica {
   user_cooldown_hours: number
 }
 
-const SINGLETON_ID = 1
+/**
+ * Os valores que materializam a linha quando ela ainda nao existe (§8.3).
+ *
+ * Sao as colunas `NOT NULL` de `painel_config` que a parada nao decide: ela
+ * decide `enabled`, `parado_por_codigo_em` e `versao`, e o resto vem da
+ * fabrica.
+ *
+ * E um `Omit` de `LinhaGravavel`, e nao uma segunda lista com as mesmas treze
+ * linhas: uma coluna nova de comportamento tem de aparecer nos DOIS escritores
+ * da mesma linha — a parada e a gravacao do painel — e duas listas divergiriam
+ * na primeira vez que alguem lembrasse de uma so.
+ */
+export type LinhaDeFabrica = Omit<LinhaGravavel, 'enabled'>
+
+/**
+ * A linha unica de `painel_config` (§8.3). Exportada porque a auditoria precisa
+ * dela para prender a propria escrita a esta linha, e uma segunda grafia do `1`
+ * seria a que nao mudaria no dia em que a primeira mudasse.
+ */
+export const ID_DA_CONFIG = 1
 
 export class PainelConfigRepository {
   constructor(private readonly db: D1Database) {}
@@ -130,7 +153,7 @@ export class PainelConfigRepository {
    */
   async ler(): Promise<LeituraDeConfig> {
     const [global, midias] = await this.db.batch<PainelConfigRecord | PainelMidiaRecord>([
-      this.db.prepare('SELECT * FROM painel_config WHERE id = ?').bind(SINGLETON_ID),
+      this.db.prepare('SELECT * FROM painel_config WHERE id = ?').bind(ID_DA_CONFIG),
       this.db.prepare('SELECT * FROM painel_midias WHERE ativo = 1 ORDER BY media_id'),
     ])
 
@@ -160,10 +183,31 @@ export class PainelConfigRepository {
   async lerEstadoDaAutomacao(): Promise<EstadoDaAutomacao | null> {
     const linha = await this.db
       .prepare('SELECT enabled, versao FROM painel_config WHERE id = ?')
-      .bind(SINGLETON_ID)
+      .bind(ID_DA_CONFIG)
       .first<EstadoDaAutomacao>()
 
     return linha ?? null
+  }
+
+  /**
+   * A data da ultima parada por codigo, para a confirmacao de religar (§10.12).
+   *
+   * Consulta PROPRIA, e nao uma coluna a mais em `lerEstadoDaAutomacao`: aquela
+   * e a leitura barata da rota de parada, que §9.10 orca em duas leituras e que
+   * nao tem nenhum uso para esta data. Aqui a pergunta e outra — "desde quando
+   * esta desligada?" — e ela so e feita quando a automacao esta DESLIGADA, que
+   * e o unico estado em que a tela oferece religar.
+   *
+   * `null` significa duas coisas que a tela trata igual: nunca houve parada por
+   * codigo, ou nao ha linha nenhuma. Nos dois casos a tela nao inventa uma data.
+   */
+  async lerParadaPorCodigo(): Promise<number | null> {
+    const linha = await this.db
+      .prepare('SELECT parado_por_codigo_em FROM painel_config WHERE id = ?')
+      .bind(ID_DA_CONFIG)
+      .first<{ parado_por_codigo_em: number | null }>()
+
+    return linha?.parado_por_codigo_em ?? null
   }
 
   /**
@@ -210,7 +254,7 @@ export class PainelConfigRepository {
          WHERE painel_config.enabled = 1`,
       )
       .bind(
-        SINGLETON_ID,
+        ID_DA_CONFIG,
         fabrica.trigger_keywords,
         fabrica.match_mode,
         fabrica.case_sensitive,
@@ -227,6 +271,86 @@ export class PainelConfigRepository {
         now,
         now,
         now,
+      )
+  }
+
+  /**
+   * O `UPDATE` da gravacao pelo painel, com a trava otimista de §8.8 — ou o
+   * `INSERT` que materializa a linha na PRIMEIRA vez que o dono salva.
+   *
+   * **A trava e a clausula `WHERE painel_config.versao = ?`.** A tela envia a
+   * versao que carregou; se a linha ja andou — outra aba, ou a parada de
+   * emergencia, que tambem incrementa a versao —, o `DO UPDATE` nao casa,
+   * `meta.changes` volta `0` e quem chamou responde `409`. O efeito colateral e
+   * recurso, e nao acidente: quem estava com o formulario aberto e obrigado a
+   * recarregar e ver, em letras grandes, que a automacao foi parada (§8.8).
+   *
+   * **`versaoEsperada = 0` e o unico valor legitimo para o ramo `INSERT`**:
+   * `carregarConfigEfetiva` devolve `versao: 0` exatamente quando a linha nao
+   * existe (`origem: 'arquivo'`). Um `INSERT` com `VALUES` nao aceita `WHERE`,
+   * entao essa metade NAO e travada pelo SQL — quem chama confere a versao lida
+   * contra a enviada antes de montar o lote, e o teste GRAV-08 e onde isso fica
+   * preso.
+   *
+   * **`parado_por_codigo_em` fica de fora do `SET`, de proposito.** Ele e o
+   * carimbo da ultima parada de emergencia, e e dele que §10.12 tira a data que
+   * a tela mostra ao religar. Uma gravacao comum nao pode apagar esse carimbo:
+   * religar devolve a chave ao estado anterior, e nao reescreve a historia.
+   *
+   * Devolve statement, e nao grava: ele vai no MESMO lote da linha de
+   * auditoria. Sem log, sem mudanca.
+   */
+  statementDeGravacao(
+    now: number,
+    valores: LinhaGravavel,
+    versaoEsperada: number,
+  ): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `INSERT INTO painel_config
+           (id, enabled, trigger_keywords, match_mode, case_sensitive, normalize_accents,
+            ignore_punctuation, process_only_reels, media_scope, public_reply_enabled,
+            public_reply_text, private_reply_enabled, private_reply_text, destination_url,
+            user_cooldown_hours, versao, parado_por_codigo_em, criado_em, atualizado_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NULL, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           enabled              = excluded.enabled,
+           trigger_keywords     = excluded.trigger_keywords,
+           match_mode           = excluded.match_mode,
+           case_sensitive       = excluded.case_sensitive,
+           normalize_accents    = excluded.normalize_accents,
+           ignore_punctuation   = excluded.ignore_punctuation,
+           process_only_reels   = excluded.process_only_reels,
+           media_scope          = excluded.media_scope,
+           public_reply_enabled = excluded.public_reply_enabled,
+           public_reply_text    = excluded.public_reply_text,
+           private_reply_enabled= excluded.private_reply_enabled,
+           private_reply_text   = excluded.private_reply_text,
+           destination_url      = excluded.destination_url,
+           user_cooldown_hours  = excluded.user_cooldown_hours,
+           versao               = painel_config.versao + 1,
+           atualizado_em        = excluded.atualizado_em
+         WHERE painel_config.versao = ?`,
+      )
+      .bind(
+        ID_DA_CONFIG,
+        valores.enabled,
+        valores.trigger_keywords,
+        valores.match_mode,
+        valores.case_sensitive,
+        valores.normalize_accents,
+        valores.ignore_punctuation,
+        valores.process_only_reels,
+        valores.media_scope,
+        valores.public_reply_enabled,
+        valores.public_reply_text,
+        valores.private_reply_enabled,
+        valores.private_reply_text,
+        valores.destination_url,
+        valores.user_cooldown_hours,
+        now,
+        now,
+        versaoEsperada,
       )
   }
 }

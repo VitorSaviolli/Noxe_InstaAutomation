@@ -12,15 +12,26 @@
  *
  * **Custo: 3 subrequests ao D1** (§12.10): a linha de sessao, que o roteador
  * ja fez, o `db.batch()` da configuracao — um lote inteiro vale UM subrequest
- * — e a pergunta sobre a conta. `ignorarCache: true` porque mostrar ao dono um
- * valor mais velho que o salvo destroi a confianca mais rapido que qualquer
- * defeito.
+ * — e a pergunta sobre a conta. Sao 4 no estado DESLIGADA, e so nele: a data da
+ * ultima parada por codigo, que §10.12 exige na confirmacao de religar.
+ * `ignorarCache: true` porque mostrar ao dono um valor mais velho que o salvo
+ * destroi a confianca mais rapido que qualquer defeito.
+ *
+ * Este arquivo tambem hospeda `POST /painel/chave`, a chave liga/desliga de
+ * §7.1: ela nao tem tela propria e o `303` dela aponta para `/painel?ok=`, que
+ * e a tela que a acao mudou.
  */
 import { isDestinationUrlConfigured } from '../../config'
+import { PainelConfigRepository } from '../../repositories/painel-config-repository'
 import { carregarConfigEfetiva, type SnapshotConfig } from '../../services/config-store'
+import { fichaCsrf } from '../../services/panel-session'
 import type { Env } from '../../types/env'
-import { escopoDeMidias, traduzirAviso } from './dicionario'
+import { dataEmPortugues, escopoDeMidias, fraseDeConfirmacao, traduzirAviso } from './dicionario'
+import { gravarConfiguracao } from './gravar'
+import { CAMPO_DA_FICHA } from './guardas'
 import { type HtmlSeguro, html } from './html'
+import { erro } from './resposta'
+import { ROTA_CHAVE, ROTA_INICIO } from './rotas'
 import type { EntradaDaRota } from './router'
 import { type Aba, type Moldura, telaDoPainel } from './tela'
 
@@ -303,24 +314,125 @@ export async function configDaTela(env: Env, now: number): Promise<SnapshotConfi
 }
 
 // ---------------------------------------------------------------------------
+// O que toda tela que GRAVA compartilha
+// ---------------------------------------------------------------------------
+
+/**
+ * A faixa verde que nasce do `?ok=` (§7.1, §12.2).
+ *
+ * **O valor da query string NUNCA e escrito na pagina.** A frase vem da tabela
+ * fechada do dicionario; um `?ok=` desconhecido nao mostra faixa nenhuma. E a
+ * consulta a uma lista fechada — e nao o escape — que impede a query string de
+ * virar conteudo, e ela vale mesmo se alguem um dia trocar o `html` por outra
+ * coisa nesta linha.
+ */
+export function blocoDeConfirmacao(request: Request): HtmlSeguro {
+  const frase = fraseDeConfirmacao(new URL(request.url).searchParams.get('ok'))
+  if (frase === null) return html``
+
+  return html`<p class="faixa faixa-ok" role="status" aria-live="polite">${frase}</p>`
+}
+
+/**
+ * Os dois campos escondidos que todo formulario de gravacao carrega.
+ *
+ * A ficha e o passo 7 da escada; a `versao` e a trava otimista do passo 9
+ * (§8.8). Escritos num lugar so porque um formulario sem `versao` gravaria por
+ * cima de uma mudanca feita em outra aba, e um formulario sem ficha seria
+ * recusado — o primeiro erro e silencioso, e e o que este helper mata.
+ */
+export function camposDoFormulario(ficha: string, versao: number): HtmlSeguro {
+  return html`<input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
+<input type="hidden" name="versao" value="${String(versao)}">`
+}
+
+/** A ficha CSRF daquela sessao, para os formularios da tela. */
+export async function fichaDaTela(entrada: EntradaDaRota): Promise<string> {
+  // `sessao` e `null` so em rota sem portao de sessao, e nenhuma tela do painel
+  // e uma dessas. A string vazia nao "funciona sem ficha": ela e recusada pelo
+  // passo 7 como qualquer outra ficha errada.
+  if (entrada.sessao === null) return ''
+  return await fichaCsrf(entrada.env, entrada.sessao.sidHash)
+}
+
+// ---------------------------------------------------------------------------
 // GET /painel
 // ---------------------------------------------------------------------------
 
 /**
+ * O botao de um toque de §3: a chave que liga e desliga a automacao.
+ *
+ * **Desligar e UM toque**, e a ausencia de confirmacao e a decisao de §10.10:
+ * desligar e a direcao segura, e a parada de emergencia depende de desligar ser
+ * barato. **Religar pede um gesto a mais** — a caixa de confirmacao — e mostra a
+ * data da ultima parada por codigo, que e o que §10.12 exige: "religar exige
+ * sessao e confirmacao explicita, com a data vinda de `parado_por_codigo_em`".
+ *
+ * Nem um nem outro pede a digital, e isso tambem e §10.10: religar nao muda
+ * nenhum valor, so devolve a chave ao estado anterior — que o dono ja autorizou
+ * quando gravou aqueles campos. Exigir biometria aqui puniria justamente quem
+ * acabou de usar o freio.
+ *
+ * O link de `/painel/parar` na barra do topo continua onde esta, e nao e
+ * duplicata: ele e o freio que funciona SEM sessao, com o codigo anotado no
+ * papel, para o dia em que o celular nao entrar.
+ */
+function blocoDaChave(
+  snapshot: SnapshotConfig,
+  ficha: string,
+  paradaEm: number | null,
+): HtmlSeguro {
+  const campos = camposDoFormulario(ficha, snapshot.versao)
+
+  if (snapshot.global.enabled) {
+    return html`<section class="bloco-chave">
+<form method="post" action="${ROTA_CHAVE.caminho}">
+${campos}
+<input type="hidden" name="acao" value="desligar">
+<button type="submit" class="botao-desligar">Desligar a automa&ccedil;&atilde;o</button>
+</form>
+<p>Ela para de responder na hora. Nada do que voc&ecirc; salvou &eacute; apagado.</p>
+</section>`
+  }
+
+  return html`<section class="bloco-chave">
+<form method="post" action="${ROTA_CHAVE.caminho}">
+${campos}
+<input type="hidden" name="acao" value="ligar">
+${
+  paradaEm === null
+    ? null
+    : html`<p>A automa&ccedil;&atilde;o foi desligada pelo c&oacute;digo de emerg&ecirc;ncia em
+${dataEmPortugues(paradaEm)}.</p>`
+}
+<p><label><input type="checkbox" name="confirmar" value="sim"> Quero ligar a
+automa&ccedil;&atilde;o de novo, com os ajustes que est&atilde;o salvos.</label></p>
+<button type="submit">Ligar a automa&ccedil;&atilde;o</button>
+</form>
+</section>`
+}
+
+/**
  * A tela de Inicio.
  *
- * Sem `<form>` e sem botao que grave: esta etapa sobe as telas em modo
- * LEITURA. O botao de um toque de §3 e um `POST /painel/chave`, que nasce com
- * a etapa da escrita; ate la, o freio que funciona e o link de `/painel/parar`
- * na barra do topo, com o codigo anotado no papel.
+ * **Custo: 3 subrequests ao D1 com a automacao ligada, e 4 quando ela esta
+ * desligada.** O quarto e a data da ultima parada por codigo, que so a tela de
+ * religar usa e que §10.12 torna obrigatoria. Perguntar por ela sempre custaria
+ * uma leitura por visita para um dado que a tela nao mostra no estado normal.
  */
 export async function handleInicio(entrada: EntradaDaRota): Promise<Response> {
   const snapshot = await configDaTela(entrada.env, entrada.now)
   const conta = await contaConectada(entrada.env.DB)
   const visao = panorama(snapshot, conta)
 
+  const paradaEm = snapshot.global.enabled
+    ? null
+    : await new PainelConfigRepository(entrada.env.DB).lerParadaPorCodigo()
+
   const corpo = html`<h1>In&iacute;cio</h1>
+${blocoDeConfirmacao(entrada.request)}
 ${blocoDeEstado(visao)}
+${blocoDaChave(snapshot, await fichaDaTela(entrada), paradaEm)}
 ${blocoDeAvisos(visao)}
 ${blocoDeFabrica(visao)}
 ${blocoDePendencias(visao)}
@@ -335,4 +447,46 @@ ${blocoDePendencias(visao)}
 </section>`
 
   return telaDoPainel(molduraCom('inicio', 'Início', visao, corpo))
+}
+
+// ---------------------------------------------------------------------------
+// POST /painel/chave — a chave liga/desliga
+// ---------------------------------------------------------------------------
+
+/** As duas acoes que §7.1 declara para esta rota. Nada mais casa. */
+const LIGAR = 'ligar'
+const DESLIGAR = 'desligar'
+
+/**
+ * `POST /painel/chave` com `acao=ligar|desligar` (§7.1).
+ *
+ * A rota nao tem tela propria — e por isso o `303` dela aponta para
+ * `/painel?ok=<codigo>`, que e a tela que a acao mudou. Toda a ordem de §11.3
+ * mora em `gravarConfiguracao`; aqui so acontece a traducao de `acao` para o
+ * campo `enabled`, que e o vocabulario que §7.1 escreveu para esta rota.
+ *
+ * **A caixa de confirmacao so e exigida ao LIGAR** (§10.12). Ela nao e um campo
+ * de configuracao: e um gesto, e por isso entra como campo estrutural do
+ * pedido. Ausente, a gravacao e recusada como qualquer outro corpo invalido —
+ * nunca aceita "por ter vindo de um formulario do painel".
+ */
+export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
+  const { contexto, corpo } = entrada
+  if (corpo.familia !== 'formulario') return erro('corpo_invalido', contexto)
+
+  const acao = corpo.campos.get('acao')
+  if (acao !== LIGAR && acao !== DESLIGAR) {
+    return erro('dados_invalidos', { ...contexto, motivoInterno: 'acao_desconhecida' })
+  }
+
+  if (acao === LIGAR && corpo.campos.get('confirmar') !== 'sim') {
+    return erro('dados_invalidos', { ...contexto, motivoInterno: 'confirmacao_ausente' })
+  }
+
+  return await gravarConfiguracao(entrada, {
+    para: ROTA_INICIO.caminho,
+    confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
+    estruturais: ['acao', 'confirmar'],
+    patchDoHandler: { enabled: acao === LIGAR },
+  })
 }

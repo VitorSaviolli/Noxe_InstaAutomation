@@ -224,6 +224,31 @@ async function snapshotDoBanco(): Promise<SnapshotConfig> {
   return await carregarConfigEfetiva(env, AGORA, { ignorarCache: true })
 }
 
+/**
+ * As tres chaves de comparacao que a tela de Ajustes GRAVA.
+ *
+ * Elas viraram par de radios quando a escrita nasceu, e por isso as DUAS frases
+ * de cada uma aparecem na pagina. A afirmacao de TELA-11 e TELA-12 nao mudou de
+ * sentido — a tela nao pode mentir sobre o que esta valendo —, mudou de forma:
+ * o que prova o valor agora e qual das duas esta MARCADA.
+ */
+const CHAVES_EDITAVEIS: readonly CampoDeComparacao[] = [
+  'caseSensitive',
+  'normalizeAccents',
+  'ignorePunctuation',
+]
+
+/**
+ * Aquela frase e a opcao MARCADA?
+ *
+ * O `checked>` colado na frase e o que separa "a tela mostra as duas opcoes",
+ * que e o que um formulario faz, de "a tela diz que este e o valor", que e a
+ * afirmacao. Um teste de `includes` solto passaria com o radio errado marcado.
+ */
+function estaMarcada(corpo: string, frase: string): boolean {
+  return corpo.includes(`checked> ${escapeHtml(frase)}`)
+}
+
 /** A palavra aparece com fronteira de palavra? Substring nao conta (§12.7). */
 function contemPalavra(texto: string, palavra: string): boolean {
   const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
@@ -660,9 +685,6 @@ describe('TELA — o que a tela imprime', () => {
       ESCOPO_DE_MIDIAS.selecionadas,
       'A mesma pessoa só aciona de novo depois de 5 horas.',
       MODO_DE_COMPARACAO.contains,
-      fraseDoAjuste('caseSensitive', config),
-      fraseDoAjuste('normalizeAccents', config),
-      fraseDoAjuste('ignorePunctuation', config),
       fraseDoAjuste('processOnlyReels', config),
       'Desligada: nada é escrito embaixo do Reel.',
       'Ligado: quem comenta recebe o Direct com o link.',
@@ -674,12 +696,23 @@ describe('TELA — o que a tela imprime', () => {
     for (const proibido of [
       ESCOPO_DE_MIDIAS.todas,
       MODO_DE_COMPARACAO.exact,
-      FRASE_DO_AJUSTE.caseSensitive.falso,
-      FRASE_DO_AJUSTE.normalizeAccents.verdadeiro,
-      FRASE_DO_AJUSTE.ignorePunctuation.verdadeiro,
       FRASE_DO_AJUSTE.processOnlyReels.verdadeiro,
     ]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
+    }
+
+    // As tres chaves editaveis: a frase do valor que esta valendo e a MARCADA,
+    // e a oposta aparece so como a outra opcao — nunca marcada.
+    for (const campo of CHAVES_EDITAVEIS) {
+      expect({
+        [campo]: {
+          atual: estaMarcada(corpo, fraseDoAjuste(campo, config)),
+          oposta: estaMarcada(
+            corpo,
+            config[campo] ? FRASE_DO_AJUSTE[campo].falso : FRASE_DO_AJUSTE[campo].verdadeiro,
+          ),
+        },
+      }).toEqual({ [campo]: { atual: true, oposta: false } })
     }
   })
 
@@ -700,14 +733,12 @@ describe('TELA — o que a tela imprime', () => {
     const cookie = await abrirSessao()
 
     const corpo = await corpoDa(TELA_AJUSTES, cookie)
+    const config = (await snapshotDoBanco()).global
 
     for (const esperado of [
       ESCOPO_DE_MIDIAS.todas,
       'A mesma pessoa pode acionar quantas vezes quiser, sem espera.',
       MODO_DE_COMPARACAO.exact,
-      FRASE_DO_AJUSTE.caseSensitive.falso,
-      FRASE_DO_AJUSTE.normalizeAccents.verdadeiro,
-      FRASE_DO_AJUSTE.ignorePunctuation.verdadeiro,
       FRASE_DO_AJUSTE.processOnlyReels.verdadeiro,
       'Ligada: a automação responde embaixo do Reel.',
       'Desligado: ninguém recebe Direct.',
@@ -718,12 +749,22 @@ describe('TELA — o que a tela imprime', () => {
     for (const proibido of [
       ESCOPO_DE_MIDIAS.selecionadas,
       MODO_DE_COMPARACAO.contains,
-      FRASE_DO_AJUSTE.caseSensitive.verdadeiro,
-      FRASE_DO_AJUSTE.normalizeAccents.falso,
-      FRASE_DO_AJUSTE.ignorePunctuation.falso,
       FRASE_DO_AJUSTE.processOnlyReels.falso,
     ]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
+    }
+
+    // O contrapositivo das tres chaves editaveis: aqui a MARCADA e a outra.
+    for (const campo of CHAVES_EDITAVEIS) {
+      expect({
+        [campo]: {
+          atual: estaMarcada(corpo, fraseDoAjuste(campo, config)),
+          oposta: estaMarcada(
+            corpo,
+            config[campo] ? FRASE_DO_AJUSTE[campo].falso : FRASE_DO_AJUSTE[campo].verdadeiro,
+          ),
+        },
+      }).toEqual({ [campo]: { atual: true, oposta: false } })
     }
   })
 
@@ -870,16 +911,28 @@ describe('TELA — o portao e o custo', () => {
     }
   })
 
-  test('TELA-20: cada tela custa 3 subrequests ao D1, num unico lote', async () => {
-    // §12.10 orca 3 para o Inicio e 5 para "O que aconteceu". As tres telas do
-    // meio pagam os mesmos 3, e o terceiro e a pergunta sobre a conta: sem ela
-    // a barra do topo — que §12.1 exige IGUAL em toda tela — diria "Ligada e
-    // respondendo" numa instalacao que nao consegue enviar nada.
+  test('TELA-20: o orcamento de subrequests de cada tela, num unico lote', async () => {
+    // §12.10 orca 3 para o Inicio e 5 para "O que aconteceu". Quatro telas pagam
+    // 3, e o terceiro e a pergunta sobre a conta: sem ela a barra do topo — que
+    // §12.1 exige IGUAL em toda tela — diria "Ligada e respondendo" numa
+    // instalacao que nao consegue enviar nada.
+    //
+    // **Ajustes paga 4**, e o quarto e o bloco de historico que a Etapa 10 exige
+    // em letras. O numero fica travado AQUI de proposito: a condicao para subir
+    // um subrequest e o custo ficar visivel, e nao escondido dentro do handler.
     //
     // `batches === 1` nao e detalhe: e a PREMISSA de `subrequests()`. A conta
     // `prepares - batches` so vale enquanto existe um unico lote de dois
     // statements; um lote a mais, ou um lote de tres, a quebraria em silencio
     // e o orcamento passaria a ser afirmado por engano.
+    const ORCAMENTO: Record<string, number> = {
+      [ROTA_INICIO.caminho]: 3,
+      [ROTA_PALAVRAS.caminho]: 3,
+      [ROTA_MENSAGEM.caminho]: 3,
+      [ROTA_AJUSTES.caminho]: 4,
+      [ROTA_ATIVIDADE.caminho]: 3,
+    }
+
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
     const cookie = await abrirSessao()
@@ -891,8 +944,28 @@ describe('TELA — o portao e o custo', () => {
 
       expect({
         [tela.rota.caminho]: { subrequests: subrequests(contador), lotes: contador.batches },
-      }).toEqual({ [tela.rota.caminho]: { subrequests: 3, lotes: 1 } })
+      }).toEqual({
+        [tela.rota.caminho]: { subrequests: ORCAMENTO[tela.rota.caminho], lotes: 1 },
+      })
     }
+  })
+
+  test('TELA-22: o Inicio paga 1 subrequest a mais so quando a automacao esta desligada', async () => {
+    // A data da ultima parada por codigo (§10.12) e o quarto, e ela so e lida no
+    // estado em que a tela oferece religar. Perguntar por ela sempre custaria uma
+    // leitura por visita para um dado que a tela ligada nao mostra.
+    await gravarConfig(env.DB, { enabled: 0 })
+    await ligarConta(env, AGORA)
+    const cookie = await abrirSessao()
+
+    invalidarCacheDeConfig()
+    const contador = new D1Contador(env.DB)
+    await abrirTela(TELA_INICIO, cookie, ambienteCom({ DB: comoD1(contador) }))
+
+    expect({ subrequests: subrequests(contador), lotes: contador.batches }).toEqual({
+      subrequests: 4,
+      lotes: 1,
+    })
   })
 
   test('TELA-21: nenhuma tela consulta `processed_comments`', async () => {

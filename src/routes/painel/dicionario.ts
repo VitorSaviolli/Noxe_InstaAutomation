@@ -88,6 +88,53 @@ export const ORIGEM_DOS_AJUSTES: Record<OrigemConfig, string> = {
   parado_por_erro: 'os de segurança, porque os salvos não puderam ser lidos',
 }
 
+/**
+ * Uma data em portugues, `dd/mm/aaaa`, a partir do epoch em milissegundos.
+ *
+ * **So a data, sem a hora, e a ausencia e decisao.** O Worker roda em UTC e o
+ * fuso da instalacao nao esta em lugar nenhum do contrato de ambiente: uma hora
+ * escrita em UTC estaria tres horas errada para quem le no Brasil, e uma hora
+ * errada numa tela que existe para explicar e pior que nenhuma hora. A data
+ * responde a pergunta que a tela faz — "desde quando?" — e so erra na virada da
+ * meia-noite. Quando a tela de "O que aconteceu" precisar de hora, o fuso vira
+ * dado de ambiente e esta funcao ganha o par dela.
+ */
+export function dataEmPortugues(epochMs: number): string {
+  const data = new Date(epochMs)
+  const dia = String(data.getUTCDate()).padStart(2, '0')
+  const mes = String(data.getUTCMonth() + 1).padStart(2, '0')
+  return `${dia}/${mes}/${data.getUTCFullYear()}`
+}
+
+/**
+ * As frases da faixa verde, e a lista FECHADA de codigos de `?ok=` (§7.1).
+ *
+ * `POST /painel/<tela>` grava e responde `303` para `GET
+ * /painel/<tela>?ok=<codigo>`; a faixa verde nasce desse `?ok=`. A tela NUNCA
+ * escreve na pagina o que veio da query string — ela procura o codigo AQUI e
+ * mostra a frase daqui. Um `?ok=` desconhecido nao mostra faixa nenhuma, e e
+ * essa consulta a uma tabela fechada, e nao um escape, que impede a query
+ * string de virar conteudo da pagina.
+ *
+ * `sem_mudanca` existe porque reenviar o mesmo formulario NAO grava (§9.9
+ * registra gravacao, e um reenvio identico nao e uma) e a pessoa precisa saber
+ * que o botao funcionou.
+ */
+export const CONFIRMACOES = {
+  salvo: 'Pronto, salvo. Já está valendo.',
+  ligada: 'A automação está ligada de novo.',
+  desligada: 'A automação está desligada. Nada do que você salvou foi perdido.',
+  sem_mudanca: 'Nada mudou: o que você enviou já era o que estava salvo.',
+} as const
+
+export type CodigoDeConfirmacao = keyof typeof CONFIRMACOES
+
+/** A frase daquele `?ok=`, ou `null` quando o codigo nao e da lista. */
+export function fraseDeConfirmacao(codigo: string | null): string | null {
+  if (codigo === null) return null
+  return Object.hasOwn(CONFIRMACOES, codigo) ? CONFIRMACOES[codigo as CodigoDeConfirmacao] : null
+}
+
 /** Os quatro campos booleanos que a tela explica com uma frase inteira. */
 export type CampoDeComparacao =
   | 'caseSensitive'

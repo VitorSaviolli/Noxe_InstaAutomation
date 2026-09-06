@@ -20,10 +20,21 @@
  * existe para acabar. O mesmo vale para Mensagem e Ajustes.
  */
 import type { AutomationConfig } from '../../config'
+import { MAX_GATILHOS } from '../../services/config-validation'
 import { matchKeyword, normalizeOptionsFrom } from '../../utils/normalize'
 import { fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
+import { comoLinhas, gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
-import { configDaTela, contaConectada, molduraCom, panorama } from './inicio'
+import {
+  blocoDeConfirmacao,
+  camposDoFormulario,
+  configDaTela,
+  contaConectada,
+  fichaDaTela,
+  molduraCom,
+  panorama,
+} from './inicio'
+import { ROTA_PALAVRAS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
 
@@ -98,7 +109,42 @@ function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
 </section>`
 }
 
+/**
+ * O formulario das palavras: uma caixa de texto, uma palavra por linha.
+ *
+ * **Uma caixa de texto, e nao vinte campos.** Sem JavaScript nao ha como
+ * acrescentar um campo, e vinte campos fixos numa tela de celular seriam vinte
+ * caixas vazias. Uma linha por palavra e o formato que a propria pessoa ja usa
+ * quando escreve uma lista, e a linha em branco e o Enter dela — nao um item.
+ *
+ * O formulario grava SO as palavras. As tres chaves de comparacao aparecem
+ * aqui como explicacao e sao editadas em Ajustes (§3), onde elas moram: dois
+ * formularios gravando o mesmo campo seriam duas telas discordando sobre quem
+ * manda.
+ */
+function formularioDasPalavras(
+  config: AutomationConfig,
+  ficha: string,
+  versao: number,
+): HtmlSeguro {
+  return html`<form method="post" action="${ROTA_PALAVRAS.caminho}">
+${camposDoFormulario(ficha, versao)}
+<p><label for="triggerKeywords">Uma palavra ou frase por linha, at&eacute;
+${String(MAX_GATILHOS)}.</label></p>
+<textarea id="triggerKeywords" name="triggerKeywords" rows="6"
+>${comoLinhas(config.triggerKeywords)}</textarea>
+<p><button type="submit">Salvar</button></p>
+</form>`
+}
+
 export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> {
+  if (entrada.request.method === 'POST') {
+    return await gravarConfiguracao(entrada, {
+      para: ROTA_PALAVRAS.caminho,
+      confirmacao: 'salvo',
+    })
+  }
+
   const snapshot = await configDaTela(entrada.env, entrada.now)
   const visao = panorama(snapshot, await contaConectada(entrada.env.DB))
   const { global } = snapshot
@@ -106,6 +152,7 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
   const fichas = global.triggerKeywords.map((palavra) => html`<li class="ficha">${palavra}</li>`)
 
   const corpo = html`<h1>Palavras que ligam a automa&ccedil;&atilde;o</h1>
+${blocoDeConfirmacao(entrada.request)}
 ${
   global.triggerKeywords.length === 0
     ? html`<p class="faixa faixa-aviso" role="status">Sem nenhuma palavra a automa&ccedil;&atilde;o
@@ -113,10 +160,9 @@ nunca responde. Ou escreva pelo menos uma, ou desligue &mdash; as duas s&atilde;
 s&oacute; uma fica clara no seu painel.</p>`
     : html`<ul class="fichas">${fichas}</ul>`
 }
+${formularioDasPalavras(global, await fichaDaTela(entrada), snapshot.versao)}
 ${blocoDeRegras(global)}
-${blocoDeExemplos(global)}
-<p>Trocar as palavras &eacute; a pr&oacute;xima parte do painel. Por enquanto esta tela mostra o que
-est&aacute; valendo agora.</p>`
+${blocoDeExemplos(global)}`
 
   return telaDoPainel(molduraCom('palavras', 'Palavras', visao, corpo))
 }
