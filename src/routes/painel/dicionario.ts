@@ -175,6 +175,21 @@ export function motivoDaRecusa(codigo: string): string {
 }
 
 /**
+ * O crachá dos tres sinais de §12.3: cadeado, a palavra "protegido" e a classe
+ * que pinta a borda ambar do grupo.
+ *
+ * **Uma grafia, e as tres telas a usam.** Ele nasceu em `/painel/mensagem` e foi
+ * copiado a mao para `/painel/ajustes` e `/painel/palavras` quando aquelas
+ * ganharam campo protegido — tres copias sao tres chances de uma delas perder um
+ * dos tres sinais, e §12.3 os exige **sempre juntos, nunca so cor**.
+ *
+ * Aqui mora so a PALAVRA, porque `dicionario.ts` nao conhece a tag `html`. Quem
+ * a transforma nos tres sinais e `seloProtegido()`, em `inicio.ts` — a mesma
+ * divisao de sempre: a frase no dicionario, a marcacao na tela.
+ */
+export const SELO_PROTEGIDO = 'protegido'
+
+/**
  * As duas frases que explicam uma recusa que NAO e de valor invalido.
  *
  * Elas moram aqui pelo mesmo motivo que todas as outras: nenhuma frase de tela

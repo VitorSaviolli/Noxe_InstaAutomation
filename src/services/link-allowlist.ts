@@ -200,14 +200,6 @@ export function validarConfigComAllowlist(
 }
 
 /**
- * Os achados da allowlist nos tres campos que carregam endereco.
- *
- * Lista nao configurada devolve vazio, e isso NAO e "permitir": e a decisao
- * de §9.8 de nao punir, na atualizacao, quem tem um `destinationUrl` no
- * arquivo e ainda nao teve chance de preencher a variavel nova. A recusa
- * nesse estado acontece na escrita, perguntando a `allowlist.configurada`.
- */
-/**
  * Aquele campo carrega endereco, e por isso depende da allowlist? (§9.8)
  *
  * Sao os mesmos tres que `conferirDominios` examina — e eles nao viram uma lista
@@ -225,6 +217,15 @@ export function campoCarregaEndereco(campo: string): boolean {
   return campo === 'destinationUrl' || campo === 'privateReplyText' || campo === 'publicReplyText'
 }
 
+/**
+ * Os achados da allowlist nos tres campos que carregam endereco.
+ *
+ * Lista nao configurada devolve vazio, e isso NAO e "permitir": e a decisao de
+ * §9.8 de nao punir, na LEITURA, quem tem um `destinationUrl` no arquivo e ainda
+ * nao teve chance de preencher a variavel nova. A recusa nesse estado acontece
+ * na ESCRITA, perguntando a `allowlist.configurada` — e quem pergunta e
+ * `validarOuRecusar`, no funil, com o predicado acima.
+ */
 function conferirDominios(valores: AutomationConfig, allowlist: Allowlist): readonly Achado[] {
   if (!allowlist.configurada) return []
 

@@ -11,7 +11,7 @@ import {
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
 import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
-import { jsonCanonico, opHash } from '../src/routes/painel/stepup'
+import { handleOpcoesDeStepUp, jsonCanonico, opHash } from '../src/routes/painel/stepup'
 import { PRAZO_DE_ENVELOPE_MS } from '../src/security/signed-envelope'
 import { invalidarCacheDeConfig } from '../src/services/config-store'
 import {
@@ -20,6 +20,7 @@ import {
   fichaCsrf,
   PRAZO_OCIOSO_DE_SESSAO_MS,
 } from '../src/services/panel-session'
+import { prefixoDeCredencial } from '../src/services/webauthn/verificar'
 import { AutenticadorFalso, cerimonia, semUv } from './fixtures/autenticador'
 import { gravarConfig, limparBanco } from './fixtures/banco'
 import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
@@ -126,6 +127,31 @@ async function cadastrarAparelho(aparelho: AutenticadorFalso): Promise<void> {
     .run()
 }
 
+/**
+ * Uma SEGUNDA credencial do mesmo dono, sem tocar em `painel_estado`.
+ *
+ * Existe para separar "a passkey que abriu a sessao" de "a passkey que
+ * autorizou a mudanca" — §9.9 quer a segunda no `ator`, e enquanto so houvesse
+ * uma credencial cadastrada as duas coincidiam e a distincao era indistinguivel.
+ */
+async function cadastrarSegundoAparelho(outro: AutenticadorFalso): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO painel_credenciais
+       (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
+        sign_count, backup_eligible, backup_state, apelido, origem_registro, criado_em, usado_em)
+     VALUES (?, ?, ?, ?, ?, NULL, 0, 0, 0, 'Outro aparelho', 'sessao', ?, NULL)`,
+  )
+    .bind(
+      outro.credentialId,
+      env.PANEL_RP_ID,
+      HANDLE_DO_DONO,
+      JSON.stringify(outro.jwkParaOBanco),
+      outro.algCose,
+      AGORA,
+    )
+    .run()
+}
+
 /** O alvo de cada rota que grava, para os testes que variam de tela. */
 const MENSAGEM: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_MENSAGEM,
@@ -196,6 +222,39 @@ function mudancaDaTela(corpo: string): Record<string, unknown> {
   return JSON.parse(desescapar(achado[1] as string)) as Record<string, unknown>
 }
 
+/**
+ * O `<form id="confirmar">` que o servidor renderizou, lido como um navegador o
+ * leria: o `action`, e cada `<input type="hidden">` com nome e valor.
+ *
+ * **Nenhum teste desta suite montava o segundo POST a partir do formulario de
+ * verdade** — todos remontavam o corpo da ficha e da versao que o proprio teste
+ * guardava, e por isso tres quebras de uma linha na tela de conferencia
+ * sobreviviam a suite inteira: a ficha virar constante (o botao daria `403
+ * csrf_invalido` e o step-up seria IMPOSSIVEL), a `versao` sair incrementada (a
+ * trava otimista virava carimbo automatico no unico formulario que pede
+ * biometria) e o `action` apontar para outra tela.
+ *
+ * E a mesma classe do achado I-5 da Task 11 — nada ligava o formulario
+ * renderizado ao funil que o le — reaparecendo na tela nova.
+ */
+function formularioDeConfirmacao(corpo: string): {
+  action: string
+  campos: URLSearchParams
+} {
+  const bloco = /<form method="post" action="([^"]*)" id="confirmar"[\s\S]*?<\/form>/.exec(corpo)
+  if (bloco === null) throw new Error('a tela de conferencia nao trouxe o formulario')
+
+  const campos = new URLSearchParams()
+  const escondidos = /<input type="hidden" name="([^"]*)" value="([^"]*)">/g
+  let achado = escondidos.exec(bloco[0] as string)
+  while (achado !== null) {
+    campos.set(desescapar(achado[1] as string), desescapar(achado[2] as string))
+    achado = escondidos.exec(bloco[0] as string)
+  }
+
+  return { action: desescapar(bloco[1] as string), campos }
+}
+
 /** O valor do cookie `__Host-painel_stepup` que a cerimonia devolveu. */
 function cookieDoEnvelope(resposta: Response): string {
   const bruto = resposta.headers.get('set-cookie') ?? ''
@@ -230,13 +289,9 @@ async function pedirOpcoes(
     opcoes.ambiente ?? AMBIENTE,
     opcoes.now ?? AGORA,
     ROTA_OPCOES_DE_STEPUP,
-    handleOpcoesDaRota,
+    handleOpcoesDeStepUp,
   )
 }
-
-/** O handler da rota da cerimonia, importado pelo caminho de producao. */
-const handleOpcoesDaRota: HandlerDoPainel = async (entrada) =>
-  (await import('../src/routes/painel/stepup')).handleOpcoesDeStepUp(entrada)
 
 /** A digital: a assertion serializada do jeito que o `painel.js` a monta. */
 async function digitalPara(
@@ -269,7 +324,14 @@ async function comDigital(
   sessao: Sessao,
   aparelho: AutenticadorFalso,
   opcoes: OpcoesDeEnvio = {},
-): Promise<{ conferencia: Response; envio: Response; mudanca: Record<string, unknown> }> {
+): Promise<{
+  conferencia: Response
+  envio: Response
+  mudanca: Record<string, unknown>
+  /** O envelope e a digital que ESTE envio usou, para quem quiser reapresenta-los. */
+  envelope: string
+  digital: string
+}> {
   const conferencia = await postar(alvo, campos, sessao, opcoes)
   const mudanca = mudancaDaTela(await conferencia.text())
 
@@ -279,13 +341,11 @@ async function comDigital(
   })
   const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
 
-  const envio = await postar(alvo, campos, sessao, {
-    ...opcoes,
-    stepup: cookieDoEnvelope(cerimoniaResposta),
-    digital: await digitalPara(aparelho, challenge),
-  })
+  const envelope = cookieDoEnvelope(cerimoniaResposta)
+  const digital = await digitalPara(aparelho, challenge)
+  const envio = await postar(alvo, campos, sessao, { ...opcoes, stepup: envelope, digital })
 
-  return { conferencia, envio, mudanca }
+  return { conferencia, envio, mudanca, envelope, digital }
 }
 
 async function linhaDeConfig(): Promise<Record<string, unknown> | null> {
@@ -508,7 +568,11 @@ describe('STEP — step-up preso ao conteudo', () => {
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
 
-    const { envio } = await comDigital(
+    const {
+      envio,
+      envelope: envelopeUsado,
+      digital: digitalUsada,
+    } = await comDigital(
       MENSAGEM,
       `privateReplyText=${encodeURIComponent(TEXTO_NOVO)}`,
       sessao,
@@ -535,11 +599,15 @@ describe('STEP — step-up preso ao conteudo', () => {
       (await env.DB.prepare('SELECT sid_hash FROM painel_sessoes').first<{ sid_hash: string }>())
         ?.sid_hash as string,
     )
+    // O enunciado da linha de §13.2 e literal — "o MESMO step-up" —, entao a
+    // segunda gravacao reapresenta o envelope REAL e a digital REAL da primeira,
+    // e nao um par de valores-lixo. Ele nomeia um `sid` que nao existe mais, e o
+    // proprio `303` acabou de apaga-lo.
     const segunda = await postar(
       MENSAGEM,
       `privateReplyText=${encodeURIComponent(OUTRO_TEXTO)}`,
       { ...seguinte, ficha },
-      { versao: 2, stepup: '__Host-painel_stepup=nao-importa', digital: 'nao-importa' },
+      { versao: 2, stepup: envelopeUsado, digital: digitalUsada },
     )
 
     expect(segunda.status).toBe(403)
@@ -1040,6 +1108,138 @@ describe('STEP — step-up preso ao conteudo', () => {
     }
   })
 
+  test('STEP-32: o formulario RENDERIZADO da tela de conferencia leva a gravacao ate o fim', async () => {
+    // O segundo POST e montado a partir do `<form id="confirmar">` que o
+    // servidor desenhou — `action`, `csrf`, `versao` e os escondidos DELE —, e
+    // nao do que o teste guardou. E o que um navegador faz, e e a unica forma de
+    // prender a ficha, a versao e o destino do formulario de uma vez.
+    await gravarConfig(env.DB, { versao: 7 })
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    const conferencia = await postar(
+      MENSAGEM,
+      `destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
+      sessao,
+      { versao: 7 },
+    )
+    const corpo = await conferencia.text()
+    const formulario = formularioDeConfirmacao(corpo)
+
+    // O que o servidor emitiu e o que o funil espera receber de volta.
+    expect(formulario.action).toBe(ROTA_MENSAGEM.caminho)
+    expect(formulario.campos.get('csrf')).toBe(sessao.ficha)
+    expect(formulario.campos.get('versao')).toBe('7')
+    expect(formulario.campos.get('destinationUrl')).toBe(LINK_NOVO)
+
+    // A cerimonia, e entao o envio dirigido pelo PROPRIO formulario.
+    const cerimoniaResposta = await pedirOpcoes(sessao, mudancaDaTela(corpo))
+    const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
+    formulario.campos.set('digital', await digitalPara(aparelho, challenge))
+
+    const envio = await despachar(
+      new Request(`${RAIZ}${formulario.action}`, {
+        method: 'POST',
+        headers: {
+          'content-type': FORMULARIO,
+          origin: RAIZ,
+          cookie: `${sessao.cookie}; ${cookieDoEnvelope(cerimoniaResposta)}`,
+        },
+        body: formulario.campos.toString(),
+      }),
+      AMBIENTE,
+      AGORA,
+      ROTA_MENSAGEM,
+      handleMensagem,
+    )
+
+    expect(envio.status).toBe(303)
+    expect((await linhaDeConfig())?.destination_url).toBe(LINK_NOVO)
+  })
+
+  test('STEP-33: uma rota nao grava campo de outra tela, nem com a digital (Ruling 70)', async () => {
+    // §7.1 diz "step-up **sempre** no POST" de `/painel/mensagem`, e a celula so
+    // e verdadeira porque aquela rota declara os tres campos sempre protegidos e
+    // mais nenhum: `gravarConfiguracao` e agnostica de rota, entao sem a lista um
+    // `triggerKeywords` mandado para la gravava sem digital nenhuma.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    const intruso = await postar(
+      MENSAGEM,
+      `triggerKeywords=${encodeURIComponent('palavra intrusa')}&enabled=nao`,
+      sessao,
+    )
+
+    expect(intruso.status).toBe(400)
+    const linha = await linhaDeConfig()
+    expect({ palavras: linha?.trigger_keywords, ligada: linha?.enabled }).toEqual({
+      palavras: '["eu quero","quero o link"]',
+      ligada: 1,
+    })
+    expect((await auditoria())[0]).toEqual({
+      acao: 'mudanca_recusada',
+      step_up: 0,
+      campos: '["enabled","triggerKeywords"]',
+      versao: 1,
+    })
+
+    // E o inverso, que e a razao de §15.4: um formulario de `/painel/palavras`
+    // que carregasse o link passaria pelo step-up — o lote inteiro exige — e
+    // gravaria o link sob uma digital pedida para outra coisa. A lista impede,
+    // e impede DEPOIS da digital: o `403` vem primeiro, o `400` da lista depois.
+    await limparBanco(env.DB)
+    invalidarCacheDeConfig()
+    await gravarConfig(env.DB)
+    await cadastrarAparelho(aparelho)
+    const outra = await abrirSessao(aparelho.credentialId)
+
+    const { conferencia, envio } = await comDigital(
+      PALAVRAS,
+      `destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
+      outra,
+      aparelho,
+    )
+
+    expect({ sem: conferencia.status, com: envio.status }).toEqual({ sem: 403, com: 400 })
+    expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
+  })
+
+  test('STEP-34: o `ator` da auditoria e a passkey que AUTORIZOU, nao a que abriu a sessao', async () => {
+    // §9.9 pergunta quem fez a mudanca, e a resposta e o aparelho que encostou o
+    // dedo. A sessao aqui e aberta pelo aparelho A e a digital vem do B — o
+    // cenario que a Task 14 vai tornar comum, e que hoje so existe porque este
+    // teste cadastra a segunda credencial.
+    await gravarConfig(env.DB)
+    const segundo = await AutenticadorFalso.criar()
+    await cadastrarSegundoAparelho(segundo)
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    const { envio } = await comDigital(
+      MENSAGEM,
+      `privateReplyText=${encodeURIComponent(TEXTO_NOVO)}`,
+      sessao,
+      segundo,
+    )
+    expect(envio.status).toBe(303)
+
+    const linhas = await env.DB.prepare('SELECT acao, ator FROM painel_auditoria ORDER BY id').all<{
+      acao: string
+      ator: string
+    }>()
+
+    expect(linhas.results?.map((linha) => linha.acao)).toEqual([
+      'stepup_recusado',
+      'config_alterada',
+    ])
+    expect(linhas.results?.[1]?.ator).toBe(
+      `passkey:${await prefixoDeCredencial(segundo.credentialId)}`,
+    )
+    // E NAO o da sessao, que e o aparelho A.
+    expect(linhas.results?.[1]?.ator).not.toBe(
+      `passkey:${await prefixoDeCredencial(aparelho.credentialId)}`,
+    )
+  })
+
   test('STEP-29: com a allowlist VAZIA os tres campos de endereco sao recusados', async () => {
     // §9.8, §12.7 e LNK-12: lista nao configurada nao "passa tudo" — ela recusa
     // qualquer endereco. O validador devolve zero achados nesse estado de
@@ -1050,23 +1250,49 @@ describe('STEP — step-up preso ao conteudo', () => {
     // Este teste existe porque, com eles gravaveis, ela passou a depender de uma
     // pergunta explicita — e sem ela uma instalacao sem a variavel aceitaria
     // qualquer link, com a digital correta.
-    await gravarConfig(env.DB)
-    const sessao = await abrirSessao(aparelho.credentialId)
+    // **Os TRES campos, e nao so o link.** §13.2 LNK lista "URL dentro do texto
+    // do Direct passa pela allowlist" e "idem no texto publico" como garantias
+    // SEPARADAS. A primeira grafia deste teste exercitava so `destinationUrl`, e
+    // reduzir o predicado a `campo === 'destinationUrl'` deixava a suite verde —
+    // o titulo nomeava tres e afirmava um, que e o teste que §13.1 proibe.
+    const CAMPOS_DE_ENDERECO: readonly { campo: string; corpo: string; coluna: string }[] = [
+      {
+        campo: 'destinationUrl',
+        corpo: `destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
+        coluna: 'destination_url',
+      },
+      {
+        campo: 'privateReplyText',
+        corpo: `privateReplyText=${encodeURIComponent(TEXTO_NOVO)}`,
+        coluna: 'private_reply_text',
+      },
+      {
+        campo: 'publicReplyText',
+        corpo: `publicReplyText=${encodeURIComponent(TEXTO_PUBLICO_NOVO)}`,
+        coluna: 'public_reply_text',
+      },
+    ]
 
-    const { envio } = await comDigital(
-      MENSAGEM,
-      `destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
-      sessao,
-      aparelho,
-      { ambiente: env },
-    )
+    for (const caso of CAMPOS_DE_ENDERECO) {
+      await limparBanco(env.DB)
+      invalidarCacheDeConfig()
+      await gravarConfig(env.DB)
+      await cadastrarAparelho(aparelho)
+      const sessao = await abrirSessao(aparelho.credentialId)
+      const antes = (await linhaDeConfig())?.[caso.coluna]
 
-    expect(envio.status).toBe(403)
-    expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
-    expect((await auditoria()).map((linha) => linha.acao)).toEqual([
-      'stepup_recusado',
-      'mudanca_recusada',
-    ])
+      const { envio } = await comDigital(MENSAGEM, caso.corpo, sessao, aparelho, {
+        ambiente: env,
+      })
+
+      expect({ [caso.campo]: envio.status }).toEqual({ [caso.campo]: 403 })
+      expect({ [caso.campo]: (await linhaDeConfig())?.[caso.coluna] }).toEqual({
+        [caso.campo]: antes,
+      })
+      expect({ [caso.campo]: (await auditoria()).map((linha) => linha.acao) }).toEqual({
+        [caso.campo]: ['stepup_recusado', 'mudanca_recusada'],
+      })
+    }
   })
 
   test('STEP-30: gravacao que perde a trava otimista NAO rotaciona o `sid`', async () => {

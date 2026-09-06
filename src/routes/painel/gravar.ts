@@ -108,43 +108,6 @@ function comoJson(estado: EstadoDeComportamento): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Os campos que o painel GRAVA hoje.
- *
- * `userCooldownHours` entra nas DUAS direcoes desde a etapa do step-up: baixar
- * a janela alarga o alcance, e alargar agora tem como ser confirmado com a
- * digital em vez de recusado. A direcao continua sendo conferida em
- * `alargaOAlcance`, e nao aqui, porque ela depende do valor atual.
- *
- * **Ruling 65: a direcao de alargamento passou a ser gravavel nas telas que ja
- * sao donas daqueles campos** — `matchMode` em `/painel/palavras`,
- * `processOnlyReels` em `/painel/ajustes`, e o link e os dois textos em
- * `/painel/mensagem`. Sem isso, tres das dezessete garantias STEP so
- * conseguiriam provar a metade negativa ("exige step-up") e nunca a positiva
- * ("com a digital, passa"), que e exatamente o teste que finge cobrir o que nao
- * cobre, proibido por §13.1.
- *
- * **`mediaScope` continua FORA, e a ausencia e decisao (Ruling 68):** a tela
- * dona dele — `/painel/reels` — ainda nao existe, e `/painel/ajustes` mostra
- * "Quais Reels" em leitura. A garantia STEP dele fica testada como a recusa que
- * ela e hoje, com a metade positiva declarada como adiada no proprio teste.
- * `publicReplyEnabled` e `privateReplyEnabled` ficam fora pelo mesmo motivo:
- * nenhum formulario de hoje os emite.
- */
-const CAMPOS_GRAVAVEIS: readonly CampoDaConfig[] = [
-  'enabled',
-  'triggerKeywords',
-  'matchMode',
-  'caseSensitive',
-  'normalizeAccents',
-  'ignorePunctuation',
-  'processOnlyReels',
-  'publicReplyText',
-  'privateReplyText',
-  'destinationUrl',
-  'userCooldownHours',
-]
-
-/**
  * O codigo de erro de uma recusa do validador (§11.4).
  *
  * Achado de dominio e `403 dominio_nao_permitido`; o resto e
@@ -176,6 +139,29 @@ export interface PedidoDeGravacao {
   readonly confirmacao: CodigoDeConfirmacao
   /** Campos do corpo que nao sao configuracao, alem de `csrf` e `versao`. */
   readonly estruturais?: readonly string[]
+  /**
+   * Os campos de comportamento que ESTA rota pode escrever (Ruling 70).
+   *
+   * **Nao existe uma lista global de "campos gravaveis", e a ausencia dela e a
+   * decisao.** `gravarConfiguracao` e agnostica de rota: sem esta lista,
+   * qualquer formulario do painel podia escrever qualquer campo, e a celula de
+   * §7.1 que diz "step-up **sempre** no POST" de `/painel/mensagem` era falsa —
+   * bastava mandar `triggerKeywords` para aquela rota e gravar sem digital
+   * nenhuma.
+   *
+   * Com a lista, aquela celula vira verdade **por construcao**: os unicos campos
+   * que `/painel/mensagem` escreve sao os tres de `CAMPOS_SEMPRE_PROTEGIDOS`.
+   *
+   * E ela vale mais do que arrumacao. §15.4 manda a tela da mensagem dizer,
+   * ANTES do gesto, que aquele toque cobre a tela inteira. Um formulario de
+   * `/painel/palavras` que carregasse `destinationUrl` passaria pelo step-up —
+   * o lote inteiro exige, §10.10 — e gravaria o link sob uma frase que prometia
+   * cobrir outra coisa. A lista por rota e o que impede.
+   *
+   * Ela mora ao lado do FORMULARIO de cada tela, como `estruturais`: quem emite
+   * os campos e quem os declara.
+   */
+  readonly campos: readonly CampoDaConfig[]
   /** A mudanca que o proprio handler traduziu — `acao=ligar` vira `enabled`. */
   readonly patchDoHandler?: PatchDeEstado
 }
@@ -291,7 +277,11 @@ export async function gravarConfiguracao(
   if ('resposta' in passagem) return passagem.resposta
   const credencialDoStepUp = passagem.credentialId
 
-  const foraDoEscopo = mudados.filter((campo) => !CAMPOS_GRAVAVEIS.includes(campo))
+  // Ruling 70: o que esta rota nao declara, ela nao escreve. Vem DEPOIS do
+  // passo 8 pela ordem de §10.10 — se qualquer campo do lote exige step-up, o
+  // lote inteiro exige —, entao um campo de outra tela e recusado ainda que a
+  // digital feche.
+  const foraDoEscopo = mudados.filter((campo) => !pedido.campos.includes(campo))
   if (foraDoEscopo.length > 0) {
     return await recusa.registrar({
       acao: 'mudanca_recusada',
@@ -335,7 +325,16 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     entrada,
     sessao,
     pedido,
-    ator: recusa.ator,
+    // §9.9: o `ator` e a credencial que AUTORIZOU aquela gravacao, e nao a que
+    // abriu a sessao. Hoje as duas coincidem — so ha uma passkey cadastrada nos
+    // cenarios de teste —, e e justamente por isso que a distincao tem de estar
+    // no codigo antes de a Task 14 fazer duas passkeys existirem de verdade: o
+    // dia em que o dono confirmar com o aparelho novo uma mudanca de uma sessao
+    // aberta pelo antigo, a linha tem de nomear o aparelho que encostou o dedo.
+    ator:
+      credencialDoStepUp === null
+        ? recusa.ator
+        : `passkey:${await prefixoDeCredencial(credencialDoStepUp)}`,
     antes,
     depois,
     mudados,
@@ -476,12 +475,15 @@ async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Response> 
     ),
   ]
 
-  // TERCEIRA posicao, e a posicao faz parte do statement: ele confere
-  // `changes() > 0` para nao rotacionar o `sid` de uma gravacao que a trava
-  // otimista recusou — o dono seria deslogado sem receber o cookie novo.
+  // TERCEIRA posicao, e `presoAMudanca` diz por que a posicao importa: sem ele,
+  // o `sid` rotacionaria numa gravacao que a trava otimista recusou, e o dono
+  // seria deslogado sem receber o cookie novo. A opcao esta escrita aqui, no
+  // call site, e nao escondida no SQL.
   if (sessaoNova !== null) {
     lote.push(
-      new PainelSessoesRepository(env.DB).statementDeRotacao(sessao.sidHash, sessaoNova.sidHash),
+      new PainelSessoesRepository(env.DB).statementDeRotacao(sessao.sidHash, sessaoNova.sidHash, {
+        presoAMudanca: true,
+      }),
     )
   }
 

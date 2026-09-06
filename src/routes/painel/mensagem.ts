@@ -26,6 +26,7 @@ import type { AutomationConfig } from '../../config'
 import { MAX_CARACTERES_DO_TEXTO } from '../../services/config-validation'
 import { lerAllowlist } from '../../services/link-allowlist'
 import { renderTemplate } from '../../utils/templates'
+import type { CampoDaConfig } from './dicionario'
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import {
@@ -36,10 +37,24 @@ import {
   fichaDaTela,
   molduraCom,
   panorama,
+  seloProtegido,
 } from './inicio'
 import { ROTA_MENSAGEM } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
+
+/**
+ * Os campos que ESTA tela grava (Ruling 70).
+ *
+ * Sao exatamente os tres de `CAMPOS_SEMPRE_PROTEGIDOS` (§10.10), e e essa
+ * coincidencia que torna "step-up **sempre** no POST" (§7.1) verdadeira por
+ * construcao: nao existe campo barato que esta rota saiba escrever.
+ */
+const CAMPOS_DA_TELA: readonly CampoDaConfig[] = [
+  'privateReplyText',
+  'destinationUrl',
+  'publicReplyText',
+]
 
 /**
  * O @ que a previa usa no lugar de `{username}`.
@@ -50,11 +65,6 @@ import { telaDoPainel } from './tela'
  */
 const APELIDO_DE_EXEMPLO = 'quem comentou'
 
-/** Os tres sinais de §12.3, sempre juntos: cadeado, palavra e borda. */
-function protegido(): HtmlSeguro {
-  return html`<span class="selo-protegido"><span aria-hidden="true">&#128274;</span> protegido</span>`
-}
-
 /**
  * Um campo protegido, editavel.
  *
@@ -63,7 +73,7 @@ function protegido(): HtmlSeguro {
  */
 function campoDeTexto(campo: string, rotulo: string, valor: string, linhas: number): HtmlSeguro {
   return html`<div class="campo-protegido">
-<p class="rotulo"><label for="${campo}">${rotulo}</label> ${protegido()}</p>
+<p class="rotulo"><label for="${campo}">${rotulo}</label> ${seloProtegido()}</p>
 <textarea id="${campo}" name="${campo}" rows="${String(linhas)}"
 maxlength="${String(MAX_CARACTERES_DO_TEXTO)}">${valor}</textarea>
 </div>`
@@ -71,7 +81,7 @@ maxlength="${String(MAX_CARACTERES_DO_TEXTO)}">${valor}</textarea>
 
 function campoDeLink(valor: string): HtmlSeguro {
   return html`<div class="campo-protegido">
-<p class="rotulo"><label for="destinationUrl">Link de destino</label> ${protegido()}</p>
+<p class="rotulo"><label for="destinationUrl">Link de destino</label> ${seloProtegido()}</p>
 <input type="url" id="destinationUrl" name="destinationUrl" value="${valor}">
 </div>`
 }
@@ -152,6 +162,11 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
     return await gravarConfiguracao(entrada, {
       para: ROTA_MENSAGEM.caminho,
       confirmacao: 'salvo',
+      // Ruling 70, e e AQUI que ela paga: os tres campos desta tela sao
+      // exatamente os tres de `CAMPOS_SEMPRE_PROTEGIDOS`, entao "step-up
+      // **sempre** no POST" (§7.1) e verdade por construcao — nao ha campo
+      // barato que esta rota saiba escrever.
+      campos: CAMPOS_DA_TELA,
     })
   }
 

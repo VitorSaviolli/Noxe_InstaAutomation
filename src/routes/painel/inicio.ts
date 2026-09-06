@@ -31,6 +31,7 @@ import {
   escopoDeMidias,
   fraseDeConfirmacao,
   RECUSA_SEM_VALOR,
+  SELO_PROTEGIDO,
   traduzirAviso,
 } from './dicionario'
 import { gravarConfiguracao } from './gravar'
@@ -291,6 +292,21 @@ export function blocoDeFabrica(panorama: Panorama): HtmlSeguro {
 vez para o painel passar a mandar.</p>`
 }
 
+/**
+ * Os tres sinais de §12.3, num lugar so: cadeado, palavra e a classe da borda.
+ *
+ * §12.3 pede os tres **sempre juntos, nunca so cor**. As tres telas que tem
+ * campo protegido — Mensagem, Palavras e Ajustes — chamavam a mesma marcacao
+ * escrita a mao, e a terceira copia ja tinha nascido com a quebra de linha em
+ * outro lugar. Uma funcao, tres chamadas.
+ *
+ * Mora aqui, e nao em `dicionario.ts`, porque isto e MARCACAO e nao frase: o
+ * dicionario nao conhece a tag `html`. A palavra, essa sim, vem de la.
+ */
+export function seloProtegido(): HtmlSeguro {
+  return html`<span class="selo-protegido"><span aria-hidden="true">&#128274;</span> ${SELO_PROTEGIDO}</span>`
+}
+
 /** A moldura pronta, com o estado global ja na barra do topo. */
 export function molduraCom(
   aba: Aba,
@@ -489,6 +505,8 @@ export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
   return await gravarConfiguracao(entrada, {
     para: ROTA_INICIO.caminho,
     confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
+    // A chave escreve UM campo, e e o que o `acao` do corpo traduz.
+    campos: ['enabled'],
     // So `acao` — a confirmacao de §10.12 e estrutural de TODA rota, e quem a
     // exige e o funil, na transicao `desligada -> ligada`. Conferi-la aqui
     // deixava `POST /painel/ajustes` com `enabled=sim` desfazer a parada de

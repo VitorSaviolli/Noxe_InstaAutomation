@@ -285,7 +285,12 @@ function comoValorCanonico(valor: unknown): ValorCanonico | null {
 export async function handleOpcoesDeStepUp(entrada: EntradaDaRota): Promise<Response> {
   const { env, now, contexto, corpo, sessao } = entrada
 
-  if (corpo.familia !== 'json' || sessao === null) return erro('corpo_invalido', contexto)
+  // Os dois casos sao INALCANCAVEIS pela tabela de rotas — a linha declara
+  // `sessao: true` e a familia `/painel/api/*` —, e ainda assim cada um responde
+  // o codigo que §11.4 escreve para ele: sessao ausente nao e corpo invalido, e
+  // a tabela canonica nao admite aproximacao.
+  if (sessao === null) return erro('sessao_ausente', contexto)
+  if (corpo.familia !== 'json') return erro('corpo_invalido', contexto)
 
   const mudanca = lerPedidoDaCerimonia(corpo.dados)
   if (mudanca === null) {

@@ -139,23 +139,35 @@ export class PainelSessoesRepository {
    * configuracao e da auditoria — sem log, sem mudanca, e sem sessao rotacionada
    * por uma gravacao que nao aconteceu.
    *
-   * **`AND changes() > 0` nao e enfeite, e este statement so esta certo na
-   * TERCEIRA posicao daquele lote.** A trava otimista de §8.8 pode fazer o
-   * `UPDATE` da configuracao alterar zero linhas sem que o `db.batch()` rejeite
-   * nada; a linha de auditoria ja se defende disso pelo mesmo `changes()`, e sem
-   * esta condicao a rotacao aconteceria assim mesmo. O `sid` no banco mudaria, a
-   * rota responderia `versao_desatualizada` **sem** mandar o cookie novo, e o
-   * dono seria deslogado por uma gravacao que nunca aconteceu — o pior desfecho
+   * **`presoAMudanca` e OPCAO, e nao o padrao, pelo mesmo motivo do irmao dele
+   * em `painel-auditoria-repository.ts`:** ela so esta certa quando este
+   * statement vem logo depois de uma escrita que ele audita, dentro do mesmo
+   * lote. Fora dessa posicao, `changes()` responde sobre outra escrita qualquer.
+   * Ser opcao — e nao um `AND` escondido no SQL — e o que faz a restricao
+   * aparecer em TODO call site, e nao so neste docblock.
+   *
+   * O que ela impede: a trava otimista de §8.8 pode fazer o `UPDATE` da
+   * configuracao alterar zero linhas sem que o `db.batch()` rejeite nada. A
+   * linha de auditoria ja se defende pelo mesmo `changes()`; sem esta condicao a
+   * rotacao aconteceria assim mesmo, o `sid` no banco mudaria, a rota
+   * responderia `versao_desatualizada` **sem** mandar o cookie novo, e o dono
+   * seria deslogado por uma gravacao que nunca aconteceu — o pior desfecho
    * possivel para quem acabou de encostar o dedo no leitor.
    *
    * A cadeia: `UPDATE` da config altera N linhas; o `INSERT` da auditoria roda
    * `WHERE changes() > 0` e insere 1 quando N > 0, ou 0 quando N = 0; entao
    * `changes()` vale 1 ou 0 exatamente quando a gravacao aconteceu ou nao.
    */
-  statementDeRotacao(sidHashAntigo: string, sidHashNovo: string): D1PreparedStatement {
-    return this.db
-      .prepare('UPDATE painel_sessoes SET sid_hash = ? WHERE sid_hash = ? AND changes() > 0')
-      .bind(sidHashNovo, sidHashAntigo)
+  statementDeRotacao(
+    sidHashAntigo: string,
+    sidHashNovo: string,
+    opcoes: { presoAMudanca?: boolean } = {},
+  ): D1PreparedStatement {
+    const sql = opcoes.presoAMudanca
+      ? 'UPDATE painel_sessoes SET sid_hash = ? WHERE sid_hash = ? AND changes() > 0'
+      : 'UPDATE painel_sessoes SET sid_hash = ? WHERE sid_hash = ?'
+
+    return this.db.prepare(sql).bind(sidHashNovo, sidHashAntigo)
   }
 
   /**

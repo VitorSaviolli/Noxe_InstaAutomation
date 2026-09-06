@@ -45,6 +45,7 @@ import {
   fichaDaTela,
   molduraCom,
   panorama,
+  seloProtegido,
 } from './inicio'
 import { ROTA_AJUSTES } from './rotas'
 import type { EntradaDaRota } from './router'
@@ -58,6 +59,34 @@ import { telaDoPainel } from './tela'
  * rolagem que ninguem le. A poda de §8.9 continua sendo a regra de retencao.
  */
 const MUDANCAS_NO_HISTORICO = 5
+
+/**
+ * Os campos que ESTA tela grava (Ruling 70).
+ *
+ * As tres chaves de comparacao, o tipo de publicacao e o intervalo por pessoa
+ * sao os controles do formulario. `enabled`, `triggerKeywords` e `matchMode`
+ * entram por causa do botao "Voltar a esta versao", que reenvia o `antes`
+ * INTEIRO pela rota normal de gravacao (§9.9, Ruling 55) — sem eles o botao
+ * recusaria restaurar uma versao que so difere numa palavra-gatilho.
+ *
+ * **O link, os dois textos e `mediaScope` ficam de fora, e a ausencia e a
+ * decisao de Ruling 70:** eles sao de `/painel/mensagem` e de `/painel/reels`.
+ * A consequencia aceita, e declarada, e que restaurar uma versao que difere no
+ * link e recusada aqui — quem restaura o link e a tela que o mostra, com a
+ * frase de §15.4 na frente do gesto. O que a lista compra em troca e o escopo:
+ * um formulario adulterado desta tela nao consegue gravar o link sob a digital
+ * que foi pedida para outra coisa.
+ */
+const CAMPOS_DA_TELA: readonly CampoDaConfig[] = [
+  'enabled',
+  'triggerKeywords',
+  'matchMode',
+  'caseSensitive',
+  'normalizeAccents',
+  'ignorePunctuation',
+  'processOnlyReels',
+  'userCooldownHours',
+]
 
 /** Uma linha "nome do ajuste / o que ele quer dizer hoje". */
 function linha(rotulo: string, valor: string): HtmlSeguro {
@@ -150,8 +179,7 @@ function escolhaDoTipoDePublicacao(config: AutomationConfig): HtmlSeguro {
   }> ${frases.verdadeiro}</label></p>
 <p><label><input type="radio" name="processOnlyReels" value="nao"${
     config.processOnlyReels ? null : html` checked`
-  }> ${frases.falso} <span class="selo-protegido"><span aria-hidden="true">&#128274;</span>
-protegido</span></label></p>
+  }> ${frases.falso} ${seloProtegido()}</label></p>
 </fieldset>`
 }
 
@@ -276,6 +304,7 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
     return await gravarConfiguracao(entrada, {
       para: ROTA_AJUSTES.caminho,
       confirmacao: 'salvo',
+      campos: CAMPOS_DA_TELA,
     })
   }
 

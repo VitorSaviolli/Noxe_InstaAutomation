@@ -22,7 +22,7 @@
 import type { AutomationConfig } from '../../config'
 import { MAX_GATILHOS } from '../../services/config-validation'
 import { matchKeyword, normalizeOptionsFrom } from '../../utils/normalize'
-import { fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
+import { type CampoDaConfig, fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
 import { comoLinhas, MODO_NO_FORMULARIO } from './formulario'
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
@@ -34,10 +34,20 @@ import {
   fichaDaTela,
   molduraCom,
   panorama,
+  seloProtegido,
 } from './inicio'
 import { ROTA_PALAVRAS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
+
+/**
+ * Os campos que ESTA tela grava (Ruling 70).
+ *
+ * As palavras e o modo de comparacao — os dois controles do formulario, e nada
+ * alem deles. `matchMode` para "basta aparecer no meio" alarga o alcance e pede
+ * a digital (§10.10); voltar estreita e nao pede.
+ */
+const CAMPOS_DA_TELA: readonly CampoDaConfig[] = ['triggerKeywords', 'matchMode']
 
 /** Um exemplo de comentario e o veredito da funcao de producao. */
 interface Exemplo {
@@ -160,8 +170,7 @@ function escolhaDeModo(config: AutomationConfig): HtmlSeguro {
   }> ${MODO_DE_COMPARACAO.exact}</label></p>
 <p><label><input type="radio" name="matchMode" value="${MODO_NO_FORMULARIO.contains}"${
     config.matchMode === 'contains' ? html` checked` : null
-  }> ${MODO_DE_COMPARACAO.contains} <span class="selo-protegido"><span aria-hidden="true"
->&#128274;</span> protegido</span></label></p>
+  }> ${MODO_DE_COMPARACAO.contains} ${seloProtegido()}</label></p>
 </fieldset>`
 }
 
@@ -170,6 +179,10 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
     return await gravarConfiguracao(entrada, {
       para: ROTA_PALAVRAS.caminho,
       confirmacao: 'salvo',
+      // Ruling 70: os dois controles que o formulario desta tela emite. O link
+      // e os textos sao de `/painel/mensagem`, e a lista e o que impede um
+      // formulario adulterado daqui de grava-los sob a digital pedida aqui.
+      campos: CAMPOS_DA_TELA,
     })
   }
 
