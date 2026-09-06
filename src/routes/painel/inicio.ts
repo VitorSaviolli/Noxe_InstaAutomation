@@ -26,8 +26,14 @@ import { PainelConfigRepository } from '../../repositories/painel-config-reposit
 import { carregarConfigEfetiva, type SnapshotConfig } from '../../services/config-store'
 import { fichaCsrf } from '../../services/panel-session'
 import type { Env } from '../../types/env'
-import { dataEmPortugues, escopoDeMidias, fraseDeConfirmacao, traduzirAviso } from './dicionario'
-import { gravarConfiguracao } from './gravar'
+import {
+  dataEmPortugues,
+  escopoDeMidias,
+  fraseDeConfirmacao,
+  RECUSA_SEM_VALOR,
+  traduzirAviso,
+} from './dicionario'
+import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_VERSAO, gravarConfiguracao } from './gravar'
 import { CAMPO_DA_FICHA } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
@@ -185,7 +191,7 @@ function estadoDe(snapshot: SnapshotConfig, pendencias: readonly Pendencia[]): E
       // Os avisos CRUS, e nao os ja traduzidos: `traduzirAviso` le o prefixo
       // `<campo>:` do achado, e traduzir duas vezes perderia o campo e
       // devolveria a frase generica — que e justamente a que §12.6 proibe.
-      explicacao: explicacaoDaParada(snapshot.avisos),
+      explicacao: `${explicacaoDaParada(snapshot.avisos)} ${RECUSA_SEM_VALOR.configIlegivel}`,
       classe: 'estado-desligada',
     }
   }
@@ -343,7 +349,7 @@ export function blocoDeConfirmacao(request: Request): HtmlSeguro {
  */
 export function camposDoFormulario(ficha: string, versao: number): HtmlSeguro {
   return html`<input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
-<input type="hidden" name="versao" value="${String(versao)}">`
+<input type="hidden" name="${CAMPO_DA_VERSAO}" value="${String(versao)}">`
 }
 
 /** A ficha CSRF daquela sessao, para os formularios da tela. */
@@ -405,7 +411,7 @@ ${
     : html`<p>A automa&ccedil;&atilde;o foi desligada pelo c&oacute;digo de emerg&ecirc;ncia em
 ${dataEmPortugues(paradaEm)}.</p>`
 }
-<p><label><input type="checkbox" name="confirmar" value="sim"> Quero ligar a
+<p><label><input type="checkbox" name="${CAMPO_DA_CONFIRMACAO}" value="sim"> Quero ligar a
 automa&ccedil;&atilde;o de novo, com os ajustes que est&atilde;o salvos.</label></p>
 <button type="submit">Ligar a automa&ccedil;&atilde;o</button>
 </form>
@@ -465,10 +471,11 @@ const DESLIGAR = 'desligar'
  * mora em `gravarConfiguracao`; aqui so acontece a traducao de `acao` para o
  * campo `enabled`, que e o vocabulario que §7.1 escreveu para esta rota.
  *
- * **A caixa de confirmacao so e exigida ao LIGAR** (§10.12). Ela nao e um campo
- * de configuracao: e um gesto, e por isso entra como campo estrutural do
- * pedido. Ausente, a gravacao e recusada como qualquer outro corpo invalido —
- * nunca aceita "por ter vindo de um formulario do painel".
+ * **A caixa de confirmacao de §10.12 e exigida pelo FUNIL**, e nao por esta
+ * rota: `enabled` e campo gravavel, entao qualquer formulario do painel pode
+ * carrega-lo, e uma conferencia so aqui deixava `POST /painel/ajustes` com
+ * `enabled=sim` — que o proprio botao "Voltar a esta versao" emite — desfazer a
+ * parada de emergencia com um clique.
  */
 export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
   const { contexto, corpo } = entrada
@@ -479,14 +486,14 @@ export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
     return erro('dados_invalidos', { ...contexto, motivoInterno: 'acao_desconhecida' })
   }
 
-  if (acao === LIGAR && corpo.campos.get('confirmar') !== 'sim') {
-    return erro('dados_invalidos', { ...contexto, motivoInterno: 'confirmacao_ausente' })
-  }
-
   return await gravarConfiguracao(entrada, {
     para: ROTA_INICIO.caminho,
     confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
-    estruturais: ['acao', 'confirmar'],
+    // So `acao` — a confirmacao de §10.12 e estrutural de TODA rota, e quem a
+    // exige e o funil, na transicao `desligada -> ligada`. Conferi-la aqui
+    // deixava `POST /painel/ajustes` com `enabled=sim` desfazer a parada de
+    // emergencia sem confirmacao nenhuma.
+    estruturais: ['acao'],
     patchDoHandler: { enabled: acao === LIGAR },
   })
 }

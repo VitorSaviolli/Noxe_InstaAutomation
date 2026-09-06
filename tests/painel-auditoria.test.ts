@@ -3,10 +3,17 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { PainelAuditoriaRepository } from '../src/repositories/painel-auditoria-repository'
 import { escapeHtml } from '../src/routes/legal'
 import { handleAjustes } from '../src/routes/painel/ajustes'
-import { CONFIRMACOES } from '../src/routes/painel/dicionario'
-import { CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/gravar'
+import {
+  CONFIRMACOES,
+  fraseDeConfirmacao,
+  MOTIVO_DA_RECUSA,
+  NOME_DO_CAMPO,
+  PALAVRAS_PROIBIDAS,
+} from '../src/routes/painel/dicionario'
+import { CAMPOS_DE_COMPORTAMENTO, codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
 import { handlePalavras } from '../src/routes/painel/palavras'
+import { erro } from '../src/routes/painel/resposta'
 import {
   ROTA_AJUSTES,
   ROTA_CHAVE,
@@ -19,7 +26,7 @@ import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
 import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../src/services/config-store'
 import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/services/panel-session'
 import { prefixoDeCredencial } from '../src/services/webauthn/verificar'
-import { gravarConfig, limparBanco } from './fixtures/banco'
+import { gravarConfig, ligarConta, limparBanco } from './fixtures/banco'
 import {
   AGORA,
   capturarConsole,
@@ -206,6 +213,51 @@ class D1QueCorreNaFrente {
   dump(): Promise<ArrayBuffer> {
     return this.real.dump()
   }
+}
+
+/**
+ * O primeiro `<form method="post">` da pagina, ja lido em campos.
+ *
+ * Existe para o unico teste que fecha o elo entre a tela e o funil: todos os
+ * outros montam o corpo a mao, e um campo escondido apagado do formulario
+ * passaria despercebido por todos eles.
+ *
+ * A extracao e boba de proposito — os formularios do painel nao tem `<select>`,
+ * nem `textarea` fora do de palavras, nem campo repetido. Um parser esperto aqui
+ * seria uma segunda implementacao de navegador para manter.
+ */
+function primeiroFormularioDeGravacao(corpo: string): {
+  action: string
+  campos: URLSearchParams
+} {
+  const pedaco = corpo.split('<form').find((parte) => parte.includes('method="post"')) ?? ''
+  const action = /action="([^"]*)"/.exec(pedaco)?.[1] ?? ''
+  const campos = new URLSearchParams()
+
+  for (const [, nome, valor] of pedaco.matchAll(/name="([a-zA-Z]+)" value="([^"]*)"/g)) {
+    campos.set(nome ?? '', desescapar(valor ?? ''))
+  }
+
+  // O que o navegador manda de um `<textarea>` e o conteudo dele.
+  const area = /<textarea[^>]*name="([a-zA-Z]+)"[^>]*>([\s\S]*?)<\/textarea>/.exec(pedaco)
+  if (area !== null) campos.set(area[1] ?? '', desescapar(area[2] ?? ''))
+
+  // E de um grupo de radios, o valor do que estiver marcado.
+  for (const [, nome, valor] of pedaco.matchAll(/name="([a-zA-Z]+)" value="([^"]*)" checked/g)) {
+    campos.set(nome ?? '', valor ?? '')
+  }
+
+  // E de um `<input type="number">`, o `value` dele.
+  const numero = /<input type="number"[^>]*name="([a-zA-Z]+)"[^>]*\nvalue="([^"]*)"/.exec(pedaco)
+  if (numero !== null) campos.set(numero[1] ?? '', numero[2] ?? '')
+
+  return { action, campos }
+}
+
+/** A palavra aparece com fronteira de palavra? Substring nao conta (§12.7). */
+function contemPalavraNoCorpo(corpo: string, palavra: string): boolean {
+  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}([^\\p{L}\\p{N}]|$)`, 'iu').test(corpo)
 }
 
 /** A tela de Ajustes, ja lida, com a sessao viva. */
@@ -436,6 +488,92 @@ describe('AUD — a auditoria da gravacao', () => {
     expect(JSON.stringify(linhas)).toContain(PALAVRA_NOVA)
   })
 
+  test('AUD-08: a linha de uma recusa carrega os SEIS campos de §9.9, nao so a acao', async () => {
+    // AUD-01 afirma origem, ator, step_up e alvo no caminho de sucesso; o
+    // caminho de RECUSA ficava com quatro deles descobertos, e trocar
+    // `origem: painel` por `assistente` passava na suite inteira.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao('credencial-da-recusa')
+
+    await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/outro`)}`,
+      sessao,
+    )
+
+    const linha = await unicaLinha()
+    expect({
+      ocorrido_em: linha.ocorrido_em,
+      versao: linha.versao,
+      origem: linha.origem,
+      ator: linha.ator,
+      step_up: linha.step_up,
+      acao: linha.acao,
+      alvo: linha.alvo,
+      campos: linha.campos,
+      antes: linha.antes,
+      depois: linha.depois,
+    }).toEqual({
+      ocorrido_em: AGORA,
+      // A versao NAO anda numa recusa: nada mudou.
+      versao: 1,
+      origem: 'painel',
+      ator: `passkey:${await prefixoDeCredencial('credencial-da-recusa')}`,
+      // `step_up: 0` porque nao houve reautenticacao nenhuma — e este e o campo
+      // que responde "essa troca foi autorizada com a passkey presente?" numa
+      // investigacao (§9.9).
+      step_up: 0,
+      acao: 'stepup_recusado',
+      // `alvo` e `NULL` na configuracao global: ele nomeia a MIDIA, e so ela.
+      alvo: null,
+      campos: '["destinationUrl"]',
+      antes: null,
+      depois: null,
+    })
+  })
+
+  test('AUD-09: nem o corpo malformado leva valor de configuracao para o console', async () => {
+    // O caminho que AUD-05 nao cobria. Ele e o mais tentador de todos: o corpo
+    // inteiro esta na mao, e `motivoInterno` vai direto para o `console.warn`.
+    // §9.9 nao abre excecao — nenhum valor, nunca, nos Workers Logs.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const segredos = [
+      'quero o cardapio secreto',
+      `https://${DOMINIO_DE_TESTE}/promocao-que-ninguem-viu`,
+      'Ola! Aqui esta o link que voce pediu',
+    ]
+
+    const registrado = capturarConsole()
+    try {
+      await gravar(
+        GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+        [
+          `triggerKeywords=${encodeURIComponent(segredos[0] as string)}`,
+          `destinationUrl=${encodeURIComponent(segredos[1] as string)}`,
+          `privateReplyText=${encodeURIComponent(segredos[2] as string)}`,
+          'campoInventado=1',
+        ].join('&'),
+        sessao,
+      )
+    } finally {
+      registrado.parar()
+    }
+
+    const tudo = registrado.linhas.join('\n')
+    for (const segredo of segredos) {
+      expect({ [segredo.slice(0, 20)]: tudo.includes(segredo) }).toEqual({
+        [segredo.slice(0, 20)]: false,
+      })
+    }
+
+    // Contrapositivo: a linha do log EXISTE, com o codigo e o motivo em
+    // snake_case. Sem ela o teste passaria com um `console` mudo, que nao prova
+    // nada sobre o que ele nao escreve.
+    expect(tudo).toContain('400 dados_invalidos campo_desconhecido')
+  })
+
   test('AUD-06: desligar a automacao NAO exige step-up', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const sessao = await abrirSessao()
@@ -467,9 +605,15 @@ describe('AUD — a auditoria da gravacao', () => {
     )
     expect(semConfirmar.status).toBe(400)
     expect((await linhaDeConfig())?.enabled).toBe(0)
-    // A confirmacao ausente e corpo malformado, e nao mudanca recusada: nada foi
-    // julgado, e por isso nao ha linha nenhuma.
-    expect(await auditoria()).toEqual([])
+    // A confirmacao ausente e uma mudanca JULGADA e recusada: a linha existe,
+    // com `antes = depois = NULL` e o campo que ela tentou mexer.
+    const recusada = await unicaLinha()
+    expect({ acao: recusada.acao, campos: recusada.campos, antes: recusada.antes }).toEqual({
+      acao: 'mudanca_recusada',
+      campos: '["enabled"]',
+      antes: null,
+    })
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
 
     const comConfirmar = await gravar(
       GRAVADORAS[0] as (typeof GRAVADORAS)[number],
@@ -760,15 +904,26 @@ describe('GRAV — a forma da gravacao', () => {
     )
 
     expect(resposta.status).toBe(400)
-    // UMA consulta, e ela e a linha de sessao do passo 9 da escada, que
-    // `despachar` ja fez antes de chamar o handler. A LEITURA DA CONFIGURACAO
-    // nao aconteceu: o campo desconhecido e recusado antes dela, na cota que o
-    // painel divide com o webhook.
+    // Duas consultas: a linha de sessao, que `despachar` ja fez antes de chamar
+    // o handler, e a linha de auditoria da recusa (Ruling 59). A LEITURA DA
+    // CONFIGURACAO nao aconteceu: o campo desconhecido e recusado antes dela, na
+    // cota que o painel divide com o webhook.
     expect({ prepares: contador.prepares, escritas: contador.escritas }).toEqual({
-      prepares: 1,
-      escritas: 0,
+      prepares: 2,
+      escritas: 1,
     })
     expect(contador.sqls.some((sql) => sql.includes('painel_config'))).toBe(false)
+
+    // Ruling 59: numa sessao autenticada, um corpo que nem da para julgar e o
+    // sinal mais parecido com sequestro deste conjunto, e §9.9 diz que a linha
+    // existe para uma sequencia dessas nao passar sem rastro. `versao: 0` porque
+    // nada foi lido — o mesmo `0` de `codigos_gerados`.
+    const linha = await unicaLinha()
+    expect({ acao: linha.acao, versao: linha.versao, campos: linha.campos }).toEqual({
+      acao: 'mudanca_recusada',
+      versao: 0,
+      campos: '[]',
+    })
   })
 
   test('GRAV-10: campo ainda nao gravavel e recusado com 400 e `mudanca_recusada`', async () => {
@@ -1026,6 +1181,416 @@ describe('GRAV — a forma da gravacao', () => {
     )
     expect(soPontuacao.status).toBe(400)
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["quero o cardapio","quero a tabela"]')
+  })
+
+  test('GRAV-21: `enabled=sim` por QUALQUER tela precisa da confirmacao de §10.12', async () => {
+    // A falha que a rodada 1 de revisao encontrou: `enabled` e campo gravavel,
+    // entao a confirmacao conferida so em `handleChave` era contornavel por
+    // `POST /painel/ajustes` — e alcancavel pela propria UI, porque o botao
+    // "Voltar a esta versao" reenvia TODOS os campos, `enabled` incluso. Um
+    // clique desfazia a parada de emergencia, sem confirmacao e sem a data.
+    await gravarConfig(env.DB, { enabled: 0, parado_por_codigo_em: AGORA })
+    const sessao = await abrirSessao()
+
+    const semConfirmar = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'enabled=sim',
+      sessao,
+    )
+
+    expect(semConfirmar.status).toBe(400)
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+    expect((await unicaLinha()).acao).toBe('mudanca_recusada')
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    // E a mesma rota, com o gesto: liga. A confirmacao e um campo estrutural de
+    // TODA rota, e nao um privilegio de `/painel/chave`.
+    const comConfirmar = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'enabled=sim&confirmar=sim',
+      sessao,
+    )
+    expect(comConfirmar.status).toBe(303)
+    expect((await linhaDeConfig())?.enabled).toBe(1)
+
+    // DESLIGAR pela mesma rota continua sendo um gesto so: §10.10 e explicito, e
+    // a parada de emergencia depende de desligar ser barato.
+    const desligando = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'enabled=nao',
+      sessao,
+      { versao: 2 },
+    )
+    expect(desligando.status).toBe(303)
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+  })
+
+  test('GRAV-22: o formulario que a tela RENDERIZA e aceito pelo funil que o le', async () => {
+    // O elo que faltava. Todos os outros testes montam o corpo a mao, entao
+    // apagar um campo escondido do formulario deixava a suite verde enquanto em
+    // producao toda gravacao de toda tela passava a ser recusada. Aqui o corpo
+    // sai do HTML de verdade, campo por campo.
+    for (const tela of [
+      { rota: ROTA_INICIO, handler: handleInicio, alvo: GRAVADORAS[0] },
+      { rota: ROTA_PALAVRAS, handler: handlePalavras, alvo: GRAVADORAS[1] },
+      { rota: ROTA_AJUSTES, handler: handleAjustes, alvo: GRAVADORAS[2] },
+    ]) {
+      // Cada tela parte do mesmo estado: o formulario do Inicio DESLIGA a
+      // automacao, e sem o reset a versao andaria por baixo das seguintes.
+      await limparBanco(env.DB)
+      invalidarCacheDeConfig()
+      await gravarConfig(env.DB)
+      await ligarConta(env, AGORA)
+      const sessao = await abrirSessao()
+
+      const corpo = await (
+        await despachar(
+          pedir(tela.rota.caminho, { cookie: sessao.cookie }),
+          env,
+          AGORA,
+          tela.rota,
+          tela.handler,
+        )
+      ).text()
+
+      const formulario = primeiroFormularioDeGravacao(corpo)
+      // O formulario existe e carrega os dois campos escondidos que o funil
+      // exige. Sem esta afirmacao, uma tela sem formulario nenhum passaria.
+      expect(formulario.action).toBe((tela.alvo as (typeof GRAVADORAS)[number]).rota.caminho)
+      expect(formulario.campos.get('csrf')).toBe(sessao.ficha)
+      expect(formulario.campos.get('versao')).toBe('1')
+
+      // E o corpo do formulario, EXATAMENTE como o navegador o enviaria, e
+      // aceito: nenhum campo escondido a mais, nenhum a menos.
+      const resposta = await despachar(
+        postar(formulario.action, formulario.campos.toString(), sessao),
+        env,
+        AGORA,
+        (tela.alvo as (typeof GRAVADORAS)[number]).rota,
+        (tela.alvo as (typeof GRAVADORAS)[number]).handler,
+      )
+
+      expect({ [tela.rota.caminho]: resposta.status }).toEqual({ [tela.rota.caminho]: 303 })
+      // E o `303` aponta para a tela com um `?ok=` da lista fechada — nunca uma
+      // recusa. O Inicio desliga (o formulario dele e o botao de desligar); as
+      // outras duas reenviam o que ja estava salvo.
+      const ok = new URL(resposta.headers.get('location') ?? '', RAIZ).searchParams.get('ok')
+      expect({ [tela.rota.caminho]: fraseDeConfirmacao(ok) !== null }).toEqual({
+        [tela.rota.caminho]: true,
+      })
+    }
+  })
+
+  test('GRAV-23: a recusa NOMEIA o campo e diz por que, na lingua do dono (§12.4)', async () => {
+    // "Confira os campos destacados" sem destacar campo nenhum e a frase mais
+    // inutil que o painel poderia escrever. §11.4 fixa a frase; §12.4 exige o
+    // campo e o motivo, e as duas coisas convivem em camadas diferentes.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const resposta = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent('a')}`,
+      sessao,
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(400)
+    expect(corpo).toContain(escapeHtml('Confira os campos destacados.'))
+    // O campo, com o NOME do dicionario — nunca `triggerKeywords` cru.
+    expect(corpo).toContain(escapeHtml(NOME_DO_CAMPO.triggerKeywords))
+    expect(corpo).not.toContain('triggerKeywords')
+    // E o motivo de §12.4.
+    expect(corpo).toContain(escapeHtml(MOTIVO_DA_RECUSA.gatilho_curto as string))
+
+    // A pagina de recusa obedece §12.1 como qualquer outra tela: nenhuma das
+    // palavras proibidas. E o motivo de a traducao ser pelo CODIGO do achado — a
+    // `mensagem` do validador diz "no modo contains", e `contains` esta na lista.
+    for (const proibida of PALAVRAS_PROIBIDAS) {
+      expect({ [proibida]: contemPalavraNoCorpo(corpo, proibida) }).toEqual({ [proibida]: false })
+    }
+  })
+
+  test('GRAV-24: o `409` devolve o rascunho que a pessoa digitou (§8.8)', async () => {
+    await gravarConfig(env.DB, { versao: 3 })
+    const sessao = await abrirSessao()
+
+    const rascunho = 'quero o cardapio\nquero a tabela'
+    const resposta = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent(rascunho)}`,
+      sessao,
+      { versao: 2 },
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(409)
+    expect(corpo).toContain(escapeHtml('A configuração mudou em outro lugar; recarregue a tela.'))
+    // O que a pessoa escreveu volta na tela, inteiro.
+    expect(corpo).toContain(escapeHtml(rascunho))
+    // Com a versao de AGORA, para que reenviar funcione em vez de bater na
+    // mesma trava para sempre.
+    expect(corpo).toContain('name="versao" value="3"')
+    expect(corpo).toContain(`action="${ROTA_PALAVRAS.caminho}"`)
+
+    // E reenviar o rascunho daquela pagina grava mesmo.
+    const formulario = primeiroFormularioDeGravacao(corpo)
+    const segunda = await despachar(
+      postar(formulario.action, formulario.campos.toString(), sessao),
+      env,
+      AGORA,
+      ROTA_PALAVRAS,
+      handlePalavras,
+    )
+    expect(segunda.status).toBe(303)
+    expect((await linhaDeConfig())?.trigger_keywords).toBe('["quero o cardapio","quero a tabela"]')
+  })
+
+  test('GRAV-25: a tabela de §10.10 inteira — o que alarga pede a digital, o que estreita nao', async () => {
+    // A enumeracao fechada de §10.10, entrada por entrada, nas DUAS direcoes.
+    // A rodada 1 de revisao mostrou que so tres das sete estavam exercidas:
+    // `mediaScope`, `processOnlyReels` e os dois textos passavam com a
+    // classificacao desligada.
+    const ALARGAM: readonly { campo: string; corpo: string; partida: Record<string, unknown> }[] = [
+      { campo: 'matchMode', corpo: 'matchMode=contains', partida: { match_mode: 'exact' } },
+      {
+        campo: 'userCooldownHours',
+        corpo: 'userCooldownHours=1',
+        partida: { user_cooldown_hours: 24 },
+      },
+      { campo: 'mediaScope', corpo: 'mediaScope=todas', partida: { media_scope: 'selecionadas' } },
+      {
+        campo: 'processOnlyReels',
+        corpo: 'processOnlyReels=nao',
+        partida: { process_only_reels: 1 },
+      },
+      {
+        campo: 'destinationUrl',
+        corpo: `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/outro`)}`,
+        partida: {},
+      },
+      {
+        campo: 'privateReplyText',
+        corpo: `privateReplyText=${encodeURIComponent('Outro texto com o {link}')}`,
+        partida: {},
+      },
+      {
+        campo: 'publicReplyText',
+        corpo: `publicReplyText=${encodeURIComponent('Outro texto publico.')}`,
+        partida: {},
+      },
+    ]
+
+    for (const caso of ALARGAM) {
+      await limparBanco(env.DB)
+      invalidarCacheDeConfig()
+      await gravarConfig(env.DB, caso.partida)
+      const sessao = await abrirSessao()
+
+      const resposta = await gravar(
+        GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+        caso.corpo,
+        sessao,
+      )
+
+      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: 403 })
+      expect({ [caso.campo]: (await unicaLinha()).acao }).toEqual({
+        [caso.campo]: 'stepup_recusado',
+      })
+    }
+
+    // E o contrapositivo, que e a promessa do rodape dos Ajustes: ESTREITAR
+    // nunca pede a digital. Os dois campos abaixo ainda nao sao gravaveis, entao
+    // a recusa e `400 dados_invalidos` — e nao o `403` de quem alarga.
+    const ESTREITAM: readonly { campo: string; corpo: string; partida: Record<string, unknown> }[] =
+      [
+        { campo: 'matchMode', corpo: 'matchMode=exact', partida: { match_mode: 'contains' } },
+        {
+          campo: 'mediaScope',
+          corpo: 'mediaScope=selecionadas',
+          partida: { media_scope: 'todas' },
+        },
+        {
+          campo: 'processOnlyReels',
+          corpo: 'processOnlyReels=sim',
+          partida: { process_only_reels: 0 },
+        },
+      ]
+
+    for (const caso of ESTREITAM) {
+      await limparBanco(env.DB)
+      invalidarCacheDeConfig()
+      await gravarConfig(env.DB, { trigger_keywords: '["quero o link"]', ...caso.partida })
+      const sessao = await abrirSessao()
+
+      const resposta = await gravar(
+        GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+        caso.corpo,
+        sessao,
+      )
+
+      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: 400 })
+      expect({ [caso.campo]: (await unicaLinha()).acao }).toEqual({
+        [caso.campo]: 'mudanca_recusada',
+      })
+    }
+  })
+
+  test('GRAV-26: `codigoDaRecusaDeValidacao` separa dominio de campo invalido (§11.4)', async () => {
+    // A funcao e testada DIRETO porque o ramo do dominio nao e alcancavel pela
+    // rota nesta etapa — os tres campos que produzem esse achado sao sempre
+    // protegidos, e um link ja gravado fora da lista derruba a leitura para
+    // `parado_por_erro`, recusado antes ainda. Um teste de rota para este ramo
+    // dependeria do valor de `src/config.ts`, que muda em cada instalacao.
+    expect(
+      codigoDaRecusaDeValidacao([
+        { campo: 'triggerKeywords', codigo: 'gatilho_curto', mensagem: 'x' },
+      ]),
+    ).toBe('dados_invalidos')
+
+    expect(
+      codigoDaRecusaDeValidacao([
+        { campo: 'triggerKeywords', codigo: 'gatilho_curto', mensagem: 'x' },
+        { campo: 'destinationUrl', codigo: 'dominio_nao_permitido', mensagem: 'x' },
+      ]),
+    ).toBe('dominio_nao_permitido')
+
+    expect(codigoDaRecusaDeValidacao([])).toBe('dados_invalidos')
+  })
+
+  test('GRAV-27: o historico mostra a mais NOVA primeiro, e no maximo cinco', async () => {
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    // Seis gravacoes, cada uma com um intervalo diferente: a sexta empurra a
+    // primeira para fora da lista, e a ordem diz qual e qual.
+    for (let i = 0; i < 6; i++) {
+      const resposta = await gravar(
+        GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+        `userCooldownHours=${25 + i}`,
+        sessao,
+        { versao: 1 + i },
+      )
+      expect({ [`salvo ${i}`]: resposta.status }).toEqual({ [`salvo ${i}`]: 303 })
+    }
+
+    const corpo = await telaDeAjustes(sessao)
+    expect(corpo.split('Voltar a esta vers').length - 1).toBe(5)
+
+    // A ordem: o `antes` da mudanca mais recente e 29, e ele vem PRIMEIRO. Com
+    // `ORDER BY id ASC` a lista comecaria em 24, que e o `antes` mais antigo — e
+    // ele nem estaria na lista, porque a poda de cinco corta do lado velho.
+    const intervalos = [...corpo.matchAll(/name="userCooldownHours" value="(\d+)"/g)].map(
+      (achado) => achado[1],
+    )
+    expect(intervalos).toEqual(['29', '28', '27', '26', '25'])
+  })
+
+  test('GRAV-28: uma configuracao no tamanho MAXIMO legal ainda cabe na auditoria', async () => {
+    // O `CHECK` de 4000 da migration 0002 era alcancavel por uma configuracao
+    // inteiramente legal: 20 gatilhos de 40, dois textos de 500 e um link de
+    // 2048 dao ~4230 no JSON de `antes`. O lote inteiro falhava, e o dono nao
+    // conseguia mais salvar nem uma palavra. A migration 0005 sobe o teto.
+    const gatilhos = Array.from(
+      { length: 20 },
+      (_, i) => `${String(i).padStart(2, '0')}${'a'.repeat(38)}`,
+    )
+    const linkLongo = `https://${DOMINIO_DE_TESTE}/${'c'.repeat(2048 - 8 - DOMINIO_DE_TESTE.length - 1)}`
+
+    // O Direct sai DESLIGADO, e isso e o que faz esta ser a configuracao mais
+    // longa que o validador aceita: com ele ligado, o texto precisa conter
+    // `{link}`, e o link de 2048 renderizado dentro dele estouraria o teto de
+    // 1000 do Direct — os dois maximos nao cabem juntos.
+    await gravarConfig(env.DB, {
+      trigger_keywords: JSON.stringify(gatilhos),
+      destination_url: linkLongo,
+      private_reply_enabled: 0,
+      private_reply_text: 'd'.repeat(500),
+      public_reply_text: 'e'.repeat(500),
+    })
+    const sessao = await abrirSessao()
+
+    // A premissa: a linha e LEGAL — o validador da leitura a aceitou, senao o
+    // snapshot viria `parado_por_erro` e a gravacao seria recusada por outro
+    // motivo, e o teste passaria sem provar nada sobre o teto.
+    expect((await carregarConfigEfetiva(env, AGORA, { ignorarCache: true })).origem).toBe('banco')
+
+    const resposta = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'userCooldownHours=48',
+      sessao,
+    )
+
+    expect(resposta.status).toBe(303)
+    const linha = await unicaLinha()
+    // E a prova de que o teste morde: o JSON gravado passa dos 4000 do teto
+    // antigo.
+    expect((linha.antes ?? '').length).toBeGreaterThan(4000)
+    expect((linha.depois ?? '').length).toBeGreaterThan(4000)
+  })
+
+  test('GRAV-29: `dados_invalidos` em JSON acompanha `campos` com NOMES (§11.4)', async () => {
+    // A tabela de §11.4 e explicita: `dados_invalidos` "acompanha `campos:
+    // string[]` com **nomes**, nunca valores". Nenhuma rota de gravacao fala
+    // JSON hoje — as tres sao de pagina —, entao a afirmacao e sobre `erro()`,
+    // que e quem monta o corpo nos dois formatos a partir do mesmo contexto.
+    const resposta = erro('dados_invalidos', {
+      request: pedir('/painel/api/qualquer'),
+      caminho: '/painel/api/qualquer',
+      formato: 'json',
+      campos: ['triggerKeywords', 'userCooldownHours'],
+    })
+
+    expect(resposta.status).toBe(400)
+    expect(await resposta.json()).toEqual({
+      erro: 'dados_invalidos',
+      mensagem: 'Confira os campos destacados.',
+      campos: ['triggerKeywords', 'userCooldownHours'],
+    })
+
+    // Sem campos, a chave nao aparece: `{erro, mensagem}` continua sendo a forma
+    // de toda recusa que nao acusa campo nenhum.
+    const semCampos = erro('csrf_invalido', {
+      request: pedir('/painel/api/qualquer'),
+      caminho: '/painel/api/qualquer',
+      formato: 'json',
+    })
+    expect(await semCampos.json()).toEqual({
+      erro: 'csrf_invalido',
+      mensagem: 'Requisição bloqueada por segurança.',
+    })
+  })
+
+  test('GRAV-30: `motivoInterno` fora da forma de codigo e DESCARTADO do log', async () => {
+    // A trava estrutural que sustenta AUD-05 e AUD-09. `motivoInterno` e o unico
+    // campo do contexto de erro que vai para o `console`, e um
+    // `motivoInterno: corpo.campos.toString()` escrito por engano publicaria o
+    // formulario inteiro nos Workers Logs. A forma e conferida em tempo de
+    // execucao, e o que nao casa nao e escrito — nem truncado, nem mascarado.
+    const registrado = capturarConsole()
+    try {
+      erro('dados_invalidos', {
+        request: pedir('/painel/palavras'),
+        caminho: '/painel/palavras',
+        formato: 'pagina',
+        motivoInterno: `triggerKeywords=${PALAVRA_NOVA}&destinationUrl=https://${DOMINIO_DE_TESTE}/x`,
+      })
+      // E o contrapositivo: um codigo bem formado CONTINUA no log, senao a
+      // guarda estaria simplesmente apagando o motivo de todo mundo.
+      erro('dados_invalidos', {
+        request: pedir('/painel/palavras'),
+        caminho: '/painel/palavras',
+        formato: 'pagina',
+        motivoInterno: 'campo_desconhecido',
+      })
+    } finally {
+      registrado.parar()
+    }
+
+    const tudo = registrado.linhas.join('\n')
+    expect(tudo).not.toContain(PALAVRA_NOVA)
+    expect(tudo).not.toContain(DOMINIO_DE_TESTE)
+    expect(tudo).toContain('400 dados_invalidos campo_desconhecido')
   })
 
   test('GRAV-17: o Inicio mostra a chave, e a data da parada quando ela existe', async () => {

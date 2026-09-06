@@ -135,6 +135,60 @@ export function fraseDeConfirmacao(codigo: string | null): string | null {
   return Object.hasOwn(CONFIRMACOES, codigo) ? CONFIRMACOES[codigo as CodigoDeConfirmacao] : null
 }
 
+/**
+ * Por que aquele campo foi recusado, na lingua do dono (§12.4).
+ *
+ * A chave e o `codigo` do achado do validador, e nao a `mensagem` dele. A
+ * diferenca importa: a `mensagem` do validador e escrita para quem instala o
+ * projeto — ela diz "no modo contains", "placeholders", "normalizacao" —, e
+ * `contains` e `placeholder` estao na lista de palavras que a tela NUNCA
+ * escreve. Traduzir pelo codigo mantem o validador com uma linguagem so, a tela
+ * com outra, e o dicionario como a unica fronteira entre as duas.
+ *
+ * Os textos sao os da tabela de §12.4, palavra por palavra. Onde §12.4 escreve
+ * a palavra do dono entre aspas, a frase aqui e generica: o valor recusado NAO
+ * volta para a tela por este caminho — ele volta no formulario, que e onde a
+ * pessoa o ve no contexto em que o digitou.
+ */
+export const MOTIVO_DA_RECUSA: Record<string, string> = {
+  gatilho_curto:
+    'Esta palavra é curta demais para o modo que está valendo. Escreva mais letras — no modo “basta aparecer no meio”, pelo menos duas palavras.',
+  gatilho_longo: 'Esta frase é longa demais. Use no máximo 40 letras.',
+  gatilho_vazio:
+    'Isto não vai funcionar nunca. A automação ignora emojis e pontuação ao comparar, então esta palavra fica vazia e é pulada em silêncio.',
+  gatilho_duplicado: 'Duas palavras ficam iguais na hora de comparar. Apague uma delas.',
+  gatilhos_demais: 'Você chegou a 20 palavras, o máximo. Apague uma para adicionar outra.',
+  lista_vazia_com_automacao_ligada:
+    'Sem nenhuma palavra a automação nunca responde. Ou escreva pelo menos uma, ou desligue — as duas são seguras, mas só uma fica clara no seu painel.',
+  nao_e_lista_de_texto: 'Não conseguimos entender a lista de palavras que chegou.',
+  cooldown_fora_da_faixa: 'A espera precisa ser um número inteiro de horas, de 0 até 8760.',
+  nao_e_booleano: 'Este ajuste só aceita sim ou não.',
+  dominio_nao_permitido: 'Este endereço não está na lista liberada no deploy.',
+}
+
+/** O motivo daquele codigo, ou a frase geral quando ele nao esta na tabela. */
+export function motivoDaRecusa(codigo: string): string {
+  return (
+    MOTIVO_DA_RECUSA[codigo] ??
+    'Este valor não é aceito. Confira o que você escreveu e tente de novo.'
+  )
+}
+
+/**
+ * As duas frases que explicam uma recusa que NAO e de valor invalido.
+ *
+ * Elas moram aqui pelo mesmo motivo que todas as outras: nenhuma frase de tela
+ * nasce fora do dicionario. `protegido` e a promessa de §12.3 dita ao
+ * contrario — a pessoa tentou aumentar o alcance, e aumentar pede a digital.
+ */
+export const RECUSA_SEM_VALOR = {
+  protegido:
+    'Este ajuste aumenta o alcance da automação, e por isso ele vai pedir a sua digital. Essa parte do painel chega em seguida.',
+  naoGravavel: 'Este ajuste ainda não pode ser mudado por aqui.',
+  configIlegivel:
+    'Não conseguimos ler os seus ajustes salvos, então nada pode ser gravado por aqui até isso ser resolvido. Quem resolve é quem publicou o projeto, no computador.',
+} as const
+
 /** Os quatro campos booleanos que a tela explica com uma frase inteira. */
 export type CampoDeComparacao =
   | 'caseSensitive'
