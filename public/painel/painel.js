@@ -3,7 +3,7 @@
  * proprio e **sem `innerHTML`** — a CSP tem `require-trusted-types-for
  * 'script'`, entao um `innerHTML` aqui seria erro de RUNTIME, e nao de revisao.
  *
- * §12.8 lista cinco trabalhos para este arquivo. Nesta etapa existem os dois
+ * §12.8 lista cinco trabalhos para este arquivo. Nesta etapa existem os tres
  * que as telas de hoje precisam:
  *
  *   1. WebAuthn: `navigator.credentials.get()` e `.create()`, SEMPRE dentro de
@@ -11,10 +11,12 @@
  *      iOS) e sempre com `userVerification: "required"`.
  *   2. Ler o token do convite do FRAGMENTO (`location.hash`), limpar a barra de
  *      enderecos com `history.replaceState` e mandar o token no CORPO do POST.
+ *   3. O passo 3 de §10.10: pedir as options do step-up, ler a digital e por a
+ *      assertion serializada num campo escondido **do mesmo formulario**, que e
+ *      entao submetido para a rota de escrita normal.
  *
- * Os outros tres — miniatura que falhou, marcar em lote, inserir `{username}` /
- * `{link}` — chegam com as telas que os usam. Codigo sem tela e codigo sem
- * teste.
+ * Os outros dois — miniatura que falhou e marcar em lote — chegam com as telas
+ * que os usam. Codigo sem tela e codigo sem teste.
  *
  * A UNICA navegacao que este arquivo faz e a do `para` que o servidor devolve,
  * e ela e comparada contra uma lista fixa: um destino escolhido pela resposta
@@ -228,6 +230,83 @@
   }
 
   // -------------------------------------------------------------------------
+  // Trabalho 3: confirmar uma mudanca protegida (§10.10, passo 3)
+  // -------------------------------------------------------------------------
+
+  /**
+   * A cerimonia de step-up, e ela nao navega para lugar nenhum.
+   *
+   * O passo 3 de §10.10 e literal: a assertion serializada vai num campo
+   * escondido **do mesmo formulario**, e o formulario e submetido para a rota de
+   * escrita normal. Nao existe `/painel/api/stepup/verificar` — a verificacao
+   * acontece dentro da gravacao, e por isso nao ha uma segunda resposta a ler
+   * nem um destino a escolher aqui.
+   *
+   * A mudanca canonica vem do atributo `data-mudanca`, que o SERVIDOR escreveu:
+   * ela e insumo desta funcao, e nao do POST. Montar o objeto aqui, a partir dos
+   * campos do formulario, seria uma segunda grafia dos leitores do funil — e a
+   * primeira vez que as duas divergissem o dono apertaria a digital e receberia
+   * uma recusa sem entender por que.
+   *
+   * `formulario.submit()` e nao `requestSubmit()`: o envio tem de pular o
+   * ouvinte de `submit` que chamou esta funcao, ou a cerimonia recomecaria em
+   * laco.
+   */
+  function confirmar(formulario) {
+    var mudanca = JSON.parse(formulario.getAttribute('data-mudanca') || 'null')
+    if (mudanca === null) {
+      avisar('Não foi possível confirmar. Tente de novo.')
+      return
+    }
+
+    var ficha = formulario.querySelector('input[name="csrf"]')
+    var alvo = formulario.querySelector('input[name="digital"]')
+    if (ficha === null || alvo === null) {
+      avisar('Não foi possível confirmar. Tente de novo.')
+      return
+    }
+
+    return pedir(
+      '/painel/api/stepup/opcoes',
+      { operacao: mudanca.acao, mudanca: mudanca },
+      ficha.value,
+    ).then(function (inicio) {
+      if (!inicio.ok) {
+        avisar(frase(inicio.dados))
+        return
+      }
+
+      var opcoes = inicio.dados
+      return navigator.credentials
+        .get({
+          publicKey: {
+            challenge: paraBytes(opcoes.challenge),
+            rpId: opcoes.rpId,
+            allowCredentials: [],
+            userVerification: 'required',
+            timeout: opcoes.timeout,
+          },
+        })
+        .then(function (credencial) {
+          alvo.value = JSON.stringify({
+            credencial: {
+              id: credencial.id,
+              type: credencial.type,
+              clientDataJSON: paraTexto(credencial.response.clientDataJSON),
+              authenticatorData: paraTexto(credencial.response.authenticatorData),
+              signature: paraTexto(credencial.response.signature),
+              userHandle:
+                credencial.response.userHandle === null
+                  ? null
+                  : paraTexto(credencial.response.userHandle),
+            },
+          })
+          formulario.submit()
+        })
+    })
+  }
+
+  // -------------------------------------------------------------------------
   // Ligacao com a tela. SEMPRE dentro de um clique (§10.7, §12.8).
   // -------------------------------------------------------------------------
 
@@ -253,6 +332,13 @@
   var deEntrar = document.getElementById('entrar')
   if (deEntrar !== null) {
     ligar(deEntrar, entrar)
+  }
+
+  var deConfirmar = document.getElementById('confirmar')
+  if (deConfirmar !== null) {
+    ligar(deConfirmar, function () {
+      return confirmar(deConfirmar)
+    })
   }
 
   var deRegistrar = document.getElementById('registrar')

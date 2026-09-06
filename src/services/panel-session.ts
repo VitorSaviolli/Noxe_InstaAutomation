@@ -209,11 +209,30 @@ export function painelHabilitado(env: Env): { ok: true } | { ok: false; motivo: 
  * `sha256(sid)` para quem for gravar.
  */
 export async function emitirSessao(env: Env, now: number): Promise<SessaoEmitida> {
+  return await rotacionarSessao(env, now + PRAZO_ABSOLUTO_DE_SESSAO_MS)
+}
+
+/**
+ * Sorteia um `sid` novo MANTENDO o prazo absoluto que ja estava valendo.
+ *
+ * §10.8 manda rotacionar em exatamente dois momentos: login bem-sucedido — e
+ * ali o prazo nasce junto, por `emitirSessao` — e **step-up bem-sucedido**, em
+ * que a sessao muda de "conseguiu ler" para "acabou de autorizar". Nesse
+ * segundo momento o `expira_em` e o da sessao que ja existe: a trava de SES-01
+ * e que o prazo absoluto **nunca** e estendido, e uma rotacao que chamasse
+ * `emitirSessao(env, now)` daria 12 h novas a cada mudanca protegida — o dono
+ * que salvasse uma coisa por dia nunca mais veria o dialogo do sistema
+ * operacional que §7.6 existe para forcar.
+ *
+ * As duas portas compartilham ESTE corpo, e nao duas copias: o sorteio de 32
+ * bytes, a assinatura e o `sha256(sid)` sao os mesmos, e uma segunda grafia
+ * perderia um dos tres exatamente uma vez.
+ */
+export async function rotacionarSessao(env: Env, expiraEm: number): Promise<SessaoEmitida> {
   // Trava de SES-11: 32 bytes sorteados a CADA emissao. Derivar o `sid` do
   // relogio, do `credential_id` ou de qualquer coisa estavel faria duas
   // sessoes do mesmo milissegundo coincidirem.
   const sid = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(SID_BYTES)))
-  const expiraEm = now + PRAZO_ABSOLUTO_DE_SESSAO_MS
   const assinatura = await assinarSessao(env, sid, String(expiraEm))
 
   return {

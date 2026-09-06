@@ -113,6 +113,19 @@ export interface ContextoDoErro {
    * monta e a rota, com frases do dicionario.
    */
   readonly explicacao?: HtmlSeguro
+  /**
+   * A pagina do erro carrega o `painel.js`?
+   *
+   * Existe por UMA razao, e ela e o `403 step_up_necessario`: a explicacao dele
+   * e a tela "Confira o que vai mudar", e o gesto que a resolve e
+   * `navigator.credentials.get()`. Uma pagina de erro sem script deixaria o
+   * unico caminho de continuacao do painel sem o codigo que o percorre.
+   *
+   * Fica `false` em todo o resto, e a ausencia e decisao: uma pagina de erro que
+   * carrega script por padrao pede um arquivo a mais numa conexao ruim (§12.9)
+   * para uma tela que nao tem nada a fazer com ele.
+   */
+  readonly comScript?: boolean
 }
 
 /** Um codigo de motivo interno bem formado: snake_case curto, e nada mais. */
@@ -159,6 +172,7 @@ ${contexto.explicacao ?? null}
 <p><a href="/painel">Voltar ao início</a></p>`,
     status,
     extras: contexto.extras,
+    comScript: contexto.comScript === true,
   })
 }
 
@@ -172,12 +186,25 @@ ${contexto.explicacao ?? null}
  * Sai com os cabecalhos de pagina inteiros, `Vary: Cookie` inclusive: a regra
  * de §11.5 e "toda resposta do Worker, sem excecao por rota", e um redirect e
  * uma resposta.
+ *
+ * `cookies` e uma LISTA, e nao mais uma chave de `extras`, porque o `303` do
+ * step-up carrega **dois** `Set-Cookie` na mesma resposta: a sessao rotacionada
+ * e o envelope expirado (§10.10, passo 4). Um `Record<string, string>` nao
+ * consegue ter a mesma chave duas vezes — o segundo cookie apagaria o primeiro
+ * em silencio, e o silencio seria "o dono deslogado" ou "o envelope vivo depois
+ * de usado", conforme qual dos dois sobrasse.
  */
-export function redirecionar(para: string, extras: Record<string, string> = {}): Response {
-  return new Response(null, {
+export function redirecionar(
+  para: string,
+  extras: Record<string, string> = {},
+  cookies: readonly string[] = [],
+): Response {
+  const resposta = new Response(null, {
     status: 303,
     headers: { ...extras, ...cabecalhos('pagina'), location: para },
   })
+  for (const cookie of cookies) resposta.headers.append('set-cookie', cookie)
+  return resposta
 }
 
 /**

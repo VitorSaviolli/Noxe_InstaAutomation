@@ -185,6 +185,17 @@ export interface PedidoDeRecusa {
   readonly codigo: CodigoDeErro
   readonly motivoInterno?: string
   readonly explicacao?: HtmlSeguro
+  /** A pagina da recusa carrega o `painel.js`? So o `403` do step-up carrega. */
+  readonly comScript?: boolean
+  /**
+   * Escritas que acompanham a linha de auditoria, no MESMO lote.
+   *
+   * Existe para o contador de `falhas_stepup` de §10.10: uma falha de step-up ja
+   * custava a escrita da linha de auditoria (Ruling 59), e o incremento — ou o
+   * `DELETE` da decima falha — nao pode virar uma segunda ida ao banco nem uma
+   * escrita que sobreviva sem a linha que a explica. Vazio no caminho normal.
+   */
+  readonly extras?: readonly D1PreparedStatement[]
 }
 
 /**
@@ -214,30 +225,40 @@ export class RecusaAuditada {
   async registrar(pedido: PedidoDeRecusa): Promise<Response> {
     const campos = [...new Set(pedido.campos)]
 
-    await new PainelAuditoriaRepository(this.env.DB)
-      .statementDeRegistro({
-        ocorridoEm: this.now,
-        // A versao RESULTANTE de uma recusa e a que continua valendo: nada
-        // mudou, entao ela e a mesma de antes.
-        versao: this.snapshot.versao,
-        origem: 'painel',
-        ator: this.ator,
-        stepUp: false,
-        acao: pedido.acao,
-        alvo: null,
-        // Nomes de campo, NUNCA valores (§9.9). E o que permite investigar uma
-        // sequencia de tentativas sem guardar o que elas tentaram escrever.
-        campos: JSON.stringify(campos),
-        antes: null,
-        depois: null,
-      })
-      .run()
+    const linha = new PainelAuditoriaRepository(this.env.DB).statementDeRegistro({
+      ocorridoEm: this.now,
+      // A versao RESULTANTE de uma recusa e a que continua valendo: nada
+      // mudou, entao ela e a mesma de antes.
+      versao: this.snapshot.versao,
+      origem: 'painel',
+      ator: this.ator,
+      // A recusa NUNCA e uma gravacao com step-up: ou o step-up faltou, ou ele
+      // nao fechou. A coluna responde "esta mudanca passou pela digital?", e a
+      // resposta e nao nos dois casos.
+      stepUp: false,
+      acao: pedido.acao,
+      alvo: null,
+      // Nomes de campo, NUNCA valores (§9.9). E o que permite investigar uma
+      // sequencia de tentativas sem guardar o que elas tentaram escrever.
+      campos: JSON.stringify(campos),
+      antes: null,
+      depois: null,
+    })
+
+    // Uma ida ao banco nos dois casos: `.run()` quando so ha a linha, um
+    // `db.batch()` quando o contador de falhas de step-up vai junto. O lote
+    // existe para que a escrita que acompanha nunca sobreviva sem a linha que a
+    // explica — a mesma regra de "sem log, sem mudanca" (§8.8).
+    const extras = pedido.extras ?? []
+    if (extras.length === 0) await linha.run()
+    else await this.env.DB.batch([linha, ...extras])
 
     return erro(pedido.codigo, {
       ...this.contexto,
       campos,
       ...(pedido.motivoInterno === undefined ? {} : { motivoInterno: pedido.motivoInterno }),
       ...(pedido.explicacao === undefined ? {} : { explicacao: pedido.explicacao }),
+      ...(pedido.comScript === undefined ? {} : { comScript: pedido.comScript }),
     })
   }
 }

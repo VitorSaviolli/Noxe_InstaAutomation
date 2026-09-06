@@ -13,6 +13,16 @@
  * tabela de comentarios guarda hash do IGSID e nao o IGSID.
  */
 
+/**
+ * Quantas falhas de step-up apagam a sessao (§7.6, §10.10).
+ *
+ * Mora ao lado da coluna que ele conta. O numero e o unico teto que o painel
+ * aplica a uma rota JA autenticada: quem esta martelando step-up dentro de uma
+ * sessao valida ou e o dono errando, ou e um painel invadido tentando adivinhar
+ * — e nos dois casos derrubar a sessao e a direcao segura.
+ */
+export const FALHAS_DE_STEPUP_ATE_APAGAR = 10
+
 /** Uma sessao viva, como o banco a guarda. */
 export interface LinhaDeSessao {
   sidHash: string
@@ -104,6 +114,67 @@ export class PainelSessoesRepository {
         linha.vistaEm,
         linha.falhasStepup,
       )
+  }
+
+  /**
+   * A rotacao do `sid` depois de um step-up bem-sucedido (§10.8, §10.10).
+   *
+   * §10.8 lista dois momentos de rotacao, e este e o segundo: a sessao muda de
+   * "conseguiu ler" para "acabou de autorizar". Como ela acontece na MESMA
+   * requisicao que grava e responde `303`, o cookie novo chega junto com o
+   * redirect — nao existe a corrida de rede movel em que o cookie novo se perde.
+   *
+   * **`WHERE sid_hash = ?` com o hash ANTIGO**, e nao um `INSERT`: a sessao e a
+   * mesma linha, com o mesmo `expira_em`, o mesmo `criada_em` e o mesmo
+   * `falhas_stepup`. Uma linha nova daria uma sessao com prazo absoluto novo, e
+   * SES-01 diz que ele **nunca** e estendido.
+   *
+   * **`falhas_stepup` NAO e zerado aqui**, e a ausencia e decisao: §10.10 manda
+   * incrementar na falha e apagar a sessao na decima, e nao diz que o sucesso
+   * perdoa as anteriores. Zerar transformaria "dez falhas apagam a sessao" em
+   * "dez falhas SEGUIDAS apagam a sessao", que e um teto que quem esta
+   * martelando consegue nunca alcancar.
+   *
+   * Statement, e nao gravacao: a rotacao entra no MESMO `db.batch()` da
+   * configuracao e da auditoria — sem log, sem mudanca, e sem sessao rotacionada
+   * por uma gravacao que nao aconteceu.
+   *
+   * **`AND changes() > 0` nao e enfeite, e este statement so esta certo na
+   * TERCEIRA posicao daquele lote.** A trava otimista de §8.8 pode fazer o
+   * `UPDATE` da configuracao alterar zero linhas sem que o `db.batch()` rejeite
+   * nada; a linha de auditoria ja se defende disso pelo mesmo `changes()`, e sem
+   * esta condicao a rotacao aconteceria assim mesmo. O `sid` no banco mudaria, a
+   * rota responderia `versao_desatualizada` **sem** mandar o cookie novo, e o
+   * dono seria deslogado por uma gravacao que nunca aconteceu — o pior desfecho
+   * possivel para quem acabou de encostar o dedo no leitor.
+   *
+   * A cadeia: `UPDATE` da config altera N linhas; o `INSERT` da auditoria roda
+   * `WHERE changes() > 0` e insere 1 quando N > 0, ou 0 quando N = 0; entao
+   * `changes()` vale 1 ou 0 exatamente quando a gravacao aconteceu ou nao.
+   */
+  statementDeRotacao(sidHashAntigo: string, sidHashNovo: string): D1PreparedStatement {
+    return this.db
+      .prepare('UPDATE painel_sessoes SET sid_hash = ? WHERE sid_hash = ? AND changes() > 0')
+      .bind(sidHashNovo, sidHashAntigo)
+  }
+
+  /**
+   * Uma falha de step-up a mais naquela sessao (§10.10).
+   *
+   * O incremento e feito no SQL (`falhas_stepup + 1`) e nao em JavaScript: um
+   * valor calculado no Worker e lido antes do lote perderia uma tentativa
+   * simultanea, e o contador que existe para limitar martelada nao pode ser o
+   * primeiro a perder contagem sob martelada.
+   */
+  statementDeFalhaDeStepup(sidHash: string): D1PreparedStatement {
+    return this.db
+      .prepare('UPDATE painel_sessoes SET falhas_stepup = falhas_stepup + 1 WHERE sid_hash = ?')
+      .bind(sidHash)
+  }
+
+  /** Apaga UMA sessao. E o que a decima falha de step-up faz (§10.10). */
+  statementDeApagar(sidHash: string): D1PreparedStatement {
+    return this.db.prepare('DELETE FROM painel_sessoes WHERE sid_hash = ?').bind(sidHash)
   }
 
   /**

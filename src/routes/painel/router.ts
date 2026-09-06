@@ -63,11 +63,13 @@ import {
   ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_ENTRAR,
+  ROTA_OPCOES_DE_STEPUP,
   ROTA_PALAVRAS,
   ROTA_VERIFICAR_ENTRADA,
   type RotaDoPainel,
   tetoDoCorpo,
 } from './rotas'
+import { handleOpcoesDeStepUp } from './stepup'
 
 /** O prefixo do painel. `/painel` casa; `/painelzinho` nao (§11.1). */
 const RAIZ_DO_PAINEL = '/painel'
@@ -161,6 +163,13 @@ export async function routePainel(
       return despachar(request, env, now, ROTA_VERIFICAR_ENTRADA, handleVerificarEntrada, {
         limite: 'login',
       })
+
+    // O passo 2 de §10.10. Sem familia de limitador: ela corre com sessao viva
+    // e ficha CSRF, e quem martela step-up dentro de uma sessao valida ja tem o
+    // teto de `falhas_stepup` — que apaga a sessao na decima e e mais duro que
+    // qualquer balde por IP.
+    case ROTA_OPCOES_DE_STEPUP.caminho:
+      return despachar(request, env, now, ROTA_OPCOES_DE_STEPUP, handleOpcoesDeStepUp)
 
     // As tres rotas do registro vieram do `switch` de `src/index.ts` (§11.1).
     // Elas NAO passam por `despachar`: a Task 8 as entregou com a escada de
@@ -284,21 +293,23 @@ async function escada(
 
   // Passo 8, e ele vem ANTES do curto-circuito de propósito.
   //
-  // Nenhuma rota declara `stepUp: true` ainda, e o ramo FALHA FECHADO: o
-  // verificador — `op_hash` recalculado no servidor a partir da mudanca
-  // canonica — nasce com a etapa do step-up, e uma autorizacao que nao da para
-  // verificar nao pode ser concedida. Declarar `stepUp: true` numa rota antes
-  // disso tem de TRANCAR a rota, nunca abri-la em silencio.
+  // **O passo 8 de verdade NAO mora aqui**, e a ausencia e o desenho de §10.10:
+  // "a verificacao acontece **dentro** da rota de escrita". Quem confere o
+  // step-up e `exigirStepUp()` (em `stepup.ts`), chamado pelo funil de gravacao
+  // — o unico lugar que sabe transformar o corpo daquela rota na mudanca
+  // canonica e RECALCULAR o `op_hash`. O roteador nao sabe, e um verificador
+  // aqui seria uma segunda grafia da trava sem a metade que a torna uma trava.
+  //
+  // Este ramo continua existindo, e continua FALHANDO FECHADO: nenhuma rota
+  // declara `stepUp: true` — a de `/painel/mensagem` e sempre protegida pelo
+  // CONTEUDO (§11.3 passo 8: "a rota **ou** o conteudo") —, e uma linha futura
+  // que declare `true` tranca a rota em vez de abri-la em silencio.
   //
   // **Por que aqui e nao depois do portao de sessao.** Enquanto ele mora depois
   // do `if (!rota.sessao)`, a trava vale so no ramo autenticado: uma linha com
   // `stepUp: true` e `sessao: false` passava direto para o handler — que e
   // exatamente a abertura silenciosa que este ramo existe para impedir. O
   // metateste META-02 fecha a outra metade, proibindo a combinacao na tabela.
-  //
-  // Quando a etapa do step-up trouxer `exigirStepUp()`, esta linha vira aquela
-  // chamada e volta para a posicao 8 da escada de §11.3, depois da ficha: um
-  // verificador de verdade precisa do `sid` que o passo 6 produz.
   if (rota.stepUp) return erro('step_up_necessario', contexto)
 
   if (!rota.sessao) {

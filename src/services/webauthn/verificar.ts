@@ -289,6 +289,49 @@ async function credencialDaAttestation(
 // ---------------------------------------------------------------------------
 
 /**
+ * A forma minima da resposta do autenticador. Qualquer outra vira `null`.
+ *
+ * Mora AQUI, e nao na rota que a usa, porque as duas cerimonias de assertion —
+ * o login (`POST /painel/api/entrar/verificar`, corpo JSON) e o step-up (o
+ * campo escondido do formulario, §10.10 passo 3) — leem exatamente a mesma
+ * forma. A primeira grafia vivia dentro de `entrar.ts`, e a segunda teria de
+ * ser uma copia: uma copia que aceitasse um campo a menos entregaria ao
+ * `verificarAssertion` um objeto pela metade num caminho so, e seria o caminho
+ * que ninguem revisou.
+ *
+ * O envelope e sempre `{ credencial: { ... } }`: o mesmo objeto que o
+ * `painel.js` monta nas duas cerimonias.
+ */
+export function lerRespostaDeAssertion(corpo: unknown): RespostaDeAssertion | null {
+  if (typeof corpo !== 'object' || corpo === null) return null
+  const credencial = (corpo as { credencial?: unknown }).credencial
+  if (typeof credencial !== 'object' || credencial === null) return null
+
+  const lida = credencial as Record<string, unknown>
+  if (
+    typeof lida.id !== 'string' ||
+    typeof lida.type !== 'string' ||
+    typeof lida.clientDataJSON !== 'string' ||
+    typeof lida.authenticatorData !== 'string' ||
+    typeof lida.signature !== 'string'
+  ) {
+    return null
+  }
+  // `userHandle` e o unico opcional: o passo 5 de §10.7 confere os DOIS lados —
+  // ausente tambem e uma resposta possivel, e `verificarAssertion` a trata.
+  if (lida.userHandle !== null && typeof lida.userHandle !== 'string') return null
+
+  return {
+    id: lida.id,
+    type: lida.type,
+    clientDataJSON: lida.clientDataJSON,
+    authenticatorData: lida.authenticatorData,
+    signature: lida.signature,
+    userHandle: lida.userHandle as string | null,
+  }
+}
+
+/**
  * Verifica a assertion do login e do step-up (§10.7, passos 3 a 11).
  *
  * A ordem e a de §10.7. Nenhum CBOR roda aqui: a chave ja e JWK.

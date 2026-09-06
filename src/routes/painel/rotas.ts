@@ -40,7 +40,26 @@ export interface RotaDoPainel {
   readonly sessao: boolean
   /** Exige a ficha anti-CSRF. Todo POST autenticado exige (§10.9, camada 3). */
   readonly csrf: boolean
-  /** Exige step-up recente. O verificador nasce com a etapa do step-up. */
+  /**
+   * A rota exige step-up **independentemente do conteudo**?
+   *
+   * §11.3, passo 8, diz "step-up, quando a rota **ou o conteudo** exige", e
+   * desde a etapa do step-up quem manda e a segunda metade: a classificacao de
+   * §10.10 mora no funil de gravacao, que e o unico lugar capaz de transformar o
+   * corpo daquela rota na mudanca canonica e recalcular o `op_hash`. §10.10 e
+   * literal: "a verificacao acontece **dentro** da rota de escrita".
+   *
+   * `/painel/mensagem` aparece em §7.1 com "**sempre** no POST", e continua
+   * `false` AQUI porque e o conteudo que a torna sempre protegida: os tres
+   * campos daquela tela estao em `CAMPOS_SEMPRE_PROTEGIDOS`, entao toda mudanca
+   * real ali passa pelo step-up. Um `true` no roteador acrescentaria uma segunda
+   * grafia da trava — e uma que nem sabe conferir o `op_hash` — e ainda cobraria
+   * biometria de um reenvio que nao muda nada, que §9.9 nem grava.
+   *
+   * O ramo que este campo aciona em `despachar` continua FECHANDO a rota, e essa
+   * e a razao de ele existir: uma linha futura que declare `true` tranca em vez
+   * de abrir em silencio.
+   */
   readonly stepUp: boolean
   /**
    * `true` quando a rota GRAVA no D1 no caminho de sucesso (§7.1, §15.4).
@@ -125,16 +144,12 @@ export const ROTA_CHAVE: RotaDoPainel = {
  * As quatro telas que acompanham o Inicio.
  *
  * §7.1 declara `GET, POST` em `/painel/palavras`, `/painel/mensagem` e
- * `/painel/ajustes`. Palavras e Ajustes ganharam o `POST` na etapa que grava
- * os campos delas, junto do `csrf: true` e do `escreve: true` que ele exige;
- * a Mensagem continua so com `GET` pela regra que abre este arquivo — a tabela
- * declara apenas o que o handler ja faz, e os tres campos daquela tela exigem
- * step-up SEMPRE (§10.10), entao o `POST` dela nasce com o verificador.
+ * `/painel/ajustes`. Palavras e Ajustes ganharam o `POST` na etapa que grava os
+ * campos de risco baixo; a Mensagem ganhou o dela na etapa do step-up, que e
+ * quando o handler passou a saber grava-los — a regra que abre este arquivo e
+ * que a tabela declara apenas o que o handler ja faz.
  *
- * `stepUp: false` nas quatro: o verificador de step-up nasce na etapa dele, e
- * `despachar` TRANCA — nao abre — uma rota que declare `stepUp: true` antes
- * disso. A classificacao de §10.10 ja existe, em `gravar.ts`, e o que ela faz
- * hoje e RECUSAR a mudanca protegida com `403`, nunca aceita-la.
+ * `stepUp: false` nas quatro, e o campo explica por que.
  */
 export const ROTA_PALAVRAS: RotaDoPainel = {
   caminho: '/painel/palavras',
@@ -147,11 +162,11 @@ export const ROTA_PALAVRAS: RotaDoPainel = {
 
 export const ROTA_MENSAGEM: RotaDoPainel = {
   caminho: '/painel/mensagem',
-  metodos: ['GET'],
+  metodos: ['GET', 'POST'],
   sessao: true,
-  csrf: false,
+  csrf: true,
   stepUp: false,
-  escreve: false,
+  escreve: true,
 }
 
 export const ROTA_AJUSTES: RotaDoPainel = {
@@ -241,6 +256,27 @@ export const ROTA_VERIFICAR_REGISTRO: RotaDoPainel = {
 }
 
 /**
+ * O passo 2 da cerimonia de §10.10. **Sessao sim, ficha sim** (§7.1, §7.2).
+ *
+ * `escreve: false` e `stepUp: false`: ela nao grava nada — sorteia, assina e
+ * devolve um envelope no cookie — e pedir step-up para comecar um step-up seria
+ * uma recursao sem base. Quem autoriza a mudanca e a rota de ESCRITA, que
+ * recalcula o `op_hash` do corpo que recebeu.
+ *
+ * Nao existe `/painel/api/stepup/verificar`, e a ausencia e o desenho (§7.1,
+ * nomes deletados): uma rota de verificacao separada seria uma autorizacao
+ * pendurada esperando uma segunda requisicao.
+ */
+export const ROTA_OPCOES_DE_STEPUP: RotaDoPainel = {
+  caminho: '/painel/api/stepup/opcoes',
+  metodos: ['POST'],
+  sessao: true,
+  csrf: true,
+  stepUp: false,
+  escreve: false,
+}
+
+/**
  * As rotas do painel que o roteador despacha hoje.
  *
  * `/painel/convite`, `/painel/api/registrar/opcoes` e
@@ -264,4 +300,5 @@ export const ROTAS: readonly RotaDoPainel[] = [
   ROTA_VERIFICAR_ENTRADA,
   ROTA_OPCOES_DE_REGISTRO,
   ROTA_VERIFICAR_REGISTRO,
+  ROTA_OPCOES_DE_STEPUP,
 ]

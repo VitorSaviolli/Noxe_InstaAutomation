@@ -30,17 +30,12 @@ import {
   ESCOPO_DE_MIDIAS,
   escopoDeMidias,
   FRASE_DO_AJUSTE,
-  fraseDoAjuste,
   MODO_DE_COMPARACAO,
   NOME_DO_CAMPO,
   ORIGEM_DOS_AJUSTES,
 } from './dicionario'
-import {
-  CAMPOS_DE_COMPORTAMENTO,
-  gravarConfiguracao,
-  lerEstadoGuardado,
-  valorDeFormulario,
-} from './gravar'
+import { CAMPOS_DE_COMPORTAMENTO, lerEstadoGuardado, valorDeFormulario } from './formulario'
+import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import {
   blocoDeConfirmacao,
@@ -135,6 +130,32 @@ function escolhaDeChave(
 }
 
 /**
+ * Onde a automacao responde: so nos Reels, ou em qualquer publicacao.
+ *
+ * **A segunda opcao leva cadeado, a primeira nao** (§12.3): `processOnlyReels`
+ * indo para `false` amplia o raio para qualquer publicacao, e §10.10 lista isso
+ * como alargamento. Voltar para "so nos Reels" estreita, e estreitar nunca pede
+ * a digital — que e a promessa escrita no rodape desta mesma tela.
+ *
+ * As duas frases vem de `FRASE_DO_AJUSTE`, o mesmo par que a linha de leitura
+ * usava: nao nasce aqui uma segunda traducao do campo.
+ */
+function escolhaDoTipoDePublicacao(config: AutomationConfig): HtmlSeguro {
+  const frases = FRASE_DO_AJUSTE.processOnlyReels
+
+  return html`<fieldset>
+<legend>${NOME_DO_CAMPO.processOnlyReels}</legend>
+<p><label><input type="radio" name="processOnlyReels" value="sim"${
+    config.processOnlyReels ? html` checked` : null
+  }> ${frases.verdadeiro}</label></p>
+<p><label><input type="radio" name="processOnlyReels" value="nao"${
+    config.processOnlyReels ? null : html` checked`
+  }> ${frases.falso} <span class="selo-protegido"><span aria-hidden="true">&#128274;</span>
+protegido</span></label></p>
+</fieldset>`
+}
+
+/**
  * O formulario dos ajustes que esta etapa grava.
  *
  * O intervalo entra como numero, e o rotulo diz qual e a direcao que nao pede a
@@ -151,6 +172,8 @@ ${linha('Modo', MODO_DE_COMPARACAO[config.matchMode])}
 ${escolhaDeChave('caseSensitive', config)}
 ${escolhaDeChave('normalizeAccents', config)}
 ${escolhaDeChave('ignorePunctuation', config)}
+<h2>Onde a automa&ccedil;&atilde;o responde</h2>
+${escolhaDoTipoDePublicacao(config)}
 <h2>Intervalo por pessoa</h2>
 <p><label for="userCooldownHours">Quantas horas a mesma pessoa espera para acionar de novo.
 Aumentar &eacute; a dire&ccedil;&atilde;o segura.</label></p>
@@ -267,8 +290,7 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
   const corpo = html`<h1>Ajustes finos</h1>
 ${blocoDeConfirmacao(entrada.request)}
 <section>
-<h2>Onde a automa&ccedil;&atilde;o responde</h2>
-${linha('Tipo de publicação', fraseDoAjuste('processOnlyReels', global))}
+<h2>Como est&aacute; agora</h2>
 ${linha('Quais Reels', ESCOPO_DE_MIDIAS[escopoDeMidias(global)])}
 ${linha('Intervalo por pessoa', frasedoIntervalo(global.userCooldownHours))}
 </section>

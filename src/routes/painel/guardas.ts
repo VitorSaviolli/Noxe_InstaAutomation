@@ -1,7 +1,11 @@
 /**
  * As guardas do painel: o limitador de taxa, a origem, o teto de corpo, o
  * portao de sessao e a ficha anti-CSRF — os passos 2, 4, 5, 6, 7 e 9 da escada
- * de §11.3. O passo 8, o step-up, chega com a etapa que sabe verifica-lo.
+ * de §11.3. O passo 8, o step-up, mora em `stepup.ts`: ele precisa da mudanca
+ * canonica de §10.10, e o nome do cookie e o do campo escondido continuam AQUI,
+ * ao lado dos irmaos deles — os quatro atributos de `cookieDoPainel` e a lista
+ * de campos que nao sao configuracao sao um conjunto so, e uma segunda grafia
+ * perderia um deles exatamente uma vez.
  *
  * **O limitador e uma camada OPCIONAL, e essa e a afirmacao mais importante
  * deste arquivo.** Ausentes os tres bindings, o painel funciona sem a camada e
@@ -523,6 +527,16 @@ export const COOKIE_DA_SESSAO = '__Host-painel_sessao'
 export const COOKIE_DO_DESAFIO = '__Host-painel_desafio'
 
 /**
+ * O cookie do step-up (§7.2): envelope de proposito `stepup`, 120 s.
+ *
+ * **O prefixo `__Host-` fica, e nao ha plano B aceitavel** (§15.2, pendencia
+ * 11): ele e o que impede outro Worker da mesma conta `workers.dev` de sombrear
+ * este cookie com um cookie de dominio pai. Um envelope sombreado seria uma
+ * autorizacao escolhida por quem sombreou.
+ */
+export const COOKIE_DE_STEPUP = '__Host-painel_stepup'
+
+/**
  * O `Set-Cookie` de um dos tres cookies de §7.2.
  *
  * Os quatro atributos nao sao opcionais e nao tem variante: `HttpOnly` (o
@@ -557,10 +571,17 @@ export const CAMPO_DA_FICHA = 'csrf'
  * string — que e o ciclo que este projeto nao tem.
  *
  * `versao` e a trava otimista de §8.8. `confirmar` e o gesto explicito que
- * §10.12 exige para religar a automacao.
+ * §10.12 exige para religar a automacao. `digital` e onde o passo 3 de §10.10
+ * poe a assertion serializada — **no mesmo formulario** da mudanca, para que a
+ * autorizacao e o conteudo que ela cobre cheguem na MESMA requisicao e nao
+ * exista autorizacao pendurada esperando uma segunda.
+ *
+ * O nome e `digital` e nao `assertion` porque ele aparece no HTML da tela, e
+ * §12.1 fecha o vocabulario do que a tela escreve.
  */
 export const CAMPO_DA_VERSAO = 'versao'
 export const CAMPO_DA_CONFIRMACAO = 'confirmar'
+export const CAMPO_DA_DIGITAL = 'digital'
 
 /**
  * O valor de um cookie, do cabecalho cru.

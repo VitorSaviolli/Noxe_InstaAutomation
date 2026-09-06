@@ -10,14 +10,17 @@ import {
   NOME_DO_CAMPO,
   PALAVRAS_PROIBIDAS,
 } from '../src/routes/painel/dicionario'
-import { CAMPOS_DE_COMPORTAMENTO, codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
+import { CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/formulario'
+import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
+import { handleMensagem } from '../src/routes/painel/mensagem'
 import { handlePalavras } from '../src/routes/painel/palavras'
 import { erro } from '../src/routes/painel/resposta'
 import {
   ROTA_AJUSTES,
   ROTA_CHAVE,
   ROTA_INICIO,
+  ROTA_MENSAGEM,
   ROTA_PALAVRAS,
   ROTAS,
   type RotaDoPainel,
@@ -101,18 +104,34 @@ async function abrirSessao(credencial = 'credencial-de-teste'): Promise<Sessao> 
   }
 }
 
-/** A rota e o handler de cada uma das tres que gravam nesta etapa. */
+/**
+ * A rota e o handler de cada uma das que gravam.
+ *
+ * `/painel/mensagem` entrou na etapa do step-up, que e quando ela passou a ter
+ * `POST`. Ela vai no FIM, e nao na ordem de `ROTAS`, para nao mexer nos indices
+ * que o resto desta suite ja usa; GRAV-01 compara os dois conjuntos ordenados.
+ */
 const GRAVADORAS: readonly { rota: RotaDoPainel; handler: HandlerDoPainel }[] = [
   { rota: ROTA_CHAVE, handler: handleChave },
   { rota: ROTA_PALAVRAS, handler: handlePalavras },
   { rota: ROTA_AJUSTES, handler: handleAjustes },
+  { rota: ROTA_MENSAGEM, handler: handleMensagem },
 ]
 
-/** Um corpo valido para cada rota que grava, para os lacos da tabela. */
+/**
+ * Um corpo valido para cada rota que grava, para os lacos da tabela.
+ *
+ * O de `/painel/mensagem` e VAZIO de proposito: os tres campos daquela tela
+ * exigem step-up sempre, entao o unico `303` que ela produz sem digital e o
+ * `?ok=sem_mudanca` de um reenvio que nao muda nada — que e exatamente a regra
+ * de forma que GRAV-01 afirma. As duas metades do step-up dela vivem em
+ * `tests/painel-stepup.test.ts`.
+ */
 const CORPO_VALIDO: Record<string, string> = {
   [ROTA_CHAVE.caminho]: 'acao=desligar',
   [ROTA_PALAVRAS.caminho]: `triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}`,
   [ROTA_AJUSTES.caminho]: 'userCooldownHours=48',
+  [ROTA_MENSAGEM.caminho]: '',
 }
 
 function postar(
@@ -642,8 +661,8 @@ describe('GRAV — a forma da gravacao', () => {
 
     // Contrapositivo: uma tabela sem rota de pagina que grava faria o laco
     // passar sem provar nada.
-    expect(dePagina.map((rota) => rota.caminho)).toEqual(
-      GRAVADORAS.map((gravadora) => gravadora.rota.caminho),
+    expect([...dePagina.map((rota) => rota.caminho)].sort()).toEqual(
+      [...GRAVADORAS.map((gravadora) => gravadora.rota.caminho)].sort(),
     )
 
     for (const alvo of GRAVADORAS) {
@@ -927,24 +946,29 @@ describe('GRAV — a forma da gravacao', () => {
   })
 
   test('GRAV-10: campo ainda nao gravavel e recusado com 400 e `mudanca_recusada`', async () => {
-    // Estreitar o alcance NAO exige step-up (§10.10), mas `matchMode` ainda nao
-    // e gravavel nesta etapa. A recusa e explicita — nunca campo ignorado em
-    // silencio, que seria a mudanca que acontece sem a pessoa ver.
-    await gravarConfig(env.DB, { match_mode: 'contains', trigger_keywords: '["quero o link"]' })
+    // Estreitar o alcance NAO exige step-up (§10.10), mas `mediaScope` ainda nao
+    // e gravavel: a tela dona dele (`/painel/reels`) nao existe (Ruling 68). A
+    // recusa e explicita — nunca campo ignorado em silencio, que seria a mudanca
+    // que acontece sem a pessoa ver.
+    //
+    // O campo deste teste era `matchMode` ate a etapa do step-up; Ruling 65 o
+    // tornou gravavel em `/painel/palavras`, e a metade positiva dele passou a
+    // ser afirmada em `tests/painel-stepup.test.ts`.
+    await gravarConfig(env.DB, { media_scope: 'todas', trigger_keywords: '["quero o link"]' })
     const sessao = await abrirSessao()
 
     const resposta = await gravar(
       GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      'matchMode=exact',
+      'mediaScope=selecionadas',
       sessao,
     )
 
     expect(resposta.status).toBe(400)
     expect({ acao: (await unicaLinha()).acao, campos: (await unicaLinha()).campos }).toEqual({
       acao: 'mudanca_recusada',
-      campos: '["matchMode"]',
+      campos: '["mediaScope"]',
     })
-    expect((await linhaDeConfig())?.match_mode).toBe('contains')
+    expect((await linhaDeConfig())?.media_scope).toBe('todas')
   })
 
   test('GRAV-11: campo protegido e recusado com 403, mesmo junto de um campo permitido', async () => {
@@ -1489,7 +1513,7 @@ describe('GRAV — a forma da gravacao', () => {
     // `mediaScope`, `processOnlyReels` e os dois textos passavam com a
     // classificacao desligada.
     const ALARGAM: readonly { campo: string; corpo: string; partida: Record<string, unknown> }[] = [
-      { campo: 'matchMode', corpo: 'matchMode=contains', partida: { match_mode: 'exact' } },
+      { campo: 'matchMode', corpo: 'matchMode=no_meio', partida: { match_mode: 'exact' } },
       {
         campo: 'userCooldownHours',
         corpo: 'userCooldownHours=1',
@@ -1537,22 +1561,40 @@ describe('GRAV — a forma da gravacao', () => {
     }
 
     // E o contrapositivo, que e a promessa do rodape dos Ajustes: ESTREITAR
-    // nunca pede a digital. Os dois campos abaixo ainda nao sao gravaveis, entao
-    // a recusa e `400 dados_invalidos` — e nao o `403` de quem alarga.
-    const ESTREITAM: readonly { campo: string; corpo: string; partida: Record<string, unknown> }[] =
-      [
-        { campo: 'matchMode', corpo: 'matchMode=exact', partida: { match_mode: 'contains' } },
-        {
-          campo: 'mediaScope',
-          corpo: 'mediaScope=selecionadas',
-          partida: { media_scope: 'todas' },
-        },
-        {
-          campo: 'processOnlyReels',
-          corpo: 'processOnlyReels=sim',
-          partida: { process_only_reels: 0 },
-        },
-      ]
+    // nunca pede a digital. Desde Ruling 65, `matchMode` e `processOnlyReels`
+    // sao gravaveis, entao estreitar GRAVA — `303` e `config_alterada`, com
+    // `step_up = 0`. Sobra `mediaScope`, que ainda nao tem tela dona (Ruling 68)
+    // e por isso e recusado com `400 dados_invalidos` — e nao com o `403` de quem
+    // alarga, que e a distincao que este trecho existe para afirmar.
+    const ESTREITAM: readonly {
+      campo: string
+      corpo: string
+      partida: Record<string, unknown>
+      status: number
+      acao: string
+    }[] = [
+      {
+        campo: 'matchMode',
+        corpo: 'matchMode=so_isso',
+        partida: { match_mode: 'contains' },
+        status: 303,
+        acao: 'config_alterada',
+      },
+      {
+        campo: 'mediaScope',
+        corpo: 'mediaScope=selecionadas',
+        partida: { media_scope: 'todas' },
+        status: 400,
+        acao: 'mudanca_recusada',
+      },
+      {
+        campo: 'processOnlyReels',
+        corpo: 'processOnlyReels=sim',
+        partida: { process_only_reels: 0 },
+        status: 303,
+        acao: 'config_alterada',
+      },
+    ]
 
     for (const caso of ESTREITAM) {
       await limparBanco(env.DB)
@@ -1566,10 +1608,12 @@ describe('GRAV — a forma da gravacao', () => {
         sessao,
       )
 
-      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: 400 })
+      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: caso.status })
       expect({ [caso.campo]: (await unicaLinha()).acao }).toEqual({
-        [caso.campo]: 'mudanca_recusada',
+        [caso.campo]: caso.acao,
       })
+      // Nenhuma das tres passou por step-up: estreitar nunca pede a digital.
+      expect({ [caso.campo]: (await unicaLinha()).step_up }).toEqual({ [caso.campo]: 0 })
     }
   })
 

@@ -207,6 +207,24 @@ export function validarConfigComAllowlist(
  * arquivo e ainda nao teve chance de preencher a variavel nova. A recusa
  * nesse estado acontece na escrita, perguntando a `allowlist.configurada`.
  */
+/**
+ * Aquele campo carrega endereco, e por isso depende da allowlist? (§9.8)
+ *
+ * Sao os mesmos tres que `conferirDominios` examina — e eles nao viram uma lista
+ * unica porque o exame de cada um e diferente: o link passa por `achadosDoLink`
+ * e os dois textos por `achadosDoTexto`. Este predicado existe para a pergunta
+ * OPOSTA, que a gravacao faz antes de validar: "este lote mexe em algum campo de
+ * endereco?".
+ *
+ * A pergunta so passou a ter consequencia quando os tres campos viraram
+ * gravaveis: ate entao eles paravam no `403 step_up_necessario` antes de
+ * qualquer coisa, e a promessa de §9.8 — "com a lista nao configurada o painel
+ * nao altera o link nem o texto do Direct" — era verdadeira por acidente.
+ */
+export function campoCarregaEndereco(campo: string): boolean {
+  return campo === 'destinationUrl' || campo === 'privateReplyText' || campo === 'publicReplyText'
+}
+
 function conferirDominios(valores: AutomationConfig, allowlist: Allowlist): readonly Achado[] {
   if (!allowlist.configurada) return []
 

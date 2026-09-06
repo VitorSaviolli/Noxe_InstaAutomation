@@ -30,8 +30,8 @@ import {
 } from '../../services/panel-session'
 import { opcoesDeLogin, sortearDesafio } from '../../services/webauthn/opcoes'
 import {
+  lerRespostaDeAssertion,
   prefixoDeCredencial,
-  type RespostaDeAssertion,
   verificarAssertion,
 } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
@@ -154,36 +154,6 @@ export async function handleOpcoesDeEntrar(entrada: EntradaDaRota): Promise<Resp
 // POST /painel/api/entrar/verificar — o unico lugar que emite sessao
 // ---------------------------------------------------------------------------
 
-/** A forma minima da resposta do autenticador. Qualquer outra vira `null`. */
-function lerAssertion(corpo: unknown): RespostaDeAssertion | null {
-  if (typeof corpo !== 'object' || corpo === null) return null
-  const credencial = (corpo as { credencial?: unknown }).credencial
-  if (typeof credencial !== 'object' || credencial === null) return null
-
-  const lida = credencial as Record<string, unknown>
-  if (
-    typeof lida.id !== 'string' ||
-    typeof lida.type !== 'string' ||
-    typeof lida.clientDataJSON !== 'string' ||
-    typeof lida.authenticatorData !== 'string' ||
-    typeof lida.signature !== 'string'
-  ) {
-    return null
-  }
-  // `userHandle` e o unico opcional: o passo 5 de §10.7 confere os DOIS lados —
-  // ausente tambem e uma resposta possivel, e `verificarAssertion` a trata.
-  if (lida.userHandle !== null && typeof lida.userHandle !== 'string') return null
-
-  return {
-    id: lida.id,
-    type: lida.type,
-    clientDataJSON: lida.clientDataJSON,
-    authenticatorData: lida.authenticatorData,
-    signature: lida.signature,
-    userHandle: lida.userHandle as string | null,
-  }
-}
-
 /**
  * O login, na ordem de §10.7.
  *
@@ -208,7 +178,7 @@ export async function handleVerificarEntrada(entrada: EntradaDaRota): Promise<Re
     const desafio = await desafioDoCookie(request, env, now)
     if (desafio === null) return recusar('desafio_invalido', contexto)
 
-    const assertion = corpo.familia === 'json' ? lerAssertion(corpo.dados) : null
+    const assertion = corpo.familia === 'json' ? lerRespostaDeAssertion(corpo.dados) : null
     if (assertion === null) return recusar('corpo_invalido', contexto)
 
     // A PRIMEIRA e UNICA leitura do caminho de fracasso.

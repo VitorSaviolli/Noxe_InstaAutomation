@@ -23,7 +23,8 @@ import type { AutomationConfig } from '../../config'
 import { MAX_GATILHOS } from '../../services/config-validation'
 import { matchKeyword, normalizeOptionsFrom } from '../../utils/normalize'
 import { fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
-import { comoLinhas, gravarConfiguracao } from './gravar'
+import { comoLinhas, MODO_NO_FORMULARIO } from './formulario'
+import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import {
   blocoDeConfirmacao,
@@ -98,9 +99,11 @@ usa para responder de verdade.</p>
 
 /** As tres frases de comparacao, geradas dos ajustes reais do dono (§3). */
 function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
+  // O MODO nao aparece mais aqui: ele virou escolha dentro do formulario, e um
+  // eco em leitura ao lado de um controle editavel seriam duas telas dizendo o
+  // mesmo valor — a primeira a divergir seria a que ninguem atualizou.
   return html`<section>
 <h2>Como o coment&aacute;rio &eacute; comparado</h2>
-<p><strong>${MODO_DE_COMPARACAO[config.matchMode]}</strong></p>
 <ul>
 <li>${fraseDoAjuste('caseSensitive', config)}</li>
 <li>${fraseDoAjuste('normalizeAccents', config)}</li>
@@ -133,8 +136,33 @@ ${camposDoFormulario(ficha, versao)}
 ${String(MAX_GATILHOS)}.</label></p>
 <textarea id="triggerKeywords" name="triggerKeywords" rows="6"
 >${comoLinhas(config.triggerKeywords)}</textarea>
+${escolhaDeModo(config)}
 <p><button type="submit">Salvar</button></p>
 </form>`
+}
+
+/**
+ * O modo de comparacao, com as duas frases inteiras do dicionario.
+ *
+ * **Uma das duas opcoes leva cadeado, e a outra nao** (§12.3): ir para "basta
+ * aparecer no meio" ALARGA o envelope de alcance, e alargar pede a digital;
+ * voltar para "o comentario tem que ser so isso" estreita, e estreitar nunca
+ * pede. E a promessa do rodape dos Ajustes escrita dentro do controle que a
+ * exerce, e por isso o botao diz so "Salvar": §12.3 manda que, nas telas em que
+ * so PARTE dos campos e protegida, quem avisa seja o cadeado no campo mais a
+ * tela de conferencia — nunca uma surpresa biometrica.
+ */
+function escolhaDeModo(config: AutomationConfig): HtmlSeguro {
+  return html`<fieldset>
+<legend>Como o coment&aacute;rio &eacute; comparado</legend>
+<p><label><input type="radio" name="matchMode" value="${MODO_NO_FORMULARIO.exact}"${
+    config.matchMode === 'exact' ? html` checked` : null
+  }> ${MODO_DE_COMPARACAO.exact}</label></p>
+<p><label><input type="radio" name="matchMode" value="${MODO_NO_FORMULARIO.contains}"${
+    config.matchMode === 'contains' ? html` checked` : null
+  }> ${MODO_DE_COMPARACAO.contains} <span class="selo-protegido"><span aria-hidden="true"
+>&#128274;</span> protegido</span></label></p>
+</fieldset>`
 }
 
 export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> {

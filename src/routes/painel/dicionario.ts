@@ -180,10 +180,16 @@ export function motivoDaRecusa(codigo: string): string {
  * Elas moram aqui pelo mesmo motivo que todas as outras: nenhuma frase de tela
  * nasce fora do dicionario. `protegido` e a promessa de §12.3 dita ao
  * contrario — a pessoa tentou aumentar o alcance, e aumentar pede a digital.
+ *
+ * **`protegido` mudou nesta etapa, e a mudanca e uma divida quitada.** Enquanto
+ * o verificador nao existia, ela terminava em "Essa parte do painel chega em
+ * seguida" — uma frase que prometia uma continuacao que o `403` nao tinha. Agora
+ * a continuacao existe logo abaixo dela, na tela de conferencia, e a frase diz
+ * o que de fato acontece.
  */
 export const RECUSA_SEM_VALOR = {
   protegido:
-    'Este ajuste aumenta o alcance da automação, e por isso ele vai pedir a sua digital. Essa parte do painel chega em seguida.',
+    'Esta mudança pede a sua digital ou o seu rosto: ou ela aumenta o alcance da automação, ou ela troca o que a pessoa recebe. Confira abaixo o que vai mudar e confirme.',
   naoGravavel: 'Este ajuste ainda não pode ser mudado por aqui.',
   configIlegivel:
     'Não conseguimos ler os seus ajustes salvos, então nada pode ser gravado por aqui até isso ser resolvido. Quem resolve é quem publicou o projeto, no computador.',
@@ -246,6 +252,58 @@ export const FRASE_DO_AJUSTE: Record<
  */
 export function fraseDoAjuste(campo: CampoDeComparacao, config: AutomationConfig): string {
   return config[campo] ? FRASE_DO_AJUSTE[campo].verdadeiro : FRASE_DO_AJUSTE[campo].falso
+}
+
+/** Os dois campos de sim/nao que nao tem par de frases proprio. */
+const CANAL_LIGADO = 'Ligada, e quem comenta recebe.'
+const CANAL_DESLIGADO = 'Desligada, e nada e enviado por aqui.'
+
+/**
+ * O valor de UM campo escrito para a tela de conferencia de §10.10.
+ *
+ * §10.10 exige o **valor literal** antes da biometria, e §12.1 proibe o
+ * vocabulario do banco na tela. Os dois convivem porque os campos sao de duas
+ * especies: o link e os dois textos SAO texto do dono, e o literal deles e o
+ * proprio texto — ele sai como esta, sem recorte e sem reticencias. Os
+ * enumerados e os booleanos guardam `exact`, `contains`, `todas`, `0` e `1`, que
+ * §12.1 nao deixa escrever, entao o literal deles e a frase que a tela ja usa em
+ * todo lugar.
+ *
+ * As frases vem das MESMAS tabelas que as telas de leitura usam — nao ha uma
+ * segunda traducao de `matchMode` nascendo aqui. Um segundo par de frases seria
+ * a chance de a tela de conferencia dizer uma coisa e a tela de Ajustes dizer
+ * outra sobre o mesmo valor, no exato momento em que a pessoa decide assinar.
+ *
+ * O valor chega como `unknown` de proposito: o dicionario nao conhece o tipo do
+ * estado do funil, e um `import` de volta fecharia um ciclo.
+ */
+export function valorNaTela(campo: CampoDaConfig, valor: unknown): string {
+  switch (campo) {
+    case 'matchMode':
+      return MODO_DE_COMPARACAO[valor as MatchMode] ?? String(valor)
+    case 'mediaScope':
+      return ESCOPO_DE_MIDIAS[valor as EscopoDeMidias] ?? String(valor)
+    case 'caseSensitive':
+    case 'normalizeAccents':
+    case 'ignorePunctuation':
+    case 'processOnlyReels':
+      return valor === true ? FRASE_DO_AJUSTE[campo].verdadeiro : FRASE_DO_AJUSTE[campo].falso
+    case 'triggerKeywords':
+      return Array.isArray(valor) && valor.length > 0
+        ? valor.join(', ')
+        : 'Nenhuma palavra, e por isso a automação nunca responde.'
+    case 'userCooldownHours':
+      return valor === 1 ? '1 hora de espera' : `${String(valor)} horas de espera`
+    case 'enabled':
+      return valor === true ? 'Ligada' : 'Desligada'
+    case 'publicReplyEnabled':
+    case 'privateReplyEnabled':
+      return valor === true ? CANAL_LIGADO : CANAL_DESLIGADO
+    // O link e os dois textos: o literal deles e o proprio texto do dono, sem
+    // recorte e sem reticencias — quem vai assinar precisa ler o que assina.
+    default:
+      return String(valor)
+  }
 }
 
 /**

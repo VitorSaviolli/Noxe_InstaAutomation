@@ -226,17 +226,22 @@ async function snapshotDoBanco(): Promise<SnapshotConfig> {
 }
 
 /**
- * As tres chaves de comparacao que a tela de Ajustes GRAVA.
+ * As chaves de sim/nao que a tela de Ajustes GRAVA.
  *
  * Elas viraram par de radios quando a escrita nasceu, e por isso as DUAS frases
  * de cada uma aparecem na pagina. A afirmacao de TELA-11 e TELA-12 nao mudou de
  * sentido — a tela nao pode mentir sobre o que esta valendo —, mudou de forma:
  * o que prova o valor agora e qual das duas esta MARCADA.
+ *
+ * `processOnlyReels` entrou na etapa do step-up (Ruling 65): ir para "responde
+ * em qualquer publicacao" alarga o alcance, e com o step-up existindo essa
+ * direcao passou a ser gravavel em vez de recusada.
  */
 const CHAVES_EDITAVEIS: readonly CampoDeComparacao[] = [
   'caseSensitive',
   'normalizeAccents',
   'ignorePunctuation',
+  'processOnlyReels',
 ]
 
 /**
@@ -370,7 +375,13 @@ describe('HDR — o valor do banco na tela', () => {
         expect({ [tela.rota.caminho]: VAZAMENTO.test(corpo) }).toEqual({
           [tela.rota.caminho]: false,
         })
-        expect({ [tela.rota.caminho]: corpo.includes('destinationUrl') }).toEqual({
+        // O nome da coluna nao pode aparecer como TEXTO. Desde a etapa do
+        // step-up, `/painel/mensagem` grava o link, e `name=`/`id=`/`for=` sao
+        // o nome do campo do formulario — do mesmo jeito que `/painel/ajustes`
+        // ja carrega `name="userCooldownHours"`. O que continua proibido e a
+        // coluna vazando em qualquer outro lugar do corpo.
+        const semNomesDeCampo = corpo.replace(/(?:name|id|for)="[^"]*"/g, '')
+        expect({ [tela.rota.caminho]: semNomesDeCampo.includes('destinationUrl') }).toEqual({
           [tela.rota.caminho]: false,
         })
         // A frase tecnica do achado — a que fala em "endereco completo" — fica
@@ -717,12 +728,11 @@ describe('TELA — o que a tela imprime', () => {
       expect({ [esperado]: corpo.includes(escapeHtml(esperado)) }).toEqual({ [esperado]: true })
     }
 
-    // E o oposto de cada um NAO aparece.
-    for (const proibido of [
-      ESCOPO_DE_MIDIAS.todas,
-      MODO_DE_COMPARACAO.exact,
-      FRASE_DO_AJUSTE.processOnlyReels.verdadeiro,
-    ]) {
+    // E o oposto de cada um NAO aparece. `processOnlyReels` saiu desta lista na
+    // etapa do step-up: Ruling 65 o tornou editavel, entao as DUAS frases dele
+    // aparecem — como as das outras chaves — e o que se afirma sobre ele e qual
+    // opcao esta MARCADA, no laco de `CHAVES_EDITAVEIS` abaixo.
+    for (const proibido of [ESCOPO_DE_MIDIAS.todas, MODO_DE_COMPARACAO.exact]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
     }
 
@@ -771,11 +781,7 @@ describe('TELA — o que a tela imprime', () => {
       expect({ [esperado]: corpo.includes(escapeHtml(esperado)) }).toEqual({ [esperado]: true })
     }
 
-    for (const proibido of [
-      ESCOPO_DE_MIDIAS.selecionadas,
-      MODO_DE_COMPARACAO.contains,
-      FRASE_DO_AJUSTE.processOnlyReels.falso,
-    ]) {
+    for (const proibido of [ESCOPO_DE_MIDIAS.selecionadas, MODO_DE_COMPARACAO.contains]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
     }
 
