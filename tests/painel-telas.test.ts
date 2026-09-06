@@ -13,6 +13,7 @@ import {
   NOME_DO_CAMPO,
   ORIGEM_DOS_AJUSTES,
   PALAVRAS_PROIBIDAS,
+  RECUSA_SEM_VALOR,
   traduzirAviso,
 } from '../src/routes/painel/dicionario'
 import { cabecalhos } from '../src/routes/painel/html'
@@ -598,6 +599,30 @@ describe('TELA — os quatro estados grandes', () => {
     // Erro nunca inventa um valor que o dono nao viu na tela: a explicacao nao
     // propoe substituto nenhum, e nao repete a frase tecnica do achado.
     expect(visao.estado.explicacao).not.toContain('https://')
+  })
+
+  test('TELA-23: a parada por erro diz TAMBEM que o conserto e fora do painel', async () => {
+    // TELA-07 afirma que o campo e nomeado. Falta a outra metade, e ela e a que
+    // impede o dono de ficar tentando: com a configuracao salva ilegivel o
+    // painel RECUSA toda gravacao — nao pode escrever valores de fabrica por
+    // cima do que ele salvou (§9.2, §12.6) —, entao a tela precisa dizer para
+    // onde ir. Frase de tela sem asseracao ja mordeu esta branch antes.
+    await gravarConfig(env.DB, { destination_url: '[coloque-seu-link-aqui]' })
+    const cookie = await abrirSessao()
+
+    const registrado = capturarConsole()
+    let corpo: string
+    try {
+      corpo = await corpoDa(TELA_INICIO, cookie)
+    } finally {
+      registrado.parar()
+    }
+
+    expect(corpo).toContain(escapeHtml('O campo link'))
+    expect(corpo).toContain(escapeHtml(RECUSA_SEM_VALOR.configIlegivel))
+    // E a frase continua sendo do dicionario, e nao um literal na tela: sem
+    // isto, mudar o dicionario deixaria a tela para tras em silencio.
+    expect(RECUSA_SEM_VALOR.configIlegivel).toContain('nada pode ser gravado por aqui')
   })
 
   test('TELA-08: o cinza de parada por erro ganha do cinza de desligada', () => {

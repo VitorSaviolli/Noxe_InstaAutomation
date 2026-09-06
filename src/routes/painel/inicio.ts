@@ -33,8 +33,8 @@ import {
   RECUSA_SEM_VALOR,
   traduzirAviso,
 } from './dicionario'
-import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_VERSAO, gravarConfiguracao } from './gravar'
-import { CAMPO_DA_FICHA } from './guardas'
+import { gravarConfiguracao } from './gravar'
+import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
 import { ROTA_CHAVE, ROTA_INICIO } from './rotas'

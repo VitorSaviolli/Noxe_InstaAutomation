@@ -547,6 +547,22 @@ export const CABECALHO_DA_FICHA = 'x-painel-csrf'
 export const CAMPO_DA_FICHA = 'csrf'
 
 /**
+ * Os outros dois campos escondidos que um formulario do painel carrega.
+ *
+ * Eles moram ao lado da ficha porque sao a mesma especie: nomes de campo que
+ * NAO sao configuracao, e que quem le o corpo precisa reconhecer para nao os
+ * tratar como campo desconhecido. Moram AQUI, e nao no funil de gravacao, porque
+ * a tela que os emite, o funil que os le e a pagina de recusa que os reemite sao
+ * tres arquivos, e um deles teria de importar do outro so por causa de uma
+ * string — que e o ciclo que este projeto nao tem.
+ *
+ * `versao` e a trava otimista de §8.8. `confirmar` e o gesto explicito que
+ * §10.12 exige para religar a automacao.
+ */
+export const CAMPO_DA_VERSAO = 'versao'
+export const CAMPO_DA_CONFIRMACAO = 'confirmar'
+
+/**
  * O valor de um cookie, do cabecalho cru.
  *
  * Nao usa `startsWith` sobre o cabecalho inteiro: `__Host-painel_desafio` e

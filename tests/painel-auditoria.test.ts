@@ -1299,7 +1299,13 @@ describe('GRAV — a forma da gravacao', () => {
     expect(corpo).toContain(escapeHtml('Confira os campos destacados.'))
     // O campo, com o NOME do dicionario — nunca `triggerKeywords` cru.
     expect(corpo).toContain(escapeHtml(NOME_DO_CAMPO.triggerKeywords))
-    expect(corpo).not.toContain('triggerKeywords')
+    // O nome tecnico aparece SO como `name=` do rascunho que volta, nunca como
+    // texto que a pessoa le. O laco confere cada ocorrencia, e nao a ausencia:
+    // a ausencia deixaria de valer no dia em que o rascunho passasse a existir —
+    // que e exatamente o que aconteceu.
+    for (const posicao of [...corpo.matchAll(/triggerKeywords/g)].map((a) => a.index ?? 0)) {
+      expect({ [posicao]: corpo.slice(posicao - 6, posicao) }).toEqual({ [posicao]: 'name="' })
+    }
     // E o motivo de §12.4.
     expect(corpo).toContain(escapeHtml(MOTIVO_DA_RECUSA.gatilho_curto as string))
 
@@ -1344,6 +1350,137 @@ describe('GRAV — a forma da gravacao', () => {
     )
     expect(segunda.status).toBe(303)
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["quero o cardapio","quero a tabela"]')
+  })
+
+  test('GRAV-31: o `409` da CHAVE posta de volta para /painel/chave, e nao para /painel', async () => {
+    // O irmao do GRAV-24, e a rota em que o defeito era visivel. `pedido.para` e
+    // a tela para onde o `303` aponta; em Palavras e Ajustes ela coincide com o
+    // caminho do POST, e em `/painel/chave` NAO: o `303` dela vai para `/painel`,
+    // que e `GET` e so `GET`, para sempre (§7.1). Com o `action` errado, o botao
+    // de recuperacao morria em `405` — na rota que desliga a automacao.
+    await gravarConfig(env.DB, { enabled: 1, versao: 3 })
+    const sessao = await abrirSessao()
+
+    const resposta = await gravar(
+      GRAVADORAS[0] as (typeof GRAVADORAS)[number],
+      'acao=desligar',
+      sessao,
+      { versao: 2 },
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(409)
+    expect(corpo).toContain(`action="${ROTA_CHAVE.caminho}"`)
+    expect(corpo).not.toContain(`action="${ROTA_INICIO.caminho}"`)
+
+    // E o botao FUNCIONA: postar o formulario daquela pagina desliga mesmo, em
+    // vez de bater no `405 metodo_nao_permitido` de uma rota so de leitura.
+    const formulario = primeiroFormularioDeGravacao(corpo)
+    const segunda = await despachar(
+      postar(formulario.action, formulario.campos.toString(), sessao),
+      env,
+      AGORA,
+      ROTA_CHAVE,
+      handleChave,
+    )
+
+    expect(segunda.status).toBe(303)
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+  })
+
+  test('GRAV-32: o rascunho do `409` NAO carrega a confirmacao de §10.12', async () => {
+    // §8.8 desenhou o incremento de versao exatamente para o caso da parada de
+    // emergencia disparar com o formulario aberto: "obrigado a recarregar e ver,
+    // em letras grandes, que a automacao foi parada e desde quando". Carregar a
+    // confirmacao pelo `409` seria o unico caminho em que aquele gesto e
+    // CARREGADO em vez de FEITO — religar num clique sem ver a parada mais nova.
+    await gravarConfig(env.DB, { enabled: 0, versao: 3 })
+    const sessao = await abrirSessao()
+
+    const resposta = await gravar(
+      GRAVADORAS[0] as (typeof GRAVADORAS)[number],
+      'acao=ligar&confirmar=sim',
+      sessao,
+      { versao: 2 },
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(409)
+    // A acao volta — ela e o que a pessoa pediu.
+    expect(corpo).toContain('name="acao" value="ligar"')
+    // O GESTO nao volta.
+    expect(corpo).not.toContain('name="confirmar"')
+
+    // E a prova de que a ausencia MORDE: reenviar o formulario daquela pagina
+    // nao liga a automacao.
+    const formulario = primeiroFormularioDeGravacao(corpo)
+    const segunda = await despachar(
+      postar(formulario.action, formulario.campos.toString(), sessao),
+      env,
+      AGORA,
+      ROTA_CHAVE,
+      handleChave,
+    )
+
+    expect(segunda.status).toBe(400)
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+  })
+
+  test('GRAV-33: a recusa de CONTEUDO tambem devolve o rascunho, e sem botao que falha', async () => {
+    // Perder vinte palavras digitadas num celular porque uma ficou curta demais
+    // e pior do que perde-las por causa de uma aba aberta em outro aparelho. O
+    // rascunho volta; o BOTAO nao, porque reenviar o mesmo rascunho bate na
+    // mesma recusa — e um botao que sempre falha e a promessa quebrada que o
+    // rascunho existe para consertar.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const rascunho = 'quero o cardapio\nquero a tabela\na'
+    const resposta = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent(rascunho)}`,
+      sessao,
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(400)
+    expect(corpo).toContain(escapeHtml(rascunho))
+    expect(corpo).not.toContain('<button type="submit"')
+
+    // O `409` continua com botao: la reenviar FUNCIONA, porque a trava era de
+    // concorrencia e o rascunho volta com a versao de agora.
+    await env.DB.prepare('UPDATE painel_config SET versao = 9 WHERE id = 1').run()
+    invalidarCacheDeConfig()
+    const conflito = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent('quero o cardapio')}`,
+      sessao,
+      { versao: 8 },
+    )
+    expect(await conflito.text()).toContain('<button type="submit"')
+  })
+
+  test('GRAV-34: a recusa por campo protegido tambem guarda o rascunho', async () => {
+    // O `403` de step-up e uma recusa de CONTEUDO como as outras: o que a pessoa
+    // digitou no mesmo envio nao pode sumir so porque um dos campos do lote
+    // exigia a digital. Vale mais aqui do que em qualquer outro lugar, porque na
+    // etapa do step-up este e o caminho que passa a ter continuacao.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const resposta = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      [
+        'userCooldownHours=48',
+        `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/novo`)}`,
+      ].join('&'),
+      sessao,
+    )
+    const corpo = await resposta.text()
+
+    expect(resposta.status).toBe(403)
+    expect(corpo).toContain('name="userCooldownHours" value="48"')
+    expect(corpo).toContain(escapeHtml(`https://${DOMINIO_DE_TESTE}/novo`))
   })
 
   test('GRAV-25: a tabela de §10.10 inteira — o que alarga pede a digital, o que estreita nao', async () => {

@@ -28,19 +28,12 @@
  * essa e a unica escrita que sai de um caminho que nao muda a configuracao.
  */
 import type { AutomationConfig } from '../../config'
-import {
-  type AcaoDeAuditoria,
-  PainelAuditoriaRepository,
-} from '../../repositories/painel-auditoria-repository'
+import { PainelAuditoriaRepository } from '../../repositories/painel-auditoria-repository'
 import {
   type LinhaGravavel,
   PainelConfigRepository,
 } from '../../repositories/painel-config-repository'
-import {
-  carregarConfigEfetiva,
-  invalidarCacheDeConfig,
-  type SnapshotConfig,
-} from '../../services/config-store'
+import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../../services/config-store'
 import type { Achado } from '../../services/config-validation'
 import { MAX_HORAS_DE_COOLDOWN } from '../../services/config-validation'
 import {
@@ -48,9 +41,7 @@ import {
   lerAllowlist,
   validarConfigComAllowlist,
 } from '../../services/link-allowlist'
-import { fichaCsrf } from '../../services/panel-session'
 import { prefixoDeCredencial } from '../../services/webauthn/verificar'
-import type { Env } from '../../types/env'
 import {
   type CampoDaConfig,
   type CodigoDeConfirmacao,
@@ -60,9 +51,16 @@ import {
   NOME_DO_CAMPO,
   RECUSA_SEM_VALOR,
 } from './dicionario'
-import { CAMPO_DA_FICHA } from './guardas'
+import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
-import { type CodigoDeErro, type ContextoDoErro, erro, redirecionar } from './resposta'
+import {
+  blocoDaRecusa,
+  blocoDoRascunho,
+  RecusaAuditada,
+  recusaComMotivoUnico,
+  recusarCorpoMalformado,
+} from './recusa'
+import { type CodigoDeErro, erro, redirecionar } from './resposta'
 import type { EntradaDaRota } from './router'
 
 // ---------------------------------------------------------------------------
@@ -181,37 +179,6 @@ function alargaOAlcance(
 }
 
 /**
- * O que a TELA mostra debaixo da frase da tabela de erros (§12.4).
- *
- * §11.4 fixa a `mensagem` — "Confira os campos destacados." — e §12.4 exige que
- * a pessoa saiba QUAL campo e POR QUE. Sem este bloco a tela pedia para conferir
- * campos destacados sem destacar campo nenhum, que e a frase mais inutil que o
- * painel poderia escrever.
- *
- * O nome do campo vem de `NOME_DO_CAMPO` e o motivo de `motivoDaRecusa`: os dois
- * do dicionario, porque nenhuma frase de tela nasce fora dele.
- */
-function blocoDaRecusa(
-  itens: readonly { readonly campo: string; readonly motivo: string }[],
-): HtmlSeguro {
-  if (itens.length === 0) return html``
-
-  return html`<ul class="recusa">${itens.map(
-    (item) =>
-      html`<li><strong>${
-        Object.hasOwn(NOME_DO_CAMPO, item.campo)
-          ? NOME_DO_CAMPO[item.campo as CampoDaConfig]
-          : item.campo
-      }</strong>: ${item.motivo}</li>`,
-  )}</ul>`
-}
-
-/** A explicacao de uma recusa em que todos os campos falham pela mesma razao. */
-function recusaComMotivoUnico(campos: readonly CampoDaConfig[], motivo: string): HtmlSeguro {
-  return blocoDaRecusa(campos.map((campo) => ({ campo, motivo })))
-}
-
-/**
  * O codigo de erro de uma recusa do validador (§11.4).
  *
  * Achado de dominio e `403 dominio_nao_permitido`; o resto e
@@ -250,19 +217,6 @@ function camposProtegidos(
 const SIM = 'sim'
 const NAO = 'nao'
 
-/**
- * O campo escondido da trava otimista de §8.8.
- *
- * O nome mora AQUI e a tela o importa, em vez de os dois escreverem `'versao'`:
- * apagar o campo do formulario deixava a suite inteira verde enquanto toda
- * gravacao de toda tela passava a ser recusada em producao — o teste GRAV-22
- * fecha a outra metade, postando o que o formulario de verdade contem.
- */
-export const CAMPO_DA_VERSAO = 'versao'
-
-/** O gesto explicito que §10.12 exige para religar a automacao. */
-export const CAMPO_DA_CONFIRMACAO = 'confirmar'
-
 /** O valor que o campo de confirmacao precisa carregar. */
 const CONFIRMADO = 'sim'
 
@@ -275,7 +229,7 @@ const CONFIRMADO = 'sim'
  * e religar do mesmo jeito. Cada rota acrescenta os seus: `/painel/chave`
  * acrescenta `acao`.
  */
-const ESTRUTURAIS_DE_TODA_ROTA: readonly string[] = [
+export const ESTRUTURAIS_DE_TODA_ROTA: readonly string[] = [
   CAMPO_DA_FICHA,
   CAMPO_DA_VERSAO,
   CAMPO_DA_CONFIRMACAO,
@@ -515,15 +469,33 @@ export async function gravarConfiguracao(
     })
   }
 
+  /**
+   * O rascunho que a pessoa acabou de enviar, pronto para voltar na tela.
+   *
+   * `paraOPost` e o caminho da ROTA, e nao `pedido.para`: em `/painel/chave` o
+   * `303` aponta para `/painel`, que e `GET` e so `GET` (§7.1) — o botao de
+   * recuperacao morreria em `405` justamente na rota que desliga a automacao.
+   *
+   * `excluir` sao os estruturais, `confirmar` incluso: carregar o gesto de
+   * §10.12 pelo rascunho seria o unico caminho em que ele e **carregado** em vez
+   * de **feito**.
+   */
+  const rascunho = async (reenviavel: boolean): Promise<HtmlSeguro> =>
+    await blocoDoRascunho(entrada, corpo.campos, {
+      paraOPost: entrada.rota.caminho,
+      excluir: ESTRUTURAIS_DE_TODA_ROTA,
+      versaoDeAgora: snapshot.versao,
+      reenviavel,
+    })
+
   // §8.8: a pagina do `409` traz a mensagem E o formulario preenchido com o que
   // a pessoa digitou. Sem ele, quem escreveu vinte palavras-gatilho num celular
   // as perde por causa de uma aba aberta em outro aparelho — e a proxima coisa
-  // que essa pessoa aprende e a nao confiar no botao Salvar.
+  // que essa pessoa aprende e a nao confiar no botao Salvar. E o unico lugar em
+  // que reenviar FUNCIONA: a trava era de concorrencia, e o rascunho volta com a
+  // versao de agora.
   if (snapshot.versao !== versaoEnviada) {
-    return erro('versao_desatualizada', {
-      ...contexto,
-      explicacao: await blocoDoRascunho(entrada, pedido, corpo.campos, snapshot.versao),
-    })
+    return erro('versao_desatualizada', { ...contexto, explicacao: await rascunho(true) })
   }
 
   const depois: EstadoDeComportamento = {
@@ -548,7 +520,9 @@ export async function gravarConfiguracao(
       campos: protegidos,
       codigo: 'step_up_necessario',
       motivoInterno: 'campo_protegido',
-      explicacao: recusaComMotivoUnico(protegidos, RECUSA_SEM_VALOR.protegido),
+      explicacao: html`${recusaComMotivoUnico(protegidos, RECUSA_SEM_VALOR.protegido)}${await rascunho(
+        false,
+      )}`,
     })
   }
 
@@ -559,7 +533,9 @@ export async function gravarConfiguracao(
       campos: foraDoEscopo,
       codigo: 'dados_invalidos',
       motivoInterno: 'campo_nao_gravavel',
-      explicacao: recusaComMotivoUnico(foraDoEscopo, RECUSA_SEM_VALOR.naoGravavel),
+      explicacao: html`${recusaComMotivoUnico(foraDoEscopo, RECUSA_SEM_VALOR.naoGravavel)}${await rascunho(
+        false,
+      )}`,
     })
   }
 
@@ -574,7 +550,7 @@ export async function gravarConfiguracao(
       motivoInterno: 'confirmacao_ausente',
       explicacao: html`<p>Para ligar a automa&ccedil;&atilde;o de novo, use o bot&atilde;o do
 In&iacute;cio: ele mostra desde quando ela est&aacute; desligada e pede a sua
-confirma&ccedil;&atilde;o.</p>`,
+confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     })
   }
 
@@ -595,12 +571,15 @@ confirma&ccedil;&atilde;o.</p>`,
       // A frase de §12.4 de CADA achado, e nao a `mensagem` do validador: aquela
       // e escrita para quem instala o projeto e usa palavras que a tela nao
       // escreve. O dicionario traduz pelo `codigo`.
-      explicacao: blocoDaRecusa(
+      // O rascunho volta aqui tambem, e este e o caso que mais dói: perder vinte
+      // palavras digitadas num celular porque uma delas ficou curta demais e
+      // pior do que perde-las por causa de uma aba aberta em outro aparelho.
+      explicacao: html`${blocoDaRecusa(
         validacao.achados.map((achado) => ({
           campo: achado.campo,
           motivo: motivoDaRecusa(achado.codigo),
         })),
-      ),
+      )}${await rascunho(false)}`,
     })
   }
 
@@ -675,144 +654,6 @@ function lerPatchDoCorpo(
   }
 
   return { patch }
-}
-
-/**
- * O formulario da pagina de `409`, com o rascunho que a pessoa acabou de enviar.
- *
- * §8.8 pede a mensagem **e** o formulario preenchido. Os campos voltam CRUS,
- * exatamente como chegaram — nada e normalizado nem consertado no caminho —, e
- * a `versao` que acompanha e a de AGORA: e por isso que apertar o botao de novo
- * grava, em vez de bater na mesma trava para sempre.
- *
- * O botao diz o que vai acontecer. A tela ja avisou que a configuracao mudou em
- * outro lugar; quem insiste esta escolhendo, e nao sendo levado.
- */
-async function blocoDoRascunho(
-  entrada: EntradaDaRota,
-  pedido: PedidoDeGravacao,
-  campos: URLSearchParams,
-  versaoDeAgora: number,
-): Promise<HtmlSeguro> {
-  const { env, sessao } = entrada
-  if (sessao === null) return html``
-
-  const escondidos = [...campos]
-    .filter(([nome]) => nome !== CAMPO_DA_FICHA && nome !== CAMPO_DA_VERSAO)
-    .map(([nome, valor]) => html`<input type="hidden" name="${nome}" value="${valor}">`)
-
-  return html`<form method="post" action="${pedido.para}">
-<input type="hidden" name="${CAMPO_DA_FICHA}" value="${await fichaCsrf(env, sessao.sidHash)}">
-<input type="hidden" name="${CAMPO_DA_VERSAO}" value="${String(versaoDeAgora)}">
-${escondidos}
-<p>O que voc&ecirc; escreveu n&atilde;o foi perdido. Recarregue a tela para ver o que
-mudou, ou envie de novo por cima.</p>
-<button type="submit">Enviar de novo por cima</button>
-</form>`
-}
-
-/**
- * A recusa de um corpo que nao da nem para julgar — e a linha que ela deixa.
- *
- * **Ruling 59.** Campo desconhecido, `versao` ausente e valor fora da
- * enumeracao chegam numa sessao AUTENTICADA: e a coisa mais parecida com sinal
- * de sequestro deste conjunto, e §9.9 diz que a linha existe justamente para
- * uma sequencia dessas nao passar sem rastro. A excecao de §9.9 — "fracasso de
- * requisicao NAO autenticada nao gera linha" — nao alcanca aqui.
- *
- * `versao: 0` e `campos: '[]'` porque nada foi lido nem julgado: a recusa
- * acontece antes de qualquer consulta a `painel_config`, e o preco continua
- * sendo uma escrita e nenhuma leitura de configuracao. E o mesmo `0` que
- * `codigos_gerados` usa, pelo mesmo motivo (§9.9).
- */
-async function recusarCorpoMalformado(
-  env: Env,
-  now: number,
-  contexto: ContextoDoErro,
-  ator: string,
-  motivoInterno: string,
-): Promise<Response> {
-  await new PainelAuditoriaRepository(env.DB)
-    .statementDeRegistro({
-      ocorridoEm: now,
-      versao: 0,
-      origem: 'painel',
-      ator,
-      stepUp: false,
-      acao: 'mudanca_recusada',
-      alvo: null,
-      campos: '[]',
-      antes: null,
-      depois: null,
-    })
-    .run()
-
-  return erro('dados_invalidos', { ...contexto, motivoInterno })
-}
-
-/** Tudo o que uma recusa auditada precisa dizer. */
-interface PedidoDeRecusa {
-  readonly acao: Extract<AcaoDeAuditoria, 'mudanca_recusada' | 'stepup_recusado'>
-  /** Nomes tecnicos. Vao para a linha, para o JSON e para a traducao da tela. */
-  readonly campos: readonly string[]
-  readonly codigo: CodigoDeErro
-  readonly motivoInterno?: string
-  readonly explicacao?: HtmlSeguro
-}
-
-/**
- * A linha de auditoria de uma recusa, e a recusa em si, num lugar so.
- *
- * §9.9 e Ruling 54: a tentativa recusada de quem JA passou pelo portao de
- * sessao tambem deixa rastro, com `antes = depois = NULL`. Nao contradiz "nao
- * gravar fracasso de estranho": aqui a escrita ja esta limitada por uma
- * credencial, e uma sequencia de tentativas de sequestro nao pode passar sem
- * registro.
- *
- * **A recusa por versao desatualizada NAO passa por aqui**, e a ausencia e
- * decisao do controlador (Ruling 59): nada do conteudo enviado chegou a ser
- * julgado — a pessoa esta com uma tela velha aberta. Auditar isso faria uma aba
- * esquecida custar uma escrita a cada F5, num caminho que §9.10 orca em zero.
- */
-class RecusaAuditada {
-  constructor(
-    private readonly env: Env,
-    private readonly now: number,
-    private readonly contexto: ContextoDoErro,
-    private readonly snapshot: SnapshotConfig,
-    /** `passkey:<8 hex do sha256 do credential_id>`, nunca o id cru (§9.9). */
-    readonly ator: string,
-  ) {}
-
-  async registrar(pedido: PedidoDeRecusa): Promise<Response> {
-    const campos = [...new Set(pedido.campos)]
-
-    await new PainelAuditoriaRepository(this.env.DB)
-      .statementDeRegistro({
-        ocorridoEm: this.now,
-        // A versao RESULTANTE de uma recusa e a que continua valendo: nada
-        // mudou, entao ela e a mesma de antes.
-        versao: this.snapshot.versao,
-        origem: 'painel',
-        ator: this.ator,
-        stepUp: false,
-        acao: pedido.acao,
-        alvo: null,
-        // Nomes de campo, NUNCA valores (§9.9). E o que permite investigar uma
-        // sequencia de tentativas sem guardar o que elas tentaram escrever.
-        campos: JSON.stringify(campos),
-        antes: null,
-        depois: null,
-      })
-      .run()
-
-    return erro(pedido.codigo, {
-      ...this.contexto,
-      campos,
-      ...(pedido.motivoInterno === undefined ? {} : { motivoInterno: pedido.motivoInterno }),
-      ...(pedido.explicacao === undefined ? {} : { explicacao: pedido.explicacao }),
-    })
-  }
 }
 
 /** Dois valores do estado sao diferentes? Listas comparam item a item. */
