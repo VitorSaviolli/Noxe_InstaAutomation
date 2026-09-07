@@ -19,6 +19,7 @@ import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
 import { handleOpcoesDeStepUp, jsonCanonico, opHash } from '../src/routes/painel/stepup'
 import { PRAZO_DE_ENVELOPE_MS } from '../src/security/signed-envelope'
 import { invalidarCacheDeConfig } from '../src/services/config-store'
+import { limparTexto } from '../src/services/config-validation'
 import {
   emitirEnvelope,
   emitirSessao,
@@ -37,7 +38,9 @@ import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
  * "mais" da mesma linha — `json_canonico` com vetores congelados e o mesmo hash
  * a partir do JSON da cerimonia e do formulario urlencoded. STEP-22 em diante
  * sao as travas da cerimonia e da tela que as dezessete nao nomeiam mas das
- * quais dependem.
+ * quais dependem. STEP-39 mora junto dos vetores por assunto e nao por numero:
+ * ele nasceu na etapa 12c, e renumerar os que ja existiam trocaria o nome de
+ * testes que outros documentos citam.
  *
  * **A cerimonia e feita de verdade, ponta a ponta.** Nada de `vi.mock`: o
  * `AutenticadorFalso` produz os mesmos bytes que um autenticador real
@@ -261,6 +264,21 @@ function desescapar(valor: string): string {
     .replaceAll('&quot;', '"')
     .replaceAll('&#39;', "'")
     .replaceAll('&amp;', '&')
+}
+
+/**
+ * Um texto escrito como a LISTA dos pontos de codigo dele.
+ *
+ * STEP-39 compara formas que sao visualmente identicas e diferentes ponto a
+ * ponto — e essa diferenca invisivel e o assunto do teste. Impressa como
+ * texto, a falha mostraria a MESMA letra acentuada nos dois lados e ninguem
+ * entenderia por que o teste quebrou; impressa como `U+0061 U+0301` contra
+ * `U+00E1`, ela se explica sozinha.
+ */
+function pontosDeCodigo(texto: string): string[] {
+  return [...texto].map(
+    (simbolo) => `U+${(simbolo.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`,
+  )
 }
 
 /** A mudanca canonica que a tela de conferencia entrega ao `painel.js`. */
@@ -1085,6 +1103,110 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     expect(envio.status).toBe(303)
     expect((await linhaDeConfig())?.user_cooldown_hours).toBe(1)
+  })
+
+  test('STEP-39: `limparTexto` e IDEMPOTENTE — a propriedade, e nao os exemplos', () => {
+    // A trava do achado A-1 da etapa 12b, e o motivo dela ser uma PROPRIEDADE.
+    //
+    // `json_canonico` normaliza com `limparTexto`, e os dois caminhos do
+    // `op_hash` a aplicam um numero DIFERENTE de vezes: a rota de escrita uma
+    // (corpo cru -> canonico), a cerimonia duas (a tela ja emite a mudanca
+    // canonica em `data-mudanca`, o navegador a devolve, e `handleOpcoesDeStepUp`
+    // canoniza de novo). Enquanto a funcao for idempotente os dois coincidem e
+    // STEP-21 fecha. No dia em que deixar de ser, o envelope carrega um hash e a
+    // rota recalcula outro para AQUELE texto — `conteudo_diferente`, `403`, e o
+    // dono encostando o dedo para ouvir um nao que ninguem consegue explicar.
+    // §10.10 nomeia essa falha: "o hash recalculado diverge e a trava vira bug
+    // intermitente".
+    //
+    // **Por isso o teste e sobre a propriedade.** Uma lista de exemplos guarda
+    // os exemplos; foi a lista que a ordem antiga passou, porque nenhum texto
+    // realista tem `Cf` entre uma letra e um combinante. O que impede a
+    // regressao e varrer um espaco GERADO, e afirmar a razao estrutural.
+    const LETRA = 'a'
+    const COMBINANTE = '\u0301' // U+0301, acento agudo combinante (Mn)
+    const ZWJ = '\u200d' // Cf
+    const NULO = '\u0000' // Cc
+    const LIGADURA = '\ufb01' // a ligadura que o NFKC parte em duas letras
+    const LARGURA_TOTAL = '\uff21' // outra forma de compatibilidade
+    const ALFABETO = [LETRA, COMBINANTE, ZWJ, NULO, LIGADURA, LARGURA_TOTAL, ' ', '\u00a0']
+
+    /** Todas as palavras de ate quatro simbolos sobre o alfabeto acima. */
+    const palavras: string[] = ['']
+    let fronteira: string[] = ['']
+    for (let tamanho = 1; tamanho <= 4; tamanho++) {
+      fronteira = fronteira.flatMap((prefixo) => ALFABETO.map((letra) => prefixo + letra))
+      palavras.push(...fronteira)
+    }
+
+    // Contrapositivo de cobertura: o espaco varrido nao pode ter encolhido.
+    expect(palavras.length).toBe(1 + 8 + 8 ** 2 + 8 ** 3 + 8 ** 4)
+
+    const naoIdempotentes = palavras.filter((palavra) => {
+      const uma = limparTexto(palavra)
+      return limparTexto(uma) !== uma
+    })
+
+    expect(naoIdempotentes.map(pontosDeCodigo)).toEqual([])
+
+    // A RAZAO estrutural, afirmada direto: a saida nunca contem `Cc`/`Cf`, e
+    // por isso a segunda passada nao tem invisivel para tirar nem composicao
+    // nova para fazer. Sem esta linha, o laco acima seria so uma lista de
+    // exemplos maior.
+    const comInvisivelNaSaida = palavras
+      .map(limparTexto)
+      .filter((limpo) => /[\p{Cc}\p{Cf}]/u.test(limpo))
+
+    expect(comInvisivelNaSaida.map(pontosDeCodigo)).toEqual([])
+
+    // E os casos patologicos nomeados, para que a falha DIGA o que quebrou em
+    // vez de cuspir um indice de um laco de 4681.
+    const NOMEADOS: readonly { nome: string; texto: string }[] = [
+      { nome: 'Cf entre letra e combinante', texto: `a${ZWJ}${COMBINANTE}` },
+      { nome: 'Cc entre letra e combinante', texto: `o${NULO}\u0303` },
+      { nome: 'invisiveis repetidos', texto: `n${ZWJ}\u200c\u0303o` },
+      { nome: 'ligadura de compatibilidade', texto: `  con${LIGADURA}rmado${ZWJ}  ` },
+      { nome: 'espacos nas pontas', texto: '   ola mundo   ' },
+      { nome: 'largura total', texto: '\uff21\uff22\uff23' },
+      { nome: 'texto realista', texto: TEXTO_PUBLICO_NOVO },
+    ]
+
+    for (const caso of NOMEADOS) {
+      const uma = limparTexto(caso.texto)
+      expect({ [caso.nome]: pontosDeCodigo(limparTexto(uma)) }).toEqual({
+        [caso.nome]: pontosDeCodigo(uma),
+      })
+    }
+
+    // **O contrapositivo que impede este teste de ser vacuo.** A ordem ANTIGA —
+    // NFKC primeiro, remocao depois — esta escrita aqui como TESTEMUNHA, e nao
+    // como implementacao: ela prova que o espaco varrido de fato contem as
+    // entradas que a regressao quebraria. Sem ela, um alfabeto mal escolhido
+    // deixaria o laco verde nos dois mundos, e o teste guardaria nada.
+    const ordemAntiga = (texto: string): string =>
+      texto
+        .normalize('NFKC')
+        .replace(/[\p{Cc}\p{Cf}]/gu, '')
+        .trim()
+
+    const quebradosPelaOrdemAntiga = palavras.filter((palavra) => {
+      const uma = ordemAntiga(palavra)
+      return ordemAntiga(uma) !== uma
+    })
+
+    expect(quebradosPelaOrdemAntiga.length).toBeGreaterThan(0)
+
+    // E a testemunha vai mais longe: onde as duas ordens divergem, a ordem NOVA
+    // entrega exatamente o ponto fixo da antiga. Quer dizer que a correcao nao
+    // inventa forma nenhuma — ela so chega numa passada onde a antiga chegava
+    // em duas, que e por que os vetores congelados de §13.2 nao se mexem.
+    for (const palavra of quebradosPelaOrdemAntiga) {
+      let pontoFixo = ordemAntiga(palavra)
+      for (let volta = 0; volta < 8 && ordemAntiga(pontoFixo) !== pontoFixo; volta++) {
+        pontoFixo = ordemAntiga(pontoFixo)
+      }
+      expect(pontosDeCodigo(limparTexto(palavra))).toEqual(pontosDeCodigo(pontoFixo))
+    }
   })
 
   // -------------------------------------------------------------------------

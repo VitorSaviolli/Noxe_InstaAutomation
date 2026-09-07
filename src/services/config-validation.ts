@@ -79,9 +79,29 @@ const PIOR_USERNAME = 'w'.repeat(64)
  *
  * NFKC junta as formas compatíveis e `\p{Cc}\p{Cf}` tira o que e invisivel:
  * sem isso, 500 caracteres de zero-width passariam como texto valido.
+ *
+ * **A ordem nao e estilo: a remocao vem ANTES do NFKC, e e isso que torna
+ * esta funcao idempotente.** Com o NFKC na frente, um invisivel entre uma
+ * letra e um combinante impede a composicao na primeira passada; a remocao
+ * entao encosta os dois; e a SEGUNDA passada compoe. Uma letra, um ZWJ e um
+ * acento agudo saem como `"a" + U+0301` na primeira passada e so na seguinte
+ * viram `U+00E1` — visualmente identicos, hashes DIFERENTES.
+ *
+ * Isso importa porque os dois caminhos do `op_hash` de §10.10 aplicam esta
+ * funcao um numero DIFERENTE de vezes: a rota de escrita uma, a cerimonia
+ * duas, porque a tela ja emite a mudanca canonica limpa e o navegador a
+ * devolve. Com a ordem antiga, um texto com `Cf` entre letra e combinante
+ * fazia o envelope carregar um hash e a rota recalcular outro — a falha que
+ * §10.10 nomeia por extenso, "o hash recalculado diverge e a trava vira bug
+ * intermitente": o dono encostando o dedo para ouvir um nao que ninguem
+ * consegue explicar, sempre, para aquele texto.
+ *
+ * Removendo primeiro, a saida nunca contem `Cc`/`Cf` — o NFKC nao produz
+ * nenhum dos dois —, e por isso a segunda passada nao tem o que mudar. E a
+ * PROPRIEDADE, e nao a lista de exemplos, que o teste guarda.
  */
 export function limparTexto(texto: string): string {
-  return texto.normalize('NFKC').replace(CARACTERES_INVISIVEIS, '').trim()
+  return texto.replace(CARACTERES_INVISIVEIS, '').normalize('NFKC').trim()
 }
 
 /**

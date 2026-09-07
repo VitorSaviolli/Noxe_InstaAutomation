@@ -35,3 +35,19 @@ interface ImportMeta {
     opcoes: { query: '?raw'; eager: true; import: 'default' },
   ): Record<string, string>
 }
+
+/**
+ * Uma SUITE lida como texto, e nao como modulo.
+ *
+ * Existe para UM teste: META-13 varre `tests/` inteiro pelo `import.meta.glob`
+ * acima e afirma que nenhum teste oferece a cerimonia de step-up para uma
+ * gravacao que a allowlist daquele ambiente jamais aceitaria. O `glob` do Vite
+ * OMITE o modulo que o chama, entao o unico arquivo fora da guarda seria
+ * justamente aquele onde ela mora — e uma guarda cega para si mesma e o buraco
+ * mais facil de nao notar. Esta declaracao e o que deixa aquele arquivo se
+ * importar como texto e entrar na propria varredura.
+ */
+declare module '*.test.ts?raw' {
+  const conteudo: string
+  export default conteudo
+}

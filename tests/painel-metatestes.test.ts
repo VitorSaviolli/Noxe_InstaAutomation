@@ -27,6 +27,7 @@ import { camposProtegidos, jsonCanonico } from '../src/routes/painel/stepup'
 import { painelHabilitado } from '../src/services/panel-session'
 import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
 import { pedir, responder } from './fixtures/dubles'
+import esteArquivo from './painel-metatestes.test.ts?raw'
 
 /**
  * META — metatestes.
@@ -46,11 +47,19 @@ import { pedir, responder } from './fixtures/dubles'
  * META-10: rota de pagina so com GET declara `csrf: false` e `escreve: false`.
  * META-11: a UNIAO das listas de campo por rota e o conjunto gravavel da etapa.
  * META-12: todo campo tem UMA frase de recusa, e a frase certa (Ruling 82).
+ * META-13: esperar a recusa de step-up num campo de endereco exige allowlist.
+ * META-14: a varredura de META-13 nao se deixa enganar por comentario.
  *
  * META-06 estava reservado desde a Task 10 com a nota "chega com a etapa do
  * step-up" — chegou, e chegou como a spec o descreve: uma tabela, nao um
  * caminho HTTP. META-11 leva o numero seguinte livre porque META-10 ja estava
  * ocupado quando o Ruling 72 batizou o metateste da uniao.
+ *
+ * META-13 e META-14 chegaram na etapa 12c, e sao de uma familia diferente das
+ * doze anteriores: elas nao medem `src/`, medem `tests/`. §13.2 lista os nove
+ * metatestes que guardam o CODIGO; estes dois guardam o proprio conjunto de
+ * testes contra o defeito que a etapa 12b encontrou nele — um teste que oferece
+ * a cerimonia de step-up para uma gravacao que aquele ambiente jamais aceitaria.
  */
 
 /** Tabelas de infraestrutura do D1/Miniflare, que nao sao do projeto. */
@@ -1023,5 +1032,315 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     expect(gravadorasDeConfig.map((rota) => rota.caminho).sort()).toEqual(
       ESCOPO_POR_ROTA.map((rota) => rota.caminho).sort(),
     )
+  })
+})
+
+/**
+ * A marca que META-13 procura: a acao de auditoria, com as aspas dela.
+ *
+ * A guarda le as fontes de `tests/` como TEXTO, e este arquivo e UMA DELAS —
+ * de proposito, porque uma guarda cega para si mesma e o buraco mais facil de
+ * nao notar. Isso impoe uma regra a este arquivo: as suites sinteticas de
+ * META-13 e META-14 montam a marca a partir desta constante em vez de escrever
+ * a acao dentro do bloco. Nao e estilo — um bloco daqui que a escrevesse
+ * inteira, ao lado de um nome de campo protegido, satisfaria o predicado e
+ * apareceria em `desprotegidos`, porque este arquivo nao declara allowlist
+ * nenhuma. Quer dizer: a regra e AFIRMADA pela propria varredura, e nao
+ * confiada a quem lembrar dela.
+ */
+const MARCA_DE_RECUSA = "'stepup_recusado'"
+
+/** Os tres campos que §10.10 protege SEMPRE e que a allowlist tambem julga. */
+const CAMPOS_DE_ENDERECO = ['destinationUrl', 'privateReplyText', 'publicReplyText'] as const
+
+/** Uma linha que so tem comentario: `//`, a abertura `/*` ou a continuacao `*`. */
+const LINHA_SO_DE_COMENTARIO = /^\s*(?:\/\/|\/\*|\*)/
+
+/** `ALLOWED_LINK_DOMAINS` recebendo texto vazio: lista vazia recusa tudo. */
+const ALLOWLIST_VAZIA = /ALLOWED_LINK_DOMAINS:\s*(?:''|""|``)/
+/** So espaco entre as aspas — o valor que `vitest.config.ts` entrega. */
+const VALOR_VAZIO = /^\s*(?:''|""|``)\s*$/
+/** `const NOME = { ...env, ALLOWED_LINK_DOMAINS: <alguma coisa> }`. */
+const DECLARACAO_DE_ALLOWLIST =
+  /const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*\{[^{}]*\.\.\.env[^{}]*ALLOWED_LINK_DOMAINS\s*:\s*([^,}]+)/g
+/** `opcoes.ambiente ?? NOME` — o ambiente que o helper de POST usa por padrao. */
+const AMBIENTE_PADRAO = /ambiente\s*\?\?\s*([A-Za-z_$][A-Za-z0-9_$]*)/g
+/** `{ ambiente: alguma-coisa }` — o bloco escolhendo o ambiente na mao. */
+const AMBIENTE_ESCOLHIDO = /ambiente\s*:/
+/** A abertura de um bloco de teste, com a indentacao dela capturada. */
+const ABERTURA_DE_BLOCO = /^([ \t]*)(?:test|it)(?:\.[A-Za-z]+)?\(/
+/** Um identificador qualquer, para comparar por NOME e nao por substring. */
+const IDENTIFICADOR = /[A-Za-z_$][A-Za-z0-9_$]*/g
+
+/**
+ * A fonte com as linhas de comentario esvaziadas, e o resto intacto.
+ *
+ * Nao e cosmetica: sem isto a guarda seria enganada pela PROSA. Tres testes de
+ * `painel-stepup.test.ts` explicam em comentario por que NAO esperam a recusa
+ * de step-up, e um analisador que casasse texto solto os acusaria — e uma
+ * guarda que grita onde nao ha defeito e desligada na terceira vez.
+ *
+ * **Por LINHA, e nao por token.** A primeira grafia era um tokenizador de
+ * verdade — string, comentario de linha e comentario de bloco — e ela se
+ * perdia no primeiro regex literal
+ * com aspas dentro: em `/(?:''|"")/` o `'` abre uma "string" que nunca fecha
+ * onde deveria, e dali para a frente o arquivo inteiro e lido trocado. Este
+ * proprio arquivo e cheio desses regexes, e o efeito foi medido: a varredura
+ * inventava uma constante de allowlist chamada `NOME`, tirada do JSDoc de
+ * `DECLARACAO_DE_ALLOWLIST`, e passava a considerar protegido um bloco que nao
+ * e. Um analisador que erra em silencio e pior que nenhum.
+ *
+ * A regra por linha nao tem esse modo de falha: ela nunca dessincroniza,
+ * porque cada linha e decidida sozinha. O preco esta dito: um comentario no
+ * FIM de uma linha de codigo continua sendo lido como codigo. Isso so pode
+ * gerar acusacao a mais, nunca a menos — e a guarda erra para o lado de
+ * exigir, que e o lado seguro.
+ *
+ * As linhas ficam no lugar, vazias: sao elas que mantem o `^` de
+ * `ABERTURA_DE_BLOCO` apontando para a linha certa.
+ */
+function semComentarios(fonte: string): string {
+  return fonte
+    .split('\n')
+    .map((linha) => (LINHA_SO_DE_COMENTARIO.test(linha) ? '' : linha))
+    .join('\n')
+}
+
+/** O que um arquivo de teste sabe sobre allowlist, lido da fonte dele. */
+interface AllowlistDoArquivo {
+  /** Nomes de `const` que carregam uma allowlist NAO vazia. */
+  readonly constantes: ReadonlySet<string>
+  /** Todo helper de POST do arquivo ja usa uma dessas por padrao. */
+  readonly porPadrao: boolean
+}
+
+function allowlistDoArquivo(codigo: string): AllowlistDoArquivo {
+  const constantes = new Set(
+    [...codigo.matchAll(DECLARACAO_DE_ALLOWLIST)]
+      .filter((achado) => !VALOR_VAZIO.test(achado[2] ?? ''))
+      .map((achado) => achado[1] ?? ''),
+  )
+  const padroes = [...codigo.matchAll(AMBIENTE_PADRAO)].map((achado) => achado[1] ?? '')
+
+  return {
+    constantes,
+    porPadrao:
+      constantes.size > 0 && padroes.length > 0 && padroes.every((nome) => constantes.has(nome)),
+  }
+}
+
+/**
+ * Cada bloco `test(...)` do arquivo, do titulo ate o `})` que o FECHA.
+ *
+ * Fechar no `})` da mesma indentacao, e nao na abertura do teste seguinte, e o
+ * que impede o ultimo bloco de um `describe` de engolir o codigo de modulo que
+ * vem depois dele. Aqui isso nao e teoria: com a regra anterior, o ultimo teste
+ * deste proprio arquivo absorvia as constantes do analisador — `MARCA_DE_RECUSA`
+ * e `CAMPOS_DE_ENDERECO` — e aparecia como um bloco medido que ninguem escreveu.
+ * Um bloco inventado hoje passa; amanha ele vira alarme falso num teste que nao
+ * tem nada a ver com step-up.
+ */
+function blocosDeTeste(codigo: string): string[] {
+  const linhas = codigo.split('\n')
+  const blocos: string[] = []
+
+  for (let i = 0; i < linhas.length; i++) {
+    const abertura = ABERTURA_DE_BLOCO.exec(linhas[i] ?? '')
+    if (abertura === null) continue
+
+    const fechamento = `${abertura[1] ?? ''}})`
+    let fim = i + 1
+    while (fim < linhas.length && !(linhas[fim] ?? '').startsWith(fechamento)) fim++
+    blocos.push(linhas.slice(i, fim + 1).join('\n'))
+  }
+
+  return blocos
+}
+
+/** Um bloco de teste medido pela guarda de META-13. */
+interface BlocoMedido {
+  /** A primeira linha do bloco, que carrega o titulo. */
+  readonly titulo: string
+  /** O bloco declara — ou herda — um ambiente com allowlist configurada. */
+  readonly protegido: boolean
+}
+
+/**
+ * O bloco POSTa um campo de endereco esperando a recusa de step-up?
+ *
+ * As duas metades tem de estar no MESMO bloco: um teste que so nomeia o campo
+ * nao esta medindo step-up, e um que so espera a recusa pode estar medindo
+ * outra coisa (uma passkey, um lote de palavras) que a allowlist nem julga.
+ */
+function ehBlocoDeEndereco(bloco: string, identificadores: ReadonlySet<string>): boolean {
+  if (!bloco.includes(MARCA_DE_RECUSA)) return false
+  return CAMPOS_DE_ENDERECO.some((campo) => identificadores.has(campo))
+}
+
+/**
+ * "Este bloco roda com a allowlist configurada?", decidido em duas vias:
+ *
+ * 1. o bloco NOMEIA uma constante de allowlist do arquivo (o jeito de
+ *    `painel-auditoria.test.ts`, cujo helper de POST usa o `env` cru);
+ * 2. ou o arquivo tem allowlist POR PADRAO e o bloco nao troca o ambiente por
+ *    outra coisa (o jeito de `painel-stepup.test.ts`).
+ *
+ * A via 2 e o que impede a guarda de exigir ruido: um arquivo cujo helper ja
+ * aponta para o ambiente certo nao precisa repetir o nome em cada teste.
+ */
+function rodaComAllowlist(
+  bloco: string,
+  identificadores: ReadonlySet<string>,
+  arquivo: AllowlistDoArquivo,
+): boolean {
+  const nomeiaConstante = [...arquivo.constantes].some((nome) => identificadores.has(nome))
+  const montaNaMao = identificadores.has('ALLOWED_LINK_DOMAINS') && !ALLOWLIST_VAZIA.test(bloco)
+  if (nomeiaConstante || montaNaMao) return true
+  return arquivo.porPadrao && !AMBIENTE_ESCOLHIDO.test(bloco)
+}
+
+/** Os blocos de UM arquivo que caem sob a guarda, e o veredito de cada um. */
+function medirArquivo(fonte: string): readonly BlocoMedido[] {
+  const codigo = semComentarios(fonte)
+  const arquivo = allowlistDoArquivo(codigo)
+  const medidos: BlocoMedido[] = []
+
+  for (const bloco of blocosDeTeste(codigo)) {
+    const identificadores = new Set(bloco.match(IDENTIFICADOR) ?? [])
+    if (!ehBlocoDeEndereco(bloco, identificadores)) continue
+
+    const quebra = bloco.indexOf('\n')
+    medidos.push({
+      titulo: (quebra === -1 ? bloco : bloco.slice(0, quebra)).trim(),
+      protegido: rodaComAllowlist(bloco, identificadores, arquivo),
+    })
+  }
+
+  return medidos
+}
+
+/**
+ * Uma suite SINTETICA com o defeito exato que a Task 12b encontrou, e a mesma
+ * corrigida. Escrita como linhas soltas de proposito: nenhuma delas comeca a
+ * coluna zero com `test(`, entao a varredura deste proprio arquivo nao as
+ * confunde com testes de verdade.
+ */
+function suiteSintetica(comAllowlist: boolean): string {
+  const ambiente = comAllowlist ? ', { ambiente: COM_ALLOWLIST }' : ''
+
+  return [
+    "const COM_ALLOWLIST = { ...env, ALLOWED_LINK_DOMAINS: 'exemplo.com' }",
+    "describe('sintetica', () => {",
+    "  test('grava o link e espera a recusa de step-up', async () => {",
+    `    const resposta = await gravar(MENSAGEM, 'destinationUrl=' + LINK, sessao${ambiente})`,
+    '    expect(resposta.status).toBe(403)',
+    `    expect(acoes).toEqual([${MARCA_DE_RECUSA}])`,
+    '  })',
+    '})',
+  ].join('\n')
+}
+
+describe('META — a higiene do proprio conjunto de testes', () => {
+  test('META-13: esperar a recusa de step-up num campo de endereco exige allowlist', () => {
+    // O defeito silencioso que a etapa 12b desenterrou, virado guarda de
+    // CLASSE. O `vitest.config.ts` entrega `ALLOWED_LINK_DOMAINS: ''`, e lista
+    // vazia nao "passa tudo": ela recusa QUALQUER endereco (§9.8, LNK-12).
+    // Enquanto o step-up respondia antes da validacao, tres testes de
+    // `painel-auditoria.test.ts` — AUD-08, GRAV-35 e GRAV-39 — ofereciam a
+    // cerimonia para gravacoes que aquele ambiente jamais aceitaria: a
+    // patologia do Ruling 73 DENTRO do teste que a mede. Os tres ja foram
+    // consertados; o que faltava era impedir que o proximo nascesse igual.
+    //
+    // **Por que a guarda le a FONTE.** A forma literal do pedido — "todo teste
+    // que POSTa esses campos esperando a recusa de step-up roda com allowlist"
+    // — fala de OUTROS arquivos de teste, e de dentro do workerd nao existe
+    // reflexao sobre o corpo de um teste alheio nem sobre o `env` que ele
+    // passou por parametro: quando este arquivo roda, os outros ou ja rodaram
+    // ou nem foram carregados, e nenhum `expect` de la fica visivel daqui. Ler
+    // as fontes como texto e a aproximacao mais forte que se constroi, e nao e
+    // um teste que finge: e o MESMO idioma do Lema 1 de §10.6, que varre `src/`
+    // inteiro pelo `import.meta.glob(..., '?raw')`.
+    //
+    // O que ela nao alcanca fica dito para nao ser descoberto tarde: um teste
+    // que monte o ambiente por um caminho que nenhuma das duas vias reconhece
+    // — um helper importado de `tests/fixtures/`, por exemplo — cai como
+    // desprotegido e obriga quem o escreveu a nomear a allowlist no bloco. E
+    // uma guarda que erra para o lado de exigir, nunca para o de deixar passar.
+    // O  do Vite OMITE o modulo que o chama. Sem a linha
+    // seguinte, o unico arquivo de teste fora da guarda seria justamente
+    // aquele onde ela mora — e uma guarda cega para si mesma e o buraco mais
+    // facil de nao notar. O `?raw` explicito o traz de volta para a varredura.
+    const fontes: Record<string, string> = {
+      ...(import.meta.glob('../tests/**/*.test.ts', {
+        query: '?raw',
+        eager: true,
+        import: 'default',
+      }) as Record<string, string>),
+      '../tests/painel-metatestes.test.ts': esteArquivo,
+    }
+
+    const arquivos = Object.keys(fontes).sort()
+
+    // Contrapositivo da varredura: um glob quebrado devolveria lista vazia e
+    // tudo abaixo passaria comparando nada com nada.
+    expect(arquivos.length).toBeGreaterThan(20)
+    // E este arquivo esta DENTRO da varredura, uma vez so — e e isso que faz
+    // a guarda valer tambem para os blocos sinteticos que moram aqui embaixo.
+    expect(arquivos.filter((nome) => nome.endsWith('painel-metatestes.test.ts')).length).toBe(1)
+
+    const medidos = arquivos.flatMap((nome) =>
+      medirArquivo(fontes[nome] ?? '').map((bloco) => ({
+        ...bloco,
+        onde: `${nome} :: ${bloco.titulo}`,
+      })),
+    )
+    const desprotegidos = medidos.filter((bloco) => !bloco.protegido).map((bloco) => bloco.onde)
+
+    // Segundo contrapositivo, e o que importa mais: a guarda tem de estar
+    // MEDINDO alguma coisa. Um predicado que nao casa nada ficaria verde para
+    // sempre — inclusive no dia em que o teste defeituoso chegasse.
+    expect(medidos.length).toBeGreaterThanOrEqual(8)
+
+    expect(desprotegidos).toEqual([])
+
+    // Terceiro contrapositivo: a suite sintetica com o defeito e acusada, e a
+    // mesma com `ambiente: COM_ALLOWLIST` passa. Sem este par, "nenhum
+    // desprotegido" poderia significar "o analisador nunca acusa".
+    expect(medirArquivo(suiteSintetica(false)).map((bloco) => bloco.protegido)).toEqual([false])
+    expect(medirArquivo(suiteSintetica(true)).map((bloco) => bloco.protegido)).toEqual([true])
+  })
+
+  test('META-14: a varredura de META-13 nao se deixa enganar pela prosa', () => {
+    // O analisador tira comentario antes de decidir, e isso e afirmado aqui
+    // sozinho porque e a parte que erra em silencio. Tres blocos reais de
+    // `painel-stepup.test.ts` CITAM a recusa de step-up em comentario para
+    // explicar por que nao a esperam; um analisador ingenuo os acusaria, e a
+    // reacao humana a um alarme falso e desligar o alarme.
+    const PROSA = '    // Ate a etapa 12b este caminho devolvia '
+    const comProsa = [
+      "describe('sintetica', () => {",
+      "  test('a recusa aqui e do validador, nao do step-up', async () => {",
+      `${PROSA}${MARCA_DE_RECUSA} antes de validar.`,
+      "    const resposta = await gravar(MENSAGEM, 'destinationUrl=' + LINK, sessao)",
+      '    expect(resposta.status).toBe(400)',
+      '  })',
+      '})',
+    ].join('\n')
+
+    // Nenhum bloco medido: a unica ocorrencia da marca esta em comentario.
+    expect(medirArquivo(comProsa)).toEqual([])
+
+    // E a contraprova de que o predicado nao morreu: a MESMA marca fora do
+    // comentario volta a ser medida.
+    expect(medirArquivo(comProsa.replace(PROSA, '    const citada = ')).length).toBe(1)
+
+    // E o modo de falha que derrubou a primeira grafia, afirmado: um regex
+    // literal com aspas dentro nao pode dessincronizar a varredura. Um
+    // tokenizador ingenuo le o `'` de `(?:''|"")` como abertura de string e
+    // passa a ler TROCADO tudo o que vem depois — inclusive JSDoc, de onde ele
+    // tirava uma constante de allowlist que nao existe. Decidindo linha a
+    // linha, as duas linhas abaixo chegam inteiras do outro lado.
+    const comRegex = "const VAZIO = /^(?:''|\"\")$/\nconst LINK = 'https://exemplo.com/promocao'"
+    expect(semComentarios(comRegex)).toBe(comRegex)
   })
 })
