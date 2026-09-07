@@ -229,6 +229,35 @@ export function religa(antes: EstadoDeComportamento, depois: EstadoDeComportamen
 }
 
 /**
+ * Os campos de comportamento em que os dois estados diferem.
+ *
+ * **Uma grafia, dois chamadores** (Ruling 63). Ela nasceu dentro de `gravar.ts`,
+ * onde o funil monta `mudados`, e veio para ca quando a tela de UM Reel passou
+ * a precisar da MESMA conta antes de renderizar: §12.3 exige que o cadeado e o
+ * aviso apareçam no botao que vai pedir a digital, e para saber se vai pedir e
+ * preciso saber o que muda. Uma segunda comparacao na tela poderia dizer
+ * "protegido" onde o funil dissesse "livre", e a divergencia apareceria como
+ * surpresa biometrica — exatamente o que §12.3 proibe.
+ *
+ * Listas comparam item a item: `triggerKeywords` e um array, e `!==` sobre dois
+ * arrays iguais diria "mudou" em toda gravacao.
+ */
+export function camposQueMudaram(
+  antes: EstadoDeComportamento,
+  depois: EstadoDeComportamento,
+): readonly CampoDaConfig[] {
+  return CAMPOS_DE_COMPORTAMENTO.filter((campo) => mudouOValor(antes[campo], depois[campo]))
+}
+
+/** Dois valores do estado sao diferentes? Listas comparam item a item. */
+function mudouOValor(antes: unknown, depois: unknown): boolean {
+  if (Array.isArray(antes) && Array.isArray(depois)) {
+    return antes.length !== depois.length || antes.some((item, i) => item !== depois[i])
+  }
+  return antes !== depois
+}
+
+/**
  * Um valor de formulario vira o pedaco tipado daquele campo, ou `null`.
  *
  * `null` significa RECUSA, e nunca "usa o padrao": um valor que nao casa e

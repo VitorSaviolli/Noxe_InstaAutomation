@@ -16,6 +16,7 @@ import { CAMPOS_DA_RESTAURACAO, CAMPOS_DE_COMPORTAMENTO } from '../src/routes/pa
 import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
+import { esquecerAListagem } from '../src/routes/painel/midias'
 import { handlePalavras } from '../src/routes/painel/palavras'
 import { handleReel } from '../src/routes/painel/reel'
 import { handleReels } from '../src/routes/painel/reels'
@@ -46,6 +47,7 @@ import {
   AGORA,
   capturarConsole,
   comoD1,
+  contemPalavra,
   D1Contador,
   D1SegundoBatchQuebrado,
   pedir,
@@ -194,6 +196,10 @@ const GRAVADORAS: readonly { rota: RotaDoPainel; handler: HandlerDoPainel }[] = 
 
 /** O Reel FICTICIO das duas telas novas. Dezoito digitos, como os de verdade. */
 const REEL_DE_TESTE = '178414000000000001'
+
+/** O link da linha GLOBAL, e o link PRIVADO de um Reel. Os dois ficticios. */
+const LINK_GLOBAL = 'https://exemplo.com/de-todos'
+const LINK_SO_DESTE_REEL = 'https://exemplo.com/so-deste-reel'
 
 /**
  * Um corpo valido para cada rota que grava, para os lacos da tabela.
@@ -357,12 +363,6 @@ function primeiroFormularioDeGravacao(corpo: string): {
   return { action, campos }
 }
 
-/** A palavra aparece com fronteira de palavra? Substring nao conta (§12.7). */
-function contemPalavraNoCorpo(corpo: string, palavra: string): boolean {
-  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}([^\\p{L}\\p{N}]|$)`, 'iu').test(corpo)
-}
-
 /** A tela de Ajustes, ja lida, com a sessao viva. */
 async function telaDeAjustes(sessao: Sessao): Promise<string> {
   return await (
@@ -443,6 +443,11 @@ function escondidosDaConferencia(corpo: string): URLSearchParams {
 beforeEach(async () => {
   await limparBanco(env.DB)
   invalidarCacheDeConfig()
+  // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
+  // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
+  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // chamada.
+  esquecerAListagem()
 })
 
 // ---------------------------------------------------------------------------
@@ -1296,6 +1301,58 @@ describe('GRAV — a forma da gravacao', () => {
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["eu quero","quero o link"]')
   })
 
+  test('GRAV-41: a linha de um Reel NAO entra no historico de Ajustes (o Critical N-1)', async () => {
+    // **A metade que faltava, e ela e o conserto de um Critical.** GRAV-16 ja
+    // afirmava que uma linha `midia_alterada` nao aparece no historico — mas com
+    // uma linha INSERIDA A MAO, e `lote.ts` nunca emitia essa acao: toda
+    // gravacao saia como `config_alterada`, a de um Reel inclusive. O teste
+    // afirmava o filtro sobre um valor que a producao nao produzia.
+    //
+    // Aqui a linha vem da ROTA. E o `antes` dela e a config EFETIVA daquele
+    // Reel — a global com a sobreposicao por cima —, entao o link e o intervalo
+    // PRIVADOS deste Reel sao o que o botao "Voltar a esta versao" reenviaria
+    // por cima da configuracao de TODOS. A mutacao que este teste mata e
+    // exatamente a de antes: `acao: 'config_alterada'` fixo em `lote.ts`.
+    await gravarConfig(env.DB, { destination_url: LINK_GLOBAL, user_cooldown_hours: 24 })
+    await gravarMidia(env.DB, REEL_DE_TESTE, {
+      destination_url: LINK_SO_DESTE_REEL,
+      user_cooldown_hours: 72,
+    })
+    const sessao = await abrirSessao()
+
+    const pausado = await gravar(
+      GRAVADORAS[5] as (typeof GRAVADORAS)[number],
+      `acao=pausar&midia=${REEL_DE_TESTE}`,
+      sessao,
+    )
+    expect(pausado.status).toBe(303)
+
+    // A linha existe, e ela nomeia a entidade certa.
+    expect((await auditoria()).map((linha) => ({ acao: linha.acao, alvo: linha.alvo }))).toEqual([
+      { acao: 'midia_alterada', alvo: REEL_DE_TESTE },
+    ])
+
+    // E o historico da tela de Ajustes nao a alcanca: nem o link privado, nem o
+    // intervalo privado, nem o botao que os reenviaria.
+    const corpo = await telaDeAjustes(sessao)
+
+    expect(corpo).not.toContain(LINK_SO_DESTE_REEL)
+    expect(corpo).not.toContain(REEL_DE_TESTE)
+    expect(corpo).not.toContain('Voltar a esta vers')
+
+    // Contrapositivo, e sem ele o teste passaria numa tela de Ajustes quebrada:
+    // uma gravacao GLOBAL logo em seguida aparece no historico, com botao.
+    await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], 'userCooldownHours=48', sessao, {
+      versao: 2,
+    })
+    const depois = await telaDeAjustes(sessao)
+
+    expect(depois).toContain('Voltar a esta vers')
+    // E mesmo agora o link privado do Reel continua fora da tela: o `antes` que
+    // o botao carrega e o da linha GLOBAL, e nao o daquele Reel.
+    expect(depois).not.toContain(LINK_SO_DESTE_REEL)
+  })
+
   test('GRAV-18: a restauracao de uma versao com campo protegido pede a digital', async () => {
     // A consequencia aceita de Ruling 55: o botao passa pelo funil normal, entao
     // uma versao cujo `antes` carregue campo de step-up cai na cerimonia — e o
@@ -1858,7 +1915,7 @@ describe('GRAV — a forma da gravacao', () => {
     // palavras proibidas. E o motivo de a traducao ser pelo CODIGO do achado — a
     // `mensagem` do validador diz "no modo contains", e `contains` esta na lista.
     for (const proibida of PALAVRAS_PROIBIDAS) {
-      expect({ [proibida]: contemPalavraNoCorpo(corpo, proibida) }).toEqual({ [proibida]: false })
+      expect({ [proibida]: contemPalavra(corpo, proibida) }).toEqual({ [proibida]: false })
     }
   })
 

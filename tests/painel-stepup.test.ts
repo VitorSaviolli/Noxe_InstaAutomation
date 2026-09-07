@@ -2,10 +2,13 @@ import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { handleAjustes } from '../src/routes/painel/ajustes'
 import { CAMPO_DA_ACAO } from '../src/routes/painel/campos'
+import { TELA_DOS_REELS } from '../src/routes/painel/dicionario'
 import { gravarConfiguracao } from '../src/routes/painel/gravar'
 import { handleChave } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
+import { esquecerAListagem } from '../src/routes/painel/midias'
 import { handlePalavras } from '../src/routes/painel/palavras'
+import { CAMPO_DO_REEL, handleReel, SEGUIR_O_GERAL } from '../src/routes/painel/reel'
 import { handleReels } from '../src/routes/painel/reels'
 import {
   ROTA_AJUSTES,
@@ -14,6 +17,7 @@ import {
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_STEPUP,
   ROTA_PALAVRAS,
+  ROTA_REEL,
   ROTA_REELS,
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
@@ -30,7 +34,7 @@ import {
 } from '../src/services/panel-session'
 import { prefixoDeCredencial } from '../src/services/webauthn/verificar'
 import { AutenticadorFalso, cerimonia, semUv } from './fixtures/autenticador'
-import { gravarConfig, limparBanco } from './fixtures/banco'
+import { gravarConfig, gravarMidia, limparBanco } from './fixtures/banco'
 import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
 
 /**
@@ -181,6 +185,12 @@ const PALAVRAS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
 const REELS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_REELS,
   handler: handleReels,
+}
+
+/** A tela de UM Reel — a unica rota cuja gravacao tem um ALVO (Ruling 96). */
+const REEL: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
+  rota: ROTA_REEL,
+  handler: handleReel,
 }
 
 /** A rota dona de `enabled` — a unica que o declara fora da restauracao. */
@@ -486,6 +496,13 @@ async function postarFormulario(
   )
 }
 
+/** A linha daquele Reel em `painel_midias`, lida crua. */
+async function sobreposicaoDe(mediaId: string): Promise<Record<string, unknown> | null> {
+  return await env.DB.prepare('SELECT * FROM painel_midias WHERE media_id = ?')
+    .bind(mediaId)
+    .first<Record<string, unknown>>()
+}
+
 async function linhaDeConfig(): Promise<Record<string, unknown> | null> {
   return await env.DB.prepare('SELECT * FROM painel_config WHERE id = 1').first<
     Record<string, unknown>
@@ -568,6 +585,11 @@ let aparelho: AutenticadorFalso
 beforeEach(async () => {
   await limparBanco(env.DB)
   invalidarCacheDeConfig()
+  // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
+  // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
+  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // chamada.
+  esquecerAListagem()
   aparelho = await AutenticadorFalso.criar()
   await cadastrarAparelho(aparelho)
 })
@@ -1249,6 +1271,134 @@ describe('STEP — step-up preso ao conteudo', () => {
       }
       expect(pontosDeCodigo(limparTexto(palavra))).toEqual(pontosDeCodigo(pontoFixo))
     }
+  })
+
+  test('STEP-40: o `alvo` de 18 digitos atravessa `json_canonico` como TEXTO', () => {
+    // Ruling 96, a metade que o Ruling 90 ja exigia por escrito: "se alguma
+    // coisa sua fizer um id atravessar JSON, ele atravessa como string, com
+    // teste que prove o round-trip de 18 digitos".
+    //
+    // O perigo medido, e nao descrito: os dois ids abaixo sao DIFERENTES como
+    // texto e IGUAIS depois de `Number()`. Um `alvo` que virasse numero em
+    // qualquer ponto do caminho assinaria a mudanca do Reel vizinho.
+    const REEL = '178414000000000001'
+    const VIZINHO = '178414000000000000'
+    expect(REEL).not.toBe(VIZINHO)
+    expect(Number(REEL)).toBe(Number(VIZINHO))
+
+    const canonico = jsonCanonico({ acao: 'config', alvo: REEL, campos: { enabled: false } })
+
+    // O id sai ENTRE ASPAS, e o JSON volta com os 18 digitos intactos.
+    expect(canonico).toBe(`{"acao":"config","alvo":"${REEL}","enabled":false}`)
+    expect(JSON.parse(canonico).alvo).toBe(REEL)
+    expect(typeof JSON.parse(canonico).alvo).toBe('string')
+
+    // E dois Reels diferentes com o MESMO patch nao compartilham assinatura —
+    // que e o buraco inteiro do Ruling 96 numa linha.
+    expect(canonico).not.toBe(
+      jsonCanonico({ acao: 'config', alvo: VIZINHO, campos: { enabled: false } }),
+    )
+
+    // **Os vetores congelados nao se mexeram**: sem `alvo`, o JSON e o mesmo
+    // byte a byte de antes desta rodada. STEP-18 e STEP-19 continuam valendo
+    // sobre a mesma funcao, e esta linha e o que impede o campo novo de vazar
+    // para a gravacao da linha global.
+    expect(jsonCanonico({ acao: 'config', campos: { enabled: false } })).toBe(
+      '{"acao":"config","enabled":false}',
+    )
+  })
+
+  test('STEP-41: o `op_hash` amarra a digital AO REEL — trocar `midia` e recusado', async () => {
+    // **A forma exata do Ruling 86, na tela que a Task 13 criou.** Ate o Ruling
+    // 96, o `patchDoHandler` de `/painel/reel` era identico para qualquer Reel:
+    // "voltar tudo a seguir a regra geral" produz os mesmos valores globais, e o
+    // `media_id` vivia so no campo escondido `midia`, que a tela de conferencia
+    // reemite e que ficava FORA da assinatura. Trocar `midia` entre os dois
+    // POSTs mantinha o `oh` do envelope valido e mudava a entidade gravada — a
+    // digital do dono cobrindo outro Reel.
+    //
+    // Os dois Reels tem a MESMA sobreposicao de proposito: e o que faz o patch
+    // coincidir e o unico que separa os dois hashes ser o alvo.
+    const REEL_A = '178414000000000001'
+    const REEL_B = '178414000000000002'
+
+    await gravarConfig(env.DB, { enabled: 1, user_cooldown_hours: 24 })
+    await gravarMidia(env.DB, REEL_A, { user_cooldown_hours: 48 })
+    await gravarMidia(env.DB, REEL_B, { user_cooldown_hours: 48 })
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    // A conferencia do REEL_A. Desfazer a sobreposicao ALARGA — o intervalo cai
+    // de 48 para 24 —, entao §10.10 pede a digital (MID-21).
+    const conferencia = await postar(
+      REEL,
+      `${CAMPO_DA_ACAO}=${SEGUIR_O_GERAL}&${CAMPO_DO_REEL}=${REEL_A}`,
+      sessao,
+    )
+    expect(conferencia.status).toBe(403)
+
+    const tela = await conferencia.text()
+    const mudanca = mudancaDaTela(tela)
+    const formulario = formularioDeConfirmacao(tela)
+
+    // §10.10, a metade humana: a tela NOMEIA o Reel antes da biometria. Sem
+    // isto o dono lia "Intervalo por pessoa: 48 para 24" e assinava sem saber
+    // em qual Reel.
+    expect(tela).toContain(TELA_DOS_REELS.soNesteReel)
+    expect(tela).toContain(REEL_A)
+    expect(tela).not.toContain(REEL_B)
+
+    // E a metade da maquina: o alvo esta DENTRO da mudanca assinada, como texto.
+    expect(mudanca.alvo).toBe(REEL_A)
+
+    const cerimoniaResposta = await pedirOpcoes(sessao, mudanca)
+    const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
+    const envelope = cookieDoEnvelope(cerimoniaResposta)
+    const digital = await digitalPara(aparelho, challenge)
+
+    // **O ataque:** o mesmo envelope, a mesma digital, o mesmo formulario — com
+    // `midia` trocado para o outro Reel.
+    const trocado = new URLSearchParams(formulario.campos)
+    trocado.set(CAMPO_DO_REEL, REEL_B)
+
+    const registro = capturarConsole()
+    let ataque: Response
+    try {
+      ataque = await postarFormulario(
+        REEL,
+        { action: formulario.action, campos: trocado },
+        sessao,
+        envelope,
+        digital,
+      )
+    } finally {
+      registro.parar()
+    }
+
+    expect(ataque.status).toBe(403)
+    // **E o MOTIVO importa**: `conteudo_diferente` e o `op_hash` recalculado do
+    // corpo recebido nao batendo com o que o envelope assinou. Sem esta linha,
+    // uma recusa por outra razao qualquer — ficha, versao, corpo malformado —
+    // deixaria o teste verde sem provar a amarracao.
+    expect(registro.linhas.join(' ')).toContain('conteudo_diferente')
+
+    // Nenhum dos dois Reels mudou.
+    expect((await sobreposicaoDe(REEL_A))?.user_cooldown_hours).toBe(48)
+    expect((await sobreposicaoDe(REEL_B))?.user_cooldown_hours).toBe(48)
+    // Duas linhas de recusa: a do primeiro POST, que so pediu a digital
+    // (`step_up_ausente`, o caminho normal de quem apertou Salvar), e a do
+    // ataque. §10.10 manda registrar as duas.
+    expect((await auditoria()).map((linha) => linha.acao)).toEqual([
+      'stepup_recusado',
+      'stepup_recusado',
+    ])
+
+    // Contrapositivo: o MESMO envelope e a MESMA digital, com o formulario
+    // intacto, gravam. Sem ele o teste passaria com um step-up quebrado.
+    const honesto = await postarFormulario(REEL, formulario, sessao, envelope, digital)
+
+    expect(honesto.status).toBe(303)
+    expect((await sobreposicaoDe(REEL_A))?.user_cooldown_hours).toBeNull()
+    expect((await sobreposicaoDe(REEL_B))?.user_cooldown_hours).toBe(48)
   })
 
   // -------------------------------------------------------------------------

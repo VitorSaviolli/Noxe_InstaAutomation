@@ -4,30 +4,46 @@ import {
   COLUNAS_DE_SOBREPOSICAO,
   PainelMidiasRepository,
   semSobreposicao,
+  TETO_DE_MIDIAS,
 } from '../src/repositories/painel-midias-repository'
+import { escapeHtml } from '../src/routes/legal'
 import { CAMPO_DA_ACAO } from '../src/routes/painel/campos'
+import { PALAVRAS_PROIBIDAS, SELO_PROTEGIDO, TELA_DOS_REELS } from '../src/routes/painel/dicionario'
 import {
-  MOTIVO_DA_RECUSA,
-  PALAVRAS_PROIBIDAS,
-  TELA_DOS_REELS,
-} from '../src/routes/painel/dicionario'
-import { comoReel, ehReel } from '../src/routes/painel/midias'
+  CACHE_DA_LISTAGEM_MS,
+  comoReel,
+  ehReel,
+  esquecerAListagem,
+} from '../src/routes/painel/midias'
 import {
   CAMPO_DO_REEL,
   handleReel,
   PAUSAR,
+  RELIGAR,
   SEGUIR_O_GERAL,
   validarSobreposicao,
 } from '../src/routes/painel/reel'
-import { CAMPO_DA_MIDIA, CAMPO_DO_VISTO, CARREGAR, handleReels } from '../src/routes/painel/reels'
+import {
+  ATUALIZAR,
+  CAMPO_DA_MIDIA,
+  CAMPO_DO_VISTO,
+  CARREGAR,
+  handleReels,
+} from '../src/routes/painel/reels'
 import { ROTA_REEL, ROTA_REELS, ROTAS } from '../src/routes/painel/rotas'
 import { despachar } from '../src/routes/painel/router'
 import { invalidarCacheDeConfig } from '../src/services/config-store'
-import type { MetaApiClient } from '../src/services/meta-api'
 import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/services/panel-session'
-import type { ApiResult, MediaInfoResponse, MediaListResponse } from '../src/types/meta'
 import { gravarConfig, gravarMidia, ligarConta, limparBanco } from './fixtures/banco'
-import { AGORA, RAIZ } from './fixtures/dubles'
+import {
+  AGORA,
+  comApiDeListagem,
+  contemPalavra,
+  itemDeMidia as item,
+  MetaDeListagem,
+  paginaDeMidias as pagina,
+  RAIZ,
+} from './fixtures/dubles'
 
 /**
  * MID — Reels e automacoes por midia (§12.5, §13.2).
@@ -68,6 +84,9 @@ const REEL_A = '178414000000000001'
 const REEL_B = '178414000000000002'
 const REEL_C = '178414000000000003'
 
+/** O teto de HTML por tela de §12.9, em bytes. O mesmo de `TELA-29`. */
+const TETO_DE_HTML = 15 * 1024
+
 /** Um id cujo `Number()` COLIDE com o de `REEL_A`. E a prova do perigo. */
 const REEL_VIZINHO = '178414000000000000'
 
@@ -100,92 +119,18 @@ async function abrirSessao(): Promise<Sessao> {
   }
 }
 
-/** Um item de `me/media` como a Meta o devolve. Tudo ficticio. */
-function item(id: string, extras: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    id,
-    media_type: 'VIDEO',
-    media_product_type: 'REELS',
-    caption: `Legenda ficticia do ${id}`,
-    permalink: `https://www.instagram.com/reel/ficticio-${id}/`,
-    thumbnail_url: `https://scontent.example/assinada-${id}.jpg?expira=1`,
-    timestamp: '2026-01-15T12:00:00+0000',
-    ...extras,
-  }
-}
-
-/** Uma pagina de `me/media`, com ou sem `paging.next`. */
-function pagina(itens: readonly unknown[], proximo: string | null): MediaListResponse {
-  return {
-    data: itens as MediaListResponse['data'],
-    paging:
-      proximo === null
-        ? { cursors: { after: 'cursor-que-ninguem-usa' } }
-        : { next: `https://graph.instagram.com/proxima`, cursors: { after: proximo } },
-  }
-}
-
-/**
- * Duble da listagem da Meta.
- *
- * Guarda a ORDEM e o CURSOR de cada chamada — e o que prova que a paginacao
- * para onde §12.5 manda e nao onde a contagem sugere.
- */
-class MetaDeListagem {
-  readonly cursores: (string | undefined)[] = []
-  readonly consultados: string[] = []
-
-  constructor(
-    private readonly paginas: readonly MediaListResponse[],
-    private readonly opcoes: {
-      readonly falharListagem?: boolean
-      readonly conhecidos?: readonly string[]
-    } = {},
-  ) {}
-
-  async listMedia(opcoes: { after?: string } = {}): Promise<ApiResult<MediaListResponse>> {
-    this.cursores.push(opcoes.after)
-    if (this.opcoes.falharListagem === true) {
-      return {
-        ok: false,
-        error: { status: 500, code: null, subcode: null, message: 'fora', shortCode: 'HTTP_500' },
-      }
-    }
-    const proxima = this.paginas[this.cursores.length - 1]
-    return { ok: true, data: proxima ?? pagina([], null) }
-  }
-
-  async getMediaInfo(mediaId: string): Promise<ApiResult<MediaInfoResponse>> {
-    this.consultados.push(mediaId)
-    const conhecidos = this.opcoes.conhecidos
-    if (conhecidos !== undefined && !conhecidos.includes(mediaId)) {
-      return {
-        ok: false,
-        error: {
-          status: 404,
-          code: 100,
-          subcode: 33,
-          message: 'nao existe',
-          shortCode: 'OBJETO_INEXISTENTE',
-        },
-      }
-    }
-    return { ok: true, data: { id: mediaId, media_product_type: 'REELS' } }
-  }
-}
-
-function comDuble(falsa: MetaDeListagem) {
-  return { criarApi: () => falsa as unknown as MetaApiClient }
-}
-
 /** `GET /painel/reels`, pela escada de §11.3. */
-async function telaDeReels(sessao: Sessao, falsa: MetaDeListagem): Promise<Response> {
+async function telaDeReels(
+  sessao: Sessao,
+  falsa: MetaDeListagem,
+  agora = AGORA,
+): Promise<Response> {
   return await despachar(
     new Request(`${RAIZ}${ROTA_REELS.caminho}`, { headers: { cookie: sessao.cookie } }),
     env,
-    AGORA,
+    agora,
     ROTA_REELS,
-    (entrada) => handleReels(entrada, comDuble(falsa)),
+    (entrada) => handleReels(entrada, comApiDeListagem(falsa)),
   )
 }
 
@@ -205,7 +150,7 @@ async function postarReels(
     env,
     AGORA,
     ROTA_REELS,
-    (entrada) => handleReels(entrada, comDuble(falsa)),
+    (entrada) => handleReels(entrada, comApiDeListagem(falsa)),
   )
 }
 
@@ -254,6 +199,11 @@ async function auditoria(): Promise<{ acao: string; alvo: string | null; campos:
 beforeEach(async () => {
   await limparBanco(env.DB)
   invalidarCacheDeConfig()
+  // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
+  // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
+  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // chamada.
+  esquecerAListagem()
   await ligarConta(env, AGORA)
 })
 
@@ -485,7 +435,7 @@ describe('MID — Reels e automacoes por midia', () => {
       env,
       AGORA,
       ROTA_REELS,
-      (entrada) => handleReels(entrada, comDuble(falsa)),
+      (entrada) => handleReels(entrada, comApiDeListagem(falsa)),
     )
     expect(resposta.status).toBe(303)
     expect(resposta.headers.get('location')).toBe('/painel/entrar')
@@ -681,7 +631,24 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     expect(certo?.meta.changes).toBe(1)
   })
 
-  test('MID-15: a linha de auditoria de um Reel nomeia o `alvo` (§9.9)', async () => {
+  test('MID-15: a linha de auditoria de um Reel e `midia_alterada`, e nomeia o `alvo`', async () => {
+    // **A `acao` mudou nesta rodada, e a mudanca e o conserto de um Critical.**
+    // A primeira grafia afirmava `config_alterada`, que era o que `lote.ts`
+    // emitia para TODA gravacao. §9.9 lista `midia_alterada` na tabela de
+    // acoes desde sempre, e ele nunca era emitido em lugar nenhum de `src/`.
+    //
+    // O dano nao estava na etiqueta: `ultimasMudancas` filtra
+    // `WHERE acao = 'config_alterada' AND antes IS NOT NULL` e NAO le o
+    // `alvo`. Com a etiqueta errada, a linha deste Reel entrava no historico da
+    // tela de Ajustes indistinguivel de uma mudanca global, com o botao "Voltar
+    // a esta versao" ao lado — e o `antes` de uma linha de Reel e a config
+    // EFETIVA daquele Reel. O botao gravava o link e o intervalo privados de um
+    // Reel por cima da configuracao de todos. A metade silenciosa e a que
+    // decide: quando o campo divergente nao e protegido, nao ha step-up nenhum
+    // e nada aparece na tela antes de gravar.
+    //
+    // AUDIT-24, na suite da auditoria, afirma a outra ponta: com esta acao a
+    // linha nao chega ao historico. Aqui fica a fonte — quem escolhe a acao.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     await gravarMidia(env.DB, REEL_A)
     const sessao = await abrirSessao()
@@ -695,7 +662,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // O `alvo` existe desde a migration `0002` e a Etapa 12 e a primeira a
     // preenche-lo: sem ele, a auditoria diria "alguem pausou alguma coisa".
     expect(await auditoria()).toEqual([
-      { acao: 'config_alterada', alvo: REEL_A, campos: '["enabled"]' },
+      { acao: 'midia_alterada', alvo: REEL_A, campos: '["enabled"]' },
     ])
 
     // E o `alvo` viaja como TEXT: um `media_id` de 18 digitos que virasse numero
@@ -705,6 +672,245 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     }>()
     expect(typeof linha?.alvo).toBe('string')
     expect(linha?.alvo).toBe(REEL_A)
+  })
+
+  test('MID-23: um POST que nao muda nada NAO grava, NAO audita e NAO sobe a versao', async () => {
+    // **`mudou: true` fixo derrotava `mudouAlgumaCoisa`**, e o dano tinha tres
+    // metades. §9.9 registra GRAVACAO, e um formulario reenviado igual nao e
+    // uma: a linha de auditoria nascia com `campos: []`, sem nomear campo
+    // nenhum. A `versao` subia, e ela e a trava otimista de TODA aba aberta do
+    // painel — reabrir Palavras ou Mensagem passava a dar `409` por causa de um
+    // botao que nao mudou nada. E a faixa verde dizia "Pronto, salvo" para uma
+    // gravacao que nao gravou, contra §12.1 regra 4.
+    //
+    // O cenario e o mais barato que existe: `acao=religar` num Reel SEM
+    // sobreposicao nenhuma. `enabled` ja e `NULL`, entao a nova sobreposicao e
+    // identica a que esta no banco.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, REEL_A)
+    const sessao = await abrirSessao()
+
+    const resposta = await postarReel(
+      sessao,
+      `${CAMPO_DA_ACAO}=${RELIGAR}&${CAMPO_DO_REEL}=${REEL_A}`,
+    )
+
+    expect(resposta.status).toBe(303)
+    expect(resposta.headers.get('location')).toBe(`${ROTA_REELS.caminho}?ok=sem_mudanca`)
+    expect(await auditoria()).toEqual([])
+    expect(await versaoDaConfig()).toBe(1)
+
+    // Contrapositivo, e sem ele o teste passaria com uma tela que nunca grava:
+    // pausar MUDA a sobreposicao, e ai a gravacao acontece inteira.
+    const pausa = await postarReel(sessao, `${CAMPO_DA_ACAO}=${PAUSAR}&${CAMPO_DO_REEL}=${REEL_A}`)
+
+    expect(pausa.headers.get('location')).toBe(`${ROTA_REELS.caminho}?ok=salvo`)
+    expect((await auditoria()).map((linha) => linha.acao)).toEqual(['midia_alterada'])
+    expect(await versaoDaConfig()).toBe(2)
+  })
+
+  test('MID-24: o botao que VAI pedir a digital diz isso ANTES (§12.3)', async () => {
+    // §12.3 e literal: "quem garante o aviso e o cadeado no campo mais a tela de
+    // conferencia — **nunca uma surpresa biometrica**". Ate esta rodada
+    // `blocoDosBotoes` nao emitia sinal nenhum, e "Voltar tudo a seguir a regra
+    // geral" cai na cerimonia sempre que desfazer ALARGA (MID-21). O dono
+    // descobria pelo leitor de digital.
+    //
+    // A tela tem tudo para decidir na renderizacao — `antes`, `depois` e
+    // `camposProtegidos`, a tabela da propria spec —, e os dois Reels abaixo sao
+    // o mesmo botao com a sobreposicao virada para os dois lados.
+    await gravarConfig(env.DB, { enabled: 1, user_cooldown_hours: 24 })
+    // O A ESTREITAVA (48 > 24): desfazer alarga. O B ALARGAVA (12 < 24):
+    // desfazer estreita, e estreitar NUNCA pede a digital (§12.3, o rodape dos
+    // Ajustes).
+    await gravarMidia(env.DB, REEL_A, { user_cooldown_hours: 48 })
+    await gravarMidia(env.DB, REEL_B, { user_cooldown_hours: 12 })
+    const sessao = await abrirSessao()
+
+    const avisado = await (await telaDeUmReel(sessao, `?${CAMPO_DO_REEL}=${REEL_A}`)).text()
+
+    expect(avisado).toContain(SELO_PROTEGIDO)
+    expect(avisado).toContain(escapeHtml(TELA_DOS_REELS.esteBotaoPedeDigital))
+    expect(avisado).toContain(escapeHtml(TELA_DOS_REELS.vaiPedirADigital))
+
+    // E o aviso esta no formulario CERTO: o de "voltar a regra geral", e nao no
+    // da chave. Sem esta linha, um aviso solto na pagina passaria.
+    expect(formularioDaAcao(avisado, SEGUIR_O_GERAL)).toContain(SELO_PROTEGIDO)
+    expect(formularioDaAcao(avisado, PAUSAR)).not.toContain(SELO_PROTEGIDO)
+
+    // O contrapositivo, no Reel B: o botao existe e NAO avisa. Um aviso que
+    // mente e defeito na mesma medida que um que falta.
+    const livre = await (await telaDeUmReel(sessao, `?${CAMPO_DO_REEL}=${REEL_B}`)).text()
+
+    expect(livre).toContain(TELA_DOS_REELS.seguirRegraGeral)
+    expect(livre).not.toContain(SELO_PROTEGIDO)
+    expect(livre).not.toContain(escapeHtml(TELA_DOS_REELS.esteBotaoPedeDigital))
+  })
+
+  test('MID-25: a listagem tem cache de 10 minutos, e o botao Atualizar e quem o joga fora', async () => {
+    // **Ruling 98: as duas metades sao a MESMA peca.** §12.1 regra 5 e
+    // `[C]`-dura — "sem auto-refresh, sem polling, sem buscar lista a cada
+    // render; Atualizar e sempre um botao explicito" — e §12.5 e `[I]`-explicita
+    // sobre os 10 minutos. Ate esta rodada nao havia cache NENHUM (todo `GET`
+    // gastava ate quatro chamadas a Meta) e nao havia botao Atualizar em tela
+    // nenhuma — enquanto DUAS frases renderizadas mandavam toca-lo:
+    // `TELA_DOS_REELS.semReels` e `MOTIVO_DA_RECUSA.reel_desconhecido`. Frase
+    // que manda fazer o impossivel e a familia dos Rulings 75 e 82.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    const sessao = await abrirSessao()
+    const falsa = new MetaDeListagem([paginaComReel(), paginaComReel(), paginaComReel()])
+
+    // O primeiro render busca.
+    const primeira = await (await telaDeReels(sessao, falsa)).text()
+    expect(falsa.cursores.length).toBe(1)
+
+    // O botao EXISTE, e a tela diz de quando a lista e.
+    expect(primeira).toContain(`value="${ATUALIZAR}"`)
+    expect(primeira).toContain(TELA_DOS_REELS.atualizar)
+    expect(primeira).toContain(escapeHtml(TELA_DOS_REELS.listaBuscadaAgora))
+
+    // O segundo render, dentro dos 10 minutos, NAO busca. Este e o numero que
+    // §12.1 regra 5 protege: um render nao gasta cota.
+    const dentro = await (await telaDeReels(sessao, falsa, AGORA + 9 * 60_000)).text()
+    expect(falsa.cursores.length).toBe(1)
+    expect(dentro).toContain(
+      escapeHtml(`${TELA_DOS_REELS.listaBuscadaHa} 9 ${TELA_DOS_REELS.listaBuscadaHaFim}`),
+    )
+
+    // Passados os 10 minutos, o cache venceu e a tela busca de novo sozinha.
+    await telaDeReels(sessao, falsa, AGORA + CACHE_DA_LISTAGEM_MS + 1)
+    expect(falsa.cursores.length).toBe(2)
+
+    // E o botao ignora o cache: dentro da janela, o toque busca. Zero escrita,
+    // `200`, a pagina remontada — a mesma forma da paginacao (§7.1).
+    const atualizado = await postarReels(sessao, `${CAMPO_DA_ACAO}=${ATUALIZAR}`, falsa)
+
+    expect(atualizado.status).toBe(200)
+    expect(falsa.cursores.length).toBe(3)
+    expect(await linhasDeMidia()).toEqual([])
+    expect(await auditoria()).toEqual([])
+  })
+
+  test('MID-26: o botao Atualizar aparece TAMBEM quando o Instagram nao responde', async () => {
+    // As duas frases que mandam toca-lo sao justamente as dos estados ruins:
+    // `semReels` ("espere alguns minutos e toque em Atualizar") e
+    // `reel_desconhecido` ("Toque em Atualizar e escolha de novo na lista"). Um
+    // botao que sumisse no estado de falha deixaria as duas frases mentindo
+    // exatamente onde elas sao lidas.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    const sessao = await abrirSessao()
+
+    const semNada = await (await telaDeReels(sessao, new MetaDeListagem([pagina([], null)]))).text()
+    expect(semNada).toContain(escapeHtml(TELA_DOS_REELS.semReels))
+    expect(semNada).toContain(`value="${ATUALIZAR}"`)
+
+    esquecerAListagem()
+    const semMeta = await (
+      await telaDeReels(sessao, new MetaDeListagem([], { falharListagem: true }))
+    ).text()
+    expect(semMeta).toContain(escapeHtml(TELA_DOS_REELS.metaMuda))
+    expect(semMeta).toContain(`value="${ATUALIZAR}"`)
+  })
+
+  test('MID-27: o orcamento de HTML de §12.9 na tela de Reels, medido e registrado', async () => {
+    // **TELA-29 percorre a lista `TELAS` com UM Reel salvo, e por isso ela nunca
+    // mediu esta tela.** Aqui estao as duas pontas de verdade, e as duas
+    // estouram os 15 KB que §12.9 orca por tela. O numero fica ESCRITO: uma tela
+    // que passa do orcamento passa devagar, e quem paga a diferenca e quem abre
+    // o painel numa conexao ruim — que §12.9 chama de "o caso normal".
+    //
+    // **De onde vem o peso, medido:**
+    //   - uma pagina de `me/media` traz ate 25 publicacoes (§12.5) e uma conta
+    //     que so posta Reel rende 25 cartoes de uma vez, cada um com miniatura,
+    //     legenda cortada, data e o link da tela do Reel;
+    //   - §12.5 permite 200 Reels escolhidos, e a tela emite um campo escondido
+    //     por id em DOIS formularios: o de salvar, que preserva o que esta fora
+    //     da pagina, e o de "Carregar mais", que carrega a mesma escolha.
+    //
+    // §12.5 (200 Reels) e §12.9 (15 KB) nao fecham juntas, e reconciliar as duas
+    // e desenho de tela — encolher o teto, mandar a selecao preservada num campo
+    // so em vez de N, ou paginar o formulario. Vai com o resto de §3 para a Task
+    // 13b, com estes numeros na mao.
+    //
+    // **Dois consertos ja entraram nesta rodada e valem 65 KB dos 104 medidos no
+    // comeco dela:** (1) o Reel salvo que nao apareceu so e tratado como apagado
+    // quando a listagem ACABOU — antes, cada Reel nunca perguntado virava um
+    // `<li>` inteiro dizendo "Este Reel nao existe mais", o que alem de pesar
+    // era falso; (2) o botao Atualizar carrega so o que o banco ainda nao sabe.
+    //
+    // Os tetos abaixo sao TRAVA-CRESCIMENTO: eles reprovam quem piorar. A
+    // distancia deles para `TETO_DE_HTML` e a divida, e ela esta declarada.
+    const TETO_DE_UMA_PAGINA = 19 * 1024
+    const TETO_NO_LIMITE_DE_200 = 40 * 1024
+    expect(TETO_DE_UMA_PAGINA).toBeGreaterThan(TETO_DE_HTML)
+
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    const sessao = await abrirSessao()
+    const todos = idsFicticios(TETO_DE_MIDIAS)
+    const paginaCheia = todos.slice(0, 25).map((id) => item(id))
+
+    for (const id of todos.slice(0, 25)) await gravarMidia(env.DB, id)
+    const comum = await (
+      await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))
+    ).text()
+
+    expect(new TextEncoder().encode(comum).length).toBeLessThanOrEqual(TETO_DE_UMA_PAGINA)
+
+    for (const id of todos.slice(25)) await gravarMidia(env.DB, id)
+    esquecerAListagem()
+    const noTeto = await (
+      await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))
+    ).text()
+
+    expect(new TextEncoder().encode(noTeto).length).toBeLessThanOrEqual(TETO_NO_LIMITE_DE_200)
+  })
+
+  test('MID-28: "Este Reel nao existe mais" so vale quando a listagem ACABOU', async () => {
+    // **A tela afirmava um fato sobre o Instagram do dono com prova que ela nao
+    // tinha.** Uma pagina traz ate 25 publicacoes e um toque para em quatro
+    // paginas (§12.5); enquanto `paging.next` existe, o Reel que nao apareceu
+    // simplesmente NAO chegou a ser perguntado. O codigo tratava toda ausencia
+    // como apagamento, entao um dono com Reels antigos abria a tela e lia "Este
+    // Reel nao existe mais" em cada um deles, com o botao de tirar da lista ao
+    // lado. §12.1 regra 6: erro nunca inventa, e a tela nao afirma o que nao
+    // sabe.
+    //
+    // A guarda que ja existia — "so vale quando a listagem VEIO" — e a mesma
+    // ideia pela metade: com a Meta muda, ausencia nao prova nada; com a lista
+    // pela metade, tambem nao.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, REEL_A)
+    await gravarMidia(env.DB, REEL_B)
+    const sessao = await abrirSessao()
+
+    // A pagina traz so o A, e `paging.next` continua de pe: o B pode estar na
+    // proxima. A tela nao pode chama-lo de apagado.
+    const parcial = await (
+      await telaDeReels(
+        sessao,
+        // As QUATRO paginas do toque, todas com `paging.next`: o laco para pelo
+        // teto de paginas de §12.5, e nao por fim de lista.
+        new MetaDeListagem([
+          pagina([item(REEL_A)], 'p2'),
+          pagina([], 'p3'),
+          pagina([], 'p4'),
+          pagina([], 'p5'),
+        ]),
+      )
+    ).text()
+
+    expect(parcial).not.toContain(TELA_DOS_REELS.reelApagado)
+
+    // Contrapositivo: com `paging.next` AUSENTE, a lista acabou e a ausencia do
+    // B passa a ser prova. Sem esta metade, um `sumidos` fixo em `[]` — que faz
+    // o Reel apagado sumir em silencio, o que §3 proibe — passaria verde.
+    esquecerAListagem()
+    const completa = await (
+      await telaDeReels(sessao, new MetaDeListagem([pagina([item(REEL_A)], null)]))
+    ).text()
+
+    expect(completa).toContain(TELA_DOS_REELS.reelApagado)
+    expect(completa).toContain(REEL_B)
   })
 
   test('MID-16: `enabled` por Reel so aceita `0`, e a trava e do codigo E do banco', async () => {
@@ -814,30 +1020,22 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       }
     }
 
-    // E as frases do bloco novo do dicionario, uma a uma: elas chegam a tela por
-    // caminhos que nem todo cenario percorre — os quatro estados especiais de
-    // §12.5 nao aparecem juntos em tela nenhuma.
+    // **A varredura das CONSTANTES saiu daqui, e a saida e a honestidade** (§13.1).
     //
-    // **A varredura e das frases NOVAS, e a delimitacao e uma medicao, nao
-    // preguica.** Rodando `MOTIVO_DA_RECUSA` inteiro, uma frase ANTERIOR a esta
-    // etapa aparece: `dominio_nao_permitido` escreve "no deploy", e "deploy"
-    // esta na lista de §12.1. Ela nao e minha, DIC-02 nao a alcanca hoje, e
-    // consertar a frase de outra tela dentro desta etapa esconderia o achado no
-    // meio de um diff que e sobre Reels. Fica registrado no relatorio, e o laco
-    // aqui guarda o que a Etapa 12 escreveu.
-    const frases = [
-      ...Object.values(TELA_DOS_REELS),
-      ...RECUSAS_DOS_REELS.map((codigo) => MOTIVO_DA_RECUSA[codigo] ?? ''),
-    ]
-    expect(frases.length).toBeGreaterThan(20)
-    expect(frases.every((frase) => frase !== '')).toBe(true)
-    for (const frase of frases) {
-      for (const proibida of PALAVRAS_PROIBIDAS) {
-        expect({ [`${proibida} em "${frase}"`]: contemPalavra(frase, proibida) }).toEqual({
-          [`${proibida} em "${frase}"`]: false,
-        })
-      }
-    }
+    // A grafia anterior percorria `Object.values(TELA_DOS_REELS)` logo depois do
+    // laco das telas renderizadas, e o efeito de leitura era "as frases desta
+    // tela estao cobertas". Nao estavam: o laco passava em frase MORTA. Duas das
+    // constantes que ele varria — `cursorVencido` e `miniaturaVencida` — tem
+    // ZERO usos em `src/`, e um teste que da impressao de cobrir a renderizacao
+    // sem cobri-la e o que §13.1 chama de pior que ausencia, porque desliga a
+    // atencao.
+    //
+    // Quem varre as constantes do dicionario agora e o DIC-02, e ele varre o
+    // modulo INTEIRO — `TELA_DOS_REELS` e `MOTIVO_DA_RECUSA` inclusive —, entao
+    // nada se perdeu. O que este teste afirma e so o que o nome dele diz: as
+    // duas telas RENDERIZADAS nao escrevem palavra proibida. Os dois estados de
+    // §12.5 que ainda nao tem tela vao para a Task 13b, e ate la eles estao
+    // registrados no docblock de `TELA_DOS_REELS` como nao renderizados.
   })
 
   test('MID-21: desfazer a sobreposicao PEDE a digital quando desfazer alarga', async () => {
@@ -897,28 +1095,33 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
   })
 })
 
-/** Os codigos de recusa que a Etapa 12 acrescentou ao dicionario. */
-const RECUSAS_DOS_REELS: readonly string[] = [
-  'reel_desconhecido',
-  'reel_repetido',
-  'reels_demais',
-  'reels_novos_demais',
-  'selecao_vazia_com_automacao_ligada',
-  'listagem_indisponivel',
-  'reel_nao_pode_ligar',
-]
-
 /**
- * A mesma comparacao com fronteira de palavra de `painel-telas.test.ts`.
+ * O `<form>` daquela operacao, recortado da tela.
  *
- * Escrita de novo aqui, e nao importada de la: um `export` naquele arquivo o
- * transformaria em fixture de outra suite, e §13.1 fecha a lista de suites por
- * nome. Sao quatro linhas, e elas nao tem estado — a copia nao pode divergir em
- * comportamento sem que os dois lados fiquem vermelhos juntos.
+ * Os tres formularios da tela de um Reel sao irmaos e so o `acao` os separa —
+ * afirmar sobre a pagina inteira nao distinguiria "o botao certo avisa" de
+ * "algum lugar da pagina avisa".
  */
-function contemPalavra(texto: string, palavra: string): boolean {
-  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}([^\\p{L}\\p{N}]|$)`, 'iu').test(texto)
+function formularioDaAcao(corpo: string, acao: string): string {
+  for (const bloco of corpo.split('<form ').slice(1)) {
+    if (bloco.includes(`name="${CAMPO_DA_ACAO}" value="${acao}"`)) {
+      return bloco.split('</form>')[0] ?? ''
+    }
+  }
+  throw new Error(`a tela nao trouxe o formulario de ${acao}`)
+}
+
+/** Uma pagina com um Reel e um cursor, para o cache buscar alguma coisa. */
+function paginaComReel() {
+  return pagina([item(REEL_A)], null)
+}
+
+/** A `versao` da linha global — a trava otimista de toda aba aberta (§8.8). */
+async function versaoDaConfig(): Promise<number | undefined> {
+  const linha = await env.DB.prepare('SELECT versao FROM painel_config WHERE id = 1').first<{
+    versao: number
+  }>()
+  return linha?.versao
 }
 
 /** O escopo salvo na linha global, lido cru. */

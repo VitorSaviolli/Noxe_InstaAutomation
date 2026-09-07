@@ -69,7 +69,13 @@ import {
   cookieDoPainel,
   lerCookie,
 } from './campos'
-import { type CampoDaConfig, NOME_DO_CAMPO, RECUSA_SEM_VALOR, valorNaTela } from './dicionario'
+import {
+  type CampoDaConfig,
+  NOME_DO_CAMPO,
+  RECUSA_SEM_VALOR,
+  TELA_DOS_REELS,
+  valorNaTela,
+} from './dicionario'
 import type { EstadoDeComportamento, PatchDeEstado } from './formulario'
 import { type HtmlSeguro, html } from './html'
 import type { RecusaAuditada } from './recusa'
@@ -107,9 +113,27 @@ export type AcaoDeMudanca = 'config' | 'adicionar_passkey' | 'remover_passkey' |
  */
 export type ValorCanonico = string | number | boolean | readonly string[]
 
-/** A mudanca que o autenticador assina: a acao e os campos daquela operacao. */
+/**
+ * A mudanca que o autenticador assina: a acao, o ALVO e os campos.
+ *
+ * **`alvo` entrou com o Ruling 96, que emendou o Ruling 90.** Aquele dizia "os
+ * ids nao entram no `op_hash` — mantenha assim", e estava certo enquanto nao
+ * havia escrita por midia. Com `POST /painel/reel` passou a haver uma que PODE
+ * exigir step-up (desfazer uma sobreposicao que estreitava ALARGA, §10.10), e o
+ * patch dela e **identico para qualquer Reel**: o `media_id` viajava so num
+ * campo escondido que a tela de conferencia reemite e que ficava FORA da
+ * assinatura. E a forma exata do Ruling 86 — trocar `midia` entre os dois POSTs
+ * mantinha o `oh` valido e mudava a entidade gravada, com o autenticador tendo
+ * assinado "intervalo por pessoa: 48 -> 24" sem dizer de qual Reel.
+ *
+ * **Ele e STRING, sempre**, e a outra metade do Ruling 90 continua valendo: um
+ * id de 18 digitos sem aspas volta de `JSON.parse` como `number` corrompido, em
+ * silencio. O leitor da cerimonia RECUSA um `alvo` que nao seja texto.
+ */
 export interface MudancaCanonica {
   readonly acao: AcaoDeMudanca
+  /** A entidade que a mudanca alcanca, quando ela nao e a linha global. */
+  readonly alvo?: string
   readonly campos: Readonly<Record<string, ValorCanonico>>
 }
 
@@ -133,6 +157,13 @@ export interface MudancaCanonica {
  */
 export function jsonCanonico(mudanca: MudancaCanonica): string {
   const tudo: Record<string, ValorCanonico> = { ...mudanca.campos, acao: mudanca.acao }
+
+  // **O `alvo` so entra quando existe, e e isso que mantem os vetores
+  // congelados de §13.2 intactos**: sem ele o JSON e byte a byte o de antes do
+  // Ruling 96, e STEP-18, STEP-19 e STEP-21 continuam sendo os mesmos vetores
+  // escritos a mao. Ele vai DEPOIS do spread, como `acao` — nao existe campo de
+  // configuracao chamado `alvo`, e se um dia existir, quem manda e a entidade.
+  if (mudanca.alvo !== undefined) tudo.alvo = mudanca.alvo
 
   const ordenado: Record<string, ValorCanonico> = {}
   for (const chave of Object.keys(tudo).sort(porCodePoint)) {
@@ -204,8 +235,9 @@ export async function opHash(mudanca: MudancaCanonica): Promise<string> {
  * entao ele tem de ser coberto pela assinatura, senao trocar a operacao entre
  * os dois POSTs mudaria o efeito com o `oh` do envelope ainda valido.
  */
-export function mudancaDeConfig(patch: PatchDeEstado): MudancaCanonica {
-  return { acao: 'config', campos: patch as Readonly<Record<string, ValorCanonico>> }
+export function mudancaDeConfig(patch: PatchDeEstado, alvo?: string): MudancaCanonica {
+  const campos = patch as Readonly<Record<string, ValorCanonico>>
+  return alvo === undefined ? { acao: 'config', campos } : { acao: 'config', alvo, campos }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,15 +286,38 @@ function lerPedidoDaCerimonia(corpo: unknown): MudancaCanonica | null {
   }
   if (operacao !== acao) return null
 
+  // **O `alvo` e lido a parte, e so como STRING** (Ruling 90, mantido pelo 96).
+  // `comoValorCanonico` aceita numero inteiro, e um `alvo` numerico e o caminho
+  // que a migration `0002` descreve: acima de 2^53 o `JSON.parse` corrompe o id
+  // e casa o Reel errado, sem erro nenhum. Um envelope emitido sobre um id
+  // corrompido assinaria a mudanca de outro Reel, entao aqui ele e recusado.
+  const alvo = lida.alvo
+  if (alvo !== undefined && typeof alvo !== 'string') return null
+
+  const campos = camposDaCerimonia(lida)
+  if (campos === null) return null
+
+  return alvo === undefined
+    ? { acao: acao as AcaoDeMudanca, campos }
+    : { acao: acao as AcaoDeMudanca, alvo, campos }
+}
+
+/**
+ * Os campos do corpo da cerimonia na forma canonica, ou `null`.
+ *
+ * Extraida de `lerPedidoDaCerimonia` para caber no teto de complexidade do
+ * Biome depois do `alvo` do Ruling 96. `acao` e `alvo` ficam de fora porque os
+ * dois tem leitura propria acima.
+ */
+function camposDaCerimonia(lida: Record<string, unknown>): Record<string, ValorCanonico> | null {
   const campos: Record<string, ValorCanonico> = {}
   for (const [nome, valor] of Object.entries(lida)) {
-    if (nome === 'acao') continue
+    if (nome === 'acao' || nome === 'alvo') continue
     const canonico = comoValorCanonico(valor)
     if (canonico === null) return null
     campos[nome] = canonico
   }
-
-  return { acao: acao as AcaoDeMudanca, campos }
+  return campos
 }
 
 /** Um valor do corpo que cabe na forma canonica, ou `null`. */
@@ -503,6 +558,23 @@ export function telaDeConferencia(pedido: PedidoDeConferencia): HtmlSeguro {
 
   return html`<section class="conferencia">
 <h2>Confira o que vai mudar</h2>
+${
+  // §10.10, literal: "a tela **tem que** mostrar o valor literal antes da
+  // biometria. Se o humano nao leu o que assinou, a amarracao ao conteudo nao
+  // vale nada." Ate o Ruling 96 a tela dizia "Intervalo por pessoa: 48 -> 24" e
+  // ficava nisso — a mudanca era a mesma para qualquer Reel, e o dono nao tinha
+  // como saber em qual delas encostava o dedo.
+  //
+  // O que a tela escreve e o proprio `media_id`, e nao a legenda: e ELE que
+  // entra na assinatura, e mostrar um rotulo bonito ao lado de um hash sobre
+  // outro valor seria a mesma mentira em outra forma. O id nao e segredo — ele
+  // aparece no permalink publico do Reel.
+  pedido.mudanca.alvo === undefined
+    ? null
+    : html`<p class="alvo-da-mudanca">${TELA_DOS_REELS.soNesteReel} <code>${
+        pedido.mudanca.alvo
+      }</code></p>`
+}
 <ul class="mudancas">${linhas}</ul>
 ${
   pedido.mudancasNoToque > 1
@@ -613,6 +685,14 @@ export interface PassagemDeStepUp {
   readonly antes: EstadoDeComportamento
   readonly depois: EstadoDeComportamento
   readonly versaoEnviada: number
+  /**
+   * O `media_id` quando a gravacao e sobre UM Reel (Ruling 96).
+   *
+   * Ele entra na mudanca ASSINADA **e** e nomeado na tela de conferencia: as
+   * duas metades sao a mesma exigencia de §10.10 — "se o humano nao leu o que
+   * assinou, a amarracao ao conteudo nao vale nada".
+   */
+  readonly alvo?: string
 }
 
 /**
@@ -655,7 +735,7 @@ export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<Resu
   // mesmo mapa que o JSON da cerimonia produz —, e o `op_hash` e recalculado
   // AQUI, no servidor, a cada requisicao. Um hash vindo do cliente autorizaria
   // qualquer coisa.
-  const mudanca = mudancaDeConfig(passagem.patch)
+  const mudanca = mudancaDeConfig(passagem.patch, passagem.alvo)
   const opHashDeAgora = await opHash(mudanca)
   const ficha = await fichaCsrf(env, sessao.sidHash)
 

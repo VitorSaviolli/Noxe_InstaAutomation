@@ -192,6 +192,68 @@ export async function buscarPagina(
   return { ok: true, reels, proximoCursor: depois, paginas }
 }
 
+// ---------------------------------------------------------------------------
+// O cache da listagem (§12.5, §12.1 regra 5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Quanto tempo a listagem vale antes de a tela buscar de novo (§12.5, `[I]`).
+ *
+ * §12.1 regra 5 e `[C]`-dura: "sem auto-refresh, sem polling, **sem buscar
+ * lista a cada render**. Atualizar e sempre um botao explicito." Ate esta
+ * rodada todo `GET /painel/reels` gastava ate quatro chamadas a Meta, e o botao
+ * que a spec nomeia nao existia em tela nenhuma — duas frases renderizadas
+ * mandavam toca-lo.
+ */
+export const CACHE_DA_LISTAGEM_MS = 10 * 60 * 1000
+
+/** A listagem guardada, com o instante em que ela foi buscada. */
+export interface ListagemGuardada {
+  readonly em: number
+  readonly listagem: ResultadoDaListagem
+}
+
+/**
+ * O cache por ISOLATE, como o da configuracao (§9.6).
+ *
+ * Nao vai para o D1: uma listagem e um retrato temporario da conta, e §12.5 ja
+ * proibe guardar `thumbnail_url` e o cursor no banco pela mesma razao.
+ */
+let guardada: ListagemGuardada | null = null
+
+/**
+ * Esquece a listagem guardada.
+ *
+ * Chamada pelo botao Atualizar — que e o que §12.5 chama de "o botao explicito"
+ * — e pelo `beforeEach` das suites, do mesmo jeito que `invalidarCacheDeConfig`.
+ */
+export function esquecerAListagem(): void {
+  guardada = null
+}
+
+/**
+ * A primeira pagina da listagem, do cache quando ele ainda vale.
+ *
+ * **A falha da Meta TAMBEM e guardada**, e a escolha e deliberada: uma falha
+ * custa a mesma cota que um acerto, e re-buscar a cada render seria exatamente
+ * o "buscar lista a cada render" que §12.1 regra 5 proibe — com a instalacao
+ * pagando mais justamente quando a Meta esta ruim. A tela nao fica presa: ela
+ * diz de quando e a lista e oferece o botao Atualizar, que ignora o cache.
+ */
+export async function primeiraPagina(
+  env: Env,
+  now: number,
+  deps: DependenciasDeMidias = DEPENDENCIAS_DE_MIDIAS,
+  opcoes: { ignorarCache?: boolean } = {},
+): Promise<ListagemGuardada> {
+  const valida = guardada !== null && now - guardada.em < CACHE_DA_LISTAGEM_MS
+  if (opcoes.ignorarCache !== true && valida && guardada !== null) return guardada
+
+  const nova: ListagemGuardada = { em: now, listagem: await buscarPagina(env, null, deps) }
+  guardada = nova
+  return nova
+}
+
 /** Os Reels de UMA pagina, ja filtrados no Worker e com o id em texto. */
 function reelsDaPagina(pagina: MediaListResponse): ReelDaListagem[] {
   const achados: ReelDaListagem[] = []

@@ -34,6 +34,7 @@
  */
 import type { AutomationConfig } from '../../config'
 import {
+  COLUNAS_DE_SOBREPOSICAO,
   PainelMidiasRepository,
   type Sobreposicao,
   semSobreposicao,
@@ -50,7 +51,12 @@ import {
   TELA_DOS_REELS,
   valorNaTela,
 } from './dicionario'
-import { type EstadoDeComportamento, estadoDaConfig, type PatchDeEstado } from './formulario'
+import {
+  camposQueMudaram,
+  type EstadoDeComportamento,
+  estadoDaConfig,
+  type PatchDeEstado,
+} from './formulario'
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import {
@@ -61,12 +67,14 @@ import {
   fichaDaTela,
   molduraCom,
   panorama,
+  seloProtegido,
 } from './inicio'
 import { estadoEfetivo } from './midias'
 import { blocoDaRecusa, RecusaAuditada } from './recusa'
 import { erro } from './resposta'
 import { ROTA_REEL, ROTA_REELS } from './rotas'
 import type { EntradaDaRota } from './router'
+import { camposProtegidos } from './stepup'
 import { telaDoPainel } from './tela'
 
 /** O nome do parametro que nomeia o Reel, na query string e no corpo (§7.1). */
@@ -159,33 +167,111 @@ function blocoDosAjustes(
   }</p>`
 }
 
-/** Os botoes das tres operacoes, cada um no proprio formulario. */
+/**
+ * O `depois` que uma das tres operacoes produz, sem gravar nada.
+ *
+ * **Uma grafia so, e ela serve a tela E a gravacao.** `gravarNoReel` a usa para
+ * montar o `patchDoHandler`, e a tela a usa para saber, ANTES de desenhar o
+ * botao, se aquele toque vai pedir a digital. Duas expressoes separadas eram o
+ * caminho para a tela dizer "livre" onde o funil diz "protegido" — e a
+ * divergencia apareceria como surpresa biometrica, que e o que §12.3 proibe
+ * com todas as letras.
+ */
+function patchDaOperacao(
+  acao: typeof PAUSAR | typeof RELIGAR | typeof SEGUIR_O_GERAL,
+  estadoGlobal: EstadoDeComportamento,
+): PatchDeEstado {
+  if (acao === SEGUIR_O_GERAL) {
+    return Object.fromEntries(CAMPOS_DO_REEL.map((campo) => [campo, estadoGlobal[campo]]))
+  }
+  return { enabled: acao === PAUSAR ? false : estadoGlobal.enabled }
+}
+
+/**
+ * Os campos de §10.10 que aquela operacao alcanca, do jeito que o funil os
+ * classificaria.
+ *
+ * `camposProtegidos` e a tabela da propria spec, exportada desde o Ruling 77
+ * justamente para poder ser consultada fora do funil. Ela recebe o mesmo
+ * `antes`, o mesmo `depois` e a mesma lista de mudados que o passo 8 receberia.
+ */
+function protegidosDaOperacao(
+  acao: typeof PAUSAR | typeof RELIGAR | typeof SEGUIR_O_GERAL,
+  antes: EstadoDeComportamento,
+  estadoGlobal: EstadoDeComportamento,
+): readonly CampoDaConfig[] {
+  const depois: EstadoDeComportamento = { ...antes, ...patchDaOperacao(acao, estadoGlobal) }
+  return camposProtegidos(camposQueMudaram(antes, depois), antes, depois)
+}
+
+/**
+ * Os botoes das tres operacoes, cada um no proprio formulario.
+ *
+ * **§12.3, e esta tela era a unica que o descumpria**: "quem garante o aviso e
+ * o cadeado no campo mais a tela de conferencia — **nunca uma surpresa
+ * biometrica**". "Voltar tudo a seguir a regra geral" PODE cair na cerimonia
+ * (MID-21): quando a sobreposicao daquele Reel estreitava, desfaze-la alarga, e
+ * §10.10 lista o alargamento entre o que pede a digital. Ate esta rodada o
+ * botao nao dizia nada, e o dono descobria pelo leitor de digital.
+ *
+ * A tela tem tudo para decidir na renderizacao — `antes`, `depois` e a tabela
+ * de §10.10 —, entao ela decide, e emite os tres sinais de §12.3 juntos: o
+ * cadeado com a palavra "protegido", a classe que pinta a borda ambar e a frase
+ * antes do botao. E o botao diz o que vai acontecer.
+ */
 function blocoDosBotoes(
   mediaId: string,
   ficha: string,
   versao: number,
-  pausado: boolean,
-  temProprias: boolean,
+  antes: EstadoDeComportamento,
+  estadoGlobal: EstadoDeComportamento,
+  sobreposicao: Sobreposicao,
 ): HtmlSeguro {
+  const pausado = sobreposicao.enabled === 0
+  const acaoDaChave = pausado ? RELIGAR : PAUSAR
   const campos = html`${camposDoFormulario(ficha, versao)}
 <input type="hidden" name="${CAMPO_DO_REEL}" value="${mediaId}">`
 
-  return html`<form method="post" action="${ROTA_REEL.caminho}">
-${campos}
-<input type="hidden" name="${CAMPO_DA_ACAO}" value="${pausado ? RELIGAR : PAUSAR}">
-<button type="submit">${
-    pausado ? TELA_DOS_REELS.religarEsteReel : TELA_DOS_REELS.pausarEsteReel
-  }</button>
-</form>
+  return html`${formularioDaOperacao(
+    campos,
+    acaoDaChave,
+    pausado ? TELA_DOS_REELS.religarEsteReel : TELA_DOS_REELS.pausarEsteReel,
+    protegidosDaOperacao(acaoDaChave, antes, estadoGlobal),
+  )}
 ${
-  temProprias
-    ? html`<form method="post" action="${ROTA_REEL.caminho}">
-${campos}
-<input type="hidden" name="${CAMPO_DA_ACAO}" value="${SEGUIR_O_GERAL}">
-<button type="submit">${TELA_DOS_REELS.seguirRegraGeral}</button>
-</form>`
+  temRegrasProprias(sobreposicao)
+    ? formularioDaOperacao(
+        campos,
+        SEGUIR_O_GERAL,
+        TELA_DOS_REELS.seguirRegraGeral,
+        protegidosDaOperacao(SEGUIR_O_GERAL, antes, estadoGlobal),
+      )
     : null
 }`
+}
+
+/** Um botao de operacao, com os tres sinais de §12.3 quando ele e protegido. */
+function formularioDaOperacao(
+  campos: HtmlSeguro,
+  acao: string,
+  rotulo: string,
+  protegidos: readonly CampoDaConfig[],
+): HtmlSeguro {
+  const protegido = protegidos.length > 0
+
+  return html`<form method="post" action="${ROTA_REEL.caminho}"${
+    protegido ? html` class="protegidos"` : null
+  }>
+${campos}
+<input type="hidden" name="${CAMPO_DA_ACAO}" value="${acao}">
+${
+  protegido
+    ? html`<p class="rotulo">${seloProtegido()}</p>
+<p>${TELA_DOS_REELS.esteBotaoPedeDigital}</p>`
+    : null
+}
+<button type="submit">${protegido ? `${rotulo} ${TELA_DOS_REELS.vaiPedirADigital}` : rotulo}</button>
+</form>`
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +320,15 @@ ${blocoDeConfirmacao(request)}
 ${
   linha.ativo === 1
     ? null
-    : html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.foraDaLista}
+    : // §12.5 escreve o rotulo como acao — "[Incluir este Reel na lista]" — e o
+      // que a tela entrega e um LINK para "Meus Reels", onde a pessoa marca o
+      // Reel e salva. Aceitavel sem JavaScript: incluir um Reel e uma GRAVACAO,
+      // e uma gravacao precisa da ficha, da versao e do funil inteiro — um
+      // `<form>` aqui seria a segunda grafia do POST de `/painel/reels`, com a
+      // revalidacao dos ids novos e o teto de 200 por conta propria. Fica
+      // REGISTRADO como divergencia de rotulo, e nao como funcionalidade
+      // entregue.
+      html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.foraDaLista}
 <a href="${ROTA_REELS.caminho}">${TELA_DOS_REELS.incluirNaLista}</a></p>`
 }
 ${
@@ -244,13 +338,7 @@ ${
 }
 ${faixaDeLinhaInvalida(sobreposicao)}
 ${blocoDosAjustes(efetivo, global, sobreposicao)}
-${blocoDosBotoes(
-  mediaId,
-  ficha,
-  snapshot.versao,
-  sobreposicao.enabled === 0,
-  temRegrasProprias(sobreposicao),
-)}
+${blocoDosBotoes(mediaId, ficha, snapshot.versao, efetivo, global, sobreposicao)}
 <p><a href="${ROTA_REELS.caminho}">${TELA_DOS_REELS.titulo}</a></p>`
 
   return telaDoPainel(molduraCom('reels', TELA_DOS_REELS.tituloDoReel, visao, corpo))
@@ -322,10 +410,8 @@ async function gravarNoReel(
     })
   }
 
-  const patchDoHandler: PatchDeEstado =
-    acao === SEGUIR_O_GERAL
-      ? Object.fromEntries(CAMPOS_DO_REEL.map((campo) => [campo, estadoGlobal[campo]]))
-      : { enabled: acao === PAUSAR ? false : estadoGlobal.enabled }
+  // A MESMA funcao que a tela consultou para decidir o cadeado (§12.3).
+  const patchDoHandler: PatchDeEstado = patchDaOperacao(acao, estadoGlobal)
 
   return await gravarConfiguracao(entrada, {
     para: ROTA_REELS.caminho,
@@ -341,7 +427,27 @@ async function gravarNoReel(
         new PainelMidiasRepository(env.DB).statementDeSobreposicao(now, versao, mediaId, nova),
       ],
       antes,
-      mudou: true,
+      // **Calculado, e nao `true` fixo.** Um `true` fixo derrotava
+      // `mudouAlgumaCoisa` no funil e transformava todo POST desta tela numa
+      // gravacao: `acao=religar` num Reel SEM sobreposicao nenhuma respondia
+      // `303 ?ok=salvo`, gravava uma linha de auditoria com `campos: []` — que
+      // nao nomeia campo nenhum — e subia `painel_config.versao`, invalidando a
+      // trava otimista de TODA aba aberta do painel, Palavras e Mensagem
+      // inclusive. E a faixa verde dizia "Pronto, salvo" para uma gravacao que
+      // nao gravou, contra §12.1 regra 4. §9.9 registra GRAVACAO, e um
+      // formulario reenviado igual nao e uma.
+      mudou: mudouASobreposicao(atual, nova),
     },
   })
+}
+
+/**
+ * A sobreposicao nova difere da que esta no banco?
+ *
+ * `COLUNAS_DE_SOBREPOSICAO` e a lista FECHADA do schema, e comparar por ela — e
+ * nao por `Object.keys` de um dos dois — e o que impede uma coluna nova de
+ * entrar no banco e ficar de fora desta pergunta em silencio.
+ */
+function mudouASobreposicao(atual: Sobreposicao, nova: Sobreposicao): boolean {
+  return COLUNAS_DE_SOBREPOSICAO.some((coluna) => atual[coluna] !== nova[coluna])
 }

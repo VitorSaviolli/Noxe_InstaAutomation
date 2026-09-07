@@ -163,7 +163,11 @@ export const MOTIVO_DA_RECUSA: Record<string, string> = {
   nao_e_lista_de_texto: 'Não conseguimos entender a lista de palavras que chegou.',
   cooldown_fora_da_faixa: 'A espera precisa ser um número inteiro de horas, de 0 até 8760.',
   nao_e_booleano: 'Este ajuste só aceita sim ou não.',
-  dominio_nao_permitido: 'Este endereço não está na lista liberada no deploy.',
+  // A frase antiga escrevia "na lista liberada no deploy", e "deploy" esta em
+  // `PALAVRAS_PROIBIDAS`. Ela atravessou tres etapas porque DIC-02 varria cinco
+  // das dez tabelas do dicionario e esta ficava na metade nao varrida.
+  dominio_nao_permitido:
+    'Este endereço não está na lista de endereços liberados. Quem muda essa lista é quem publicou o projeto, no computador.',
   // --- Os Reels (§12.5) ---
   reel_desconhecido:
     'Este Reel não é da sua conta, ou não existe mais. Toque em Atualizar e escolha de novo na lista.',
@@ -227,7 +231,7 @@ export const SELO_PROTEGIDO = 'protegido'
  * Quem nao esta em NENHUM dos dois mapas daqui nao e editavel nem visivel em
  * lugar nenhum — e ai a frase com "ainda" e verdadeira.
  */
-const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
+export const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
   enabled: 'no bot\u00e3o do In\u00edcio',
   triggerKeywords: 'na tela de Palavras',
   matchMode: 'na tela de Palavras',
@@ -261,7 +265,7 @@ const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
  * Po-los em `TELA_DO_CAMPO` seria a terceira mentira: o caminho existiria e o
  * botao nao. Eles ficam aqui ate ganharem o interruptor, e ai mudam de mapa.
  */
-const TELA_QUE_SO_MOSTRA: Partial<Record<CampoDaConfig, string>> = {
+export const TELA_QUE_SO_MOSTRA: Partial<Record<CampoDaConfig, string>> = {
   publicReplyEnabled: 'nos Ajustes finos',
   privateReplyEnabled: 'nos Ajustes finos',
 }
@@ -418,7 +422,7 @@ export function valorNaTela(campo: CampoDaConfig, valor: unknown): string {
  * tecnica>"`. Quase todo prefixo e um campo, e cai em `NOME_DO_CAMPO`; estes
  * dois sao o resto, e sem eles a tela mostraria o nome de uma tabela do banco.
  */
-const AVISO_SEM_CAMPO: Record<string, string> = {
+export const AVISO_SEM_CAMPO: Record<string, string> = {
   banco: 'Não conseguimos ler os seus ajustes salvos agora.',
   painel_midias:
     'Encontramos escolhas de Reels sem ajustes salvos. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
@@ -553,13 +557,29 @@ export const TELA_DOS_REELS = {
   /** §12.5, linhas orfas. A mesma frase que o aviso do validador ja usa. */
   orfas:
     'Encontramos escolhas de Reels sem uma configuração salva. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
-  /** §12.5, cursor vencido. */
+  /**
+   * §12.5, cursor vencido. **NAO RENDERIZADA HOJE** — zero usos em `src/`.
+   *
+   * Ela e um dos cinco estados especiais de §12.5, e o estado que a produz — o
+   * cursor que venceu enquanto a pagina estava aberta — nao e detectado por
+   * nenhum caminho de `reels.ts`. A constante fica, e a ausencia fica ESCRITA:
+   * o estado vai para a Task 13b. Ate la, nenhum teste pode dar a entender que
+   * esta frase e alcancavel (§13.1).
+   */
   cursorVencido:
     'A lista ficou velha enquanto esta página estava aberta. Toque em Atualizar. O que você já marcou está guardado nesta tela.',
   /** §3, Reel apagado no Instagram. Ele NAO some da lista. */
   reelApagado: 'Este Reel não existe mais',
   tirarDaLista: 'Tirar da lista',
-  /** §3, miniatura vencida. Nao impede nada. */
+  /**
+   * §3, miniatura vencida. **NAO RENDERIZADA HOJE** — zero usos em `src/`.
+   *
+   * A tela ja aguenta a miniatura quebrada (o cartao cai num bloco cinza e
+   * continua selecionavel), mas a FAIXA que explica "as miniaturas venceram —
+   * e normal, elas duram pouco" nao e emitida em lugar nenhum, porque nada
+   * detecta o vencimento: um `<img>` que falha falha no navegador, e o servidor
+   * nao sabe. Mesma situacao de `cursorVencido`, e o mesmo destino: Task 13b.
+   */
   miniaturaVencida:
     'as miniaturas venceram — é normal, elas duram pouco. Nada da sua configuração foi perdido.',
   /** §12.5, as quatro paginas renderam quase nada. */
@@ -574,11 +594,37 @@ export const TELA_DOS_REELS = {
   incluirNaLista: 'Incluir este Reel na lista',
   /** §3, o rotulo do que a listagem nao conseguiu confirmar (§15.2, pend. 7). */
   videoOuReel: 'vídeo/Reel',
-  /** §3, o botao de marcar em lote. O numero e o unico que a tela promete. */
+  /**
+   * §3, o botao de marcar em lote. **NAO RENDERIZADO HOJE** — zero usos.
+   *
+   * O botao existia como `<button type="button" class="marcar-lote">`, a classe
+   * era a unica ocorrencia dela no repositorio e `painel.js` nao a conhecia:
+   * ele nao fazia nada. Saiu de `reels.ts` nesta rodada — um controle que nao
+   * faz o que promete e defeito (R-6, §12.4) —, e as duas frases ficam aqui
+   * porque o botao e §3 e volta na Task 13b, com o desenho escrito no docblock
+   * de `listaDeReels`.
+   *
+   * O numero fica FORA das frases de proposito: ele e o tamanho do que esta
+   * carregado na tela, e e o unico numero que a tela pode prometer.
+   */
   marcarOsDesta: 'Marcar os',
   marcarOsDestaFim: 'desta lista',
   carregarMais: 'Carregar mais',
   atualizar: 'Atualizar',
+  /**
+   * §12.5: a tela diz DE QUANDO a lista e, e oferece o botao que a renova.
+   *
+   * **§12.5 escreve o exemplo como "Lista de 14:32", e a hora do relogio nao
+   * pode ser escrita aqui.** O docblock de `dataEmPortugues` ja fixou a razao:
+   * o Worker roda em UTC, o fuso da instalacao nao esta no contrato de
+   * ambiente, e uma hora tres horas errada numa tela que existe para explicar e
+   * pior do que nenhuma hora. A IDADE responde a mesma pergunta — "de quando
+   * ela e?" — e nao depende de fuso nenhum. Quando o fuso virar dado de
+   * ambiente, esta frase vira a de §12.5 palavra por palavra.
+   */
+  listaBuscadaAgora: 'Esta lista acabou de ser buscada no Instagram.',
+  listaBuscadaHa: 'Esta lista foi buscada no Instagram há',
+  listaBuscadaHaFim: 'minutos.',
   /** §3, a tela de UM Reel. */
   tituloDoReel: 'Este Reel responde diferente',
   seguirRegraGeral: 'Voltar tudo a seguir a regra geral',
@@ -586,4 +632,24 @@ export const TELA_DOS_REELS = {
   religarEsteReel: 'Voltar a responder neste Reel',
   /** §3, o resumo de uma frase antes de salvar. */
   seguindoOGeral: 'Este Reel segue a regra geral em tudo.',
+  /**
+   * §10.10: a tela de conferencia NOMEIA o Reel antes de pedir a digital.
+   *
+   * Sem ela o dono lia "Intervalo por pessoa: 48 para 24" sem saber em qual
+   * Reel estava encostando o dedo — e a mudanca assinada era identica para
+   * todos eles (Ruling 96).
+   */
+  soNesteReel: 'Estas mudanças valem só neste Reel:',
+  /**
+   * §12.3, os tres sinais juntos no botao que PODE cair na cerimonia.
+   *
+   * "Voltar tudo a seguir a regra geral" alarga quando a sobreposicao daquele
+   * Reel estreitava, e §10.10 lista o alargamento entre o que pede a digital.
+   * §12.3 e literal: "quem garante o aviso e o cadeado no campo mais a tela de
+   * conferencia — nunca uma surpresa biometrica".
+   */
+  esteBotaoPedeDigital:
+    'Neste Reel, este botão aumenta o alcance da automação — então ele vai pedir a sua digital ou o seu rosto, e mostrar antes o que muda.',
+  /** O que o botao acrescenta ao proprio rotulo, para dizer o que vai acontecer. */
+  vaiPedirADigital: '(vai pedir a sua digital)',
 } as const

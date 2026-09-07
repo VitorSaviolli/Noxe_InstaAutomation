@@ -47,8 +47,8 @@ import {
   RECUSA_SEM_VALOR,
 } from './dicionario'
 import {
-  CAMPOS_DE_COMPORTAMENTO,
   CONFIRMADO,
+  camposQueMudaram,
   ESTRUTURAIS_DE_TODA_ROTA,
   type EstadoDeComportamento,
   estadoDaConfig,
@@ -182,11 +182,32 @@ export interface PedidoDeGravacao {
    *
    * O que NAO cabia no funil de hoje era uma coisa so: `antes`/`depois` sao o
    * estado de comportamento da linha GLOBAL. A extensao resolve isso deixando a
-   * tela dizer qual entidade esta mudando — e, para um Reel, o "estado completo
-   * da entidade afetada" de §9.9 e a config EFETIVA daquele Reel: a global com
-   * a sobreposicao por cima. Com ela no lugar de `antes`, a classificacao de
-   * risco, a tela de conferencia, o `op_hash` e o JSON da auditoria continuam
-   * sendo os mesmos, sem uma linha nova em nenhum dos quatro.
+   * tela dizer qual entidade esta mudando — e, para um Reel, o `antes` passa a
+   * ser a config EFETIVA daquele Reel: a global com a sobreposicao por cima.
+   * Com ela no lugar de `antes`, a classificacao de risco, a tela de
+   * conferencia, o `op_hash` e o JSON da auditoria continuam sendo os mesmos,
+   * sem uma linha nova em nenhum dos quatro.
+   *
+   * **E isto e um DESVIO de §9.9, declarado como desvio.** A frase anterior
+   * apresentava a config efetiva como se ela FOSSE o "estado completo da
+   * entidade afetada" que a spec pede, e nao e. §9.9 e literal sobre o que uma
+   * linha de midia registra: "`media_id`, `ativo` e as colunas de
+   * sobreposicao". Um `antes` MESCLADO nao distingue "este Reel tem
+   * sobreposicao de 24 h" de "este Reel herda 24 h da geral" — as duas produzem
+   * o mesmo JSON —, e a diferenca e o que decide se desfazer a sobreposicao
+   * muda alguma coisa. A perda e IRREVERSIVEL: o `depois` de ontem nao pode ser
+   * desmesclado amanha.
+   *
+   * O que a extensao ganha em troca e o que fez a escolha: com o efetivo, a
+   * classificacao de risco de §10.10, a tela de conferencia e o `op_hash`
+   * continuam com UMA grafia, porque as tres falam de `EstadoDeComportamento`.
+   * Registrar as colunas cruas exigiria uma segunda forma de `antes`/`depois` e
+   * uma segunda classificacao — que e o Ruling 63 outra vez.
+   *
+   * A saida limpa existe e nao e desta rodada: um par de colunas proprias em
+   * `painel_auditoria` para a sobreposicao crua, ao lado do efetivo. Fica
+   * registrado aqui, e no relatorio, como divergencia conhecida — e nao como
+   * cumprimento.
    */
   readonly midias?: ParteDeMidias
 }
@@ -327,7 +348,7 @@ export async function gravarConfiguracao(
   // entao ele vence um campo de mesmo nome vindo do corpo.
   const patch: PatchDeEstado = { ...patchDoCorpo.patch, ...pedido.patchDoHandler }
   const depois: EstadoDeComportamento = { ...antes, ...patch }
-  const mudados = CAMPOS_DE_COMPORTAMENTO.filter((campo) => mudou(antes[campo], depois[campo]))
+  const mudados = camposQueMudaram(antes, depois)
 
   // Nada mudou: zero escrita e zero linha de auditoria. §9.9 registra GRAVACAO,
   // e um formulario reenviado igual nao e uma. A pergunta ganhou uma segunda
@@ -451,6 +472,12 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     antes,
     depois,
     versaoEnviada,
+    // **O alvo entra na assinatura e na tela de conferencia** (Ruling 96, que
+    // emendou o 90). Sem ele o `patch` de `/painel/reel` era identico para
+    // qualquer Reel: o `media_id` viajava so no campo escondido `midia`, que a
+    // tela reemite e que ficava fora do `op_hash` — a forma exata do Ruling 86,
+    // com o `oh` do envelope continuando valido depois de a entidade trocar.
+    ...(pedido.midias?.alvo == null ? {} : { alvo: pedido.midias.alvo }),
   })
   if ('resposta' in passagem) return passagem.resposta
   const credencialDoStepUp = passagem.credentialId
@@ -631,12 +658,4 @@ async function validarOuRecusar(pedido: PedidoDeValidacao): Promise<Response | n
       })),
     )}${await rascunho(false)}`,
   })
-}
-
-/** Dois valores do estado sao diferentes? Listas comparam item a item. */
-function mudou(antes: unknown, depois: unknown): boolean {
-  if (Array.isArray(antes) && Array.isArray(depois)) {
-    return antes.length !== depois.length || antes.some((item, i) => item !== depois[i])
-  }
-  return antes !== depois
 }

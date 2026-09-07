@@ -20,12 +20,15 @@ import { cookieDeStepUpExpirado } from './stepup'
 /**
  * O JSON de `antes`/`depois`, com as chaves em ordem fixa.
  *
- * **Nenhum metadado de exibicao entra aqui, nem hoje nem quando as linhas de
- * midia chegarem** (§9.9, §15.4): `legenda_curta` e recorte da `caption` do
- * Reel, e `caption` esta na lista de proibidos dos DOIS destinos — a proibicao
- * vence a regra do "estado completo". A protecao e estrutural: a funcao copia
- * de `CAMPOS_DE_COMPORTAMENTO`, e nao do objeto que recebeu, entao um campo a
- * mais na origem nao vaza por descuido.
+ * **Nenhum metadado de exibicao entra aqui, e as linhas de midia ja chegaram**
+ * (§9.9, §15.4). A frase antiga dizia "nem hoje nem quando as linhas de midia
+ * chegarem", e elas chegaram neste mesmo commit: `POST /painel/reel` grava uma
+ * sobreposicao e `POST /painel/reels` grava a selecao, e as duas passam por
+ * aqui. A regra continua a mesma — `legenda_curta` e recorte da `caption` do
+ * Reel, e `caption` esta na lista de proibidos dos DOIS destinos, entao a
+ * proibicao vence a regra do "estado completo". A protecao e estrutural: a
+ * funcao copia de `CAMPOS_DE_COMPORTAMENTO`, e nao do objeto que recebeu, entao
+ * um campo a mais na origem nao vaza por descuido.
  */
 function comoJson(estado: EstadoDeComportamento): string {
   const ordenado: Record<string, unknown> = {}
@@ -61,6 +64,9 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
   const { entrada, sessao, pedido, antes, depois, mudados, comStepUp } = aplicacao
   const { env, now, contexto } = entrada
 
+  /** A entidade que esta gravacao altera: um `media_id`, ou a linha global. */
+  const alvo = pedido.midias?.alvo ?? null
+
   // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo —
   // a sessao muda de "conseguiu ler" para "acabou de autorizar". O prazo
   // absoluto e o que JA estava valendo: SES-01 diz que ele nunca e estendido.
@@ -69,11 +75,19 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
   const sessaoNova = comStepUp ? await rotacionarSessao(env, sessao.expiraEm) : null
 
   // **As escritas de midia vem PRIMEIRO, e a posicao e a trava** (Ruling 91).
-  // Cada uma carrega `versao = <a enviada>` na propria clausula `WHERE`, e
+  // Cada uma carrega `versao = <a ENVIADA>` na propria clausula `WHERE`, e
   // dentro da transacao do `db.batch()` a `versao` so anda quando o `UPDATE`
-  // global logo abaixo roda. Postas depois, elas veriam a versao ja incrementada
-  // e commitariam mesmo quando a trava otimista tivesse recusado a gravacao —
-  // a selecao de Reels do dono aplicada em silencio debaixo de um `409`.
+  // global logo abaixo roda. Avaliadas antes dele, elas veem a mesma versao que
+  // o `WHERE` do global vai ver: as duas travas casam juntas ou falham juntas.
+  //
+  // **Postas DEPOIS, elas nunca commitariam** — e a razao escrita aqui ate esta
+  // rodada dizia o contrario. Como o `bind` e `versaoEnviada` e a bump ja teria
+  // acontecido, o `EXISTS` seria sempre falso: a linha global e a de auditoria
+  // gravariam e a selecao de Reels do dono ficaria para tras em silencio, com a
+  // tela dizendo "Pronto, salvo". A posicao e necessaria nos dois mundos; o que
+  // muda e QUAL silencio ela evita, e a razao errada e o que sobrevive a
+  // proxima refatoracao. O comentario gemeo de `TRAVA_DE_VERSAO`, em
+  // `painel-midias-repository.ts`, ja dizia a versao certa.
   //
   // Elas tambem nao podem usar `changes() > 0`, que e como a linha de auditoria
   // se prende: `changes()` fala do statement anterior, e uma FILA de escritas
@@ -98,11 +112,35 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
         // fixo faria a auditoria nao distinguir a troca do link — que so
         // acontece com a digital — de uma troca de palavra-gatilho.
         stepUp: comStepUp,
-        acao: 'config_alterada',
+        // **A acao segue o ALVO, e nao a rota** (§9.9). `midia_alterada` ja
+        // existia em `AcaoDeAuditoria` e na lista de §9.9, e ate esta linha
+        // nunca era emitido em lugar nenhum: toda gravacao saia como
+        // `config_alterada`, inclusive a de UM Reel.
+        //
+        // Isso ligava duas telas que ninguem tinha ligado. `ultimasMudancas`
+        // filtra `WHERE acao = 'config_alterada' AND antes IS NOT NULL` e nao
+        // le o `alvo` — entao a linha de um Reel entrava no historico de
+        // Ajustes indistinguivel da global, com o botao "Voltar a esta versao"
+        // ao lado. E o `antes` de uma linha de Reel e a config EFETIVA daquele
+        // Reel: apertar o botao gravava o link e o intervalo PRIVADOS de um
+        // Reel por cima da configuracao de TODOS. Quando o campo divergente e
+        // protegido, a tela de conferencia mostra o literal e o dono tem chance
+        // de perceber; quando e o modo de comparacao, as palavras, o intervalo
+        // para cima ou a chave, nao ha step-up nenhum e a troca e silenciosa.
+        //
+        // Com a acao presa ao alvo, a linha cai FORA do filtro e o botao some
+        // sem uma linha de `ajustes.ts` mudar.
+        //
+        // A pergunta e sobre o ALVO, e nao sobre a presenca de `midias`:
+        // `POST /painel/reels` tambem escreve em `painel_midias`, e ele muda a
+        // linha GLOBAL — `mediaScope` — com um `alvo` nulo, porque marcar e
+        // desmarcar nao tem um alvo, tem um conjunto novo. Aquela linha e
+        // restauravel e continua sendo `config_alterada`.
+        acao: alvo === null ? 'config_alterada' : 'midia_alterada',
         // §9.9 quer saber QUAL entidade mudou. Um `media_id` cabe nos 32
         // caracteres da coluna, e e por isso que ela existe desde a migration
         // `0002` — a Task 13 e a primeira a preenche-la.
-        alvo: aplicacao.pedido.midias?.alvo ?? null,
+        alvo,
         campos: JSON.stringify([...mudados, ...(aplicacao.pedido.midias?.campos ?? [])]),
         antes: comoJson(antes),
         depois: comoJson(depois),

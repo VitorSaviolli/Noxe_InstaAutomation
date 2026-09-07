@@ -13,6 +13,7 @@ import type { AutomationConfig } from '../../src/config'
 import worker from '../../src/index'
 import type { MetaApiClient } from '../../src/services/meta-api'
 import type { Env } from '../../src/types/env'
+import type { ApiResult, MediaInfoResponse, MediaListResponse } from '../../src/types/meta'
 
 /** Statements que gravam. Serve para separar leitura de escrita na contagem. */
 const ESCRITA = /^\s*(insert|update|delete|replace)/i
@@ -374,4 +375,107 @@ export async function responder(request: Request, env: Env): Promise<Response> {
 /** GET na raiz ficticia, com os cabecalhos informados e NADA alem deles. */
 export function pedir(caminho: string, cabecalhos: Record<string, string> = {}): Request {
   return new Request(`${RAIZ}${caminho}`, { headers: cabecalhos })
+}
+
+/**
+ * A palavra aparece com fronteira de palavra? Substring nao conta (§12.7).
+ *
+ * **Ela morava em TRES arquivos, com o corpo identico e um nome diferente no
+ * terceiro** (`contemPalavraNoCorpo`). Tres copias de uma comparacao que
+ * decide se a tela escreveu uma palavra proibida sao tres chances de uma delas
+ * ficar para tras — e a que ficasse para tras seria a que continuaria dizendo
+ * "verde" depois de a regra ter mudado. §13.1 nomeia `tests/fixtures/*` como o
+ * lugar de um helper compartilhado, e este arquivo e o que ja hospeda o que
+ * nao e duble (`AGORA`, `RAIZ`, `pedir`, `capturarConsole`) — abrir um quinto
+ * arquivo de fixture criaria um nome que §13.1 nao lista.
+ */
+export function contemPalavra(texto: string, palavra: string): boolean {
+  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
+  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}([^\\p{L}\\p{N}]|$)`, 'iu').test(texto)
+}
+
+/** Um item de `me/media` como a Meta o devolve. Tudo ficticio. */
+export function itemDeMidia(
+  id: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id,
+    media_type: 'VIDEO',
+    media_product_type: 'REELS',
+    caption: `Legenda ficticia do ${id}`,
+    permalink: `https://www.instagram.com/reel/ficticio-${id}/`,
+    thumbnail_url: `https://scontent.example/assinada-${id}.jpg?expira=1`,
+    timestamp: '2026-01-15T12:00:00+0000',
+    ...extras,
+  }
+}
+
+/** Uma pagina de `me/media`, com ou sem `paging.next`. */
+export function paginaDeMidias(itens: readonly unknown[], proximo: string | null) {
+  return {
+    data: itens as MediaListResponse['data'],
+    paging:
+      proximo === null
+        ? { cursors: { after: 'cursor-que-ninguem-usa' } }
+        : { next: 'https://graph.instagram.com/proxima', cursors: { after: proximo } },
+  } as MediaListResponse
+}
+
+/**
+ * Duble da listagem da Meta.
+ *
+ * Guarda a ORDEM e o CURSOR de cada chamada — e o que prova que a paginacao
+ * para onde §12.5 manda e nao onde a contagem sugere.
+ *
+ * Mora aqui, e nao dentro de uma suite, porque DUAS suites precisam dele:
+ * `painel-midias` afirma a paginacao e `painel-telas` percorre as telas novas
+ * nos catorze lacos de garantia. A segunda copia seria a que divergiria.
+ */
+export class MetaDeListagem {
+  readonly cursores: (string | undefined)[] = []
+  readonly consultados: string[] = []
+
+  constructor(
+    private readonly paginas: readonly MediaListResponse[],
+    private readonly opcoes: {
+      readonly falharListagem?: boolean
+      readonly conhecidos?: readonly string[]
+    } = {},
+  ) {}
+
+  async listMedia(opcoes: { after?: string } = {}): Promise<ApiResult<MediaListResponse>> {
+    this.cursores.push(opcoes.after)
+    if (this.opcoes.falharListagem === true) {
+      return {
+        ok: false,
+        error: { status: 500, code: null, subcode: null, message: 'fora', shortCode: 'HTTP_500' },
+      }
+    }
+    const proxima = this.paginas[this.cursores.length - 1]
+    return { ok: true, data: proxima ?? paginaDeMidias([], null) }
+  }
+
+  async getMediaInfo(mediaId: string): Promise<ApiResult<MediaInfoResponse>> {
+    this.consultados.push(mediaId)
+    const conhecidos = this.opcoes.conhecidos
+    if (conhecidos !== undefined && !conhecidos.includes(mediaId)) {
+      return {
+        ok: false,
+        error: {
+          status: 404,
+          code: 100,
+          subcode: 33,
+          message: 'nao existe',
+          shortCode: 'OBJETO_INEXISTENTE',
+        },
+      }
+    }
+    return { ok: true, data: { id: mediaId, media_product_type: 'REELS' } }
+  }
+}
+
+/** Entrega o duble da listagem onde a tela espera as dependencias de midias. */
+export function comApiDeListagem(falsa: MetaDeListagem) {
+  return { criarApi: () => falsa as unknown as MetaApiClient }
 }

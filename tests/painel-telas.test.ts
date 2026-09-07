@@ -4,6 +4,7 @@ import { type AutomationConfig, automationConfig } from '../src/config'
 import { escapeHtml } from '../src/routes/legal'
 import { handleAjustes } from '../src/routes/painel/ajustes'
 import { handleAtividade } from '../src/routes/painel/atividade'
+import * as DICIONARIO from '../src/routes/painel/dicionario'
 import {
   type CampoDeComparacao,
   ESCOPO_DE_MIDIAS,
@@ -11,7 +12,6 @@ import {
   fraseDoAjuste,
   MODO_DE_COMPARACAO,
   NOME_DO_CAMPO,
-  ORIGEM_DOS_AJUSTES,
   PALAVRAS_PROIBIDAS,
   RECUSA_SEM_VALOR,
   traduzirAviso,
@@ -19,13 +19,18 @@ import {
 import { cabecalhos } from '../src/routes/painel/html'
 import { contaConectada, handleInicio, panorama } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
+import { esquecerAListagem } from '../src/routes/painel/midias'
 import { handlePalavras } from '../src/routes/painel/palavras'
+import { CAMPO_DO_REEL, handleReel } from '../src/routes/painel/reel'
+import { handleReels } from '../src/routes/painel/reels'
 import {
   ROTA_AJUSTES,
   ROTA_ATIVIDADE,
   ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_PALAVRAS,
+  ROTA_REEL,
+  ROTA_REELS,
   ROTAS,
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
@@ -40,7 +45,19 @@ import type { Env } from '../src/types/env'
 import { matchKeyword, normalizeOptionsFrom, normalizeText } from '../src/utils/normalize'
 import { renderTemplate } from '../src/utils/templates'
 import { gravarConfig, gravarMidia, ligarConta, limparBanco } from './fixtures/banco'
-import { AGORA, capturarConsole, comoD1, configDeTeste, D1Contador, pedir } from './fixtures/dubles'
+import {
+  AGORA,
+  capturarConsole,
+  comApiDeListagem,
+  comoD1,
+  configDeTeste,
+  contemPalavra,
+  D1Contador,
+  itemDeMidia,
+  MetaDeListagem,
+  paginaDeMidias,
+  pedir,
+} from './fixtures/dubles'
 
 /**
  * TELA · DIC · HDR — as cinco telas de leitura, o dicionario e o escape.
@@ -77,13 +94,79 @@ const CONFIG_ENVENENADA = {
   private_reply_text: `${VETOR} {link}`,
 }
 
-/** As cinco telas desta etapa, com o handler de cada uma. */
-const TELAS: readonly { rota: RotaDoPainel; handler: HandlerDoPainel }[] = [
+/** Um id FICTICIO de dezoito digitos, o tamanho de verdade de um `media_id`. */
+const REEL_DA_TELA = '178414000000000001'
+
+/**
+ * O que cada laco de garantia precisa saber de uma tela.
+ *
+ * `busca` e `preparar` nasceram com as duas telas de Reels (Ruling 97). Elas
+ * nao sao "telas com um caso especial": sao telas que dependem de um estado que
+ * as cinco anteriores nao tinham — `/painel/reel` casa por QUERY STRING
+ * (Ruling 93) e recusa um id sem linha, e `/painel/reels` fala com a Meta. Sem
+ * os dois campos, as duas ficariam de fora dos catorze lacos, que e exatamente
+ * a omissao silenciosa que os lacos existem para impedir.
+ */
+interface TelaDoPainel {
+  readonly rota: RotaDoPainel
+  readonly handler: HandlerDoPainel
+  /** A query string sem a qual a tela nao existe (Ruling 93). */
+  readonly busca?: string
+  /**
+   * O estado do banco que a tela exige, escrito no D1 **real**.
+   *
+   * Nunca no `D1Contador` do laco: preparar o cenario nao e custo da tela, e
+   * conta-lo transformaria os orcamentos de TELA-19 e TELA-20 em mentira.
+   */
+  readonly preparar?: () => Promise<void>
+  /**
+   * O item da barra de baixo que fica com `aria-current` (TELA-27).
+   *
+   * Ausente, e a propria rota. `/painel/reel` e a excecao declarada: ela e uma
+   * sub-tela de Reels e **nao tem item proprio na barra** — §12.1 fixa a barra
+   * em cinco destinos (seis ate o "Mais"), e nenhum deles e um Reel especifico.
+   * Marcar "Reels" e o que orienta quem usa leitor de tela; nao marcar nada
+   * deixaria a pessoa sem saber onde esta.
+   */
+  readonly marcado?: string
+}
+
+/**
+ * A linha de `painel_midias` que as duas telas de Reels exigem.
+ *
+ * Idempotente de proposito: um mesmo teste percorre as sete telas e chama isto
+ * duas vezes, e um `INSERT` cru estouraria a chave na segunda.
+ */
+async function prepararOReel(): Promise<void> {
+  await env.DB.prepare('DELETE FROM painel_midias WHERE media_id = ?').bind(REEL_DA_TELA).run()
+  await gravarMidia(env.DB, REEL_DA_TELA, { user_cooldown_hours: 48 })
+}
+
+/** As sete telas de leitura, com o handler de cada uma. */
+const TELAS: readonly TelaDoPainel[] = [
   { rota: ROTA_INICIO, handler: handleInicio },
   { rota: ROTA_PALAVRAS, handler: handlePalavras },
   { rota: ROTA_MENSAGEM, handler: handleMensagem },
   { rota: ROTA_AJUSTES, handler: handleAjustes },
   { rota: ROTA_ATIVIDADE, handler: handleAtividade },
+  {
+    rota: ROTA_REELS,
+    // O duble da Meta e uma classe local injetada por parametro, como manda
+    // §13.2: nada de `vi.mock`, e nenhum laco daqui toca a rede.
+    handler: (entrada) =>
+      handleReels(
+        entrada,
+        comApiDeListagem(new MetaDeListagem([paginaDeMidias([itemDeMidia(REEL_DA_TELA)], null)])),
+      ),
+    preparar: prepararOReel,
+  },
+  {
+    rota: ROTA_REEL,
+    handler: handleReel,
+    busca: `?${CAMPO_DO_REEL}=${REEL_DA_TELA}`,
+    marcado: ROTA_REELS.caminho,
+    preparar: prepararOReel,
+  },
 ]
 
 const TELA_INICIO = TELAS[0] as (typeof TELAS)[number]
@@ -161,18 +244,31 @@ async function abrirSessao(): Promise<Record<string, string>> {
   return { cookie: `__Host-painel_sessao=${sessao.valor}` }
 }
 
-/** Abre uma tela com sessao viva, pela mesma escada que o roteador usa. */
+/**
+ * Abre uma tela com sessao viva, pela mesma escada que o roteador usa.
+ *
+ * O `preparar` roda ANTES de `despachar` e escreve no D1 **real** — nunca no
+ * `ambiente`, que nos lacos de custo e o `D1Contador`. Contar a preparacao
+ * como gasto da tela transformaria TELA-19 e TELA-20 em afirmacoes falsas.
+ */
 async function abrirTela(
-  tela: { rota: RotaDoPainel; handler: HandlerDoPainel },
+  tela: TelaDoPainel,
   cookie: Record<string, string>,
   ambiente: Env = env,
 ): Promise<Response> {
-  return await despachar(pedir(tela.rota.caminho, cookie), ambiente, AGORA, tela.rota, tela.handler)
+  await tela.preparar?.()
+  return await despachar(
+    pedir(`${tela.rota.caminho}${tela.busca ?? ''}`, cookie),
+    ambiente,
+    AGORA,
+    tela.rota,
+    tela.handler,
+  )
 }
 
 /** O corpo da tela, ja lido. */
 async function corpoDa(
-  tela: { rota: RotaDoPainel; handler: HandlerDoPainel },
+  tela: TelaDoPainel,
   cookie: Record<string, string>,
   ambiente: Env = env,
 ): Promise<string> {
@@ -255,15 +351,44 @@ function estaMarcada(corpo: string, frase: string): boolean {
   return corpo.includes(`checked> ${escapeHtml(frase)}`)
 }
 
-/** A palavra aparece com fronteira de palavra? Substring nao conta (§12.7). */
-function contemPalavra(texto: string, palavra: string): boolean {
-  const escapada = palavra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\x2d')
-  return new RegExp(`(^|[^\\p{L}\\p{N}])${escapada}([^\\p{L}\\p{N}]|$)`, 'iu').test(texto)
+/**
+ * Toda frase de tela que `dicionario.ts` exporta, com o nome da tabela.
+ *
+ * A leitura e do MODULO INTEIRO, e nao de uma lista escrita a mao: §12.1 regra
+ * 1 vale para o dicionario todo, e uma lista de tabelas so cobre as tabelas que
+ * existiam no dia em que ela foi escrita. Funcoes, numeros e a propria
+ * `PALAVRAS_PROIBIDAS` — que e a lista das proibidas, e nao frase de tela —
+ * ficam de fora; objetos aninhados (`FRASE_DO_AJUSTE`) sao percorridos ate a
+ * string.
+ */
+function frasesDoDicionario(): { tabela: string; frase: string }[] {
+  const achadas: { tabela: string; frase: string }[] = []
+
+  const guardar = (tabela: string, valor: unknown): void => {
+    if (typeof valor === 'string') {
+      achadas.push({ tabela, frase: valor })
+      return
+    }
+    if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return
+    for (const dentro of Object.values(valor)) guardar(tabela, dentro)
+  }
+
+  for (const [nome, valor] of Object.entries(DICIONARIO)) {
+    if (nome === 'PALAVRAS_PROIBIDAS') continue
+    guardar(nome, valor)
+  }
+
+  return achadas
 }
 
 beforeEach(async () => {
   await limparBanco(env.DB)
   invalidarCacheDeConfig()
+  // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
+  // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
+  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // chamada.
+  esquecerAListagem()
 })
 
 // ---------------------------------------------------------------------------
@@ -415,23 +540,31 @@ describe('DIC — o dicionario de traducao', () => {
   })
 
   test('DIC-02: nenhuma frase do dicionario escreve uma palavra proibida (§12.7)', () => {
-    const frases = [
-      ...Object.values(NOME_DO_CAMPO),
-      ...Object.values(MODO_DE_COMPARACAO),
-      ...Object.values(ESCOPO_DE_MIDIAS),
-      ...Object.values(ORIGEM_DOS_AJUSTES),
-      ...Object.values(FRASE_DO_AJUSTE).flatMap((par) => [par.verdadeiro, par.falso]),
-    ]
+    // **A varredura era de CINCO tabelas, e o dicionario tem dez.** A metade nao
+    // varrida guardava uma violacao de verdade: `MOTIVO_DA_RECUSA
+    // .dominio_nao_permitido` escrevia "na lista liberada no deploy", e "deploy"
+    // esta em `PALAVRAS_PROIBIDAS`. Uma lista escrita a mao envelhece na
+    // primeira tabela nova, e foi o que aconteceu tres vezes seguidas —
+    // `CONFIRMACOES`, `MOTIVO_DA_RECUSA` e `TELA_DOS_REELS` nasceram depois
+    // dela e nenhuma entrou.
+    //
+    // Agora o conjunto vem do MODULO, e nao de uma lista: toda tabela exportada
+    // por `dicionario.ts` entra sozinha, e uma tabela nova nasce coberta. E o
+    // mesmo desenho dos metatestes de §13.1 — a trava que falha quando alguem
+    // cria a superficie nova sem proteger.
+    const frases = frasesDoDicionario()
 
-    // Contrapositivo: uma lista vazia de frases faria o laco passar sem provar
-    // nada.
-    expect(frases.length).toBeGreaterThan(20)
+    // Contrapositivo de COBERTURA, em duas metades. A primeira: o numero de
+    // frases nao pode encolher. A segunda, que e a que importa, e o numero de
+    // TABELAS — foi ele que ficou parado em cinco enquanto o dicionario dobrava.
+    const tabelas = new Set(frases.map((achada) => achada.tabela))
+    expect(frases.length).toBeGreaterThan(60)
+    expect(tabelas.size).toBeGreaterThanOrEqual(10)
 
-    for (const frase of frases) {
+    for (const { tabela, frase } of frases) {
       for (const proibida of PALAVRAS_PROIBIDAS) {
-        expect({ [`${proibida} em "${frase}"`]: contemPalavra(frase, proibida) }).toEqual({
-          [`${proibida} em "${frase}"`]: false,
-        })
+        const onde = `${proibida} em ${tabela}: "${frase}"`
+        expect({ [onde]: contemPalavra(frase, proibida) }).toEqual({ [onde]: false })
       }
     }
   })
@@ -962,6 +1095,26 @@ describe('TELA — o portao e o custo', () => {
       [ROTA_MENSAGEM.caminho]: 3,
       [ROTA_AJUSTES.caminho]: 4,
       [ROTA_ATIVIDADE.caminho]: 3,
+      // **As duas telas de Reels pagam 4, e o quarto e declarado como DESVIO de
+      // §12.10.** A tabela de la orca "Meus Reels" em 3, e os tres sao os
+      // mesmos das outras telas: a sessao, o lote da configuracao e a pergunta
+      // sobre a conta. O quarto e `painel_midias` lida INTEIRA — com as linhas
+      // inativas —, e ele nao cabia naquele orcamento porque a tela nao existia
+      // quando ele foi escrito. O lote da configuracao NAO serve: ele filtra
+      // `ativo = 1` de proposito, para o caminho quente do webhook, e §12.5
+      // manda esta tela mostrar exatamente o que aquele filtro descarta — o
+      // Reel apagado que "nao some da lista", o selo de regras proprias num
+      // Reel desmarcado e a lista "salvo por voce" quando a Meta nao responde.
+      //
+      // O que FOI consertado nesta rodada e o quinto, que era desperdicio de
+      // verdade: `account_tokens` era lida duas vezes na mesma renderizacao —
+      // `contaConectada` e, dentro de `buscarPagina`, `loadAccessToken`. Agora
+      // a resposta sobre a conta sai da propria listagem.
+      [ROTA_REELS.caminho]: 4,
+      // `/painel/reel` nao esta em §12.10 — a tabela de la nao tem linha para
+      // ela. Os quatro sao a sessao, o lote da configuracao, a conta e a linha
+      // daquele Reel (`lerUma`), que e o que a tela existe para mostrar.
+      [ROTA_REEL.caminho]: 4,
     }
 
     await gravarConfig(env.DB)
@@ -1078,7 +1231,14 @@ describe('TELA — o portao e o custo', () => {
       expect({ [tela.rota.caminho]: links.length }).not.toEqual({ [tela.rota.caminho]: 0 })
 
       for (const link of links) {
-        expect({ [`${tela.rota.caminho} -> ${link}`]: conhecidos.has(link) }).toEqual({
+        // **A comparacao e com o CAMINHO, e a query string fica de fora.** A
+        // tabela de rotas casa por caminho exato e NENHUM caminho tem segmento
+        // variavel (Ruling 93): `/painel/reel?midia=<id>` e a rota
+        // `/painel/reel`, e o Reel viaja na query string justamente porque o
+        // roteador nao o entenderia de outro jeito. Comparar a href inteira
+        // reprovaria o unico endereco que §12.5 manda a tela oferecer.
+        const caminho = link.split('?')[0] ?? ''
+        expect({ [`${tela.rota.caminho} -> ${link}`]: conhecidos.has(caminho) }).toEqual({
           [`${tela.rota.caminho} -> ${link}`]: true,
         })
       }
@@ -1170,7 +1330,7 @@ describe('TELA — celular e acessibilidade', () => {
       const marcados = [...corpo.matchAll(/<a href="([^"]*)"[^>]*aria-current="page"/g)]
 
       expect({ [tela.rota.caminho]: marcados.map((achado) => achado[1]) }).toEqual({
-        [tela.rota.caminho]: [tela.rota.caminho],
+        [tela.rota.caminho]: [tela.marcado ?? tela.rota.caminho],
       })
     }
   })

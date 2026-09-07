@@ -172,6 +172,18 @@ export class PainelAuditoriaRepository {
    * parada ficam de fora — elas nao sao "mudanca", e a tela de Ajustes nao e a
    * tela de seguranca.
    *
+   * **`midia_alterada` fica de fora, e a decisao e "nada, por enquanto".** Uma
+   * linha de Reel tem `antes` preenchido — a config EFETIVA daquele Reel — e
+   * por isso ela cabia no `SELECT` por acidente ate a acao passar a segui-la
+   * (`lote.ts`). Mostra-la aqui exigiria as duas coisas que esta consulta nao
+   * tem: trazer o `alvo` e dizer de QUAL Reel a linha fala, e um botao de
+   * restauracao que soubesse reenviar por `POST /painel/reel` em vez de por
+   * `/painel/ajustes`. Sem as duas, a linha ou mente sobre o alvo ou oferece um
+   * botao que grava a configuracao errada — e as duas sao piores do que a
+   * ausencia. O historico por Reel e da tela daquele Reel, e ele nao existe
+   * ainda; enquanto nao existir, a linha fica no banco e fora da tela, que e
+   * onde uma auditoria ainda cumpre a funcao dela.
+   *
    * `ORDER BY id DESC` e nao `ocorrido_em DESC`: `id` E o rowid e ja e o indice
    * cronologico (§8.9), entao a consulta nao pede indice nenhum. Duas linhas do
    * mesmo milissegundo tambem saem na ordem certa, e `ocorrido_em` empataria.
