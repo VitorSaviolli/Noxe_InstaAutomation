@@ -625,6 +625,8 @@ export const TELA_DOS_REELS = {
   listaBuscadaAgora: 'Esta lista acabou de ser buscada no Instagram.',
   listaBuscadaHa: 'Esta lista foi buscada no Instagram há',
   listaBuscadaHaFim: 'minutos.',
+  /** O singular. "há 1 minutos" e o portugues que nenhuma pessoa escreve. */
+  listaBuscadaHaFimUm: 'minuto.',
   /** §3, a tela de UM Reel. */
   tituloDoReel: 'Este Reel responde diferente',
   seguirRegraGeral: 'Voltar tudo a seguir a regra geral',

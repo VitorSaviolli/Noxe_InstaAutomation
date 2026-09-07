@@ -695,16 +695,61 @@ describe('CFG — o validador unico', () => {
  * mudar sem que alguem repare, a tela e o webhook passam a discordar.
  */
 describe('§9.2 — a forma do snapshot', () => {
-  test('§9.2: o snapshot tem exatamente os cinco campos declarados', async () => {
+  test('§9.2: o snapshot tem exatamente os seis campos declarados', async () => {
+    // **O sexto campo nasceu para o ORCAMENTO de §12.10, e nao para o
+    // comportamento.** `linhasDeMidia` carrega `painel_midias` INTEIRA — com as
+    // inativas — quando quem le pede por ela, para que as duas telas de Reels
+    // parem de gastar uma consulta propria com o que §12.5 manda elas
+    // mostrarem. Ele viaja no `db.batch()` que ja existia, entao custa zero
+    // subrequest, e o caminho quente NUNCA pede: para o webhook ele e sempre
+    // `null`, que e o que a linha abaixo afirma.
+    //
+    // A afirmacao de forma continua sendo a mesma, e e por isso que ela nao foi
+    // afrouxada para "pelo menos estes": quem acrescentar um sexto de verdade
+    // — um campo que MUDE comportamento — passa por aqui antes.
     const snapshot: SnapshotConfig = await carregarConfigEfetiva(env, AGORA)
 
     expect(Object.keys(snapshot).sort()).toEqual([
       'avisos',
       'global',
+      'linhasDeMidia',
       'origem',
       'overrides',
       'versao',
     ])
+    expect(snapshot.linhasDeMidia).toBeNull()
+  })
+
+  test('§9.2: `linhasDeMidia` so vem quando quem le pede, e traz as INATIVAS', async () => {
+    // O contrapositivo do teste acima, e a trava do conserto de §12.10: sem
+    // ele, um `comAsInativas` que nunca chegasse ao SQL passaria calado e as
+    // telas de Reels voltariam a mostrar so as linhas ativas — o Reel apagado
+    // sumiria em silencio, que e o que §3 proibe.
+    await gravarConfig(env.DB)
+    await gravarMidia(env.DB, '17912345678901234')
+    await gravarMidia(env.DB, '17912345678901235', {}, 0)
+
+    invalidarCacheDeConfig()
+    const semPedir = await carregarConfigEfetiva(env, AGORA, { ignorarCache: true })
+    expect(semPedir.linhasDeMidia).toBeNull()
+
+    invalidarCacheDeConfig()
+    const pedindo = await carregarConfigEfetiva(env, AGORA, {
+      ignorarCache: true,
+      comAsInativas: true,
+    })
+
+    expect(
+      pedindo.linhasDeMidia?.map((linha) => `${linha.media_id}:${String(linha.ativo)}`),
+    ).toEqual(['17912345678901234:1', '17912345678901235:0'])
+    // E o que resolve COMPORTAMENTO nao mudou: `overrides` sai das linhas
+    // ATIVAS nos dois casos — a inativa entra em `linhasDeMidia` e em lugar
+    // nenhum mais. Se o filtro tivesse sumido junto com o `WHERE`, o Reel
+    // desmarcado voltaria a responder, que e o alargamento silencioso que esta
+    // linha existe para impedir.
+    expect(pedindo.overrides).toHaveLength(1)
+    expect(semPedir.overrides).toHaveLength(1)
+    expect(pedindo.overrides[0]?.mediaIds).toEqual(['17912345678901234'])
   })
 
   test('§9.2: `global` tem a mesma forma de AutomationConfig, campo a campo', async () => {

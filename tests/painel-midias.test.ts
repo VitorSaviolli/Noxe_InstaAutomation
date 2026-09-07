@@ -23,13 +23,13 @@ import {
   SEGUIR_O_GERAL,
   validarSobreposicao,
 } from '../src/routes/painel/reel'
+import { handleReels } from '../src/routes/painel/reels'
 import {
   ATUALIZAR,
   CAMPO_DA_MIDIA,
   CAMPO_DO_VISTO,
   CARREGAR,
-  handleReels,
-} from '../src/routes/painel/reels'
+} from '../src/routes/painel/reels-lista'
 import { ROTA_REEL, ROTA_REELS, ROTAS } from '../src/routes/painel/rotas'
 import { despachar } from '../src/routes/painel/router'
 import { invalidarCacheDeConfig } from '../src/services/config-store'
@@ -37,12 +37,17 @@ import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/servi
 import { gravarConfig, gravarMidia, ligarConta, limparBanco } from './fixtures/banco'
 import {
   AGORA,
+  bytesComprimidos,
   comApiDeListagem,
   contemPalavra,
   itemDeMidia as item,
   MetaDeListagem,
   paginaDeMidias as pagina,
   RAIZ,
+  TETO_COMPRIMIDO_DE_REELS,
+  TETO_DE_HTML,
+  TETO_DE_UMA_PAGINA_DE_REELS,
+  TETO_NO_LIMITE_DE_200_REELS,
 } from './fixtures/dubles'
 
 /**
@@ -83,9 +88,6 @@ const CREDENCIAL = 'credencial-de-teste'
 const REEL_A = '178414000000000001'
 const REEL_B = '178414000000000002'
 const REEL_C = '178414000000000003'
-
-/** O teto de HTML por tela de §12.9, em bytes. O mesmo de `TELA-29`. */
-const TETO_DE_HTML = 15 * 1024
 
 /** Um id cujo `Number()` COLIDE com o de `REEL_A`. E a prova do perigo. */
 const REEL_VIZINHO = '178414000000000000'
@@ -777,6 +779,16 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       escapeHtml(`${TELA_DOS_REELS.listaBuscadaHa} 9 ${TELA_DOS_REELS.listaBuscadaHaFim}`),
     )
 
+    // E o singular, que ate esta rodada saia "há 1 minutos" — portugues que
+    // nenhuma pessoa escreve, na tela que existe para explicar.
+    const umMinuto = await (await telaDeReels(sessao, falsa, AGORA + 60_000)).text()
+    expect(umMinuto).toContain(
+      escapeHtml(`${TELA_DOS_REELS.listaBuscadaHa} 1 ${TELA_DOS_REELS.listaBuscadaHaFimUm}`),
+    )
+    expect(umMinuto).not.toContain(
+      escapeHtml(`${TELA_DOS_REELS.listaBuscadaHa} 1 ${TELA_DOS_REELS.listaBuscadaHaFim}`),
+    )
+
     // Passados os 10 minutos, o cache venceu e a tela busca de novo sozinha.
     await telaDeReels(sessao, falsa, AGORA + CACHE_DA_LISTAGEM_MS + 1)
     expect(falsa.cursores.length).toBe(2)
@@ -812,12 +824,9 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     expect(semMeta).toContain(`value="${ATUALIZAR}"`)
   })
 
-  test('MID-27: o orcamento de HTML de §12.9 na tela de Reels, medido e registrado', async () => {
+  test('MID-27: o peso da tela de Reels, medido cru E comprimido', async () => {
     // **TELA-29 percorre a lista `TELAS` com UM Reel salvo, e por isso ela nunca
-    // mediu esta tela.** Aqui estao as duas pontas de verdade, e as duas
-    // estouram os 15 KB que §12.9 orca por tela. O numero fica ESCRITO: uma tela
-    // que passa do orcamento passa devagar, e quem paga a diferenca e quem abre
-    // o painel numa conexao ruim — que §12.9 chama de "o caso normal".
+    // mediu esta tela.** Aqui estao as duas pontas de verdade.
     //
     // **De onde vem o peso, medido:**
     //   - uma pagina de `me/media` traz ate 25 publicacoes (§12.5) e uma conta
@@ -827,22 +836,30 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     //     por id em DOIS formularios: o de salvar, que preserva o que esta fora
     //     da pagina, e o de "Carregar mais", que carrega a mesma escolha.
     //
-    // §12.5 (200 Reels) e §12.9 (15 KB) nao fecham juntas, e reconciliar as duas
-    // e desenho de tela — encolher o teto, mandar a selecao preservada num campo
-    // so em vez de N, ou paginar o formulario. Vai com o resto de §3 para a Task
-    // 13b, com estes numeros na mao.
+    // **A AUTORIDADE dos numeros mudou nesta rodada, e a mudanca e uma divida
+    // INVENTADA sendo apagada.** A versao anterior afirmava "§12.5 (200 Reels) e
+    // §12.9 (15 KB) nao fecham juntas". Nao ha tal conflito: §12.9 nao impoe
+    // teto — a linha diz *"Conexao ruim | ... CSS ~6 KB, HTML ~15 KB por tela"*,
+    // com til, como diretriz —, e a pergunta que ela protege e "abre em conexao
+    // ruim?". Os tetos crus abaixo sao **trava-crescimento desta branch**, e nao
+    // cumprimento de §12.9: eles reprovam quem piorar.
     //
-    // **Dois consertos ja entraram nesta rodada e valem 65 KB dos 104 medidos no
-    // comeco dela:** (1) o Reel salvo que nao apareceu so e tratado como apagado
-    // quando a listagem ACABOU — antes, cada Reel nunca perguntado virava um
-    // `<li>` inteiro dizendo "Este Reel nao existe mais", o que alem de pesar
-    // era falso; (2) o botao Atualizar carrega so o que o banco ainda nao sabe.
+    // **Quem responde a pergunta de §12.9 e a medida COMPRIMIDA**, que entrou
+    // agora: a Cloudflare comprime a saida, e 39.473 bytes crus viram 2.499 no
+    // fio (a re-revisao mediu 2.507 antes desta rodada). Os 39 KB sao custo de
+    // memoria e de parse. Um teto gzipado reprova bloat ESTRUTURAL — um bloco
+    // novo por Reel — e nunca reprova repeticao barata, que e a distincao que
+    // falta ao numero cru.
     //
-    // Os tetos abaixo sao TRAVA-CRESCIMENTO: eles reprovam quem piorar. A
-    // distancia deles para `TETO_DE_HTML` e a divida, e ela esta declarada.
-    const TETO_DE_UMA_PAGINA = 19 * 1024
-    const TETO_NO_LIMITE_DE_200 = 40 * 1024
-    expect(TETO_DE_UMA_PAGINA).toBeGreaterThan(TETO_DE_HTML)
+    // **Dois consertos valem 65 KB dos 104 medidos no comeco da rodada 1:** (1)
+    // o Reel salvo que nao apareceu so e tratado como apagado quando a listagem
+    // ACABOU — antes, cada Reel nunca perguntado virava um `<li>` inteiro
+    // dizendo "Este Reel nao existe mais", o que alem de pesar era falso; (2) o
+    // botao Atualizar carrega so o que o banco ainda nao sabe.
+    //
+    // A distancia entre estes tetos e `TETO_DE_HTML` e divida DECLARADA de
+    // desenho de tela, e vai com o resto de §3 para a Task 13b.
+    expect(TETO_DE_UMA_PAGINA_DE_REELS).toBeGreaterThan(TETO_DE_HTML)
 
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     const sessao = await abrirSessao()
@@ -854,7 +871,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))
     ).text()
 
-    expect(new TextEncoder().encode(comum).length).toBeLessThanOrEqual(TETO_DE_UMA_PAGINA)
+    expect(new TextEncoder().encode(comum).length).toBeLessThanOrEqual(TETO_DE_UMA_PAGINA_DE_REELS)
 
     for (const id of todos.slice(25)) await gravarMidia(env.DB, id)
     esquecerAListagem()
@@ -862,7 +879,10 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))
     ).text()
 
-    expect(new TextEncoder().encode(noTeto).length).toBeLessThanOrEqual(TETO_NO_LIMITE_DE_200)
+    expect(new TextEncoder().encode(noTeto).length).toBeLessThanOrEqual(TETO_NO_LIMITE_DE_200_REELS)
+
+    // E o fio, que e o unico numero preso ao que §12.9 protege.
+    expect(await bytesComprimidos(noTeto)).toBeLessThanOrEqual(TETO_COMPRIMIDO_DE_REELS)
   })
 
   test('MID-28: "Este Reel nao existe mais" so vale quando a listagem ACABOU', async () => {
@@ -911,6 +931,152 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
     expect(completa).toContain(TELA_DOS_REELS.reelApagado)
     expect(completa).toContain(REEL_B)
+  })
+
+  test('MID-29: o Atualizar nao desmarca o que ja esta salvo, e o Salvar seguinte nao apaga', async () => {
+    // **CRITICAL introduzido pela rodada 1, e ele apagava a selecao do dono com
+    // faixa VERDE.** `montarTela` fazia `desenho.marcadosNaTela ?? ativos`. No
+    // `GET` o campo e `null` e cai em `ativos`, certo; no `POST` do botao
+    // Atualizar ele e o array de marcados do corpo — e o formulario do Atualizar
+    // so carrega o que o banco AINDA NAO SABE, que numa tela recem-aberta e
+    // vazio. `[] ?? ativos` e `[]`: o `??` nao dispara em array vazio. A tela
+    // voltava com tudo desmarcado E sem os campos escondidos que preservavam os
+    // Reels de fora da pagina, e o Salvar seguinte gravava `ativo = 0` neles,
+    // com `303 ?ok=salvo` e a faixa "Pronto, salvo. Ja esta valendo."
+    //
+    // §12.1 regra 4 — "o que a tela mostra e o que o Worker vai fazer" — e regra
+    // 6, na tela que §3 chama de prioridade numero um.
+    //
+    // **As DUAS pontas sao afirmadas aqui, e a segunda e a que importa:** as
+    // marcas depois do toque, e as LINHAS DO BANCO depois do Salvar seguinte.
+    // Um teste que so olhasse a tela passaria verde num painel que apaga.
+    //
+    // Os dois POSTs sao dirigidos pelos formularios RENDERIZADOS, e nao por um
+    // corpo escrito a mao: o defeito era exatamente o conteudo desses
+    // formularios, e um corpo inventado pelo teste esconderia justo o que
+    // falhava.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidia(env.DB, REEL_A)
+    await gravarMidia(env.DB, REEL_B)
+    // O terceiro fica FORA da pagina, e `paging.next` continua de pe: ele nao
+    // chegou a ser perguntado, entao nao e apagado (MID-28) e so sobrevive
+    // pelos campos escondidos.
+    await gravarMidia(env.DB, REEL_C)
+    const sessao = await abrirSessao()
+    const paginaParcial = () => [
+      pagina([item(REEL_A), item(REEL_B)], 'p2'),
+      pagina([], 'p3'),
+      pagina([], 'p4'),
+      pagina([], 'p5'),
+    ]
+
+    const tela = await (await telaDeReels(sessao, new MetaDeListagem(paginaParcial()))).text()
+    expect(marcadosDoFormulario(formularioDeSalvar(tela))).toEqual([REEL_A, REEL_B, REEL_C])
+
+    // O toque em Atualizar, com o corpo que a PROPRIA tela emitiu.
+    esquecerAListagem()
+    const atualizada = await postarReels(
+      sessao,
+      corpoDoFormulario(formularioDaAcao(tela, ATUALIZAR)),
+      new MetaDeListagem(paginaParcial()),
+    )
+    const depoisDoToque = await atualizada.text()
+
+    expect(atualizada.status).toBe(200)
+    expect(marcadosDoFormulario(formularioDeSalvar(depoisDoToque))).toEqual([
+      REEL_A,
+      REEL_B,
+      REEL_C,
+    ])
+
+    // E o Salvar seguinte, dirigido pelo formulario que o toque devolveu.
+    const salvo = await postarReels(
+      sessao,
+      corpoDoFormulario(formularioDeSalvar(depoisDoToque)),
+      new MetaDeListagem(paginaParcial()),
+    )
+
+    // **`sem_mudanca`, e nao `salvo`** — e a diferenca e a medida do defeito.
+    // Com a selecao intacta nao ha o que gravar (MID-23), entao o funil nem
+    // escreve; com o defeito, o mesmo toque devolvia `?ok=salvo` e a faixa
+    // "Pronto, salvo. Ja esta valendo." por cima de dois Reels desativados.
+    expect(salvo.status).toBe(303)
+    expect(salvo.headers.get('location')).toBe(`${ROTA_REELS.caminho}?ok=sem_mudanca`)
+    expect(
+      (await linhasDeMidia()).map((linha) => `${linha.media_id}:${String(linha.ativo)}`),
+    ).toEqual([`${REEL_A}:1`, `${REEL_B}:1`, `${REEL_C}:1`])
+  })
+
+  test('MID-30: sem linha em `account_tokens`, a tela de Reels mostra a pendencia de §3', async () => {
+    // **A peca central do conserto de subrequests da rodada 1 foi entregue sem
+    // trava nenhuma.** `contaConectada` — uma segunda leitura de
+    // `account_tokens` na mesma renderizacao — virou `contaDaListagem`, que
+    // deduz a resposta do motivo da listagem. A re-revisao mutou a chamada para
+    // `true` e depois para `false` e a suite INTEIRA passou nos dois casos: a
+    // tela podia afirmar para sempre que a conta nao esta conectada, ou esconder
+    // uma conta genuinamente desconectada, e nada ficaria vermelho.
+    //
+    // O que `contaDaListagem` alimenta nesta tela e a BARRA DO TOPO, que §12.1
+    // exige igual em toda tela. Por isso a afirmacao e sobre o estado grande, e
+    // nao sobre a faixa da listagem: a faixa le o motivo direto e passaria verde
+    // com a pergunta sobre a conta respondendo qualquer coisa.
+    await gravarConfig(env.DB)
+    // A linha da conta e escrita pelo `beforeEach`. Aqui ela sai, que e a
+    // instalacao em que o assistente ainda nao rodou no computador (§3).
+    await env.DB.prepare('DELETE FROM account_tokens').run()
+    const sessao = await abrirSessao()
+
+    const tela = await (await telaDeReels(sessao, new MetaDeListagem([pagina([], null)]))).text()
+
+    expect(tela).toContain('Ligada, mas nada vai ser enviado')
+    expect(tela).toContain('A conta do Instagram não está conectada.')
+  })
+
+  test('MID-31: a Meta muda NAO vira "conta desconectada" na barra do topo', async () => {
+    // `falha_meta` acontece **com** a conta ligada — o token existe e foi a Meta
+    // que nao respondeu. Dizer "nao conectada" ali mandaria o dono reconectar
+    // uma conta que nunca desconectou, que e a afirmacao falsa de §12.1 regra 3;
+    // e e o contrapositivo sem o qual MID-30 passaria com a pergunta fixada em
+    // `false`.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const tela = await (
+      await telaDeReels(sessao, new MetaDeListagem([], { falharListagem: true }))
+    ).text()
+
+    // A tela avisa que o Instagram nao respondeu...
+    expect(tela).toContain(escapeHtml(TELA_DOS_REELS.metaMuda))
+    // ...e NAO acusa a conta.
+    expect(tela).toContain('Ligada e respondendo')
+    expect(tela).not.toContain('A conta do Instagram não está conectada.')
+  })
+
+  test('MID-32: um Reel DESMARCADO com regras proprias mantem o selo na lista', async () => {
+    // §12.5 e literal: o selo "⚙ Regras proprias" aparece "quando aquela linha
+    // de `painel_midias` tem alguma coluna de sobreposicao preenchida" — e ela
+    // pode estar INATIVA, porque desmarcar um Reel na tela nao apaga as regras
+    // dele. E a razao de esta tela precisar das linhas que o lote da
+    // configuracao filtrava com `ativo = 1`.
+    //
+    // **A trava vale para o conserto de §12.10 desta rodada.** As linhas agora
+    // vem do `db.batch()` da configuracao, com a variante `comAsInativas`. Se um
+    // dia o `WHERE ativo = 1` voltar para aquele statement, a economia continua
+    // de pe e o selo some em silencio de todo Reel desmarcado — que e a metade
+    // do defeito que ninguem olha, porque a tela continua carregando.
+    await gravarConfig(env.DB, { media_scope: 'selecionadas', user_cooldown_hours: 24 })
+    await gravarMidia(env.DB, REEL_A, { user_cooldown_hours: 48 }, 0)
+    await gravarMidia(env.DB, REEL_B, {}, 0)
+    const sessao = await abrirSessao()
+
+    const tela = await (
+      await telaDeReels(sessao, new MetaDeListagem([pagina([item(REEL_A), item(REEL_B)], null)]))
+    ).text()
+
+    expect(cartaoDoReel(tela, REEL_A)).toContain(TELA_DOS_REELS.regrasProprias)
+    // O contrapositivo: sem coluna preenchida nao ha selo, e um selo em todo
+    // cartao nao diria nada.
+    expect(cartaoDoReel(tela, REEL_B)).not.toContain(TELA_DOS_REELS.regrasProprias)
   })
 
   test('MID-16: `enabled` por Reel so aceita `0`, e a trava e do codigo E do banco', async () => {
@@ -1109,6 +1275,87 @@ function formularioDaAcao(corpo: string, acao: string): string {
     }
   }
   throw new Error(`a tela nao trouxe o formulario de ${acao}`)
+}
+
+/**
+ * O `<form>` de SALVAR, recortado da tela de Reels.
+ *
+ * E o unico dos tres que NAO carrega `acao`: salvar e o POST sem acao (§7.1).
+ * Recortar por ausencia e o que impede o teste de afirmar sobre os campos
+ * escondidos do "Carregar mais" achando que sao os do Salvar.
+ */
+function formularioDeSalvar(corpo: string): string {
+  for (const bloco of corpo.split('<form ').slice(1)) {
+    const formulario = bloco.split('</form>')[0] ?? ''
+    if (!formulario.includes(`name="${CAMPO_DA_ACAO}"`)) return formulario
+  }
+  throw new Error('a tela nao trouxe o formulario de salvar')
+}
+
+/** Um `<input>` da tela, com o que o navegador olha para decidir se envia. */
+interface EntradaDoFormulario {
+  readonly tipo: string
+  readonly nome: string
+  readonly valor: string
+  readonly marcada: boolean
+}
+
+/** Os `<input>` de um formulario, na ordem em que a tela os emitiu. */
+function entradasDo(formulario: string): EntradaDoFormulario[] {
+  const achadas: EntradaDoFormulario[] = []
+  for (const bruto of formulario.match(/<input [^>]*>/g) ?? []) {
+    achadas.push({
+      tipo: /type="([^"]*)"/.exec(bruto)?.[1] ?? '',
+      nome: /name="([^"]*)"/.exec(bruto)?.[1] ?? '',
+      valor: /value="([^"]*)"/.exec(bruto)?.[1] ?? '',
+      marcada: / checked>/.test(bruto),
+    })
+  }
+  return achadas
+}
+
+/**
+ * Os Reels que aquele formulario manda de volta: marcados MAIS escondidos.
+ *
+ * O navegador nao distingue os dois — os dois viram `midia=` no corpo —, e a
+ * afirmacao do dono e sobre o conjunto: "o que eu tinha escolhido continua
+ * escolhido depois deste toque".
+ */
+function marcadosDoFormulario(formulario: string): string[] {
+  return entradasDo(formulario)
+    .filter((entrada) => entrada.nome === CAMPO_DA_MIDIA)
+    .filter((entrada) => entrada.tipo === 'hidden' || entrada.marcada)
+    .map((entrada) => entrada.valor)
+    .sort()
+}
+
+/**
+ * O corpo que o navegador enviaria daquele formulario.
+ *
+ * **Ficha e versao ficam de fora**, e `postarReels` as poe: elas ja viajam
+ * identicas em todo POST da suite, e manda-las duas vezes so criaria um corpo
+ * que navegador nenhum produz.
+ */
+function corpoDoFormulario(formulario: string): string {
+  return entradasDo(formulario)
+    .filter((entrada) => entrada.tipo === 'hidden' || entrada.marcada)
+    .filter((entrada) => entrada.nome !== 'csrf' && entrada.nome !== 'versao')
+    .map((entrada) => `${entrada.nome}=${encodeURIComponent(entrada.valor)}`)
+    .join('&')
+}
+
+/**
+ * O `<li>` daquele Reel, recortado da lista.
+ *
+ * Afirmar sobre a pagina inteira nao distinguiria "o cartao certo tem o selo"
+ * de "algum cartao da pagina tem".
+ */
+function cartaoDoReel(corpo: string, mediaId: string): string {
+  for (const bloco of corpo.split('<li class="cartao-reel"').slice(1)) {
+    const cartao = bloco.split('</li>')[0] ?? ''
+    if (cartao.includes(`value="${mediaId}"`)) return cartao
+  }
+  throw new Error(`a tela nao trouxe o cartao de ${mediaId}`)
 }
 
 /** Uma pagina com um Reel e um cursor, para o cache buscar alguma coisa. */

@@ -72,7 +72,17 @@ export interface PainelMidiaRecord {
 /** O que uma leitura completa devolve: a linha global e as midias ativas. */
 export interface LeituraDeConfig {
   config: PainelConfigRecord | null
+  /** As linhas ATIVAS, que sao as unicas que o webhook resolve (§9.4). */
   midias: PainelMidiaRecord[]
+  /**
+   * As linhas INTEIRAS — ativas e inativas —, ou `null` quando quem leu nao
+   * pediu por elas.
+   *
+   * `null` nao e "nao ha linhas": e "esta leitura nao perguntou". O caminho
+   * quente nao pergunta, e a diferenca entre os dois importa porque a tela de
+   * Reels mostra exatamente o que o filtro `ativo = 1` descarta.
+   */
+  todas: PainelMidiaRecord[] | null
 }
 
 /**
@@ -150,11 +160,33 @@ export class PainelConfigRepository {
    * de `allowedMediaIds` seja estavel entre invocacoes — o `.find()` de
    * `resolveConfigForMedia` ja e deterministico porque `media_id` e PRIMARY
    * KEY, e a ordenacao mantem o log e a tela previsiveis.
+   *
+   * **`comAsInativas` e a variante do PAINEL, e ela custa zero subrequest.**
+   * As duas telas de Reels precisam das linhas que o filtro `ativo = 1`
+   * descarta — o Reel apagado que §12.5 manda nao sumir da lista, o selo de
+   * regras proprias num Reel desmarcado, a lista "salvo por voce" quando a Meta
+   * nao responde — e ate a rodada 1 elas pagavam uma consulta PROPRIA por isso,
+   * o quarto subrequest que §12.10 nao orcava. Aqui a mesma pergunta viaja no
+   * lote que ja existe: um `batch` vale UM subrequest, entao a variante nao
+   * custa nada e as duas telas voltam aos 3 da tabela.
+   *
+   * **Um segundo statement filtrado, em vez de um terceiro sem filtro, foi a
+   * escolha.** Um terceiro traria as linhas ativas DUAS vezes no mesmo lote e
+   * quebraria a premissa de dois statements de que os testes de orcamento
+   * dependem. Filtrar em JavaScript e o mesmo predicado, escrito uma vez.
+   *
+   * **O caminho quente nao muda:** sem a opcao, o SQL e literalmente o de
+   * sempre, e `todas` volta `null`.
    */
-  async ler(): Promise<LeituraDeConfig> {
+  async ler(opcoes: { comAsInativas?: boolean } = {}): Promise<LeituraDeConfig> {
+    const comAsInativas = opcoes.comAsInativas === true
     const [global, midias] = await this.db.batch<PainelConfigRecord | PainelMidiaRecord>([
       this.db.prepare('SELECT * FROM painel_config WHERE id = ?').bind(ID_DA_CONFIG),
-      this.db.prepare('SELECT * FROM painel_midias WHERE ativo = 1 ORDER BY media_id'),
+      this.db.prepare(
+        comAsInativas
+          ? 'SELECT * FROM painel_midias ORDER BY media_id'
+          : 'SELECT * FROM painel_midias WHERE ativo = 1 ORDER BY media_id',
+      ),
     ])
 
     // Um `batch` que reporte falha SEM rejeitar entregaria dois resultados
@@ -166,9 +198,14 @@ export class PainelConfigRepository {
       throw new Error('D1_ERROR: a leitura da configuracao do painel nao reportou sucesso')
     }
 
+    const linhas = (midias.results ?? []) as PainelMidiaRecord[]
     return {
       config: ((global.results ?? [])[0] as PainelConfigRecord | undefined) ?? null,
-      midias: (midias.results ?? []) as PainelMidiaRecord[],
+      // O filtro sai do SQL e vem para ca **so** na variante do painel, e ele e
+      // o MESMO predicado: `ativo = 1`. Quem resolve comportamento continua
+      // vendo exatamente as linhas ativas, com ou sem a variante.
+      midias: comAsInativas ? linhas.filter((linha) => linha.ativo === 1) : linhas,
+      todas: comAsInativas ? linhas : null,
     }
   }
 

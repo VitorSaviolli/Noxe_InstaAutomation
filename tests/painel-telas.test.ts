@@ -57,6 +57,9 @@ import {
   MetaDeListagem,
   paginaDeMidias,
   pedir,
+  TETO_DE_HTML,
+  TETO_DE_UMA_PAGINA_DE_REELS,
+  TETO_NO_LIMITE_DE_200_REELS,
 } from './fixtures/dubles'
 
 /**
@@ -182,9 +185,6 @@ const TELA_ATIVIDADE = TELAS[4] as (typeof TELAS)[number]
  * fora da tabela e um link para um `404`.
  */
 const ASSETS = ['/painel/parar', '/painel/painel.css', '/painel/painel.js']
-
-/** O teto de HTML por tela de §12.9, em bytes. */
-const TETO_DE_HTML = 15 * 1024
 
 /** O que §13.2 proibe em qualquer corpo: rastro, nome de coluna, "payload". */
 const VAZAMENTO = /Error|at \w+ \(|SQLITE|D1_|undefined|payload/
@@ -312,6 +312,10 @@ function snapshotDeTeste(
     origem: 'banco',
     versao: 1,
     avisos: [],
+    // `null` e o default honesto: um snapshot montado a mao nao veio de leitura
+    // nenhuma, e `panorama` — que e o que estes testes exercitam — nao olha as
+    // linhas de midia.
+    linhasDeMidia: null,
     ...extra,
   }
 }
@@ -1095,26 +1099,34 @@ describe('TELA — o portao e o custo', () => {
       [ROTA_MENSAGEM.caminho]: 3,
       [ROTA_AJUSTES.caminho]: 4,
       [ROTA_ATIVIDADE.caminho]: 3,
-      // **As duas telas de Reels pagam 4, e o quarto e declarado como DESVIO de
-      // §12.10.** A tabela de la orca "Meus Reels" em 3, e os tres sao os
-      // mesmos das outras telas: a sessao, o lote da configuracao e a pergunta
-      // sobre a conta. O quarto e `painel_midias` lida INTEIRA — com as linhas
-      // inativas —, e ele nao cabia naquele orcamento porque a tela nao existia
-      // quando ele foi escrito. O lote da configuracao NAO serve: ele filtra
-      // `ativo = 1` de proposito, para o caminho quente do webhook, e §12.5
-      // manda esta tela mostrar exatamente o que aquele filtro descarta — o
-      // Reel apagado que "nao some da lista", o selo de regras proprias num
-      // Reel desmarcado e a lista "salvo por voce" quando a Meta nao responde.
+      // **As duas telas de Reels pagam 3, e o DESVIO que a rodada 1 declarou
+      // aqui foi removido.** Ele dizia que juntar a leitura de `painel_midias`
+      // ao lote da configuracao "acoplaria a falha do `account_tokens` a
+      // listagem, virando `500` onde hoje ha tela degradada". A re-revisao
+      // mediu duas coisas contra esse argumento: (1) ja era `500` —
+      // `buscarPagina` sempre chamou `loadAccessToken`, que nao tem
+      // `try/catch`, e a tela degradada e a de `/painel/atividade`; (2) a saida
+      // custa ZERO subrequest, porque `PainelConfigRepository.ler()` ja faz um
+      // `db.batch()` e um `batch` vale UM subrequest.
       //
-      // O que FOI consertado nesta rodada e o quinto, que era desperdicio de
-      // verdade: `account_tokens` era lida duas vezes na mesma renderizacao —
-      // `contaConectada` e, dentro de `buscarPagina`, `loadAccessToken`. Agora
-      // a resposta sobre a conta sai da propria listagem.
-      [ROTA_REELS.caminho]: 4,
+      // O que mudou: `configDaTela` pede a variante `comAsInativas`, e o
+      // statement de midias do lote deixa de filtrar `ativo = 1` para o painel.
+      // §12.5 manda estas telas mostrarem exatamente o que aquele filtro
+      // descarta — o Reel apagado que "nao some da lista", o selo de regras
+      // proprias num Reel desmarcado, a lista "salvo por voce" quando a Meta
+      // nao responde —, e agora elas mostram sem pagar consulta nenhuma. O
+      // caminho quente do webhook segue com o lote filtrado (CFG-11 e CFG-12
+      // travam os numeros dele).
+      //
+      // Os tres sao os mesmos das outras telas: a sessao, o lote da
+      // configuracao e a pergunta sobre a conta — que em `/painel/reels` sai da
+      // propria listagem (`loadAccessToken`, dentro de `buscarPagina`) e em
+      // `/painel/reel` continua sendo `contaConectada`.
+      [ROTA_REELS.caminho]: 3,
       // `/painel/reel` nao esta em §12.10 — a tabela de la nao tem linha para
-      // ela. Os quatro sao a sessao, o lote da configuracao, a conta e a linha
-      // daquele Reel (`lerUma`), que e o que a tela existe para mostrar.
-      [ROTA_REEL.caminho]: 4,
+      // ela —, e ela paga os mesmos 3. A linha daquele Reel vinha de um
+      // `lerUma` proprio e agora sai do mesmo lote.
+      [ROTA_REEL.caminho]: 3,
     }
 
     await gravarConfig(env.DB)
@@ -1351,19 +1363,36 @@ describe('TELA — celular e acessibilidade', () => {
     }
   })
 
-  test('TELA-29: nenhuma tela passa do orcamento de HTML de §12.9', async () => {
-    // "Conexao ruim e o caso normal, nao o excepcional": §12.9 orca ~15 KB de
-    // HTML por tela. O teto esta escrito aqui, e nao adivinhado, porque a
-    // tela que estoura o orcamento estoura devagar — um bloco por etapa — e
-    // ninguem percebe pelo olho.
+  test('TELA-29: nenhuma tela passa do teto de HTML que esta branch se impos', async () => {
+    // **A AUTORIDADE deste teste mudou nesta rodada, e o numero nao.** Ele
+    // afirmava "conformidade com §12.9", e §12.9 nao e teto: a linha da tabela
+    // diz *"Conexao ruim | ... CSS ~6 KB, HTML ~15 KB por tela"*, com til, como
+    // diretriz. O que este laco entrega e uma **trava-crescimento desta
+    // branch** — a tela que estoura o orcamento estoura devagar, um bloco por
+    // etapa, e ninguem percebe pelo olho.
+    //
+    // A pergunta que §12.9 protege — "abre em conexao ruim?" — nao se responde
+    // com o numero cru: 39.473 bytes da tela de Reels viram 2.499 comprimidos.
+    // Quem a responde e o MID-27, que mede as duas pontas.
+    //
+    // **Os 15 KB seguem para as cinco telas de TEXTO. As duas de Reels adotam
+    // os tetos ja medidos do MID-27**, porque o laco daqui as percorre com UM
+    // Reel salvo e UM item listado — o cenario que menos importa — e afirmar
+    // 15 KB sobre ele daria a impressao de cobrir o que nao cobre (§13.1).
+    const TETO: Record<string, number> = {
+      [ROTA_REELS.caminho]: TETO_NO_LIMITE_DE_200_REELS,
+      [ROTA_REEL.caminho]: TETO_DE_UMA_PAGINA_DE_REELS,
+    }
+
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
 
     for (const tela of TELAS) {
       invalidarCacheDeConfig()
       const bytes = new TextEncoder().encode(await corpoDa(tela, cookie)).length
+      const teto = TETO[tela.rota.caminho] ?? TETO_DE_HTML
 
-      expect({ [tela.rota.caminho]: bytes <= TETO_DE_HTML }).toEqual({
+      expect({ [tela.rota.caminho]: bytes <= teto }).toEqual({
         [tela.rota.caminho]: true,
       })
     }

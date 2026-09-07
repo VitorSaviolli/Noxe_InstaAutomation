@@ -337,9 +337,18 @@ export function molduraCom(
  * Um lugar so para que nenhuma tela esqueca o `ignorarCache` e mostre um valor
  * de ate um minuto atras (o TTL de desligado, §9.6) logo depois de o dono
  * salvar.
+ *
+ * **`comAsInativas` tambem mora aqui, e ele e o conserto do orcamento de
+ * §12.10.** As duas telas de Reels precisam das linhas que o lote da
+ * configuracao filtra (`ativo = 1`) e pagavam uma consulta PROPRIA por elas — o
+ * quarto subrequest que a tabela de §12.10 nao orca. Pedindo no MESMO lote, a
+ * pergunta custa zero: um `batch` vale um subrequest. As outras cinco telas
+ * carregam algumas linhas a mais na memoria e nao pagam nada por isso; separar
+ * "a tela que precisa" da "que nao precisa" custaria uma segunda grafia de
+ * `configDaTela`, e a segunda grafia e a que um dia esqueceria o `ignorarCache`.
  */
 export async function configDaTela(env: Env, now: number): Promise<SnapshotConfig> {
-  return await carregarConfigEfetiva(env, now, { ignorarCache: true })
+  return await carregarConfigEfetiva(env, now, { ignorarCache: true, comAsInativas: true })
 }
 
 // ---------------------------------------------------------------------------

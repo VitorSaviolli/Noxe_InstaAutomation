@@ -28,6 +28,7 @@ import {
   sobreposicaoDaLinha,
   temRegrasProprias,
 } from '../../repositories/painel-midias-repository'
+import type { SnapshotConfig } from '../../services/config-store'
 import { ehMediaIdValido } from '../../services/config-validation'
 import { MetaApiClient } from '../../services/meta-api'
 import { loadAccessToken } from '../../services/token-manager'
@@ -361,6 +362,34 @@ export interface MidiaSalva {
   readonly indisponivelDesde: number | null
   readonly sobreposicao: Sobreposicao
   readonly regrasProprias: boolean
+}
+
+/**
+ * As linhas de `painel_midias` que o LOTE da configuracao ja trouxe (§12.10).
+ *
+ * As duas telas de Reels liam `painel_midias` por conta propria — o quarto
+ * subrequest que a tabela de §12.10 nao orca. `configDaTela` agora pede as
+ * linhas inteiras dentro do `db.batch()` que a configuracao ja fazia, e um
+ * `batch` vale UM subrequest: a mesma resposta, de graca.
+ *
+ * `null` chega quando a leitura da configuracao falhou — e ai a tela cai na
+ * tarja de `parado_por_erro`, com lista vazia, em vez do `500` que a consulta
+ * separada produzia (ela chamava `lerTodas`, que lanca).
+ */
+export function midiasSalvasDo(snapshot: SnapshotConfig): MidiaSalva[] {
+  return (snapshot.linhasDeMidia ?? []).map(comoMidiaSalva)
+}
+
+/**
+ * A linha CRUA daquele Reel dentro do snapshot, ou `null`.
+ *
+ * `null` continua significando o que significava com `lerUma`: nao existe linha
+ * para este `media_id`, e §12.5 com o Ruling 93 manda RECUSAR em vez de
+ * renderizar uma tela vazia. A busca e linear sobre no maximo 200 linhas
+ * (§12.5), e ela troca um subrequest por um laco em memoria.
+ */
+export function linhaDoReel(snapshot: SnapshotConfig, mediaId: string): PainelMidiaRecord | null {
+  return (snapshot.linhasDeMidia ?? []).find((linha) => linha.media_id === mediaId) ?? null
 }
 
 /** Uma linha do banco no vocabulario da tela. */

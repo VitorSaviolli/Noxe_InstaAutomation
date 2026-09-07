@@ -19,24 +19,35 @@
  * **`acao` que nao casa e recusa, e nao silencio** (Ruling 85): §11.3, passo 6,
  * trata campo que nao casa como erro de digitacao ou cliente adulterado.
  *
- * **Custo, e ele mudou nesta rodada.** `GET`: a linha de sessao, o lote da
- * configuracao e a leitura de `painel_midias` — quatro subrequests contando a
- * linha de sessao —, mais as chamadas a Meta **so quando o cache de 10 minutos
- * de §12.5 esta frio**. §12.1 regra 5 e `[C]`-dura: "sem buscar lista a cada
- * render; Atualizar e sempre um botao explicito", e o botao existe desde agora.
+ * **Custo: os 3 subrequests que §12.10 orca, e o desvio acabou.** A linha de
+ * sessao, o lote da configuracao e `account_tokens` — mais as chamadas a Meta
+ * **so quando o cache de 10 minutos de §12.5 esta frio**. §12.1 regra 5 e
+ * `[C]`-dura: "sem buscar lista a cada render; Atualizar e sempre um botao
+ * explicito", e o botao existe desde a rodada 1.
  *
- * A pergunta sobre a conta deixou de ser uma consulta propria: `buscarPagina`
- * ja le `account_tokens` para carregar o token, e `contaConectada` lia a MESMA
- * tabela de novo na mesma renderizacao. §12.10 orca esta tela em 3 consultas; a
- * quarta e `painel_midias` inteira, que o lote da configuracao nao serve porque
- * ele filtra `ativo = 1` para o caminho quente e §12.5 manda esta tela mostrar
- * exatamente o que aquele filtro descarta. O desvio esta declarado em TELA-20.
+ * Os dois consertos que tiraram esta tela de 5 para 3:
  *
- * A paginacao nao le `painel_midias` de novo por acaso: ela precisa saber o que
- * ja esta salvo para o cartao dizer a verdade.
+ *   1. a pergunta sobre a conta saiu da propria listagem. `buscarPagina` ja le
+ *      `account_tokens` para carregar o token, e `contaConectada` lia a MESMA
+ *      tabela de novo na mesma renderizacao;
+ *   2. `painel_midias` INTEIRA — com as inativas, que §12.5 manda esta tela
+ *      mostrar — viaja no `db.batch()` da configuracao, e um `batch` vale UM
+ *      subrequest. Ate a rodada 1 ela era uma consulta propria, declarada como
+ *      desvio de §12.10; o desvio saiu do TELA-20 junto com a consulta.
+ *
+ * **O argumento que sustentava o desvio nao se sustentava.** Ele dizia que
+ * juntar as leituras "acoplaria a falha do `account_tokens` a listagem, virando
+ * `500` onde hoje ha tela degradada". A re-revisao mediu: ja era `500` —
+ * `buscarPagina` sempre chamou `loadAccessToken`, que nao tem `try/catch`. A
+ * tela degradada e a de `/painel/atividade`. E juntar `painel_midias` ao lote
+ * nao acopla falha nova: e a mesma transacao e o mesmo modo de falha que a
+ * configuracao ja tinha, que cai em `parado_por_erro` — melhor do que o `500`
+ * que `lerTodas` produzia.
+ *
+ * A paginacao usa as MESMAS linhas: ela precisa saber o que ja esta salvo para
+ * o cartao dizer a verdade, e o snapshot dela e o mesmo da renderizacao.
  */
 import {
-  AVISO_DE_TETO_DE_MIDIAS,
   IDS_NOVOS_POR_GRAVACAO,
   type MetadadosDeMidia,
   PainelMidiasRepository,
@@ -46,17 +57,9 @@ import { ehMediaIdValido } from '../../services/config-validation'
 import { loadAccessToken } from '../../services/token-manager'
 import { prefixoDeCredencial } from '../../services/webauthn/verificar'
 import { CAMPO_DA_ACAO } from './campos'
-import {
-  type CampoDaConfig,
-  dataEmPortugues,
-  ESCOPO_DE_MIDIAS,
-  escopoDeMidias,
-  motivoDaRecusa,
-  NOME_DO_CAMPO,
-  TELA_DOS_REELS,
-} from './dicionario'
+import { type CampoDaConfig, escopoDeMidias, motivoDaRecusa, TELA_DOS_REELS } from './dicionario'
 import { gravarConfiguracao } from './gravar'
-import { type HtmlSeguro, html } from './html'
+import { html } from './html'
 import {
   blocoDeConfirmacao,
   camposDoFormulario,
@@ -64,21 +67,34 @@ import {
   fichaDaTela,
   molduraCom,
   panorama,
-  seloProtegido,
 } from './inicio'
 import {
   buscarPagina,
-  comoMidiaSalva,
   DEPENDENCIAS_DE_MIDIAS,
   type DependenciasDeMidias,
-  type MidiaSalva,
-  POUCOS_REELS,
+  midiasSalvasDo,
   primeiraPagina,
-  type ReelDaListagem,
 } from './midias'
 import { blocoDaRecusa, RecusaAuditada } from './recusa'
+import {
+  ATUALIZAR,
+  botaoDeAtualizar,
+  CAMPO_DA_MIDIA,
+  CAMPO_DO_CURSOR,
+  CAMPO_DO_VISTO,
+  CARREGAR,
+  cartoesSumidos,
+  contaDaListagem,
+  escolhaDoEscopo,
+  escondidosPreservados,
+  faixaDaListagem,
+  faixaDeOrfas,
+  faixaDoTeto,
+  listaDeReels,
+  maisPagina,
+} from './reels-lista'
 import { erro } from './resposta'
-import { ROTA_REEL, ROTA_REELS } from './rotas'
+import { ROTA_REELS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
 
@@ -91,30 +107,6 @@ import { telaDoPainel } from './tela'
  * patch de estado.
  */
 export const CAMPOS_DOS_REELS: readonly CampoDaConfig[] = ['mediaScope']
-
-/** A operacao de paginacao. Ela nao grava e nao responde `303` (§7.1). */
-export const CARREGAR = 'carregar'
-
-/**
- * O botao Atualizar de §12.5. Ele nao grava e nao responde `303`.
- *
- * **Ele e a outra metade do cache de 10 minutos** (Ruling 98): o cache e o que
- * cumpre §12.1 regra 5 — "sem buscar lista a cada render" — e este botao e o
- * unico jeito de a pessoa sair dele. Sem o botao, o cache prenderia a tela; sem
- * o cache, cada render gastaria ate quatro chamadas a Meta. Entregar um sem o
- * outro seria trocar um defeito por outro, e duas frases da tela ja mandavam
- * "toque em Atualizar" para um botao que nao existia em lugar nenhum.
- */
-export const ATUALIZAR = 'atualizar'
-
-/** O nome do campo de cada Reel marcado. Repetido, um por caixa marcada. */
-export const CAMPO_DA_MIDIA = 'midia'
-
-/** Os ids que a tela MOSTROU, para desmarcar so o que a pessoa podia ver. */
-export const CAMPO_DO_VISTO = 'visto'
-
-/** O cursor da proxima pagina. Campo escondido; **nunca** vai para o D1. */
-export const CAMPO_DO_CURSOR = 'depois'
 
 /** Os campos do corpo que nao sao configuracao, nesta rota (§11.3, passo 6). */
 const ESTRUTURAIS_DOS_REELS: readonly string[] = [
@@ -229,7 +221,7 @@ interface DesenhoDaTela {
 async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   const { entrada, deps } = desenho
   const snapshot = await configDaTela(entrada.env, entrada.now)
-  const salvas = (await new PainelMidiasRepository(entrada.env.DB).lerTodas()).map(comoMidiaSalva)
+  const salvas = midiasSalvasDo(snapshot)
   const ficha = await fichaDaTela(entrada)
 
   // A primeira pagina vem do cache de §12.5; a paginacao, nao — "Carregar mais"
@@ -248,7 +240,7 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   // o primeiro ja nao tivesse respondido.
   const visao = panorama(snapshot, contaDaListagem(listagem))
   const ativos = salvas.filter((midia) => midia.ativo).map((midia) => midia.mediaId)
-  const marcados = desenho.marcadosNaTela ?? ativos
+  const marcados = marcadosDesta(desenho, ativos)
 
   const escopo = escopoDeMidias(snapshot.global)
   const reels = listagem.ok ? listagem.reels : []
@@ -297,275 +289,37 @@ ${listagem.ok && listagem.proximoCursor !== null ? maisPagina(listagem.proximoCu
 }
 
 /**
- * A conta do Instagram esta ligada? A listagem ja respondeu.
+ * Quais Reels aparecem marcados nesta renderizacao.
  *
- * `sem_conta` e o unico motivo que significa "nao ha linha em
- * `account_tokens`"; `falha_meta` acontece **com** a conta ligada — o token
- * existe e foi a Meta que nao respondeu —, e dizer "nao conectada" ali seria a
- * afirmacao falsa que §12.1 regra 3 proibe.
+ * Tres origens, e a do meio custou um Critical:
+ *
+ *   - `GET`: a tela nao carrega escolha nenhuma (`marcadosNaTela` e `null`), e
+ *     o que vale e o banco;
+ *   - **`ATUALIZAR`: a UNIAO do que a tela carregou com o que ja esta ativo.**
+ *     O formulario daquele botao so reemite o que o banco ainda nao sabe, entao
+ *     numa tela recem-aberta ele carrega um array VAZIO — e `[] ?? ativos` e
+ *     `[]`, porque o `??` nao dispara em array vazio. Sem a uniao, tocar
+ *     Atualizar desmarcava os Reels salvos e, junto, descartava os campos
+ *     escondidos que preservavam os que estao fora da pagina: o Salvar seguinte
+ *     gravava `ativo = 0` neles, com `303 ?ok=salvo` e faixa verde;
+ *   - `CARREGAR`: exatamente o que a tela carregou, e nada mais. Ali o
+ *     formulario reemite a escolha INTEIRA (`escondidosDaEscolha`), entao um
+ *     array vazio significa mesmo "a pessoa desmarcou tudo" — e uniao ali
+ *     desfaria a desmarcacao dela.
+ *
+ * **Por que a uniao, e nao emitir a escolha inteira no formulario do
+ * Atualizar.** A segunda saida tambem consertaria as marcas, mas mudaria o
+ * SENTIDO do botao: desmarcar um Reel salvo e tocar em Atualizar passaria a
+ * levar a desmarcacao junto, e o botao deixaria de ser "joga fora o retrato
+ * velho, o retrato do banco e o que fica". O custo em bytes nao decide nada
+ * aqui — a pagina inteira no teto de 200 Reels sao 39 KB crus e ~2,5 KB
+ * comprimidos (MID-27) —, quem decide e o que o botao promete.
  */
-function contaDaListagem(listagem: Awaited<ReturnType<typeof buscarPagina>>): boolean {
-  return listagem.ok || listagem.motivo !== 'sem_conta'
-}
-
-/** A faixa que explica o estado da listagem (§12.5, os quatro especiais). */
-function faixaDaListagem(
-  listagem: Awaited<ReturnType<typeof buscarPagina>>,
-  quantos: number,
-): HtmlSeguro {
-  if (!listagem.ok) {
-    return html`<p class="faixa faixa-aviso" role="status">${
-      listagem.motivo === 'sem_conta'
-        ? 'A conta do Instagram não está conectada. Quem conecta é o assistente, no computador onde o projeto foi publicado.'
-        : TELA_DOS_REELS.metaMuda
-    }</p>
-<p>${TELA_DOS_REELS.salvoPorVoce}</p>`
-  }
-
-  if (quantos === 0) {
-    return html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.semReels}</p>`
-  }
-
-  // §12.5: quatro paginas que rendem menos de tres Reels ganham explicacao, em
-  // vez de a tela parecer quebrada para quem posta muita foto.
-  if (quantos < POUCOS_REELS && listagem.proximoCursor !== null) {
-    return html`<p class="faixa" role="status">${TELA_DOS_REELS.poucosReels}</p>`
-  }
-
-  return html``
-}
-
-/** §12.5: escolhas de Reels sem configuracao salva estao sendo ignoradas. */
-function faixaDeOrfas(avisos: readonly string[]): HtmlSeguro {
-  const temOrfas = avisos.some((aviso) => aviso.startsWith('painel_midias:'))
-  if (!temOrfas) return html``
-  return html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.orfas}</p>`
-}
-
-/** §12.5: o aviso a partir de 197 Reels escolhidos. */
-function faixaDoTeto(quantos: number): HtmlSeguro {
-  if (quantos < AVISO_DE_TETO_DE_MIDIAS) return html``
-  return html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.quaseNoTeto}</p>`
-}
-
-/**
- * As duas opcoes de §3, com as frases do dicionario.
- *
- * **"Em todos os meus Reels" leva cadeado** (§12.3): ir para `todas` alarga o
- * envelope de alcance, e §10.10 lista o alargamento entre o que pede a digital.
- * Voltar para "so nos que eu escolher" estreita, e estreitar nunca pede.
- */
-function escolhaDoEscopo(escopo: 'todas' | 'selecionadas'): HtmlSeguro {
-  return html`<fieldset>
-<legend>${NOME_DO_CAMPO.mediaScope}</legend>
-<p><label><input type="radio" name="mediaScope" value="todas"${
-    escopo === 'todas' ? html` checked` : null
-  }> ${ESCOPO_DE_MIDIAS.todas} ${seloProtegido()}</label></p>
-<p><label><input type="radio" name="mediaScope" value="selecionadas"${
-    escopo === 'selecionadas' ? html` checked` : null
-  }> ${ESCOPO_DE_MIDIAS.selecionadas}</label></p>
-</fieldset>`
-}
-
-/** O cartao de UM Reel: a area de toque e o cartao inteiro (§3). */
-function cartao(reel: ReelDaListagem, salva: MidiaSalva | undefined, marcado: boolean): HtmlSeguro {
-  const rotulo = reel.mediaProductType === 'REELS' ? 'Reel' : TELA_DOS_REELS.videoOuReel
-
-  return html`<li class="cartao-reel">
-<label class="cartao">
-<input type="checkbox" name="${CAMPO_DA_MIDIA}" value="${reel.mediaId}"${
-    marcado ? html` checked` : null
-  }>
-${
-  reel.miniatura === null
-    ? html`<span class="miniatura-vazia" aria-hidden="true"></span>`
-    : html`<img class="miniatura" src="${reel.miniatura}" alt="">`
-}
-<span class="legenda">${reel.legendaCurta ?? rotulo}</span>
-<span class="data">${reel.postadoEm === null ? '' : dataEmPortugues(reel.postadoEm)}</span>
-</label>
-${
-  salva?.regrasProprias === true
-    ? html`<p class="selo-proprias"><span aria-hidden="true">&#9881;</span> ${
-        TELA_DOS_REELS.regrasProprias
-      }</p>`
-    : null
-}
-<p><a href="${ROTA_REEL.caminho}?midia=${reel.mediaId}">${TELA_DOS_REELS.tituloDoReel}</a></p>
-</li>`
-}
-
-/**
- * A lista de cartoes.
- *
- * **O botao "Marcar os N desta lista" saiu, e a saida e uma remocao de defeito,
- * nao de funcionalidade entregue.** Ele era um `<button type="button"
- * class="marcar-lote">`, a classe era a UNICA ocorrencia dela no repositorio e
- * `painel.js` nao a conhecia: o botao nao fazia absolutamente nada. Pela regra
- * desta branch (R-6, §12.4) um controle que nao faz o que promete e defeito, e
- * §12.1 regra 4 diz que o que a tela mostra e o que o Worker faz.
- *
- * §3 pede o botao, e a divida fica REGISTRADA e nao apagada. Faze-lo funcionar
- * nao e cosmetica: ou `painel.js` ganha um sexto trabalho (§12.8 fecha a lista
- * em cinco) e esta tela passa a carregar o script, que `telaDoPainel` nao
- * carrega nas telas de leitura de proposito (§12.9, conexao ruim); ou ele vira
- * um `acao=` a mais que so re-renderiza — o desenho que funciona SEM
- * JavaScript, como "Carregar mais" e "Atualizar" —, e ai ele precisa saber
- * quais ids estao na tela depois do re-render, o que interage com o teto de
- * HTML de §12.9. As duas saidas sao decisao de desenho, e vao com o resto de §3
- * para a Task 13b.
- */
-function listaDeReels(
-  reels: readonly ReelDaListagem[],
-  salvas: readonly MidiaSalva[],
-  marcados: readonly string[],
-  listagemVeio: boolean,
-): HtmlSeguro {
-  if (!listagemVeio) return listaSalva(salvas, marcados)
-  if (reels.length === 0) return html``
-
-  const porId = new Map(salvas.map((midia) => [midia.mediaId, midia]))
-
-  return html`<ul class="reels">${reels.map((reel) =>
-    cartao(reel, porId.get(reel.mediaId), marcados.includes(reel.mediaId)),
-  )}</ul>`
-}
-
-/**
- * A lista salva, quando o Instagram nao respondeu (§12.5).
- *
- * Ela sai de `painel_midias`, marcada como "salvo por voce", e o botao de
- * salvar fica desabilitado: gravar a partir de uma lista que nao carregou
- * apagaria a selecao existente, que e a recusa que §9.7 nomeia.
- */
-function listaSalva(salvas: readonly MidiaSalva[], marcados: readonly string[]): HtmlSeguro {
-  const ativas = salvas.filter((midia) => marcados.includes(midia.mediaId))
-  if (ativas.length === 0) return html``
-
-  return html`<ul class="reels reels-salvos">${ativas.map(
-    (midia) => html`<li class="cartao-reel">
-<span class="legenda">${midia.legendaCurta ?? midia.mediaId}</span>
-<span class="salvo">${TELA_DOS_REELS.salvoPorVoce}</span>
-<p><a href="${ROTA_REEL.caminho}?midia=${midia.mediaId}">${TELA_DOS_REELS.tituloDoReel}</a></p>
-</li>`,
-  )}</ul>`
-}
-
-/** §3: o Reel apagado fica cinza, com o botao de tirar da lista. */
-function cartoesSumidos(sumidos: readonly MidiaSalva[], marcados: readonly string[]): HtmlSeguro {
-  if (sumidos.length === 0) return html``
-
-  return html`<ul class="reels reels-sumidos">${sumidos.map(
-    (midia) => html`<li class="cartao-reel cartao-cinza">
-<label class="cartao">
-<input type="checkbox" name="${CAMPO_DA_MIDIA}" value="${midia.mediaId}"${
-      marcados.includes(midia.mediaId) ? html` checked` : null
-    }>
-<span class="legenda">${midia.legendaCurta ?? midia.mediaId}</span>
-</label>
-<p class="faixa faixa-aviso">${TELA_DOS_REELS.reelApagado}</p>
-<p>Desmarque para ${TELA_DOS_REELS.tirarDaLista.toLowerCase()}.</p>
-</li>`,
-  )}</ul>`
-}
-
-/**
- * Os ids marcados que NAO estao na tela, reemitidos escondidos (§12.5).
- *
- * Sem eles, salvar depois de "Carregar mais" desmarcaria tudo o que ficou na
- * pagina anterior. Junto vao os `visto`, que dizem ao funil o que a pessoa
- * PODIA desmarcar — e e essa lista, e nao a de marcados, que impede a tela de
- * apagar o que ela nunca mostrou.
- */
-function escondidosPreservados(
-  marcados: readonly string[],
-  reels: readonly ReelDaListagem[],
-  sumidos: readonly MidiaSalva[],
-  vistos: readonly string[],
-): HtmlSeguro {
-  const naTela = new Set([
-    ...reels.map((reel) => reel.mediaId),
-    ...sumidos.map((midia) => midia.mediaId),
-  ])
-  const fora = marcados.filter((id) => !naTela.has(id))
-  const todosVistos = [...new Set([...vistos, ...naTela])]
-
-  return html`${fora.map(
-    (id) => html`<input type="hidden" name="${CAMPO_DA_MIDIA}" value="${id}">`,
-  )}${todosVistos.map((id) => html`<input type="hidden" name="${CAMPO_DO_VISTO}" value="${id}">`)}`
-}
-
-/**
- * "Esta lista foi buscada ha N minutos. [Atualizar]" (§12.5).
- *
- * Ele mora FORA do formulario de salvar porque HTML nao aninha `<form>`, e vem
- * antes dele porque §12.5 poe a idade da lista no topo, junto do estado dela.
- * Carrega os mesmos escondidos de "Carregar mais": o que a pessoa ja marcou e
- * nao salvou sobrevive ao toque, que e o que a frase do cursor vencido promete.
- */
-function botaoDeAtualizar(
-  buscadaEm: number,
-  agora: number,
-  ficha: string,
-  versao: number,
-  marcados: readonly string[],
-  ativos: readonly string[],
-): HtmlSeguro {
-  const minutos = Math.floor((agora - buscadaEm) / 60_000)
-  // **So o que o banco ainda NAO sabe**, e nao a selecao inteira. Um Reel que ja
-  // esta ativo volta marcado sozinho na re-renderizacao, porque `marcados` cai
-  // em `ativos` quando a tela nao carrega nada — reemiti-lo aqui seria a
-  // terceira copia de ate 200 campos escondidos na mesma pagina, e §12.9 orca a
-  // tela em 15 KB. O que este formulario preserva e o que se perderia de
-  // verdade: as marcacoes que a pessoa fez e ainda nao salvou.
-  //
-  // A perda que sobra esta declarada: DESmarcar um Reel salvo e tocar em
-  // Atualizar devolve ele marcado. Atualizar e o botao que joga fora o retrato
-  // velho, e o retrato do banco e o que fica.
-  const naoSalvos = marcados.filter((id) => !ativos.includes(id))
-
-  return html`<form method="post" action="${ROTA_REELS.caminho}" class="atualizar">
-${camposDoFormulario(ficha, versao)}
-<input type="hidden" name="${CAMPO_DA_ACAO}" value="${ATUALIZAR}">
-${naoSalvos.map((id) => html`<input type="hidden" name="${CAMPO_DA_MIDIA}" value="${id}">`)}
-<p>${
-    minutos < 1
-      ? TELA_DOS_REELS.listaBuscadaAgora
-      : `${TELA_DOS_REELS.listaBuscadaHa} ${String(minutos)} ${TELA_DOS_REELS.listaBuscadaHaFim}`
-  }</p>
-<button type="submit">${TELA_DOS_REELS.atualizar}</button>
-</form>`
-}
-
-/** Os escondidos que um botao de re-render carrega: o marcado e o visto. */
-function escondidosDaEscolha(
-  marcados: readonly string[],
-  vistos: readonly string[],
-  reels: readonly ReelDaListagem[],
-): HtmlSeguro {
-  const todosVistos = [...new Set([...vistos, ...reels.map((reel) => reel.mediaId)])]
-
-  return html`${marcados.map(
-    (id) => html`<input type="hidden" name="${CAMPO_DA_MIDIA}" value="${id}">`,
-  )}${todosVistos.map((id) => html`<input type="hidden" name="${CAMPO_DO_VISTO}" value="${id}">`)}`
-}
-
-/** O formulario de "Carregar mais": o cursor num campo escondido (§12.5). */
-function maisPagina(
-  cursor: string,
-  ficha: string,
-  versao: number,
-  marcados: readonly string[],
-  vistos: readonly string[],
-  reels: readonly ReelDaListagem[],
-): HtmlSeguro {
-  return html`<form method="post" action="${ROTA_REELS.caminho}" class="mais">
-${camposDoFormulario(ficha, versao)}
-<input type="hidden" name="${CAMPO_DA_ACAO}" value="${CARREGAR}">
-<input type="hidden" name="${CAMPO_DO_CURSOR}" value="${cursor}">
-${escondidosDaEscolha(marcados, vistos, reels)}
-<button type="submit">${TELA_DOS_REELS.carregarMais}</button>
-</form>`
+function marcadosDesta(desenho: DesenhoDaTela, ativos: readonly string[]): readonly string[] {
+  const daTela = desenho.marcadosNaTela
+  if (daTela === null) return ativos
+  if (!desenho.atualizar) return daTela
+  return [...new Set([...daTela, ...ativos])]
 }
 
 // ---------------------------------------------------------------------------
@@ -636,7 +390,9 @@ async function salvarSelecao(
 
   const snapshot = await configDaTela(env, now)
   const midias = new PainelMidiasRepository(env.DB)
-  const salvas = (await midias.lerTodas()).map(comoMidiaSalva)
+  // As linhas vem do MESMO lote da configuracao (§12.10): o repositorio aqui
+  // existe para os STATEMENTS da gravacao, e nao para uma segunda leitura.
+  const salvas = midiasSalvasDo(snapshot)
   const ativosHoje = salvas.filter((midia) => midia.ativo).map((midia) => midia.mediaId)
 
   const recusa = new RecusaAuditada(

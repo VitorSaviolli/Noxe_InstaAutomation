@@ -51,6 +51,16 @@ export interface SnapshotConfig {
   readonly versao: number
   /** Achados do validador na leitura. Vao para a tela, nao para o webhook. */
   readonly avisos: readonly string[]
+  /**
+   * As linhas de `painel_midias` INTEIRAS — ativas e inativas —, ou `null`
+   * quando quem leu nao pediu por elas.
+   *
+   * Existe para as telas de Reels, e ela e a razao de §12.10 voltar a fechar:
+   * a pergunta viaja no `db.batch()` que a configuracao ja faz, e um `batch`
+   * vale UM subrequest. `null` significa "esta leitura nao perguntou" — o
+   * caminho quente do webhook nunca pergunta —, e nao "nao ha linhas".
+   */
+  readonly linhasDeMidia: readonly PainelMidiaRecord[] | null
 }
 
 /**
@@ -85,15 +95,19 @@ let cache: { snapshot: SnapshotConfig; expiraEm: number } | null = null
  *
  * O painel sempre chama com `ignorarCache: true`: salvar e a tela mostrar o
  * valor antigo destroi a confianca de um leigo mais rapido que qualquer bug.
+ *
+ * `comAsInativas` e so do painel (§12.10): ele acrescenta as linhas inativas de
+ * `painel_midias` ao MESMO lote, sem subrequest novo. O webhook nunca pede, e
+ * por isso o caminho quente continua com o lote filtrado por `ativo = 1`.
  */
 export async function carregarConfigEfetiva(
   env: Env,
   now: number,
-  opcoes: { ignorarCache?: boolean } = {},
+  opcoes: { ignorarCache?: boolean; comAsInativas?: boolean } = {},
 ): Promise<SnapshotConfig> {
   if (!opcoes.ignorarCache && cache !== null && now < cache.expiraEm) return cache.snapshot
 
-  const snapshot = await lerEValidar(env)
+  const snapshot = await lerEValidar(env, opcoes.comAsInativas === true)
   const ttl = snapshot.global.enabled ? TTL_LIGADO_MS : TTL_DESLIGADO_MS
   cache = { snapshot: congelarFundo(snapshot), expiraEm: now + ttl }
 
@@ -115,11 +129,15 @@ export function invalidarCacheDeConfig(): void {
 // Leitura e julgamento
 // ---------------------------------------------------------------------------
 
-async function lerEValidar(env: Env): Promise<SnapshotConfig> {
+async function lerEValidar(env: Env, comAsInativas: boolean): Promise<SnapshotConfig> {
   let leitura: LeituraDeConfig
   try {
-    leitura = await new PainelConfigRepository(env.DB).ler()
+    leitura = await new PainelConfigRepository(env.DB).ler({ comAsInativas })
   } catch (cause) {
+    // A leitura falhou, entao nao ha linha de midia nenhuma para entregar: as
+    // telas de Reels caem na mesma tarja de `parado_por_erro` que a config, que
+    // e o modo de falha que elas ja tinham quando a consulta era propria — e
+    // uma tarja e melhor que o `500` que a consulta separada produzia.
     return doErroDeLeitura(cause)
   }
 
@@ -132,7 +150,7 @@ async function lerEValidar(env: Env): Promise<SnapshotConfig> {
       leitura.midias.length > 0
         ? ['painel_midias: ha midias selecionadas sem configuracao global; elas foram ignoradas.']
         : []
-    return daFabrica('arquivo', 0, avisos)
+    return daFabrica('arquivo', 0, avisos, leitura.todas)
   }
 
   // A allowlist e lida UMA vez por preenchimento de cache, nunca por
@@ -141,7 +159,7 @@ async function lerEValidar(env: Env): Promise<SnapshotConfig> {
   const allowlist = lerAllowlist(env.ALLOWED_LINK_DOMAINS)
 
   const global = lerGlobal(leitura.config, leitura.midias, allowlist)
-  if (!global.ok) return doValidadorReprovado(leitura.config, global.achados)
+  if (!global.ok) return doValidadorReprovado(leitura.config, global.achados, leitura.todas)
 
   return {
     global: global.valor,
@@ -149,6 +167,7 @@ async function lerEValidar(env: Env): Promise<SnapshotConfig> {
     origem: 'banco',
     versao: leitura.config.versao,
     avisos: [],
+    linhasDeMidia: leitura.todas,
   }
 }
 
@@ -167,6 +186,7 @@ function daFabrica(
   origem: OrigemConfig,
   versao: number,
   avisos: readonly string[],
+  linhas: readonly PainelMidiaRecord[] | null = null,
 ): SnapshotConfig {
   return {
     global: {
@@ -179,6 +199,12 @@ function daFabrica(
     origem,
     versao,
     avisos,
+    // As linhas cruas seguem mesmo nos estados degradados, e a decisao e a que a
+    // tela de Reels ja tinha quando lia por conta propria: com a linha global
+    // ilegivel, "salvo por voce" continua sendo a unica coisa verdadeira que
+    // aquela tela pode mostrar. Elas nao alargam nada — quem resolve
+    // comportamento le `overrides`, e ele esta vazio aqui.
+    linhasDeMidia: linhas,
   }
 }
 
@@ -273,6 +299,7 @@ function doErroDeLeitura(cause: unknown): SnapshotConfig {
 function doValidadorReprovado(
   linha: PainelConfigRecord,
   achados: readonly Achado[],
+  linhasDeMidia: readonly PainelMidiaRecord[] | null = null,
 ): SnapshotConfig {
   console.warn(
     'Configuracao do painel recusada na leitura:',
@@ -280,7 +307,7 @@ function doValidadorReprovado(
   )
 
   const versao = Number.isInteger(linha.versao) && linha.versao >= 1 ? linha.versao : 0
-  return daFabrica('parado_por_erro', versao, achados.map(comoAviso))
+  return daFabrica('parado_por_erro', versao, achados.map(comoAviso), linhasDeMidia)
 }
 
 function comoAviso(achado: Achado): string {
@@ -534,6 +561,11 @@ function congelarFundo(snapshot: SnapshotConfig): SnapshotConfig {
   }
   Object.freeze(snapshot.overrides)
   Object.freeze(snapshot.avisos)
+
+  if (snapshot.linhasDeMidia !== null) {
+    for (const linha of snapshot.linhasDeMidia) Object.freeze(linha)
+    Object.freeze(snapshot.linhasDeMidia)
+  }
 
   return Object.freeze(snapshot)
 }

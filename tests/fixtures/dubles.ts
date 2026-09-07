@@ -91,6 +91,55 @@ export function comoD1(contador: D1Contador): D1Database {
 /** Relogio fixo do projeto. Sem fake timers: `now` e sempre injetado. */
 export const AGORA = 1_700_000_000_000
 
+/**
+ * Os tetos de HTML por tela, em bytes — e a AUTORIDADE de cada um.
+ *
+ * **§12.9 nao e teto.** A linha da tabela diz *"Conexao ruim | ... CSS ~6 KB,
+ * HTML ~15 KB por tela"* — com til, como diretriz de projeto. Quem transformou
+ * a aproximacao em assercao dura foi o TELA-29, e a pergunta que §12.9 protege
+ * nao e "cabe no numero" e sim **"abre em conexao ruim?"**.
+ *
+ * A resposta a essa pergunta foi MEDIDA, e ela e sim com folga: a tela de Reels
+ * no teto de 200 Reels sao 39.473 bytes crus e **2.499 comprimidos**
+ * (`CompressionStream('gzip')`, que e o que a Cloudflare aplica na saida). Os
+ * 39 KB sao custo de memoria e de parse, nao de rede — e por isso o MID-27
+ * mede as duas coisas: o teto cru trava crescimento, e o comprimido e o unico
+ * numero preso ao que §12.9 protege.
+ *
+ * Os tres numeros abaixo sao **trava-crescimento desta branch**, e nao
+ * cumprimento de §12.9: eles reprovam quem piorar. A distancia entre
+ * `TETO_DE_HTML` e os dois de Reels e divida DECLARADA de desenho de tela —
+ * encolher o teto de 200, mandar a selecao preservada num campo so em vez de N,
+ * ou paginar o formulario —, e ela vai com o resto de §3 para a Task 13b.
+ *
+ * Moram AQUI porque duas suites os afirmam: `painel-telas` percorre as sete
+ * telas e `painel-midias` mede os dois cenarios de Reels que aquele laco nunca
+ * alcanca. As duas copias ja existiam, e a copia e que diverge.
+ */
+export const TETO_DE_HTML = 15 * 1024
+
+/** Uma pagina cheia de Reels: 25 cartoes, que e o `limit` de §12.5. */
+export const TETO_DE_UMA_PAGINA_DE_REELS = 19 * 1024
+
+/** A mesma pagina com os 200 Reels de §12.5 escolhidos, em campos escondidos. */
+export const TETO_NO_LIMITE_DE_200_REELS = 40 * 1024
+
+/**
+ * O teto da tela de Reels **comprimida**, que e o numero que §12.9 protege.
+ *
+ * Medido em 2.499 bytes no pior cenario (200 escolhidos, 25 na pagina). O teto
+ * folgado nao afrouxa nada: um teto gzipado reprova bloat ESTRUTURAL de
+ * verdade — um bloco novo por Reel, uma tabela inteira a mais — e nunca reprova
+ * repeticao barata, que e exatamente a distincao que falta ao numero cru.
+ */
+export const TETO_COMPRIMIDO_DE_REELS = 6 * 1024
+
+/** Os bytes que a Cloudflare poria no fio, medidos como ela mede. */
+export async function bytesComprimidos(texto: string): Promise<number> {
+  const fluxo = new Blob([texto]).stream().pipeThrough(new CompressionStream('gzip'))
+  return (await new Response(fluxo).arrayBuffer()).byteLength
+}
+
 /** Conta profissional ficticia usada em todas as suites. */
 export const IG_USER_ID = '17841400000000000'
 export const USERNAME_CONTA = 'conta_de_teste'

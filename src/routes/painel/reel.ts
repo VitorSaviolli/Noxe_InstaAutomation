@@ -69,7 +69,7 @@ import {
   panorama,
   seloProtegido,
 } from './inicio'
-import { estadoEfetivo } from './midias'
+import { estadoEfetivo, linhaDoReel } from './midias'
 import { blocoDaRecusa, RecusaAuditada } from './recusa'
 import { erro } from './resposta'
 import { ROTA_REEL, ROTA_REELS } from './rotas'
@@ -295,7 +295,15 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
     return erro('dados_invalidos', { ...contexto, motivoInterno: 'reel_invalido' })
   }
 
-  const linha = await new PainelMidiasRepository(env.DB).lerUma(mediaId)
+  // **A linha daquele Reel sai do LOTE da configuracao, e nao de uma consulta
+  // propria** (§12.10). `configDaTela` pede `painel_midias` inteira dentro do
+  // `db.batch()` que a configuracao ja fazia, e um `batch` vale UM subrequest:
+  // esta tela caiu de 4 para os 3 da tabela, e o desvio declarado no TELA-20
+  // saiu junto. A ordem inverteu — a config vem antes da recusa por id
+  // desconhecido —, e nao ha custo nisso: os dois caminhos leem o mesmo lote, e
+  // a recusa continua acontecendo antes de qualquer escrita.
+  const snapshot = await configDaTela(env, now)
+  const linha = linhaDoReel(snapshot, mediaId)
   if (linha === null) {
     // Ruling 93: um `media_id` que nao casa com linha e RECUSADO, e nao
     // ignorado. Renderizar uma tela vazia ensinaria que o painel conhece Reels
@@ -304,7 +312,6 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
   }
 
   const sobreposicao = sobreposicaoDaLinha(linha)
-  const snapshot = await configDaTela(env, now)
 
   if (request.method === 'POST') {
     return await gravarNoReel(entrada, mediaId, sobreposicao, snapshot.global, snapshot.versao)
