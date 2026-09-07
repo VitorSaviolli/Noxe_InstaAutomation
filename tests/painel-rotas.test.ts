@@ -346,6 +346,7 @@ describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
       csrf: true,
       stepUp: false,
       escreve: false,
+      gravaConfig: false,
     }
     const espiao = { chamadas: 0 }
     const handler = () => {
@@ -1031,6 +1032,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
     csrf: false,
     stepUp: false,
     escreve: true,
+    gravaConfig: false,
   }
 
   const eco = (): Response => new Response('ok', { status: 200 })

@@ -204,11 +204,17 @@ export function lerVersao(campos: URLSearchParams): number | null {
  * Religar a automacao, e so isso.
  *
  * `false -> true` e a UNICA transicao que §10.12 obriga a confirmar. A
- * conferencia mora no FUNIL, e nao no handler de `/painel/chave`, e a diferenca
- * e a falha que a primeira grafia tinha: `enabled` e campo gravavel, entao
- * `POST /painel/ajustes` com `enabled=sim` — que o proprio botao "Voltar a esta
- * versao" emite, porque ele reenvia todos os campos — desfazia a parada de
- * emergencia com um clique, sem confirmacao e sem a data na tela.
+ * conferencia mora no FUNIL, e nao no handler de `/painel/chave`, porque
+ * `enabled` chega ao funil por DOIS veiculos nomeados: `POST /painel/chave`, que
+ * o declara em `CAMPOS_DA_CHAVE`, e `acao=restaurar`, cujo escopo e a uniao
+ * gravavel inteira (Ruling 74). O botao "Voltar a esta versao" reenvia o estado
+ * anterior inteiro, `enabled` incluso — conferir so no handler da chave o
+ * deixaria desfazer a parada de emergencia com um clique, sem confirmacao e sem
+ * a data na tela.
+ *
+ * A frase antiga dizia "`enabled` e campo gravavel, entao QUALQUER formulario do
+ * painel pode carrega-lo". Era verdade enquanto toda rota escrevia todo campo;
+ * depois do Ruling 74 sao dois veiculos, e nao qualquer um (Rulings 79 e 83).
  */
 export function religa(antes: EstadoDeComportamento, depois: EstadoDeComportamento): boolean {
   return antes.enabled === false && depois.enabled === true

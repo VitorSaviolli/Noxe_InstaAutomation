@@ -1,7 +1,11 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { CAMPOS_DE_AJUSTES } from '../src/routes/painel/ajustes'
-import type { CampoDaConfig } from '../src/routes/painel/dicionario'
+import {
+  type CampoDaConfig,
+  motivoDeCampoForaDaTela,
+  RECUSA_SEM_VALOR,
+} from '../src/routes/painel/dicionario'
 import {
   CAMPOS_DA_RESTAURACAO,
   CAMPOS_DE_COMPORTAMENTO,
@@ -41,6 +45,7 @@ import { pedir, responder } from './fixtures/dubles'
  * META-09: todo caminho da tabela e string exata, sob `/painel`, sem variavel.
  * META-10: rota de pagina so com GET declara `csrf: false` e `escreve: false`.
  * META-11: a UNIAO das listas de campo por rota e o conjunto gravavel da etapa.
+ * META-12: todo campo tem UMA frase de recusa, e a frase certa (Ruling 82).
  *
  * META-06 estava reservado desde a Task 10 com a nota "chega com a etapa do
  * step-up" — chegou, e chegou como a spec o descreve: uma tabela, nao um
@@ -901,15 +906,85 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     }
   })
 
+  test('META-12: cada campo recebe a frase de recusa que diz a verdade sobre ele', () => {
+    // A recusa de escopo e a unica coisa que a pessoa le quando o painel diz
+    // "nao": ela precisa dizer ONDE se muda aquilo, ou admitir que nao da para
+    // mudar em lugar nenhum. Sao TRES situacoes, e ate o Ruling 82 havia duas
+    // frases para elas — `publicReplyEnabled` e `privateReplyEnabled` caiam na
+    // frase que promete "a tela que cuida dele chega em uma proxima parte", e
+    // essa tela ja existe: §3 os poe em "Ajustes finos", que ja os MOSTRA. O que
+    // falta neles e o interruptor, e nenhuma etapa de §14 o nomeia.
+    //
+    // O metateste prende a divisao a uma fonte que nao e ela mesma: **quem e
+    // gravavel por alguma rota TEM de saber dizer a tela dele**. Um campo novo
+    // que entre na uniao sem entrar no mapa cai aqui, e nao numa tela de recusa.
+    const CAMINHO = /^Este ajuste .* mudado (.+), e n.+o por aqui\.$/u
+    const SO_LEITURA = /^Este ajuste aparece (.+), mas por enquanto s.+ para leitura:/u
+
+    for (const campo of CAMPOS_DA_RESTAURACAO) {
+      expect({ [campo]: CAMINHO.test(motivoDeCampoForaDaTela(campo)) }).toEqual({ [campo]: true })
+    }
+
+    // Os dois que uma tela ja mostra sem deixar mudar. Eles NAO podem cair na
+    // frase do caminho — prometeria um botao que nao existe — nem na do "ainda
+    // nao da", que manda esperar por uma tela pronta.
+    for (const campo of ['publicReplyEnabled', 'privateReplyEnabled'] as const) {
+      const frase = motivoDeCampoForaDaTela(campo)
+      expect({ [campo]: SO_LEITURA.test(frase) }).toEqual({ [campo]: true })
+      expect({ [campo]: CAMINHO.test(frase) }).toEqual({ [campo]: false })
+    }
+
+    // E o unico campo que a promessa antiga ainda cobre: `mediaScope` e a
+    // Etapa 12 de §14, e para ele "chega em uma proxima parte" e verdade.
+    expect(motivoDeCampoForaDaTela('mediaScope')).toBe(RECUSA_SEM_VALOR.naoGravavel)
+
+    // Contrapositivo de cobertura: os catorze campos estao repartidos entre as
+    // tres frases, sem sobra e sem um campo em duas.
+    const porFrase = CAMPOS_DE_COMPORTAMENTO.map((campo) => {
+      const frase = motivoDeCampoForaDaTela(campo)
+      if (CAMINHO.test(frase)) return 'caminho'
+      if (SO_LEITURA.test(frase)) return 'so_leitura'
+      return frase === RECUSA_SEM_VALOR.naoGravavel ? 'ainda_nao' : 'nenhuma'
+    })
+
+    expect({
+      caminho: porFrase.filter((qual) => qual === 'caminho').length,
+      so_leitura: porFrase.filter((qual) => qual === 'so_leitura').length,
+      ainda_nao: porFrase.filter((qual) => qual === 'ainda_nao').length,
+      nenhuma: porFrase.filter((qual) => qual === 'nenhuma').length,
+    }).toEqual({ caminho: CAMPOS_DA_RESTAURACAO.length, so_leitura: 2, ainda_nao: 1, nenhuma: 0 })
+  })
+
   test('META-11: as rotas de gravacao da tabela sao exatamente as quatro declaradas aqui', () => {
     // Sem isto, a uniao acima seria a uniao das rotas que ALGUEM LEMBROU de
     // listar. A Task 13 acrescenta `/painel/reels` a tabela de rotas, e este
     // teste e quem a obriga a vir declarar o escopo dela — que e exatamente o
     // momento em que se quer ser obrigado a olhar.
-    const gravadorasDeConfig = ROTAS.filter(
-      (rota) =>
-        !rota.caminho.startsWith(PREFIXO_DA_API) && rota.escreve && rota.metodos.includes('POST'),
-    )
+    //
+    // **O predicado pergunta `gravaConfig`, e nao `escreve`** (Ruling 84). A
+    // primeira grafia media a coisa errada: `rotas.ts` define `escreve` como
+    // "grava no D1 no caminho de sucesso", que e outra pergunta. §7.1 ja declara
+    // `/painel/aparelhos` e `/painel/sair` como POST, e as duas vao gravar no D1
+    // sem gravar CONFIGURACAO; quando a Task 13 as registrar, este teste
+    // exigiria que elas aparecessem em `ESCOPO_POR_ROTA`, e o contrapositivo do
+    // teste acima — nenhuma lista de rota pode estar vazia — tornaria isso
+    // insatisfazivel. O nome do teste passou a medir o que ele promete.
+    const gravadorasDeConfig = ROTAS.filter((rota) => rota.gravaConfig)
+
+    // E as duas afirmacoes que impedem `gravaConfig` de virar um rotulo solto:
+    // toda gravadora de configuracao e uma rota de PAGINA (o funil responde
+    // `303`, e §10.7 passo 13 reserva o JSON para `/painel/api/*`), grava no D1
+    // e recebe POST. Sem elas, um `gravaConfig: true` num GET de leitura passaria
+    // por aqui e so seria descoberto pelo escopo que ninguem declarou.
+    for (const rota of gravadorasDeConfig) {
+      expect({
+        [rota.caminho]: {
+          api: rota.caminho.startsWith(PREFIXO_DA_API),
+          escreve: rota.escreve,
+          post: rota.metodos.includes('POST'),
+        },
+      }).toEqual({ [rota.caminho]: { api: false, escreve: true, post: true } })
+    }
 
     expect(gravadorasDeConfig.map((rota) => rota.caminho).sort()).toEqual(
       ESCOPO_POR_ROTA.map((rota) => rota.caminho).sort(),

@@ -326,6 +326,19 @@ async function digitalPara(
  *
  * Ela e a forma NORMAL de uso, e por isso mora no fixture: cada teste que
  * afirma uma trava troca exatamente UMA peca dela, e a troca fica visivel.
+ *
+ * **O segundo POST e dirigido pelo `<form id="confirmar">` RENDERIZADO**, e nao
+ * pela mesma string de campos que o primeiro envio usou (Ruling 81). Reenviar a
+ * string do teste era o que escondia o C-1 da rodada 2: `acao=restaurar` estava
+ * na lista de estruturais da rota, a tela de conferencia nao o reemitia, e o
+ * botao "Voltar a esta versao" morria em `400 dados_invalidos` DEPOIS de colher
+ * a digital — enquanto um cliente que montasse o proprio corpo, como este
+ * fixture montava, passava. A suite pegava o adulterado e deixava passar o
+ * legitimo, que e a inversao exata do que ela existe para fazer.
+ *
+ * Esta foi a QUARTA quebra de uma linha da tela de conferencia a sobreviver a
+ * suite inteira, entao deixou de ser conserto caso a caso e virou regra: todo
+ * caminho positivo do step-up passa por `formularioDeConfirmacao`.
  */
 async function comDigital(
   alvo: { rota: RotaDoPainel; handler: HandlerDoPainel },
@@ -342,7 +355,22 @@ async function comDigital(
   digital: string
 }> {
   const conferencia = await postar(alvo, campos, sessao, opcoes)
-  const mudanca = mudancaDaTela(await conferencia.text())
+  const tela = await conferencia.text()
+  const mudanca = mudancaDaTela(tela)
+  const formulario = formularioDeConfirmacao(tela)
+
+  // O `action` do formulario e a rota que vai receber o segundo POST. Afirmar a
+  // igualdade aqui prende o destino em TODO caminho positivo, e nao so no
+  // STEP-32: um `action` apontando para outra tela mandaria a digital para um
+  // handler que nao e o dono daquele conteudo.
+  expect(formulario.action).toBe(alvo.rota.caminho)
+
+  // E o que a tela NAO pode reemitir: `confirmar` (§10.12). Um gesto que o
+  // servidor recarrega sozinho no formulario seguinte deixa de ser um gesto —
+  // a pessoa confirmaria religar a automacao sem nunca ter marcado nada. A
+  // afirmacao mora aqui, e nao num teste so, porque a tela de conferencia ja
+  // perdeu uma linha quatro vezes sem a suite notar (Ruling 81).
+  expect(formulario.campos.has('confirmar')).toBe(false)
 
   const cerimoniaResposta = await pedirOpcoes(sessao, mudanca, {
     now: opcoes.now,
@@ -352,9 +380,45 @@ async function comDigital(
 
   const envelope = cookieDoEnvelope(cerimoniaResposta)
   const digital = await digitalPara(aparelho, challenge)
-  const envio = await postar(alvo, campos, sessao, { ...opcoes, stepup: envelope, digital })
+  const envio = await postarFormulario(alvo, formulario, sessao, envelope, digital, opcoes)
 
   return { conferencia, envio, mudanca, envelope, digital }
+}
+
+/**
+ * O segundo POST, montado do jeito que o navegador o monta: os campos
+ * escondidos que o servidor emitiu, mais a digital no campo que a tela deixou
+ * vazio para ela.
+ *
+ * Nada daqui vem do teste — nem a ficha, nem a versao, nem os campos de
+ * configuracao, nem a operacao declarada. E o que faz da tela de conferencia uma
+ * peca sob teste em vez de um enfeite que ninguem le.
+ */
+async function postarFormulario(
+  alvo: { rota: RotaDoPainel; handler: HandlerDoPainel },
+  formulario: { action: string; campos: URLSearchParams },
+  sessao: Sessao,
+  envelope: string,
+  digital: string,
+  opcoes: OpcoesDeEnvio = {},
+): Promise<Response> {
+  formulario.campos.set('digital', digital)
+
+  return await despachar(
+    new Request(`${RAIZ}${formulario.action}`, {
+      method: 'POST',
+      headers: {
+        'content-type': FORMULARIO,
+        origin: RAIZ,
+        cookie: `${sessao.cookie}; ${envelope}`,
+      },
+      body: formulario.campos.toString(),
+    }),
+    opcoes.ambiente ?? AMBIENTE,
+    opcoes.now ?? AGORA,
+    alvo.rota,
+    alvo.handler,
+  )
 }
 
 async function linhaDeConfig(): Promise<Record<string, unknown> | null> {

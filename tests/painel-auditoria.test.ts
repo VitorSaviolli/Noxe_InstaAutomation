@@ -1354,6 +1354,88 @@ describe('GRAV — a forma da gravacao', () => {
     expect(corpo).not.toContain('conseguimos ler o que estava salvo')
   })
 
+  test('GRAV-37: sem `acao=restaurar`, o formulario comum de Ajustes so escreve o que e dele', async () => {
+    // A SEGUNDA ancora de uma garantia que morria em um teste so — o trecho
+    // `semOperacao` do STEP-35, num teste cujo nome fala de outra coisa. Ela e o
+    // que sobrou da razao 3 do Ruling 70 depois que o Ruling 74 abriu a
+    // restauracao para a uniao gravavel: o escopo por tela continua valendo para
+    // o formulario COMUM, e quem o alarga e a operacao declarada, nao o corpo
+    // ter carregado o campo.
+    //
+    // O veiculo aqui e `triggerKeywords`, que e barato — de proposito. Com um
+    // campo protegido, um `400` nao distinguiria recusa por escopo de recusa por
+    // step-up; com um campo que nao pede digital nenhuma, o unico portao que
+    // pode responder e o do escopo.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const intruso = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}`,
+      sessao,
+    )
+    const tela = await intruso.text()
+
+    expect(intruso.status).toBe(400)
+    expect((await linhaDeConfig())?.trigger_keywords).toBe('["eu quero","quero o link"]')
+    const linha = await unicaLinha()
+    expect({ acao: linha.acao, campos: linha.campos }).toEqual({
+      acao: 'mudanca_recusada',
+      campos: '["triggerKeywords"]',
+    })
+    // E a recusa diz ONDE se muda a palavra-gatilho, em vez de "ainda nao da"
+    // (Ruling 75): a tela existe, e mandar a pessoa esperar por ela seria mentir.
+    expect(tela).toContain('na tela de Palavras')
+
+    // O contrapositivo, e ele e o que prende a garantia ao escopo e nao a outra
+    // coisa qualquer: o MESMO corpo, com a operacao declarada, grava.
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    const declarado = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      `acao=restaurar&triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}`,
+      sessao,
+    )
+
+    expect(declarado.status).toBe(303)
+    expect((await linhaDeConfig())?.trigger_keywords).toBe(JSON.stringify([PALAVRA_NOVA]))
+  })
+
+  test('GRAV-38: `acao` que nao casa e recusada nas DUAS rotas que a leem (Ruling 85)', async () => {
+    // §11.3, passo 6, trata campo que nao casa como erro de digitacao ou cliente
+    // adulterado. `/painel/chave` ja recusava com `acao_desconhecida`;
+    // `/painel/ajustes` engolia em silencio e seguia como gravacao COMUM — a
+    // operacao pedida sumia, e o que era para ser uma restauracao virava uma
+    // escrita com outro escopo que ninguem pediu. As duas rotas convergem.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    // Em Ajustes a operacao e OPCIONAL (§7.1): o formulario comum nao declara
+    // nenhuma, e por isso o teste manda um corpo que gravaria se `acao` nao
+    // estivesse la — sem isso, o `400` poderia vir do campo e nao da operacao.
+    const errada = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'acao=restaurr&userCooldownHours=48',
+      sessao,
+    )
+
+    expect(errada.status).toBe(400)
+    expect((await linhaDeConfig())?.user_cooldown_hours).toBe(24)
+    // Recusa de FORMA, antes do funil: nao ha linha de auditoria, como em
+    // qualquer `400` de corpo malformado.
+    expect(await auditoria()).toEqual([])
+
+    // O mesmo corpo sem a operacao errada grava, e e ele que prova que o `400`
+    // acima veio do `acao` e nao do cooldown.
+    const limpa = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'userCooldownHours=48',
+      sessao,
+    )
+    expect(limpa.status).toBe(303)
+    expect((await linhaDeConfig())?.user_cooldown_hours).toBe(48)
+  })
+
   test('GRAV-20: a caixa de texto e uma palavra por linha, e linha em branco nao vira palavra', async () => {
     // Descartar a linha vazia e ler o FORMATO da caixa de texto — e o Enter que
     // a pessoa deu antes de escrever a proxima —, e nao consertar um valor. O
@@ -1381,6 +1463,73 @@ describe('GRAV — a forma da gravacao', () => {
     )
     expect(soPontuacao.status).toBe(400)
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["quero o cardapio","quero a tabela"]')
+  })
+
+  test('GRAV-39: religar + campo protegido e recusado ANTES da digital (Ruling 73)', async () => {
+    // A combinacao que nenhum teste cobria, e por isso a ordem errada sobrevivia:
+    // restaurar uma versao que RELIGA a automacao **e** difere num campo
+    // protegido. Ate esta rodada, o funil mostrava a tela de conferencia com o
+    // link literal, colhia a digital e so entao devolvia `400
+    // confirmacao_ausente` — o gesto gasto numa operacao que nao podia dar
+    // certo, que e a patologia que o Ruling 73 proibiu palavra por palavra.
+    //
+    // A outra saida seria a tela de conferencia reemitir `confirmar`, e ela e
+    // proibida por §10.12: um gesto que o servidor recarrega sozinho no
+    // formulario seguinte deixa de ser um gesto. Quem guarda ESSA metade e o
+    // fixture `comDigital` de `painel-stepup`, que afirma a ausencia do campo em
+    // todo caminho positivo do step-up.
+    await gravarConfig(env.DB, { enabled: 0, parado_por_codigo_em: AGORA })
+    const sessao = await abrirSessao()
+
+    // A versao anterior estava LIGADA e com outro link: os dois portoes de uma
+    // vez. Se ela diferisse so no `enabled`, o teste viraria o GRAV-21.
+    const ligadaComOutroLink = {
+      ...ESTADO_GUARDADO_DA_LINHA_VALIDA,
+      enabled: true,
+      destinationUrl: `https://${DOMINIO_DE_TESTE}/antigo`,
+    }
+    await env.DB.prepare(
+      `INSERT INTO painel_auditoria
+         (ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
+       VALUES (?, 1, 'painel', 'passkey:00000000', 1, 'config_alterada', NULL,
+               '["destinationUrl","enabled"]', ?, ?)`,
+    )
+      .bind(
+        AGORA,
+        JSON.stringify(ligadaComOutroLink),
+        JSON.stringify({ ...ESTADO_GUARDADO_DA_LINHA_VALIDA, enabled: false }),
+      )
+      .run()
+
+    const doBotao = camposDoBotaoDeVoltar(await telaDeAjustes(sessao))
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    const semConfirmar = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao)
+    const tela = await semConfirmar.text()
+
+    expect(semConfirmar.status).toBe(400)
+    // Nenhuma cerimonia foi oferecida: sem tela de conferencia, sem mudanca
+    // canonica para o `painel.js` assinar, e sem linha de step-up recusado.
+    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('data-mudanca')
+    expect((await unicaLinha()).acao).toBe('mudanca_recusada')
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+    expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
+
+    // E com o gesto, a MESMA operacao chega a cerimonia: e o portao de §10.12
+    // que respondia primeiro, e nao o link ter deixado de ser protegido.
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    const comConfirmar = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      `${doBotao}&confirmar=sim`,
+      sessao,
+    )
+
+    expect(comConfirmar.status).toBe(403)
+    expect((await unicaLinha()).acao).toBe('stepup_recusado')
+    expect(await comConfirmar.text()).toContain('Confira o que vai mudar')
+    expect((await linhaDeConfig())?.enabled).toBe(0)
   })
 
   test('GRAV-21: religar pela RESTAURACAO tambem precisa da confirmacao de §10.12', async () => {

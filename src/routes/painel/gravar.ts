@@ -132,7 +132,15 @@ export interface PedidoDeGravacao {
   readonly para: string
   /** O codigo da faixa verde no caminho de sucesso. */
   readonly confirmacao: CodigoDeConfirmacao
-  /** Campos do corpo que nao sao configuracao, alem de `csrf` e `versao`. */
+  /**
+   * Campos do corpo que nao sao configuracao, alem dos de TODA rota.
+   *
+   * Uma coisa so, e e importante que seja uma so (Ruling 80): eles atravessam o
+   * passo 6 de §11.3 sem virar patch nem `campo_desconhecido`. Isto **nao** diz
+   * nada sobre o segundo POST — a tela de conferencia reemite tudo o que nao
+   * seja estrutural de TODA rota, `acao` inclusive, porque o botao que declarou
+   * a operacao precisa declara-la de novo depois da digital.
+   */
   readonly estruturais?: readonly string[]
   /**
    * Os campos de comportamento que ESTA rota pode escrever (Ruling 70).
@@ -155,6 +163,18 @@ export interface PedidoDeGravacao {
    *
    * Ela mora ao lado do FORMULARIO de cada tela, como `estruturais`: quem emite
    * os campos e quem os declara.
+   *
+   * **A RESTAURACAO nao e uma tela, e por isso nao e defendida por aqui**
+   * (Ruling 74, que emendou o 70). §9.9 diz o que ela atravessa — "o mesmo
+   * validador, o MESMO step-up e a allowlist de hoje" — e nomeia UMA recusa
+   * sancionada, "se a allowlist encolheu". A lista por rota era um quarto portao
+   * que a spec nao sanciona, e com ele toda linha de historico anterior a uma
+   * troca de link ficava irrestauravel. Entao `acao=restaurar` e uma OPERACAO
+   * declarada cujo escopo e a uniao gravavel inteira, e a defesa dela e outra:
+   * a tela de conferencia mostrando literalmente cada campo que muda, mais o
+   * `op_hash` recalculado no servidor sobre esse conteudo. Para campo NAO
+   * protegido nao ha privilegio a ganhar — a mesma sessao escreve os mesmos
+   * campos pela tela dona deles.
    */
   readonly campos: readonly CampoDaConfig[]
   /** A mudanca que o proprio handler traduziu — `acao=ligar` vira `enabled`. */
@@ -276,33 +296,26 @@ export async function gravarConfiguracao(
     })
   }
 
-  // Passo 8. A classificacao e a cerimonia sao UMA chamada, em `stepup.ts`:
-  // separa-las daria duas coisas para desencontrar.
-  const passagem = await passarPeloStepUp({
-    entrada,
-    sessao,
-    recusa,
-    campos: corpo.campos,
-    patch: patchDoCorpo.patch,
-    estruturais: [...ESTRUTURAIS_DE_TODA_ROTA, ...(pedido.estruturais ?? [])],
-    mudados,
-    antes,
-    depois,
-    versaoEnviada,
-  })
-  if ('resposta' in passagem) return passagem.resposta
-  const credencialDoStepUp = passagem.credentialId
-
   // §10.12: religar exige sessao, ficha E confirmacao explicita na tela. A
   // conferencia mora aqui, e nao em `handleChave`, porque `enabled` chega ao
-  // funil por MAIS DE UM caminho: `POST /painel/chave`, que o declara em
+  // funil por DOIS veiculos nomeados: `POST /painel/chave`, que o declara em
   // `CAMPOS_DA_CHAVE`, e `acao=restaurar`, cujo escopo e a uniao gravavel
   // inteira (Ruling 74). Conferir so no handler da chave deixaria a restauracao
-  // desfazer a parada de emergencia com um clique.
+  // desfazer a parada de emergencia com um clique. A frase antiga dizia
+  // "qualquer formulario do painel pode carrega-lo", e ela so era verdadeira
+  // quando toda rota escrevia todo campo — Rulings 79 e 83.
   //
-  // A frase antiga dizia "qualquer formulario do painel pode carrega-lo", e ela
-  // era verdadeira quando toda rota escrevia todo campo. Depois do Ruling 74 sao
-  // dois veiculos nomeados, e nao qualquer um — Ruling 79.
+  // **Ela roda ANTES da cerimonia, pela razao do Ruling 73.** Ate esta linha
+  // rodava depois, e a combinacao existia: restaurar uma versao que religa E
+  // difere num campo protegido mostrava a tela de conferencia, colhia a digital
+  // e so entao devolvia `400 confirmacao_ausente`. O gesto era gasto numa
+  // operacao que nao podia dar certo, que e a patologia exata que aquele ruling
+  // proibiu. O portao e conhecivel aqui: `antes`, `depois` e o campo
+  // `confirmar` ja estao todos na mao, e nada abaixo os muda.
+  //
+  // Reemitir `confirmar` na tela de conferencia seria a outra saida, e ela e
+  // proibida: um gesto que o servidor recarrega sozinho no formulario seguinte
+  // deixa de ser um gesto (§10.12). Por isso ele e estrutural de TODA rota.
   if (religa(antes, depois) && corpo.campos.get(CAMPO_DA_CONFIRMACAO) !== CONFIRMADO) {
     return await recusa.registrar({
       acao: 'mudanca_recusada',
@@ -314,6 +327,37 @@ In&iacute;cio: ele mostra desde quando ela est&aacute; desligada e pede a sua
 confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     })
   }
+
+  // Passo 8. A classificacao e a cerimonia sao UMA chamada, em `stepup.ts`:
+  // separa-las daria duas coisas para desencontrar.
+  const passagem = await passarPeloStepUp({
+    entrada,
+    sessao,
+    recusa,
+    campos: corpo.campos,
+    patch: patchDoCorpo.patch,
+    // **So os estruturais de TODA ROTA** (Ruling 80), e nao os desta rota. A
+    // lista tinha dois significados fundidos num so: "nao e campo de
+    // configuracao, entao atravessa o passo 6 de §11.3" — que e o que
+    // `lerPatchDoCorpo` acima pergunta — e "nao pode ser reemitido no segundo
+    // POST", que e o que a tela de conferencia pergunta aqui. `confirmar` e do
+    // segundo tipo: reemiti-lo faria o gesto de §10.12 virar carimbo. `acao` e
+    // do primeiro, e exclui-lo quebrava o botao "Voltar a esta versao" —
+    // a operacao declarada sumia do segundo POST, o escopo caia para o do
+    // formulario comum de Ajustes, e a resposta era `400 dados_invalidos`
+    // DEPOIS da digital, que e exatamente o que o Ruling 73 proibe.
+    //
+    // E a inversao e o que fazia daquilo o pior tipo de falha: um cliente que
+    // monta o proprio corpo inclui `acao` nos dois POSTs e passa. So o botao
+    // honesto, que depende do HTML que o servidor emitiu, quebrava.
+    estruturais: ESTRUTURAIS_DE_TODA_ROTA,
+    mudados,
+    antes,
+    depois,
+    versaoEnviada,
+  })
+  if ('resposta' in passagem) return passagem.resposta
+  const credencialDoStepUp = passagem.credentialId
 
   // Passo 7, com a allowlist de HOJE — inclusive na restauracao (§9.9).
   const recusaDoValidador = await validarOuRecusar({

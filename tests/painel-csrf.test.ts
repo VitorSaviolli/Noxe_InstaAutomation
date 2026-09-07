@@ -45,6 +45,7 @@ const ROTA_DE_FORMULARIO: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: true,
+  gravaConfig: false,
 }
 
 /** A mesma coisa na familia JSON, onde a ficha viaja no cabecalho. */
@@ -55,6 +56,7 @@ const ROTA_DE_API: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 const FORMULARIO = 'application/x-www-form-urlencoded'
@@ -323,6 +325,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
       csrf: true,
       stepUp: true,
       escreve: true,
+      gravaConfig: false,
     }
     const sessao = await abrirSessao()
     const espiao = new HandlerEspiao()
@@ -359,6 +362,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
       csrf: false,
       stepUp: true,
       escreve: false,
+      gravaConfig: false,
     }
     const espiao = new HandlerEspiao()
 

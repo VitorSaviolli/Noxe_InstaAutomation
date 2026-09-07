@@ -36,7 +36,7 @@ import {
   traduzirAviso,
 } from './dicionario'
 import { gravarConfiguracao } from './gravar'
-import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
+import { CAMPO_DA_ACAO, CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
 import { ROTA_CHAVE, ROTA_INICIO } from './rotas'
@@ -411,7 +411,7 @@ function blocoDaChave(
     return html`<section class="bloco-chave">
 <form method="post" action="${ROTA_CHAVE.caminho}">
 ${campos}
-<input type="hidden" name="acao" value="desligar">
+<input type="hidden" name="${CAMPO_DA_ACAO}" value="${DESLIGAR}">
 <button type="submit" class="botao-desligar">Desligar a automa&ccedil;&atilde;o</button>
 </form>
 <p>Ela para de responder na hora. Nada do que voc&ecirc; salvou &eacute; apagado.</p>
@@ -421,7 +421,7 @@ ${campos}
   return html`<section class="bloco-chave">
 <form method="post" action="${ROTA_CHAVE.caminho}">
 ${campos}
-<input type="hidden" name="acao" value="ligar">
+<input type="hidden" name="${CAMPO_DA_ACAO}" value="${LIGAR}">
 ${
   paradaEm === null
     ? null
@@ -497,16 +497,20 @@ const DESLIGAR = 'desligar'
  * campo `enabled`, que e o vocabulario que §7.1 escreveu para esta rota.
  *
  * **A caixa de confirmacao de §10.12 e exigida pelo FUNIL**, e nao por esta
- * rota: `enabled` e campo gravavel, entao qualquer formulario do painel pode
- * carrega-lo, e uma conferencia so aqui deixava `POST /painel/ajustes` com
- * `enabled=sim` — que o proprio botao "Voltar a esta versao" emite — desfazer a
- * parada de emergencia com um clique.
+ * rota: `enabled` chega la por DOIS veiculos — esta rota, que o declara em
+ * `CAMPOS_DA_CHAVE`, e `acao=restaurar` de `/painel/ajustes`, cujo escopo e a
+ * uniao gravavel inteira (Ruling 74). Uma conferencia so aqui deixava o botao
+ * "Voltar a esta versao" desfazer a parada de emergencia com um clique, porque
+ * ele reenvia o estado anterior inteiro, `enabled` incluso.
+ *
+ * A frase antiga dizia "qualquer formulario do painel pode carrega-lo", e ela
+ * so era verdadeira enquanto toda rota escrevia todo campo (Rulings 79 e 83).
  */
 export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
   const { contexto, corpo } = entrada
   if (corpo.familia !== 'formulario') return erro('corpo_invalido', contexto)
 
-  const acao = corpo.campos.get('acao')
+  const acao = corpo.campos.get(CAMPO_DA_ACAO)
   if (acao !== LIGAR && acao !== DESLIGAR) {
     return erro('dados_invalidos', { ...contexto, motivoInterno: 'acao_desconhecida' })
   }
@@ -517,9 +521,10 @@ export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
     campos: CAMPOS_DA_CHAVE,
     // So `acao` — a confirmacao de §10.12 e estrutural de TODA rota, e quem a
     // exige e o funil, na transicao `desligada -> ligada`. Conferi-la aqui
-    // deixava `POST /painel/ajustes` com `enabled=sim` desfazer a parada de
-    // emergencia sem confirmacao nenhuma.
-    estruturais: ['acao'],
+    // deixava o OUTRO veiculo de `enabled`, o `acao=restaurar` de
+    // `/painel/ajustes`, desfazer a parada de emergencia sem confirmacao
+    // nenhuma (Rulings 74, 79 e 83).
+    estruturais: [CAMPO_DA_ACAO],
     patchDoHandler: { enabled: acao === LIGAR },
   })
 }

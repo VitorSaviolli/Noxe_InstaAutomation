@@ -43,6 +43,7 @@ import {
   valorDeFormulario,
 } from './formulario'
 import { gravarConfiguracao } from './gravar'
+import { CAMPO_DA_ACAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import {
   blocoDeConfirmacao,
@@ -54,6 +55,7 @@ import {
   panorama,
   seloProtegido,
 } from './inicio'
+import { erro } from './resposta'
 import { ROTA_AJUSTES } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
@@ -291,7 +293,7 @@ n&atilde;o d&aacute; para voltar a ela por aqui.</p>`
     : inteira
       ? html`<form method="post" action="${ROTA_AJUSTES.caminho}">
 ${camposDoFormulario(ficha, versao)}
-<input type="hidden" name="acao" value="${RESTAURAR}">
+<input type="hidden" name="${CAMPO_DA_ACAO}" value="${RESTAURAR}">
 ${escondidos}
 <button type="submit">Voltar a esta vers&atilde;o</button>
 </form>`
@@ -331,13 +333,27 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
     // restauracao (Ruling 74). A protecao dela nao muda: mesmo validador, mesmo
     // step-up preso ao conteudo, allowlist de hoje, e a tela de conferencia
     // mostrando literalmente cada campo que muda.
-    const restaurando =
-      entrada.corpo.familia === 'formulario' && entrada.corpo.campos.get('acao') === RESTAURAR
+    //
+    // **`acao` que nao casa e recusa, e nao silencio** (Ruling 85): §11.3, passo
+    // 6, trata campo que nao casa como erro de digitacao ou cliente adulterado,
+    // e `/painel/chave` ja recusava com `acao_desconhecida`. Aqui, ate esta
+    // linha, um `acao=restaurr` caia no `!==` e virava uma gravacao COMUM de
+    // Ajustes — a operacao pedida sumia, e o que sobrava era um formulario com
+    // outro escopo, gravado sem que ninguem tivesse pedido isso. As duas rotas
+    // convergem. A diferenca que fica e de forma, e ela vem de §7.1: em
+    // `/painel/chave` a operacao e OBRIGATORIA, e aqui e opcional — o formulario
+    // comum de Ajustes nao declara nenhuma.
+    const acao =
+      entrada.corpo.familia === 'formulario' ? entrada.corpo.campos.get(CAMPO_DA_ACAO) : null
+    if (acao !== null && acao !== RESTAURAR) {
+      return erro('dados_invalidos', { ...entrada.contexto, motivoInterno: 'acao_desconhecida' })
+    }
+    const restaurando = acao === RESTAURAR
 
     return await gravarConfiguracao(entrada, {
       para: ROTA_AJUSTES.caminho,
       confirmacao: 'salvo',
-      estruturais: ['acao'],
+      estruturais: [CAMPO_DA_ACAO],
       campos: restaurando ? CAMPOS_DA_RESTAURACAO : CAMPOS_DE_AJUSTES,
     })
   }

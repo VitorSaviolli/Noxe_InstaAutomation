@@ -211,8 +211,8 @@ export const SELO_PROTEGIDO = 'protegido'
  * tela. "Ainda" e falso para o que existe hoje, e mandar a pessoa esperar por
  * uma tela que ja esta pronta e pior do que nao dizer nada.
  *
- * Quem NAO esta neste mapa nao e editavel em lugar nenhum — e ai a frase com
- * "ainda" e verdadeira.
+ * Quem nao esta em NENHUM dos dois mapas daqui nao e editavel nem visivel em
+ * lugar nenhum — e ai a frase com "ainda" e verdadeira.
  */
 const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
   enabled: 'no bot\u00e3o do In\u00edcio',
@@ -229,19 +229,49 @@ const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
 }
 
 /**
+ * Os campos que uma tela JA MOSTRA, mas ainda so em leitura (Ruling 82).
+ *
+ * A terceira frase existe porque as outras duas mentiam para estes dois.
+ * `RECUSA_SEM_VALOR.naoGravavel` promete que "a tela que cuida dele chega em uma
+ * proxima parte" — verdade para `mediaScope`, que e a Etapa 12 de §14. Para
+ * `publicReplyEnabled` e `privateReplyEnabled` e falso nas duas metades: §3 os
+ * poe em "Ajustes finos", tela que JA existe e que ja os mostra ("Direct:
+ * Ligado", "Resposta no comentario: Desligada"), e nenhuma etapa de §14 os
+ * nomeia. Mandar esperar por uma tela pronta e prometer uma parte que ninguem
+ * planejou sao dois enganos diferentes, e quem le a recusa nao tem como
+ * descobrir nenhum dos dois.
+ *
+ * Po-los em `TELA_DO_CAMPO` seria a terceira mentira: o caminho existiria e o
+ * botao nao. Eles ficam aqui ate ganharem o interruptor, e ai mudam de mapa.
+ */
+const TELA_QUE_SO_MOSTRA: Partial<Record<CampoDaConfig, string>> = {
+  publicReplyEnabled: 'nos Ajustes finos',
+  privateReplyEnabled: 'nos Ajustes finos',
+}
+
+/**
  * Por que aquele campo nao pode ser gravado POR ESTA rota (Ruling 75).
  *
- * Duas frases, e a diferenca importa para quem esta na tela: um campo que mora
- * em outra tela pede o CAMINHO, e um campo que nao mora em nenhuma pede a
- * verdade — que ele ainda nao da para mudar.
+ * Tres frases, e a diferenca importa para quem esta na tela: um campo que mora
+ * em outra tela pede o CAMINHO; um campo que uma tela ja MOSTRA sem deixar mudar
+ * pede que se diga isso, senao a pessoa vai procurar o botao onde ele nao esta;
+ * e um campo que nao aparece em lugar nenhum pede a verdade — que ele ainda nao
+ * da para mudar.
  */
 export function motivoDeCampoForaDaTela(campo: string): string {
-  const tela = Object.hasOwn(TELA_DO_CAMPO, campo)
-    ? TELA_DO_CAMPO[campo as CampoDaConfig]
-    : undefined
+  const naTela = (mapa: Partial<Record<CampoDaConfig, string>>): string | undefined =>
+    Object.hasOwn(mapa, campo) ? mapa[campo as CampoDaConfig] : undefined
 
-  if (tela === undefined) return RECUSA_SEM_VALOR.naoGravavel
-  return `Este ajuste \u00e9 mudado ${tela}, e n\u00e3o por aqui.`
+  const editavel = naTela(TELA_DO_CAMPO)
+  if (editavel !== undefined) return `Este ajuste \u00e9 mudado ${editavel}, e n\u00e3o por aqui.`
+
+  // A frase dos que uma tela ja mostra sem deixar mudar (Ruling 82).
+  const mostrada = naTela(TELA_QUE_SO_MOSTRA)
+  if (mostrada !== undefined) {
+    return `Este ajuste aparece ${mostrada}, mas por enquanto s\u00f3 para leitura: ainda n\u00e3o d\u00e1 para lig\u00e1-lo ou deslig\u00e1-lo pelo painel.`
+  }
+
+  return RECUSA_SEM_VALOR.naoGravavel
 }
 
 export const RECUSA_SEM_VALOR = {

@@ -561,7 +561,7 @@ export const CABECALHO_DA_FICHA = 'x-painel-csrf'
 export const CAMPO_DA_FICHA = 'csrf'
 
 /**
- * Os outros dois campos escondidos que um formulario do painel carrega.
+ * Os outros tres campos escondidos que um formulario do painel carrega.
  *
  * Eles moram ao lado da ficha porque sao a mesma especie: nomes de campo que
  * NAO sao configuracao, e que quem le o corpo precisa reconhecer para nao os
@@ -582,6 +582,27 @@ export const CAMPO_DA_FICHA = 'csrf'
 export const CAMPO_DA_VERSAO = 'versao'
 export const CAMPO_DA_CONFIRMACAO = 'confirmar'
 export const CAMPO_DA_DIGITAL = 'digital'
+
+/**
+ * O campo que declara QUAL operacao aquele POST e (§7.1, §11.3 passo 6).
+ *
+ * §7.1 nao cria rota por operacao: `/painel/chave` recebe `ligar` e `desligar`,
+ * e `/painel/ajustes` recebe o `restaurar` do botao "Voltar a esta versao". O
+ * identificador da escrita vai no CORPO, e este e o nome dele.
+ *
+ * Ele mora aqui pela mesma razao que os outros quatro: a tela que o emite, o
+ * handler que o le e a lista de estruturais que o deixa passar pelo passo 6 sao
+ * tres lugares, e ate esta linha eram SETE grafias soltas da mesma string —
+ * duas delas dentro de HTML, onde nenhum compilador olha.
+ *
+ * **So o NOME sobe; os valores ficam com as rotas donas.** `ligar`, `desligar` e
+ * `restaurar` sao vocabulario de UMA tela cada, e junta-los aqui convidaria a
+ * proxima rota a aceitar o verbo da outra. E ele NAO alcanca a chave `acao` do
+ * JSON canonico de §10.10, em `stepup.ts`: aquilo e outro espaco de nomes com a
+ * mesma grafia, e uma constante compartilhada faria renomear um campo de
+ * formulario mudar o hash de toda operacao ja assinada.
+ */
+export const CAMPO_DA_ACAO = 'acao'
 
 /**
  * O valor de um cookie, do cabecalho cru.

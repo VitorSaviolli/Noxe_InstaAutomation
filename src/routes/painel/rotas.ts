@@ -76,6 +76,24 @@ export interface RotaDoPainel {
    * ela devolve `{ ok, para }` e quem navega e o `painel.js` (§10.7 passo 13).
    */
   readonly escreve: boolean
+  /**
+   * `true` quando a rota chama `gravarConfiguracao` — o funil de §11.3.
+   *
+   * Ele existe porque `escreve` responde outra pergunta. `escreve` e "grava no
+   * D1 no caminho de sucesso", e por isso `/painel/api/verificar` o tem: ela
+   * grava sessao, credencial e auditoria. Quem precisa declarar um ESCOPO DE
+   * CAMPOS (Ruling 70) e so quem escreve CONFIGURACAO, e o metateste da uniao
+   * media a coisa errada enquanto perguntava a `escreve`: §7.1 ja declara
+   * `/painel/aparelhos` e `/painel/sair` como POST, e no dia em que elas forem
+   * registradas — a Task 13 — o teste exigiria escopo de quem nao tem campo
+   * nenhum para declarar, o que o contrapositivo "nenhuma lista pode estar
+   * vazia" torna insatisfazivel.
+   *
+   * E `boolean`, e nao opcional, de proposito: uma rota nova e OBRIGADA a
+   * responder, e e assim que a Task 13 chega ao metateste da uniao com
+   * `/painel/reels` na mao em vez de passar por ele em silencio.
+   */
+  readonly gravaConfig: boolean
 }
 
 /**
@@ -115,6 +133,7 @@ export const ROTA_INICIO: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /**
@@ -138,6 +157,7 @@ export const ROTA_CHAVE: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: true,
+  gravaConfig: true,
 }
 
 /**
@@ -158,6 +178,7 @@ export const ROTA_PALAVRAS: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: true,
+  gravaConfig: true,
 }
 
 export const ROTA_MENSAGEM: RotaDoPainel = {
@@ -167,6 +188,7 @@ export const ROTA_MENSAGEM: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: true,
+  gravaConfig: true,
 }
 
 export const ROTA_AJUSTES: RotaDoPainel = {
@@ -176,6 +198,7 @@ export const ROTA_AJUSTES: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: true,
+  gravaConfig: true,
 }
 
 /** "O que aconteceu". `GET` unico, hoje e sempre: ela so le (§7.1). */
@@ -186,6 +209,7 @@ export const ROTA_ATIVIDADE: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /** Entrar. Renderiza com ZERO consulta ao D1 (§14, etapa 8). */
@@ -199,6 +223,7 @@ export const ROTA_ENTRAR: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /** A pagina do convite, que le o token do fragmento. 0 consulta. */
@@ -209,6 +234,7 @@ export const ROTA_CONVITE: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /** A rota nao autenticada mais exposta do painel, e ela custa 0 consulta. */
@@ -219,6 +245,7 @@ export const ROTA_OPCOES_DE_ENTRAR: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /** O login. `escreve: true` — sessao, credencial e auditoria, num lote so. */
@@ -229,6 +256,7 @@ export const ROTA_VERIFICAR_ENTRADA: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: true,
+  gravaConfig: false,
 }
 
 /**
@@ -244,6 +272,7 @@ export const ROTA_OPCOES_DE_REGISTRO: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: true,
+  gravaConfig: false,
 }
 
 export const ROTA_VERIFICAR_REGISTRO: RotaDoPainel = {
@@ -253,6 +282,7 @@ export const ROTA_VERIFICAR_REGISTRO: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: true,
+  gravaConfig: false,
 }
 
 /**
@@ -274,6 +304,7 @@ export const ROTA_OPCOES_DE_STEPUP: RotaDoPainel = {
   csrf: true,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
 }
 
 /**
