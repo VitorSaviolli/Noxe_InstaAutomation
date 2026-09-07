@@ -55,12 +55,14 @@ import {
 import type { Env } from '../../types/env'
 import {
   CABECALHO_DA_FICHA,
-  CAMINHO_DE_ENTRAR,
   COOKIE_DA_SESSAO,
   COOKIE_DO_DESAFIO,
   cookieDoPainel,
-  type Limitador,
   lerCookie,
+} from './campos'
+import {
+  CAMINHO_DE_ENTRAR,
+  type Limitador,
   lerCorpoCapado,
   limitar,
   origemConfere,

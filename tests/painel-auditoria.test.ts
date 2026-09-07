@@ -9,6 +9,7 @@ import {
   MOTIVO_DA_RECUSA,
   NOME_DO_CAMPO,
   PALAVRAS_PROIBIDAS,
+  RECUSA_SEM_VALOR,
 } from '../src/routes/painel/dicionario'
 import { CAMPOS_DA_RESTAURACAO, CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/formulario'
 import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
@@ -1399,6 +1400,51 @@ describe('GRAV — a forma da gravacao', () => {
 
     expect(declarado.status).toBe(303)
     expect((await linhaDeConfig())?.trigger_keywords).toBe(JSON.stringify([PALAVRA_NOVA]))
+  })
+
+  test('GRAV-40: a recusa de um campo que a tela SO MOSTRA chega por HTTP (Ruling 89)', async () => {
+    // A terceira frase de `motivoDeCampoForaDaTela` nasceu no Ruling 82 e ate
+    // esta rodada era exercitada so no nivel da funcao, por META-12, enquanto as
+    // outras duas tinham um caminho HTTP cada (STEP-33 e GRAV-37). Uma frase de
+    // tela cuja unica prova e uma chamada direta nao demonstra que ela CHEGA a
+    // alguem: bastava um portao anterior recusar o campo por outro motivo para a
+    // frase nunca ser impressa, e nada quebraria.
+    //
+    // Ela e alcancavel, e o caminho e curto: `publicReplyEnabled` esta em
+    // `NOME_DO_CAMPO`, entao atravessa o passo 6 de §11.3 como campo conhecido,
+    // e nenhuma das quatro rotas o declara — a recusa que sobra e a de escopo,
+    // que e quem imprime a frase.
+    //
+    // O veiculo e BARATO de proposito, como em GRAV-37: o interruptor nao pede
+    // digital nenhuma, entao o unico portao que pode responder e o do escopo.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    const recusado = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      'publicReplyEnabled=nao',
+      sessao,
+    )
+    const tela = await recusado.text()
+
+    expect(recusado.status).toBe(400)
+    expect((await linhaDeConfig())?.public_reply_enabled).toBe(1)
+    const linha = await unicaLinha()
+    expect({ acao: linha.acao, campos: linha.campos }).toEqual({
+      acao: 'mudanca_recusada',
+      campos: '["publicReplyEnabled"]',
+    })
+
+    // A frase que a pessoa le nomeia a tela que JA mostra o campo e admite que
+    // ali so da para ler. As outras duas mentiriam: a do caminho prometeria um
+    // botao que nao existe, e a do "ainda nao" mandaria esperar por uma tela
+    // pronta que nenhuma etapa de §14 vai construir.
+    expect(tela).toContain('nos Ajustes finos')
+    expect(tela).toContain(
+      'mas por enquanto só para leitura: ainda não dá para ligá-lo ou desligá-lo pelo painel.',
+    )
+    expect(tela).not.toContain('e não por aqui.')
+    expect(tela).not.toContain(RECUSA_SEM_VALOR.naoGravavel)
   })
 
   test('GRAV-38: `acao` que nao casa e recusada nas DUAS rotas que a leem (Ruling 85)', async () => {

@@ -48,6 +48,7 @@ import {
 import { rotacionarSessao } from '../../services/panel-session'
 import { prefixoDeCredencial } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
+import { CAMPO_DA_CONFIRMACAO, COOKIE_DA_SESSAO, cookieDoPainel } from './campos'
 import {
   type CampoDaConfig,
   type CodigoDeConfirmacao,
@@ -66,7 +67,6 @@ import {
   type PatchDeEstado,
   religa,
 } from './formulario'
-import { CAMPO_DA_CONFIRMACAO, COOKIE_DA_SESSAO, cookieDoPainel } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import {
   blocoDaRecusa,
@@ -177,7 +177,20 @@ export interface PedidoDeGravacao {
    * campos pela tela dona deles.
    */
   readonly campos: readonly CampoDaConfig[]
-  /** A mudanca que o proprio handler traduziu — `acao=ligar` vira `enabled`. */
+  /**
+   * A mudanca que o proprio handler traduziu — `acao=ligar` vira `enabled`.
+   *
+   * **Ela entra na mudanca ASSINADA, e nao so no estado `depois`** (Ruling 86).
+   * Ate esta linha o `op_hash` saia so do patch do CORPO, entao um campo
+   * produzido aqui era MOSTRADO na tela de conferencia e nao era coberto pela
+   * assinatura — o inverso exato da garantia de §10.10, que existe para que o
+   * autenticador assine *aquela* mudanca.
+   *
+   * O caminho de ataque e concreto desde o Ruling 80, que fez `acao` sobreviver
+   * ao segundo POST: trocar `acao=ligar` por `acao=desligar` entre os dois
+   * envios mantinha o `oh` do envelope valido e mudava o efeito da gravacao. A
+   * digital continuava sendo do dono, e cobria outra coisa.
+   */
   readonly patchDoHandler?: PatchDeEstado
 }
 
@@ -262,11 +275,16 @@ export async function gravarConfiguracao(
     return erro('versao_desatualizada', { ...contexto, explicacao: await rascunho(true) })
   }
 
-  const depois: EstadoDeComportamento = {
-    ...antes,
-    ...patchDoCorpo.patch,
-    ...pedido.patchDoHandler,
-  }
+  // A mudanca que ESTE POST aplica: o que o corpo carregou mais o que o handler
+  // traduziu. **UM objeto, e ele alimenta os dois** — o estado `depois` que a
+  // tela de conferencia mostra e a mudanca canonica que o `op_hash` assina
+  // (Ruling 86). Duas expressoes separadas eram o defeito: a tela mostrava o
+  // campo do handler e a assinatura nao o cobria.
+  //
+  // A ordem e a mesma nos dois usos, e ela importa: o handler vem por ultimo,
+  // entao ele vence um campo de mesmo nome vindo do corpo.
+  const patch: PatchDeEstado = { ...patchDoCorpo.patch, ...pedido.patchDoHandler }
+  const depois: EstadoDeComportamento = { ...antes, ...patch }
   const mudados = CAMPOS_DE_COMPORTAMENTO.filter((campo) => mudou(antes[campo], depois[campo]))
 
   // Nada mudou: zero escrita e zero linha de auditoria. §9.9 registra GRAVACAO,
@@ -335,7 +353,7 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     sessao,
     recusa,
     campos: corpo.campos,
-    patch: patchDoCorpo.patch,
+    patch,
     // **So os estruturais de TODA ROTA** (Ruling 80), e nao os desta rota. A
     // lista tinha dois significados fundidos num so: "nao e campo de
     // configuracao, entao atravessa o passo 6 de §11.3" — que e o que

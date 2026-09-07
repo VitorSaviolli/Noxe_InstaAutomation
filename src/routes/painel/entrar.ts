@@ -35,13 +35,8 @@ import {
   verificarAssertion,
 } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
-import {
-  COOKIE_DA_SESSAO,
-  COOKIE_DO_DESAFIO,
-  cookieDoPainel,
-  lerCookie,
-  zerarLimite,
-} from './guardas'
+import { COOKIE_DA_SESSAO, COOKIE_DO_DESAFIO, cookieDoPainel, lerCookie } from './campos'
+import { zerarLimite } from './guardas'
 import { html, pagina } from './html'
 import { type ContextoDoErro, erro, json } from './resposta'
 import { ROTA_INICIO } from './rotas'

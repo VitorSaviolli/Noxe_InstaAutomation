@@ -26,6 +26,7 @@ import { PainelConfigRepository } from '../../repositories/painel-config-reposit
 import { carregarConfigEfetiva, type SnapshotConfig } from '../../services/config-store'
 import { fichaCsrf } from '../../services/panel-session'
 import type { Env } from '../../types/env'
+import { CAMPO_DA_ACAO, CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './campos'
 import type { CampoDaConfig } from './dicionario'
 import {
   dataEmPortugues,
@@ -36,7 +37,6 @@ import {
   traduzirAviso,
 } from './dicionario'
 import { gravarConfiguracao } from './gravar'
-import { CAMPO_DA_ACAO, CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
 import { ROTA_CHAVE, ROTA_INICIO } from './rotas'

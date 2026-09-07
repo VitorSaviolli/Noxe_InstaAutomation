@@ -1,12 +1,15 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { handleAjustes } from '../src/routes/painel/ajustes'
+import { CAMPO_DA_ACAO } from '../src/routes/painel/campos'
+import { gravarConfiguracao } from '../src/routes/painel/gravar'
 import { handleChave } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
 import { handlePalavras } from '../src/routes/painel/palavras'
 import {
   ROTA_AJUSTES,
   ROTA_CHAVE,
+  ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_STEPUP,
   ROTA_PALAVRAS,
@@ -173,6 +176,42 @@ const PALAVRAS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
 const CHAVE: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_CHAVE,
   handler: handleChave,
+}
+
+/** As duas acoes de `/painel/chave` (§7.1), como o handler de teste as le. */
+const LIGAR = 'ligar'
+const DESLIGAR = 'desligar'
+
+/**
+ * Uma gravadora que TRADUZ `acao` num campo **e** declara um campo protegido.
+ *
+ * Nenhuma rota de `src/` tem essa forma hoje, e e por isso que o buraco do
+ * Ruling 86 era inalcancavel: `/painel/chave` e a unica que usa `patchDoHandler`
+ * e ela so escreve `enabled`, que nunca e protegido — entao aquela rota nunca
+ * chega a tela de conferencia. O que fecha o buraco antes de ele ser alcancavel
+ * e testa-lo onde ele existe de verdade: no funil.
+ *
+ * **Isto nao inventa rota nenhuma.** `despachar` recebe o handler por parametro,
+ * como todo teste desta suite ja faz; o caminho, os metodos e a escada de §11.3
+ * continuam sendo os de `ROTA_CHAVE`. O que muda e so o `PedidoDeGravacao`, que
+ * e um argumento de funcao, e a combinacao que ele monta e exatamente a que a
+ * Task 13 pode trazer: uma tela que declara uma operacao no corpo e escreve um
+ * campo que pede digital.
+ */
+const CHAVE_COM_LINK: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
+  rota: ROTA_CHAVE,
+  handler: async (entrada) => {
+    const acao =
+      entrada.corpo.familia === 'formulario' ? entrada.corpo.campos.get(CAMPO_DA_ACAO) : null
+
+    return await gravarConfiguracao(entrada, {
+      para: ROTA_INICIO.caminho,
+      confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
+      campos: ['enabled', 'destinationUrl'],
+      estruturais: [CAMPO_DA_ACAO],
+      patchDoHandler: { enabled: acao === LIGAR },
+    })
+  },
 }
 
 interface OpcoesDeEnvio {
@@ -1379,6 +1418,98 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     expect(semOperacao.status).toBe(400)
     expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
+  })
+
+  test('STEP-36: a mudanca assinada cobre o campo que o HANDLER produziu (Ruling 86)', async () => {
+    // §10.10 promete que o autenticador assina *aquela* mudanca, e que a tela
+    // mostra o valor literal antes da biometria. Ate o Ruling 86 as duas metades
+    // discordavam: `depois` — o que a tela MOSTRA — fundia o patch do corpo com
+    // o `patchDoHandler`, e o `op_hash` saia so do patch do CORPO. Um campo
+    // produzido pelo handler era exibido na conferencia e ficava FORA da
+    // assinatura, que e o inverso exato da garantia.
+    //
+    // O teste vive no nivel do funil porque e la que o defeito mora: hoje a
+    // unica rota com `patchDoHandler` e `/painel/chave`, que so escreve
+    // `enabled` — nunca protegido —, entao ela jamais renderiza a conferencia.
+    // Esperar a rota que combine as duas coisas seria esperar a Task 13 com o
+    // buraco aberto.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    // O corpo carrega `enabled=sim` de proposito, contra a operacao declarada:
+    // e o que prende a PRECEDENCIA. O handler traduz `acao=desligar` em
+    // `enabled: false`, e ele tem de vencer — se o corpo vencesse, mandar a
+    // operacao junto com o campo cru deixaria um cliente adulterado escolher o
+    // efeito por baixo da operacao que a tela anunciou.
+    const { conferencia, envio, mudanca } = await comDigital(
+      CHAVE_COM_LINK,
+      `acao=${DESLIGAR}&enabled=sim&destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
+      sessao,
+      aparelho,
+    )
+
+    expect(conferencia.status).toBe(403)
+
+    // A mudanca canonica que a tela entrega ao `painel.js` — e que o envelope
+    // assina — carrega o `enabled` do HANDLER, e nao o do corpo.
+    expect(mudanca).toEqual({ acao: 'config', destinationUrl: LINK_NOVO, enabled: false })
+
+    // E o hash fecha nos dois lados: o servidor recalcula do corpo recebido, e o
+    // envio passa. Se a soma fosse feita so num dos lados, esta linha seria um
+    // `403 step_up_invalido`.
+    expect(envio.status).toBe(303)
+    const linha = await linhaDeConfig()
+    expect({ link: linha?.destination_url, ligada: linha?.enabled }).toEqual({
+      link: LINK_NOVO,
+      ligada: 0,
+    })
+  })
+
+  test('STEP-37: trocar a operacao entre os dois POSTs quebra o `op_hash`', async () => {
+    // O caminho de ataque que o Ruling 80 abriu ao fazer `acao` sobreviver ao
+    // segundo POST — e que o Ruling 86 fecha. A digital e a do dono, o envelope
+    // esta dentro dos 120 s e o `oh` continua sendo o que ele assinou; o unico
+    // campo trocado e a operacao declarada, que o handler traduz num campo de
+    // configuracao. Sem o Ruling 86 esse campo nao entra no hash, entao a troca
+    // e invisivel para a comparacao e a gravacao acontece com um efeito que
+    // ninguem confirmou.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao(aparelho.credentialId)
+
+    const conferencia = await postar(
+      CHAVE_COM_LINK,
+      `acao=${DESLIGAR}&destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
+      sessao,
+    )
+    const tela = await conferencia.text()
+    const formulario = formularioDeConfirmacao(tela)
+
+    // A cerimonia assina EXATAMENTE o que a tela mostrou (Ruling 81: o segundo
+    // POST sai do formulario renderizado, e nao de uma string do teste).
+    const cerimoniaResposta = await pedirOpcoes(sessao, mudancaDaTela(tela))
+    const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
+
+    // A UNICA coisa trocada entre o que foi assinado e o que e enviado.
+    formulario.campos.set(CAMPO_DA_ACAO, LIGAR)
+
+    const envio = await postarFormulario(
+      CHAVE_COM_LINK,
+      formulario,
+      sessao,
+      cookieDoEnvelope(cerimoniaResposta),
+      await digitalPara(aparelho, challenge),
+    )
+
+    expect(envio.status).toBe(403)
+    // E nada foi gravado: nem o link, que o corpo carregava sem alteracao, nem o
+    // `enabled`, que a troca queria manter ligado contra o que o dono assinou.
+    const linha = await linhaDeConfig()
+    expect({ link: linha?.destination_url, ligada: linha?.enabled }).toEqual({
+      link: 'https://exemplo.com/do-banco',
+      ligada: 1,
+    })
+    // A falha de step-up INVALIDA conta, ao contrario da ausente (§10.10).
+    expect(await falhasDaSessao(sessao.sidHash)).toBe(1)
   })
 
   test('STEP-34: o `ator` da auditoria e a passkey que AUTORIZOU, nao a que abriu a sessao', async () => {

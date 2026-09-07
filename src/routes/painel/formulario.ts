@@ -25,13 +25,13 @@
  */
 import type { AutomationConfig, MatchMode } from '../../config'
 import { MAX_HORAS_DE_COOLDOWN } from '../../services/config-validation'
+import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_DIGITAL, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './campos'
 import {
   type CampoDaConfig,
   type EscopoDeMidias,
   escopoDeMidias,
   NOME_DO_CAMPO,
 } from './dicionario'
-import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_DIGITAL, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 
 // ---------------------------------------------------------------------------
 // O estado de comportamento: o que entra em `antes`/`depois` (§9.9)

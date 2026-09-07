@@ -61,8 +61,6 @@ import {
 import { opcoesDeStepUp, sortearDesafio } from '../../services/webauthn/opcoes'
 import { lerRespostaDeAssertion, verificarAssertion } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
-import { type CampoDaConfig, NOME_DO_CAMPO, RECUSA_SEM_VALOR, valorNaTela } from './dicionario'
-import type { EstadoDeComportamento, PatchDeEstado } from './formulario'
 import {
   CAMPO_DA_DIGITAL,
   CAMPO_DA_FICHA,
@@ -70,7 +68,9 @@ import {
   COOKIE_DE_STEPUP,
   cookieDoPainel,
   lerCookie,
-} from './guardas'
+} from './campos'
+import { type CampoDaConfig, NOME_DO_CAMPO, RECUSA_SEM_VALOR, valorNaTela } from './dicionario'
+import type { EstadoDeComportamento, PatchDeEstado } from './formulario'
 import { type HtmlSeguro, html } from './html'
 import type { RecusaAuditada } from './recusa'
 import { erro, json } from './resposta'
@@ -192,11 +192,17 @@ export async function opHash(mudanca: MudancaCanonica): Promise<string> {
  * corpo. E o que faz o formulario urlencoded e o JSON da cerimonia chegarem ao
  * mesmo hash: os dois passam por aqui com o mesmo mapa.
  *
- * O escopo e "os campos que este formulario esta enviando", e nao "os campos
- * que mudaram": §12.2 diz que o `op_hash` cobre o **conteudo inteiro**, e e o
- * que faz mexer num campo escondido da tela de conferencia mudar o hash e a
+ * O escopo e "os campos que esta gravacao esta aplicando", e nao "os campos que
+ * mudaram": §12.2 diz que o `op_hash` cobre o **conteudo inteiro**, e e o que
+ * faz mexer num campo escondido da tela de conferencia mudar o hash e a
  * gravacao ser recusada. Cobrir so o diff deixaria os campos escondidos que
  * "nao mudaram" livres para serem trocados depois da digital.
+ *
+ * E "aplicando" e mais que "enviando" (Ruling 86): o que o HANDLER traduziu
+ * entra aqui junto com o que o corpo carregou. Um campo que o handler produz
+ * — `acao=ligar` virando `enabled: true` — e mostrado na tela de conferencia,
+ * entao ele tem de ser coberto pela assinatura, senao trocar a operacao entre
+ * os dois POSTs mudaria o efeito com o `oh` do envelope ainda valido.
  */
 export function mudancaDeConfig(patch: PatchDeEstado): MudancaCanonica {
   return { acao: 'config', campos: patch as Readonly<Record<string, ValorCanonico>> }
@@ -593,7 +599,14 @@ export interface PassagemDeStepUp {
   readonly recusa: RecusaAuditada
   /** O corpo recebido, CRU: e ele que volta na tela de conferencia. */
   readonly campos: URLSearchParams
-  /** O pedaco de estado ja lido campo a campo. E dele que sai o `op_hash`. */
+  /**
+   * A mudanca INTEIRA que este POST aplica, ja lida campo a campo: o patch do
+   * corpo mais o que o handler traduziu. E dela que sai o `op_hash`.
+   *
+   * **O funil monta UM objeto e o usa nos dois lugares** — o `depois` que a tela
+   * mostra e este —, porque separa-los era o defeito do Ruling 86: um campo
+   * produzido pelo handler aparecia na conferencia sem entrar na assinatura.
+   */
   readonly patch: PatchDeEstado
   readonly estruturais: readonly string[]
   readonly mudados: readonly CampoDaConfig[]

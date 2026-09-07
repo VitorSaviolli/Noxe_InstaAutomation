@@ -24,6 +24,7 @@ import {
   type MudancaRegistrada,
   PainelAuditoriaRepository,
 } from '../../repositories/painel-auditoria-repository'
+import { CAMPO_DA_ACAO } from './campos'
 import {
   type CampoDaConfig,
   dataEmPortugues,
@@ -43,7 +44,6 @@ import {
   valorDeFormulario,
 } from './formulario'
 import { gravarConfiguracao } from './gravar'
-import { CAMPO_DA_ACAO } from './guardas'
 import { type HtmlSeguro, html } from './html'
 import {
   blocoDeConfirmacao,

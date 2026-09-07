@@ -918,11 +918,32 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // O metateste prende a divisao a uma fonte que nao e ela mesma: **quem e
     // gravavel por alguma rota TEM de saber dizer a tela dele**. Um campo novo
     // que entre na uniao sem entrar no mapa cai aqui, e nao numa tela de recusa.
-    const CAMINHO = /^Este ajuste .* mudado (.+), e n.+o por aqui\.$/u
-    const SO_LEITURA = /^Este ajuste aparece (.+), mas por enquanto s.+ para leitura:/u
+    // **A clausula que DISCRIMINA e afirmada literal** (Ruling 89). A primeira
+    // grafia media as tres frases por regex com `.*` e `.+` no meio das
+    // palavras, entao uma reescrita que mantivesse so a FORMA — trocar "e
+    // mudado" por "e alterado", trocar o fim de "so para leitura" — passava, e o
+    // metateste continuaria verde afirmando uma promessa que ninguem faz mais.
+    //
+    // O que fica literal e so o pedaco que CARREGA a promessa: a frase do
+    // caminho promete que existe outro lugar onde mexer, e a do so-leitura
+    // promete o contrario, que ali nao da. O nome da tela continua livre — ele
+    // e o que muda por campo, e congela-lo seria congelar o portugues inteiro,
+    // que nao e o que este teste existe para guardar.
+    const CAMINHO_ABRE = 'Este ajuste é mudado '
+    const CAMINHO_FECHA = ', e não por aqui.'
+    const SO_LEITURA_ABRE = 'Este ajuste aparece '
+    const SO_LEITURA_FECHA =
+      ', mas por enquanto só para leitura: ainda não dá para ligá-lo ou desligá-lo pelo painel.'
+
+    /** O `(.+)` do meio continua exigido: sem o nome da tela a frase nao serve. */
+    const entre = (frase: string, abre: string, fecha: string): boolean =>
+      frase.startsWith(abre) && frase.endsWith(fecha) && frase.length > abre.length + fecha.length
+
+    const ehCaminho = (frase: string): boolean => entre(frase, CAMINHO_ABRE, CAMINHO_FECHA)
+    const ehSoLeitura = (frase: string): boolean => entre(frase, SO_LEITURA_ABRE, SO_LEITURA_FECHA)
 
     for (const campo of CAMPOS_DA_RESTAURACAO) {
-      expect({ [campo]: CAMINHO.test(motivoDeCampoForaDaTela(campo)) }).toEqual({ [campo]: true })
+      expect({ [campo]: ehCaminho(motivoDeCampoForaDaTela(campo)) }).toEqual({ [campo]: true })
     }
 
     // Os dois que uma tela ja mostra sem deixar mudar. Eles NAO podem cair na
@@ -930,8 +951,8 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // nao da", que manda esperar por uma tela pronta.
     for (const campo of ['publicReplyEnabled', 'privateReplyEnabled'] as const) {
       const frase = motivoDeCampoForaDaTela(campo)
-      expect({ [campo]: SO_LEITURA.test(frase) }).toEqual({ [campo]: true })
-      expect({ [campo]: CAMINHO.test(frase) }).toEqual({ [campo]: false })
+      expect({ [campo]: ehSoLeitura(frase) }).toEqual({ [campo]: true })
+      expect({ [campo]: ehCaminho(frase) }).toEqual({ [campo]: false })
     }
 
     // E o unico campo que a promessa antiga ainda cobre: `mediaScope` e a
@@ -942,8 +963,8 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // tres frases, sem sobra e sem um campo em duas.
     const porFrase = CAMPOS_DE_COMPORTAMENTO.map((campo) => {
       const frase = motivoDeCampoForaDaTela(campo)
-      if (CAMINHO.test(frase)) return 'caminho'
-      if (SO_LEITURA.test(frase)) return 'so_leitura'
+      if (ehCaminho(frase)) return 'caminho'
+      if (ehSoLeitura(frase)) return 'so_leitura'
       return frase === RECUSA_SEM_VALOR.naoGravavel ? 'ainda_nao' : 'nenhuma'
     })
 
