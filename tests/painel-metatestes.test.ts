@@ -23,7 +23,7 @@ import {
   ROTA_PALAVRAS,
   ROTAS,
 } from '../src/routes/painel/rotas'
-import { camposProtegidos } from '../src/routes/painel/stepup'
+import { camposProtegidos, jsonCanonico } from '../src/routes/painel/stepup'
 import { painelHabilitado } from '../src/services/panel-session'
 import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
 import { pedir, responder } from './fixtures/dubles'
@@ -858,6 +858,19 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // sempre-protegidos dao dez casos que EXIGEM, e os outros dezoito nao.
     expect(TABELA_DE_RISCO.filter((caso) => caso.exige).length).toBe(10)
     expect(TABELA_DE_RISCO.filter((caso) => !caso.exige).length).toBe(18)
+
+    // A disjuncao entre os dois espacos de nomes `acao`, que ate aqui so
+    // existia em comentario. `jsonCanonico` monta o objeto assinado como
+    // `{ ...campos, acao }`, com a operacao POR ULTIMO: um campo de
+    // configuracao chamado `acao` seria sobrescrito e sumiria do hash EM
+    // SILENCIO — o autenticador assinaria um objeto que nao contem o valor que
+    // a tela mostrou, e §10.10 diz que a amarracao ao conteudo e a coisa toda.
+    // Nenhum campo se chama assim hoje, e o mesmo `src/config.ts` que faz um
+    // campo novo entrar sozinho em `CAMPOS_DE_COMPORTAMENTO` e o que faria este
+    // esbarrao entrar sozinho tambem. A primeira linha ancora o nome no hash
+    // para que a segunda nao vire uma comparacao contra uma string morta.
+    expect(JSON.parse(jsonCanonico({ acao: 'config', campos: {} }))).toEqual({ acao: 'config' })
+    expect(CAMPOS_DE_COMPORTAMENTO).not.toContain('acao')
   })
 
   test('META-06: um lote misto tranca inteiro, e o classificador nomeia so o protegido', () => {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { PainelAuditoriaRepository } from '../src/repositories/painel-auditoria-repository'
 import { escapeHtml } from '../src/routes/legal'
 import { handleAjustes, RESTAURAR } from '../src/routes/painel/ajustes'
+import { CAMPO_DA_CONFIRMACAO } from '../src/routes/painel/campos'
 import {
   CONFIRMACOES,
   fraseDeConfirmacao,
@@ -371,6 +372,27 @@ function desescapar(valor: string): string {
     .replaceAll('&quot;', '"')
     .replaceAll('&#39;', "'")
     .replaceAll('&amp;', '&')
+}
+
+/**
+ * Os campos escondidos do `<form id="confirmar">` que o servidor renderizou.
+ *
+ * O recorte e o FORMULARIO, e nao a pagina: a tela de conferencia e servida
+ * dentro da mesma pagina que ja tinha formularios, e uma extracao solta juntaria
+ * os campos dos dois. Se o bloco nao existir, isto estoura — uma leitura vazia
+ * faria toda afirmacao de ausencia passar sem ter olhado nada.
+ */
+function escondidosDaConferencia(corpo: string): URLSearchParams {
+  const bloco = /<form method="post" action="([^"]*)" id="confirmar"[\s\S]*?<\/form>/.exec(corpo)
+  if (bloco === null) throw new Error('a tela de conferencia nao trouxe o formulario')
+
+  const campos = new URLSearchParams()
+  for (const [, nome, valor] of (bloco[0] as string).matchAll(
+    /<input type="hidden" name="([^"]*)" value="([^"]*)">/g,
+  )) {
+    campos.set(desescapar(nome ?? ''), desescapar(valor ?? ''))
+  }
+  return campos
 }
 
 beforeEach(async () => {
@@ -1574,8 +1596,27 @@ describe('GRAV — a forma da gravacao', () => {
 
     expect(comConfirmar.status).toBe(403)
     expect((await unicaLinha()).acao).toBe('stepup_recusado')
-    expect(await comConfirmar.text()).toContain('Confira o que vai mudar')
+    const conferencia = await comConfirmar.text()
+    expect(conferencia).toContain('Confira o que vai mudar')
     expect((await linhaDeConfig())?.enabled).toBe(0)
+
+    // E a outra metade de §10.12, a que ninguem afirmava de verdade: a tela de
+    // conferencia NAO reemite `confirmar`. A afirmacao gemea de `painel-stepup`
+    // mora no fixture `comDigital` e e VAZIA — nenhum caminho positivo de
+    // step-up manda o gesto no corpo, entao ela nega a presenca de um campo que
+    // nunca poderia estar ali. Este e o unico ponto do repositorio onde o corpo
+    // CARREGA `confirmar` e a conferencia e renderizada, e por isso e o unico
+    // lugar de onde ela morde: tirar `CAMPO_DA_CONFIRMACAO` dos estruturais do
+    // funil faz o gesto voltar no formulario seguinte, o servidor o recarrega
+    // sozinho, e religar a automacao passa a nao exigir que alguem tenha
+    // marcado coisa nenhuma — que e o gesto de §10.12 virando carimbo.
+    //
+    // O `acao` ao lado nao e enfeite: ele e o contrapositivo. Prova que a
+    // leitura achou os campos escondidos de verdade, e que a ausencia do outro
+    // e uma ausencia medida, e nao um formulario que ninguem conseguiu ler.
+    const escondidos = escondidosDaConferencia(conferencia)
+    expect(escondidos.get(CAMPO_DA_ACAO)).toBe(RESTAURAR)
+    expect(escondidos.has(CAMPO_DA_CONFIRMACAO)).toBe(false)
   })
 
   test('GRAV-21: religar pela RESTAURACAO tambem precisa da confirmacao de §10.12', async () => {
