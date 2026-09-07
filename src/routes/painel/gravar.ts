@@ -108,10 +108,11 @@ function comoJson(estado: EstadoDeComportamento): string {
  * Achado de dominio e `403 dominio_nao_permitido`; o resto e
  * `400 dados_invalidos`.
  *
- * **O ramo do dominio passou a ser alcancavel pela rota nesta etapa**, e essa e
- * uma das garantias STEP: o link e os dois textos agora sao gravaveis com a
- * digital, e a validacao roda DEPOIS da verificacao do step-up — entao um link
- * fora da allowlist e barrado **mesmo com a digital correta**. A funcao continua
+ * **O ramo do dominio e alcancavel pela rota desde a etapa do step-up**, e essa
+ * e uma das garantias STEP: o link e os dois textos sao gravaveis com a digital.
+ * A validacao roda ANTES da cerimonia (§9.7, passos 7 e 8) — entao um link fora
+ * da allowlist e barrado **sem que a digital chegue a ser pedida**, e nao depois
+ * de ela ter sido conferida com sucesso. A funcao continua
  * exportada e testada direto porque ela e a traducao achado -> codigo, e um
  * teste que so a exercitasse pela rota nao distinguiria "achado de dominio" de
  * "primeiro achado da lista".
@@ -346,8 +347,45 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     })
   }
 
+  // Passo 7, com a allowlist de HOJE — inclusive na restauracao (§9.9).
+  //
+  // **Ele vem ANTES da cerimonia, e §9.7 numera assim de proposito** (Ruling
+  // 73, terceira instancia). A propria linha do passo 8 da spec antecipa a
+  // objecao: o hash e sobre a mudanca canonica, que **ja existe aqui** — o
+  // corpo foi lido no passo 5 e traduzido campo a campo —, e ate esta linha
+  // nada foi gravado. Ate a etapa 12b a ordem era a inversa, e a combinacao
+  // existia: uma mudanca que o validador nunca aceitaria renderizava a tela de
+  // conferencia, colhia a digital, VERIFICAVA a assertion com sucesso e so
+  // entao era recusada. O gesto era gasto numa operacao que nao podia dar
+  // certo — e atingia justamente a unica recusa que §9.9 sanciona para a
+  // restauracao, "se a allowlist encolheu".
+  //
+  // O portao e conhecivel aqui e nada entre as duas posicoes o move:
+  // `passarPeloStepUp` so LE `mudados`, `antes`, `depois` e `patch`, e tudo o
+  // que ele escreve (a linha de auditoria da recusa e `falhas_stepup`) sai por
+  // um `return`. Mover uma recusa para antes nao pode conceder nada: o conjunto
+  // de gravacoes bem-sucedidas e identico, porque este mesmo validador ja
+  // rodava antes de `aplicarMudanca` com exatamente estas entradas.
+  const recusaDoValidador = await validarOuRecusar({
+    env,
+    recusa,
+    mudados,
+    depois,
+    idsDeMidia: snapshot.global.allowedMediaIds,
+    rascunho,
+  })
+  if (recusaDoValidador !== null) return recusaDoValidador
+
   // Passo 8. A classificacao e a cerimonia sao UMA chamada, em `stepup.ts`:
   // separa-las daria duas coisas para desencontrar.
+  //
+  // §10.10 quer que o objeto hasheado seja "o mapa de campos **ja validado e
+  // normalizado** pelo mesmo `config-validation.ts`". As duas metades fecham
+  // exatamente aqui: "ja validado" e a linha acima, e "normalizado" e o
+  // `normalizar` de `jsonCanonico`, que aplica a `limparTexto` do proprio
+  // `config-validation.ts` a cada string — a MESMA funcao nos dois caminhos, e
+  // e por isso que os vetores congelados de §13.2 fecham. Limpar o `patch`
+  // aqui, antes de entrega-lo, seria uma segunda grafia da mesma normalizacao.
   const passagem = await passarPeloStepUp({
     entrada,
     sessao,
@@ -376,17 +414,6 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
   })
   if ('resposta' in passagem) return passagem.resposta
   const credencialDoStepUp = passagem.credentialId
-
-  // Passo 7, com a allowlist de HOJE — inclusive na restauracao (§9.9).
-  const recusaDoValidador = await validarOuRecusar({
-    env,
-    recusa,
-    mudados,
-    depois,
-    idsDeMidia: snapshot.global.allowedMediaIds,
-    rascunho,
-  })
-  if (recusaDoValidador !== null) return recusaDoValidador
 
   // Passos 9 e 10.
   return await aplicarMudanca({
@@ -438,6 +465,11 @@ interface PedidoDeValidacao {
  * de chegar a validacao. Com eles gravaveis (Ruling 65), esta pergunta passou a
  * ser a unica coisa entre "sem lista configurada" e "o painel aceita qualquer
  * link" — o oposto do que a allowlist existe para fazer.
+ *
+ * Desde a etapa 12b esta recusa acontece no PRIMEIRO POST, e nao no segundo: a
+ * ordem de §9.7 poe o passo 7 antes do 8, entao a pessoa cujo deploy nao tem a
+ * variavel le a tarja em vez de encostar o dedo para ouvir um "nao" que ja
+ * estava decidido.
  */
 async function validarOuRecusar(pedido: PedidoDeValidacao): Promise<Response | null> {
   const { env, recusa, mudados, depois, rascunho } = pedido

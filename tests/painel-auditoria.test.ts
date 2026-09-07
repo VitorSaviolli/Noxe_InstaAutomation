@@ -72,6 +72,24 @@ const PALAVRA_NOVA = 'quero o cardapio'
 /** Dominio FICTICIO, e o mesmo que a linha de config de teste usa. */
 const DOMINIO_DE_TESTE = 'exemplo.com'
 
+/**
+ * O ambiente com a allowlist CONFIGURADA, para os tres testes que gravam link.
+ *
+ * O `env` do `vitest.config.ts` traz `ALLOWED_LINK_DOMAINS: ''`, e lista vazia
+ * nao "passa tudo": ela recusa qualquer mudanca de endereco (§9.8, §12.7,
+ * LNK-12). Ate a etapa 12b isso passava despercebido nesta suite porque o
+ * step-up respondia PRIMEIRO — os tres testes que mexem no link recebiam
+ * `stepup_recusado` e nunca chegavam ao validador. Quer dizer: eles ofereciam a
+ * cerimonia para uma gravacao que a allowlist deste ambiente jamais aceitaria,
+ * que e a patologia do Ruling 73 dentro do proprio teste que a mede.
+ *
+ * Com a ordem de §9.7 no lugar, a lista precisa existir para que a operacao
+ * seja de verdade possivel e a recusa medida seja mesmo a do step-up. Esta
+ * constante e o que separa "o teste afirma o que o titulo diz" de "o teste
+ * ficou verde".
+ */
+const COM_ALLOWLIST = { ...env, ALLOWED_LINK_DOMAINS: DOMINIO_DE_TESTE } as unknown as typeof env
+
 const FORMULARIO = 'application/x-www-form-urlencoded'
 
 /**
@@ -592,10 +610,15 @@ describe('AUD — a auditoria da gravacao', () => {
     await gravarConfig(env.DB)
     const sessao = await abrirSessao('credencial-da-recusa')
 
+    // **O ambiente traz a allowlist, e isso e da etapa 12b.** A recusa que este
+    // teste mede e a de STEP-UP; sem a lista, a ordem de §9.7 faz o validador
+    // responder antes com `mudanca_recusada` — e com razao, porque um link que
+    // a allowlist nao permite nao tinha o que confirmar.
     await gravar(
       GRAVADORAS[3] as (typeof GRAVADORAS)[number],
       `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/outro`)}`,
       sessao,
+      { ambiente: COM_ALLOWLIST },
     )
 
     const linha = await unicaLinha()
@@ -1315,7 +1338,14 @@ describe('GRAV — a forma da gravacao', () => {
     // depois da gravacao e o que a gravacao escreveu.
     await env.DB.prepare('DELETE FROM painel_auditoria').run()
 
-    const volta = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao)
+    // O ambiente traz a allowlist (etapa 12b): a versao anterior aponta para um
+    // link do dominio de teste, e com a ordem de §9.7 uma restauracao que a
+    // allowlist recusaria morreria no validador antes de chegar a cerimonia — o
+    // que este teste NAO quer medir. §9.9 sanciona aquela recusa ("se a
+    // allowlist encolheu"); esta aqui e sobre o link ser ALCANCAVEL e protegido.
+    const volta = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao, {
+      ambiente: COM_ALLOWLIST,
+    })
 
     // Antes do Ruling 74 isto era `400` com `campo_nao_gravavel`.
     expect(volta.status).toBe(403)
@@ -1572,7 +1602,15 @@ describe('GRAV — a forma da gravacao', () => {
     const doBotao = camposDoBotaoDeVoltar(await telaDeAjustes(sessao))
     await env.DB.prepare('DELETE FROM painel_auditoria').run()
 
-    const semConfirmar = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao)
+    // Os dois envios usam o ambiente COM a allowlist (etapa 12b): a versao
+    // anterior difere tambem no link, e com a ordem de §9.7 uma lista vazia
+    // faria o validador responder antes dos dois portoes que este teste mede.
+    const semConfirmar = await gravar(
+      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      doBotao,
+      sessao,
+      { ambiente: COM_ALLOWLIST },
+    )
     const tela = await semConfirmar.text()
 
     expect(semConfirmar.status).toBe(400)
@@ -1592,6 +1630,7 @@ describe('GRAV — a forma da gravacao', () => {
       GRAVADORAS[2] as (typeof GRAVADORAS)[number],
       `${doBotao}&confirmar=sim`,
       sessao,
+      { ambiente: COM_ALLOWLIST },
     )
 
     expect(comConfirmar.status).toBe(403)

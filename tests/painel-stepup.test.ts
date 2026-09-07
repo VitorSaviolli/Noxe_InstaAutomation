@@ -1156,24 +1156,44 @@ describe('STEP — step-up preso ao conteudo', () => {
     })
   })
 
-  test('STEP-24: link fora da allowlist e barrado MESMO com a digital correta', async () => {
+  test('STEP-24: link fora da allowlist e barrado ANTES da cerimonia (§9.7, passos 7 e 8)', async () => {
+    // **O titulo e a expectativa deste teste mudaram na etapa 12b, e a mudanca
+    // e uma correcao, nao uma acomodacao.** Ele dizia "barrado MESMO com a
+    // digital correta" e congelava a sequencia `['stepup_recusado',
+    // 'mudanca_recusada']`: a tela de conferencia saia, o dono encostava o
+    // dedo, a assertion era VERIFICADA COM SUCESSO, e so entao o validador
+    // recusava.
+    //
+    // §9.7 numera **7. Validacao campo a campo** e **8. Step-up**, nessa ordem,
+    // e a propria linha do passo 8 antecipa a objecao: "vem depois da validacao
+    // porque o hash e sobre a mudanca canonica, que so existe depois do parse —
+    // e isso nao e concessao: ate aqui nada foi gravado". O codigo fazia o
+    // contrario, e era a terceira instancia viva da patologia do Ruling 73:
+    // "nao existe motivo para gastar o gesto numa operacao que nao podia dar
+    // certo. Uma cerimonia que nunca pode suceder ensina o dono que digital as
+    // vezes nao faz nada".
+    //
+    // A garantia de §13.2 LNK — "link fora da lista recusado e nada gravado" —
+    // continua inteira; o que mudou e que ela deixou de custar um gesto.
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
 
-    const { envio } = await comDigital(
+    const recusa = await postar(
       MENSAGEM,
       `destinationUrl=${encodeURIComponent(LINK_PROIBIDO)}`,
       sessao,
-      aparelho,
     )
+    const tela = await recusa.text()
 
-    expect(envio.status).toBe(403)
+    expect(recusa.status).toBe(403)
     expect((await linhaDeConfig())?.destination_url).not.toBe(LINK_PROIBIDO)
-    // E a recusa e do VALIDADOR, e nao do step-up: a linha diz `mudanca_recusada`.
-    expect((await auditoria()).map((linha) => linha.acao)).toEqual([
-      'stepup_recusado',
-      'mudanca_recusada',
-    ])
+
+    // Nenhuma cerimonia foi oferecida: sem tela de conferencia, sem a mudanca
+    // canonica que o `painel.js` mandaria assinar, e sem a linha de step-up
+    // recusado na frente. So a recusa do validador.
+    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('data-mudanca')
+    expect((await auditoria()).map((linha) => linha.acao)).toEqual(['mudanca_recusada'])
   })
 
   test('STEP-25: a gravacao com step-up carimba `step_up = 1` e rotaciona o `sid`', async () => {
@@ -1589,16 +1609,31 @@ describe('STEP — step-up preso ao conteudo', () => {
       const sessao = await abrirSessao(aparelho.credentialId)
       const antes = (await linhaDeConfig())?.[caso.coluna]
 
-      const { envio } = await comDigital(MENSAGEM, caso.corpo, sessao, aparelho, {
-        ambiente: env,
-      })
+      // **UM POST so, e a expectativa mudou na etapa 12b.** Ate aqui este teste
+      // dirigia a cerimonia inteira por `comDigital` e afirmava a sequencia
+      // `['stepup_recusado', 'mudanca_recusada']` — quer dizer: o painel de uma
+      // instalacao sem a variavel de deploy mostrava a tela de conferencia,
+      // colhia a digital do dono, VERIFICAVA a assertion com sucesso e so entao
+      // dizia que nao. §9.7 poe a validacao no passo 7 e o step-up no passo 8,
+      // e o Ruling 73 e literal sobre o custo de inverter isso: uma cerimonia
+      // que nunca pode suceder ensina o dono que digital as vezes nao faz nada.
+      // Nao ha sequer o que confirmar aqui — nenhum endereco pode ser gravado
+      // enquanto a lista nao existir.
+      const recusa = await postar(MENSAGEM, caso.corpo, sessao, { ambiente: env })
+      const tela = await recusa.text()
 
-      expect({ [caso.campo]: envio.status }).toEqual({ [caso.campo]: 403 })
+      expect({ [caso.campo]: recusa.status }).toEqual({ [caso.campo]: 403 })
       expect({ [caso.campo]: (await linhaDeConfig())?.[caso.coluna] }).toEqual({
         [caso.campo]: antes,
       })
       expect({ [caso.campo]: (await auditoria()).map((linha) => linha.acao) }).toEqual({
-        [caso.campo]: ['stepup_recusado', 'mudanca_recusada'],
+        [caso.campo]: ['mudanca_recusada'],
+      })
+      // E a contraprova de que nenhum gesto foi pedido: a tela da recusa nao
+      // traz a conferencia nem a mudanca canonica.
+      expect({ [caso.campo]: tela.includes('data-mudanca') }).toEqual({ [caso.campo]: false })
+      expect({ [caso.campo]: tela.includes('Confira o que vai mudar') }).toEqual({
+        [caso.campo]: false,
       })
     }
   })
@@ -1697,5 +1732,43 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await linhaDeConfig())?.private_reply_text).toBe(
       'Ola, {username}! Aqui esta o link: {link}',
     )
+  })
+
+  test('STEP-38: mudanca INVALIDA em campo protegido morre no validador, sem cerimonia', async () => {
+    // A garantia que a etapa 12b acrescentou, e o veiculo e de proposito uma
+    // recusa que **nao** e a da allowlist. STEP-24 e STEP-29 ja cobrem o ramo
+    // do dominio; um teste que so exercitasse aquele ramo deixaria o resto do
+    // validador — tamanho, placeholder, cooldown, gatilho — fora da ordem de
+    // §9.7, e a ordem e uma propriedade do funil, nao da allowlist.
+    //
+    // O veiculo e `publicReplyText` com um placeholder, que §9.7 recusa em uma
+    // linha so: "nenhum placeholder", porque o texto publico nao passa por
+    // `renderTemplate` e um `{link}` ali sairia escrito assim mesmo,
+    // publicamente. O campo e protegido SEMPRE (§10.10), entao ele reune as
+    // duas metades num corpo so: exige a digital e nunca poderia ser gravado.
+    //
+    // **Este e o teste que a mutacao de ORDEM PURA mata.** Mover
+    // `validarOuRecusar` de volta para depois de `passarPeloStepUp` — sem
+    // mudar mais nada — o quebra em tres pontos de uma vez: o `400
+    // dados_invalidos` vira `403 step_up_necessario`, a tela passa a trazer a
+    // conferencia e o `data-mudanca`, e a auditoria ganha a linha
+    // `stepup_recusado` na frente.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao(aparelho.credentialId)
+    const antes = (await linhaDeConfig())?.public_reply_text
+
+    const recusa = await postar(
+      MENSAGEM,
+      `publicReplyText=${encodeURIComponent('Ja mandei o {link} no seu Direct.')}`,
+      sessao,
+    )
+    const tela = await recusa.text()
+
+    expect(recusa.status).toBe(400)
+    expect((await linhaDeConfig())?.public_reply_text).toBe(antes)
+
+    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('data-mudanca')
+    expect((await auditoria()).map((linha) => linha.acao)).toEqual(['mudanca_recusada'])
   })
 })
