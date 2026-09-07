@@ -50,7 +50,7 @@ import { telaDoPainel } from './tela'
  * coincidencia que torna "step-up **sempre** no POST" (§7.1) verdadeira por
  * construcao: nao existe campo barato que esta rota saiba escrever.
  */
-const CAMPOS_DA_TELA: readonly CampoDaConfig[] = [
+export const CAMPOS_DA_MENSAGEM: readonly CampoDaConfig[] = [
   'privateReplyText',
   'destinationUrl',
   'publicReplyText',
@@ -166,7 +166,7 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
       // exatamente os tres de `CAMPOS_SEMPRE_PROTEGIDOS`, entao "step-up
       // **sempre** no POST" (§7.1) e verdade por construcao — nao ha campo
       // barato que esta rota saiba escrever.
-      campos: CAMPOS_DA_TELA,
+      campos: CAMPOS_DA_MENSAGEM,
     })
   }
 

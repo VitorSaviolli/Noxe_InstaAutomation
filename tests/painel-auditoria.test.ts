@@ -2,7 +2,7 @@ import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { PainelAuditoriaRepository } from '../src/repositories/painel-auditoria-repository'
 import { escapeHtml } from '../src/routes/legal'
-import { handleAjustes } from '../src/routes/painel/ajustes'
+import { handleAjustes, RESTAURAR } from '../src/routes/painel/ajustes'
 import {
   CONFIRMACOES,
   fraseDeConfirmacao,
@@ -10,7 +10,7 @@ import {
   NOME_DO_CAMPO,
   PALAVRAS_PROIBIDAS,
 } from '../src/routes/painel/dicionario'
-import { CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/formulario'
+import { CAMPOS_DA_RESTAURACAO, CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/formulario'
 import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
@@ -29,7 +29,7 @@ import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
 import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../src/services/config-store'
 import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/services/panel-session'
 import { prefixoDeCredencial } from '../src/services/webauthn/verificar'
-import { gravarConfig, ligarConta, limparBanco } from './fixtures/banco'
+import { gravarConfig, LINHA_DE_CONFIG_VALIDA, ligarConta, limparBanco } from './fixtures/banco'
 import {
   AGORA,
   capturarConsole,
@@ -71,6 +71,43 @@ const PALAVRA_NOVA = 'quero o cardapio'
 const DOMINIO_DE_TESTE = 'exemplo.com'
 
 const FORMULARIO = 'application/x-www-form-urlencoded'
+
+/**
+ * O `antes` que a auditoria guardaria para a linha de config do fixture.
+ *
+ * DERIVADO de `LINHA_DE_CONFIG_VALIDA`, campo a campo, e nao copiado: um objeto
+ * escrito a mao aqui divergiria da linha no dia em que ela mudasse, e o botao
+ * "Voltar a esta versao" some sem alarde quando o `antes` guardado difere do
+ * estado de hoje em campo que ninguem grava (§12.4, R-6) — o teste ficaria
+ * verde afirmando uma tela sem botao.
+ */
+const ESTADO_GUARDADO_DA_LINHA_VALIDA: Record<string, unknown> = {
+  enabled: LINHA_DE_CONFIG_VALIDA.enabled === 1,
+  triggerKeywords: JSON.parse(LINHA_DE_CONFIG_VALIDA.trigger_keywords) as string[],
+  matchMode: LINHA_DE_CONFIG_VALIDA.match_mode,
+  caseSensitive: LINHA_DE_CONFIG_VALIDA.case_sensitive === 1,
+  normalizeAccents: LINHA_DE_CONFIG_VALIDA.normalize_accents === 1,
+  ignorePunctuation: LINHA_DE_CONFIG_VALIDA.ignore_punctuation === 1,
+  processOnlyReels: LINHA_DE_CONFIG_VALIDA.process_only_reels === 1,
+  // `mediaScope` e DERIVADO de `allowedMediaIds` (§9.4): `todas` no fixture
+  // porque a lista de ids fica em `["*"]`.
+  mediaScope: LINHA_DE_CONFIG_VALIDA.media_scope,
+  publicReplyEnabled: LINHA_DE_CONFIG_VALIDA.public_reply_enabled === 1,
+  publicReplyText: LINHA_DE_CONFIG_VALIDA.public_reply_text,
+  privateReplyEnabled: LINHA_DE_CONFIG_VALIDA.private_reply_enabled === 1,
+  privateReplyText: LINHA_DE_CONFIG_VALIDA.private_reply_text,
+  destinationUrl: LINHA_DE_CONFIG_VALIDA.destination_url,
+  userCooldownHours: LINHA_DE_CONFIG_VALIDA.user_cooldown_hours,
+}
+
+/**
+ * O campo do corpo que declara QUAL operacao aquele POST e (§7.1).
+ *
+ * `ligar`/`desligar` em `/painel/chave`, `restaurar` em `/painel/ajustes`. O
+ * nome e estrutural — nunca um campo de configuracao — e por isso entra em
+ * `estruturais` de cada rota, e nao em `CAMPOS_DE_COMPORTAMENTO`.
+ */
+const CAMPO_DA_ACAO = 'acao'
 
 interface Sessao {
   readonly cookie: string
@@ -296,21 +333,32 @@ async function telaDeAjustes(sessao: Sessao): Promise<string> {
  * O corpo que o botao "Voltar a esta versao" enviaria, extraido da tela.
  *
  * O recorte e o formulario DO BOTAO, e nao a pagina toda: o formulario de cima
- * usa os mesmos nomes de campo, e uma extracao solta juntaria os dois. Sao os
- * campos de comportamento, todos eles — a `versao` e a ficha entram por
- * `gravar`, como em qualquer outro POST.
+ * usa os mesmos nomes de campo, e uma extracao solta juntaria os dois. A
+ * `versao` e a ficha entram por `gravar`, como em qualquer outro POST.
+ *
+ * **O botao passou a declarar a operacao, e a contagem passou de catorze para
+ * onze** (Ruling 74). A restauracao e `acao=restaurar`, como `acao=ligar|
+ * desligar` de §7.1, e o escopo dela e a UNIAO gravavel — os onze de
+ * `CAMPOS_DA_RESTAURACAO`. Os tres que sobram (`mediaScope` e os dois
+ * interruptores de canal) nao sao escritos por rota nenhuma nesta etapa: manda-
+ * los faria a gravacao ser recusada justamente por eles. Quem confere que os
+ * onze mais os tres dao os catorze e META-11.
  */
 function camposDoBotaoDeVoltar(corpo: string): string {
   const doBotao = corpo.split('<form').find((pedaco) => pedaco.includes('Voltar a esta vers'))
   expect(doBotao).toBeDefined()
 
+  const enviaveis = [...CAMPOS_DA_RESTAURACAO, CAMPO_DA_ACAO] as readonly string[]
   const escondidos = [...(doBotao ?? '').matchAll(/name="([a-zA-Z]+)" value="([^"]*)"/g)]
-    .filter(([, nome]) => (CAMPOS_DE_COMPORTAMENTO as readonly string[]).includes(nome ?? ''))
+    .filter(([, nome]) => enviaveis.includes(nome ?? ''))
     .map(([, nome, valor]) => `${nome}=${encodeURIComponent(desescapar(valor ?? ''))}`)
 
   // O `antes` e reenviado INTEIRO: um campo a menos significaria "nao mexe
-  // nisso", e a restauracao ficaria pela metade sem ninguem perceber.
-  expect(escondidos.length).toBe(CAMPOS_DE_COMPORTAMENTO.length)
+  // nisso", e a restauracao ficaria pela metade sem ninguem perceber. O `+ 1` e
+  // o proprio `acao=restaurar`, sem o qual a rota escreveria com o escopo do
+  // formulario de Ajustes e recusaria os campos das outras telas.
+  expect(escondidos.length).toBe(CAMPOS_DA_RESTAURACAO.length + 1)
+  expect(escondidos).toContain(`${CAMPO_DA_ACAO}=${RESTAURAR}`)
   return escondidos.join('&')
 }
 
@@ -511,11 +559,18 @@ describe('AUD — a auditoria da gravacao', () => {
     // AUD-01 afirma origem, ator, step_up e alvo no caminho de sucesso; o
     // caminho de RECUSA ficava com quatro deles descobertos, e trocar
     // `origem: painel` por `assistente` passava na suite inteira.
+    //
+    // **O veiculo mudou de `/painel/ajustes` para `/painel/mensagem`, e a
+    // expectativa continua a mesma** (Ruling 74). A recusa que este teste mede e
+    // a de STEP-UP, `stepup_recusado`; depois que o link saiu do escopo de
+    // Ajustes, aquela rota passa a recusar por ESCOPO — `mudanca_recusada`,
+    // outra linha, outro caminho — e o teste mediria a recusa errada. O link e
+    // de `/painel/mensagem`, que e quem o declara, e la a recusa e a de sempre.
     await gravarConfig(env.DB)
     const sessao = await abrirSessao('credencial-da-recusa')
 
     await gravar(
-      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
+      GRAVADORAS[3] as (typeof GRAVADORAS)[number],
       `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/outro`)}`,
       sessao,
     )
@@ -974,19 +1029,31 @@ describe('GRAV — a forma da gravacao', () => {
   test('GRAV-11: campo protegido e recusado com 403, mesmo junto de um campo permitido', async () => {
     // §10.10: se QUALQUER campo do lote exige step-up, o lote inteiro exige — e
     // gravacao parcial e impossivel.
-    await gravarConfig(env.DB)
+    //
+    // **O veiculo mudou para `/painel/palavras`** (Ruling 78). O lote misto
+    // precisa de UMA rota que seja dona dos dois campos: depois do Ruling 74,
+    // `/painel/ajustes` nao escreve mais o link, e o lote seria recusado por
+    // escopo antes de a classificacao rodar — `400`, e nao o `403` que este
+    // teste existe para medir. `triggerKeywords` (barato) com `matchMode` para
+    // "no meio do comentario" (protegido) e palavra por palavra o exemplo do
+    // Ruling 66, e as duas colunas sao de `/painel/palavras`.
+    await gravarConfig(env.DB, { match_mode: 'exact' })
     const sessao = await abrirSessao()
 
     const resposta = await gravar(
-      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      `userCooldownHours=48&destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/novo`)}`,
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      `triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}&matchMode=no_meio`,
       sessao,
     )
 
     expect(resposta.status).toBe(403)
     expect((await unicaLinha()).acao).toBe('stepup_recusado')
     // Nem o campo permitido do mesmo lote foi gravado.
-    expect((await linhaDeConfig())?.user_cooldown_hours).toBe(24)
+    const linha = await linhaDeConfig()
+    expect({ palavras: linha?.trigger_keywords, modo: linha?.match_mode }).toEqual({
+      palavras: '["eu quero","quero o link"]',
+      modo: 'exact',
+    })
   })
 
   test('GRAV-12: o cooldown sobe; descer e recusado — a direcao decide, nao o campo', async () => {
@@ -1138,7 +1205,8 @@ describe('GRAV — a forma da gravacao', () => {
     expect(corpo).toContain(escapeHtml('eu quero\nquero o link'))
 
     // O botao reenvia o `antes` INTEIRO pela rota normal de gravacao (Ruling 55):
-    // nao ha rota de restauracao, e por isso o mesmo validador, a mesma allowlist
+    // nao ha rota de restauracao — ha uma OPERACAO declarada nela, `acao=
+    // restaurar` (Ruling 74) —, e por isso o mesmo validador, a mesma allowlist
     // de hoje e a mesma classificacao de risco valem para ele.
     const volta = await gravar(
       GRAVADORAS[2] as (typeof GRAVADORAS)[number],
@@ -1151,11 +1219,15 @@ describe('GRAV — a forma da gravacao', () => {
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["eu quero","quero o link"]')
   })
 
-  test('GRAV-18: a restauracao de uma versao com campo protegido e recusada hoje', async () => {
-    // A consequencia aceita de Ruling 55, e ela e a mesma forma da recusa que
-    // §9.9 ja declara certa: o botao passa pelo funil normal, entao uma versao
-    // cujo `antes` carregue campo de step-up e recusada — e passa a funcionar na
-    // etapa do step-up sem que o botao mude.
+  test('GRAV-18: a restauracao de uma versao com campo protegido pede a digital', async () => {
+    // A consequencia aceita de Ruling 55: o botao passa pelo funil normal, entao
+    // uma versao cujo `antes` carregue campo de step-up cai na cerimonia — e o
+    // que era `403` terminal virou `403` com a tela de conferencia, sem que o
+    // botao mudasse, que e o que aquele comentario prometeu por escrito.
+    //
+    // O veiculo continua sendo o cooldown, que e de Ajustes. A metade que este
+    // teste NAO alcanca — restaurar um campo de OUTRA tela — e GRAV-35, e ela so
+    // existe desde o Ruling 74.
     await gravarConfig(env.DB, { user_cooldown_hours: 24 })
     const sessao = await abrirSessao()
 
@@ -1176,6 +1248,110 @@ describe('GRAV — a forma da gravacao', () => {
       'config_alterada',
       'stepup_recusado',
     ])
+  })
+
+  test('GRAV-35: restaurar alcanca campo de OUTRA tela — o link (Ruling 74)', async () => {
+    // **A consequencia declarada do Ruling 74, e ela e mudanca de
+    // comportamento**, entao tem teste (Ruling 76). Enquanto a restauracao usava
+    // a lista de campos de `/painel/ajustes`, uma versao que diferisse no link
+    // era recusada com `400 dados_invalidos` / `campo_nao_gravavel` — e, pior,
+    // toda linha de historico anterior a uma troca de link ficava irrestauravel,
+    // inclusive as que eram sobre palavra-gatilho. §9.9 nomeia UMA recusa
+    // sancionada para a restauracao, "se a allowlist encolheu", e nao esta.
+    //
+    // Agora `acao=restaurar` declara a operacao, o escopo dela e a uniao
+    // gravavel, e o link volta a ser alcancavel — protegido, como sempre foi:
+    // `403` com a tela de conferencia mostrando o valor literal. GRAV-18 nao
+    // pegava isto porque restaura `userCooldownHours`, que e da propria tela.
+    await gravarConfig(env.DB)
+    const sessao = await abrirSessao()
+
+    // A versao anterior difere APENAS no link. Ela entra a mao porque grava-la
+    // pela rota exigiria a digital, que e a cerimonia inteira — e ela mora em
+    // `painel-stepup.test.ts`, onde o autenticador existe.
+    const anterior = {
+      ...ESTADO_GUARDADO_DA_LINHA_VALIDA,
+      destinationUrl: `https://${DOMINIO_DE_TESTE}/antigo`,
+    }
+    await env.DB.prepare(
+      `INSERT INTO painel_auditoria
+         (ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
+       VALUES (?, 1, 'painel', 'passkey:00000000', 1, 'config_alterada', NULL,
+               '["destinationUrl"]', ?, ?)`,
+    )
+      .bind(AGORA, JSON.stringify(anterior), JSON.stringify(ESTADO_GUARDADO_DA_LINHA_VALIDA))
+      .run()
+
+    const corpo = await telaDeAjustes(sessao)
+    // O botao SAI: a versao difere so em campo que alguma rota escreve, entao
+    // ela volta inteira. Se ele nao saisse, o resto do teste nao provaria nada.
+    expect(corpo).toContain('Voltar a esta vers')
+    const doBotao = camposDoBotaoDeVoltar(corpo)
+
+    // A linha montada a mao ja cumpriu o papel dela; o que sobrar na tabela
+    // depois da gravacao e o que a gravacao escreveu.
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    const volta = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao)
+
+    // Antes do Ruling 74 isto era `400` com `campo_nao_gravavel`.
+    expect(volta.status).toBe(403)
+    const linha = await unicaLinha()
+    expect({ acao: linha.acao, campos: linha.campos }).toEqual({
+      acao: 'stepup_recusado',
+      campos: '["destinationUrl"]',
+    })
+    expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
+
+    // E a tela que veio no `403` e a de conferencia, com o valor LITERAL dos
+    // dois lados (§10.10): sem ela, o `403` seria so uma recusa com outro numero.
+    const tela = await volta.text()
+    expect(tela).toContain('Confira o que vai mudar')
+    expect(tela).toContain(escapeHtml(`https://${DOMINIO_DE_TESTE}/antigo`))
+  })
+
+  test('GRAV-36: a versao que NAO volta inteira nao ganha botao, e a linha diz por que', async () => {
+    // O contrapositivo de GRAV-35, e a garantia que faltava: o botao so sai
+    // quando a versao guardada difere de hoje apenas em campo que ALGUMA rota
+    // escreve. `mediaScope` e os dois interruptores de canal nao sao gravaveis
+    // nesta etapa (Ruling 68), entao uma versao que difira num deles voltaria
+    // pela metade — e um botao que promete recuperacao e recupera parte dela e
+    // a promessa quebrada que §12.4 recusa.
+    //
+    // A mutacao que este teste mata: fazer `restauracaoPossivel` devolver sempre
+    // `true`. Ela sobrevivia a suite inteira — o botao passava a sair para toda
+    // linha, e a gravacao seguinte seria recusada pelo campo que ninguem grava,
+    // com a pessoa levando a recusa depois do clique em vez de antes.
+    await gravarConfig(env.DB, { media_scope: 'todas' })
+    const sessao = await abrirSessao()
+
+    // Duas linhas: a de cima difere so no link (volta inteira), a de baixo
+    // difere tambem no escopo de midias (nao volta). Uma linha so nao provaria
+    // a distincao — provaria apenas que a tela as vezes nao tem botao.
+    const soOLink = {
+      ...ESTADO_GUARDADO_DA_LINHA_VALIDA,
+      destinationUrl: `https://${DOMINIO_DE_TESTE}/antigo`,
+    }
+    const tambemOEscopo = { ...soOLink, mediaScope: 'selecionadas' }
+    for (const antes of [soOLink, tambemOEscopo]) {
+      await env.DB.prepare(
+        `INSERT INTO painel_auditoria
+           (ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
+         VALUES (?, 1, 'painel', 'passkey:00000000', 1, 'config_alterada', NULL,
+                 '["destinationUrl"]', ?, ?)`,
+      )
+        .bind(AGORA, JSON.stringify(antes), JSON.stringify(ESTADO_GUARDADO_DA_LINHA_VALIDA))
+        .run()
+    }
+
+    const corpo = await telaDeAjustes(sessao)
+
+    // Duas linhas no historico, e UM botao so.
+    expect(corpo.split('Voltar a esta vers').length - 1).toBe(1)
+    // E a linha sem botao diz por que — em portugues, sem nomear coluna nenhuma
+    // (§12.1): nao e a mesma frase da linha ilegivel, que e outro caso.
+    expect(corpo).toContain('ajustes que o painel ainda n&atilde;o sabe mudar')
+    expect(corpo).not.toContain('conseguimos ler o que estava salvo')
   })
 
   test('GRAV-20: a caixa de texto e uma palavra por linha, e linha em branco nao vira palavra', async () => {
@@ -1207,46 +1383,79 @@ describe('GRAV — a forma da gravacao', () => {
     expect((await linhaDeConfig())?.trigger_keywords).toBe('["quero o cardapio","quero a tabela"]')
   })
 
-  test('GRAV-21: `enabled=sim` por QUALQUER tela precisa da confirmacao de §10.12', async () => {
+  test('GRAV-21: religar pela RESTAURACAO tambem precisa da confirmacao de §10.12', async () => {
     // A falha que a rodada 1 de revisao encontrou: `enabled` e campo gravavel,
-    // entao a confirmacao conferida so em `handleChave` era contornavel por
-    // `POST /painel/ajustes` — e alcancavel pela propria UI, porque o botao
-    // "Voltar a esta versao" reenvia TODOS os campos, `enabled` incluso. Um
-    // clique desfazia a parada de emergencia, sem confirmacao e sem a data.
+    // entao a confirmacao conferida so em `handleChave` era contornavel — e
+    // alcancavel pela propria UI, porque o botao "Voltar a esta versao" reenvia
+    // TODOS os campos, `enabled` incluso. Um clique desfazia a parada de
+    // emergencia, sem confirmacao e sem a data.
+    //
+    // **O nome do teste dizia "por QUALQUER tela", e isso deixou de ser
+    // verdade** (Ruling 79). Depois do Ruling 74, `enabled` chega ao funil por
+    // dois caminhos nomeados: `POST /painel/chave`, que o declara, e
+    // `acao=restaurar`, cujo escopo e a uniao. Um `enabled=sim` solto em
+    // `/painel/ajustes` agora e recusado por ESCOPO, antes de §10.12 — e um
+    // teste que continuasse mandando aquilo mediria o portao errado. O veiculo
+    // que ainda prova o que §10.12 quer — que a conferencia mora no FUNIL, e nao
+    // no handler da chave — e a restauracao.
     await gravarConfig(env.DB, { enabled: 0, parado_por_codigo_em: AGORA })
     const sessao = await abrirSessao()
 
-    const semConfirmar = await gravar(
-      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      'enabled=sim',
-      sessao,
+    // A versao anterior, com a automacao LIGADA e nada mais diferente: restaurar
+    // essa versao e religar.
+    const ligada = { ...ESTADO_GUARDADO_DA_LINHA_VALIDA, enabled: true }
+    const desligada = { ...ESTADO_GUARDADO_DA_LINHA_VALIDA, enabled: false }
+    await env.DB.prepare(
+      `INSERT INTO painel_auditoria
+         (ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)
+       VALUES (?, 1, 'painel', 'passkey:00000000', 0, 'config_alterada', NULL,
+               '["enabled"]', ?, ?)`,
     )
+      .bind(AGORA, JSON.stringify(ligada), JSON.stringify(desligada))
+      .run()
+
+    const doBotao = camposDoBotaoDeVoltar(await telaDeAjustes(sessao))
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+
+    const semConfirmar = await gravar(GRAVADORAS[2] as (typeof GRAVADORAS)[number], doBotao, sessao)
 
     expect(semConfirmar.status).toBe(400)
     expect((await linhaDeConfig())?.enabled).toBe(0)
     expect((await unicaLinha()).acao).toBe('mudanca_recusada')
     await env.DB.prepare('DELETE FROM painel_auditoria').run()
 
-    // E a mesma rota, com o gesto: liga. A confirmacao e um campo estrutural de
-    // TODA rota, e nao um privilegio de `/painel/chave`.
+    // E a mesma operacao, com o gesto: liga. A confirmacao e um campo estrutural
+    // de TODA rota, e nao um privilegio de `/painel/chave`.
     const comConfirmar = await gravar(
       GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      'enabled=sim&confirmar=sim',
+      `${doBotao}&confirmar=sim`,
       sessao,
     )
     expect(comConfirmar.status).toBe(303)
     expect((await linhaDeConfig())?.enabled).toBe(1)
 
-    // DESLIGAR pela mesma rota continua sendo um gesto so: §10.10 e explicito, e
-    // a parada de emergencia depende de desligar ser barato.
+    // DESLIGAR pela mesma operacao continua sendo um gesto so: §10.10 e
+    // explicito, e a parada de emergencia depende de desligar ser barato.
     const desligando = await gravar(
       GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      'enabled=nao',
+      `${doBotao.replace('enabled=sim', 'enabled=nao')}`,
       sessao,
       { versao: 2 },
     )
     expect(desligando.status).toBe(303)
     expect((await linhaDeConfig())?.enabled).toBe(0)
+
+    // E o portao da chave, que e o outro veiculo: sem `confirmar`, nao liga.
+    await env.DB.prepare('DELETE FROM painel_auditoria').run()
+    const pelaChave = await gravar(
+      GRAVADORAS[0] as (typeof GRAVADORAS)[number],
+      'acao=ligar',
+      sessao,
+      { versao: 3 },
+    )
+    expect(pelaChave.status).toBe(400)
+    expect((await linhaDeConfig())?.enabled).toBe(0)
+    expect((await unicaLinha()).acao).toBe('mudanca_recusada')
   })
 
   test('GRAV-22: o formulario que a tela RENDERIZA e aceito pelo funil que o le', async () => {
@@ -1489,132 +1698,80 @@ describe('GRAV — a forma da gravacao', () => {
     // digitou no mesmo envio nao pode sumir so porque um dos campos do lote
     // exigia a digital. Vale mais aqui do que em qualquer outro lugar, porque na
     // etapa do step-up este e o caminho que passa a ter continuacao.
-    await gravarConfig(env.DB)
+    //
+    // **O veiculo mudou para `/painel/palavras`** (Ruling 78), pelo mesmo motivo
+    // de GRAV-11: o lote misto precisa de uma rota dona dos dois campos, e o
+    // link ja nao e de Ajustes. O que se afirma continua sendo o rascunho — o
+    // campo BARATO do lote volta na tela, com o valor que a pessoa digitou.
+    await gravarConfig(env.DB, { match_mode: 'exact' })
     const sessao = await abrirSessao()
 
     const resposta = await gravar(
-      GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-      [
-        'userCooldownHours=48',
-        `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/novo`)}`,
-      ].join('&'),
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      [`triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}`, 'matchMode=no_meio'].join('&'),
       sessao,
     )
     const corpo = await resposta.text()
 
     expect(resposta.status).toBe(403)
-    expect(corpo).toContain('name="userCooldownHours" value="48"')
-    expect(corpo).toContain(escapeHtml(`https://${DOMINIO_DE_TESTE}/novo`))
+    expect(corpo).toContain(`name="triggerKeywords" value="${PALAVRA_NOVA}"`)
+    expect(corpo).toContain('name="matchMode" value="no_meio"')
   })
 
-  test('GRAV-25: a tabela de §10.10 inteira — o que alarga pede a digital, o que estreita nao', async () => {
-    // A enumeracao fechada de §10.10, entrada por entrada, nas DUAS direcoes.
-    // A rodada 1 de revisao mostrou que so tres das sete estavam exercidas:
-    // `mediaScope`, `processOnlyReels` e os dois textos passavam com a
-    // classificacao desligada.
-    const ALARGAM: readonly { campo: string; corpo: string; partida: Record<string, unknown> }[] = [
-      { campo: 'matchMode', corpo: 'matchMode=no_meio', partida: { match_mode: 'exact' } },
-      {
-        campo: 'userCooldownHours',
-        corpo: 'userCooldownHours=1',
-        partida: { user_cooldown_hours: 24 },
-      },
-      { campo: 'mediaScope', corpo: 'mediaScope=todas', partida: { media_scope: 'selecionadas' } },
-      {
-        campo: 'processOnlyReels',
-        corpo: 'processOnlyReels=nao',
-        partida: { process_only_reels: 1 },
-      },
-      {
-        campo: 'destinationUrl',
-        corpo: `destinationUrl=${encodeURIComponent(`https://${DOMINIO_DE_TESTE}/outro`)}`,
-        partida: {},
-      },
-      {
-        campo: 'privateReplyText',
-        corpo: `privateReplyText=${encodeURIComponent('Outro texto com o {link}')}`,
-        partida: {},
-      },
-      {
-        campo: 'publicReplyText',
-        corpo: `publicReplyText=${encodeURIComponent('Outro texto publico.')}`,
-        partida: {},
-      },
-    ]
+  test('GRAV-25: a tabela de §10.10 chega ao HTTP — um end-to-end por direcao', async () => {
+    // **Esta era a tabela inteira, entrada por entrada, e deixou de poder ser**
+    // (Ruling 77). Ela era exercida por `POST /painel/ajustes` quando aquela rota
+    // escrevia todo campo de comportamento; depois que o Ruling 73 pos a recusa
+    // de escopo antes da cerimonia e o Ruling 74 encolheu a lista da rota, seis
+    // das sete entradas passaram a ser recusadas por ESCOPO — `400`, e nao o
+    // `403` da classificacao. O teste teria continuado verde medindo o portao
+    // errado se as duas mudancas nao tivessem chegado juntas.
+    //
+    // A tabela mudou de endereco: ela e afirmada sobre `camposProtegidos` em
+    // META-06, `tests/painel-metatestes.test.ts`, com os catorze campos nas duas
+    // direcoes. E estritamente mais forte — cobre `mediaScope`, que nao tem rota
+    // dona ate a Task 13 — e imune a mudanca de escopo de rota. O que fica AQUI
+    // e o que so o HTTP prova: que a classificacao esta LIGADA no funil, e que
+    // ela decide o status, a linha de auditoria e a gravacao. Uma direcao cada,
+    // na rota que e dona do campo.
+    //
+    // `matchMode` e o veiculo porque as duas direcoes dele sao gravaveis em
+    // `/painel/palavras` (Ruling 65): "no meio do comentario" alarga e pede a
+    // digital, "so isso" estreita e grava sem pedir nada.
+    await gravarConfig(env.DB, { match_mode: 'exact' })
+    const sessao = await abrirSessao()
 
-    for (const caso of ALARGAM) {
-      await limparBanco(env.DB)
-      invalidarCacheDeConfig()
-      await gravarConfig(env.DB, caso.partida)
-      const sessao = await abrirSessao()
+    const alargando = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      'matchMode=no_meio',
+      sessao,
+    )
 
-      const resposta = await gravar(
-        GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-        caso.corpo,
-        sessao,
-      )
-
-      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: 403 })
-      expect({ [caso.campo]: (await unicaLinha()).acao }).toEqual({
-        [caso.campo]: 'stepup_recusado',
-      })
-    }
+    expect(alargando.status).toBe(403)
+    expect((await unicaLinha()).acao).toBe('stepup_recusado')
+    // A classificacao decide a GRAVACAO, e nao so o numero da resposta.
+    expect((await linhaDeConfig())?.match_mode).toBe('exact')
 
     // E o contrapositivo, que e a promessa do rodape dos Ajustes: ESTREITAR
-    // nunca pede a digital. Desde Ruling 65, `matchMode` e `processOnlyReels`
-    // sao gravaveis, entao estreitar GRAVA — `303` e `config_alterada`, com
-    // `step_up = 0`. Sobra `mediaScope`, que ainda nao tem tela dona (Ruling 68)
-    // e por isso e recusado com `400 dados_invalidos` — e nao com o `403` de quem
-    // alarga, que e a distincao que este trecho existe para afirmar.
-    const ESTREITAM: readonly {
-      campo: string
-      corpo: string
-      partida: Record<string, unknown>
-      status: number
-      acao: string
-    }[] = [
-      {
-        campo: 'matchMode',
-        corpo: 'matchMode=so_isso',
-        partida: { match_mode: 'contains' },
-        status: 303,
-        acao: 'config_alterada',
-      },
-      {
-        campo: 'mediaScope',
-        corpo: 'mediaScope=selecionadas',
-        partida: { media_scope: 'todas' },
-        status: 400,
-        acao: 'mudanca_recusada',
-      },
-      {
-        campo: 'processOnlyReels',
-        corpo: 'processOnlyReels=sim',
-        partida: { process_only_reels: 0 },
-        status: 303,
-        acao: 'config_alterada',
-      },
-    ]
+    // nunca pede a digital — e, desde o Ruling 65, estreitar GRAVA.
+    await limparBanco(env.DB)
+    invalidarCacheDeConfig()
+    await gravarConfig(env.DB, { match_mode: 'contains' })
+    const outra = await abrirSessao()
 
-    for (const caso of ESTREITAM) {
-      await limparBanco(env.DB)
-      invalidarCacheDeConfig()
-      await gravarConfig(env.DB, { trigger_keywords: '["quero o link"]', ...caso.partida })
-      const sessao = await abrirSessao()
+    const estreitando = await gravar(
+      GRAVADORAS[1] as (typeof GRAVADORAS)[number],
+      'matchMode=so_isso',
+      outra,
+    )
 
-      const resposta = await gravar(
-        GRAVADORAS[2] as (typeof GRAVADORAS)[number],
-        caso.corpo,
-        sessao,
-      )
-
-      expect({ [caso.campo]: resposta.status }).toEqual({ [caso.campo]: caso.status })
-      expect({ [caso.campo]: (await unicaLinha()).acao }).toEqual({
-        [caso.campo]: caso.acao,
-      })
-      // Nenhuma das tres passou por step-up: estreitar nunca pede a digital.
-      expect({ [caso.campo]: (await unicaLinha()).step_up }).toEqual({ [caso.campo]: 0 })
-    }
+    expect(estreitando.status).toBe(303)
+    expect((await linhaDeConfig())?.match_mode).toBe('exact')
+    const linha = await unicaLinha()
+    expect({ acao: linha.acao, step_up: linha.step_up }).toEqual({
+      acao: 'config_alterada',
+      step_up: 0,
+    })
   })
 
   test('GRAV-26: `codigoDaRecusaDeValidacao` separa dominio de campo invalido (§11.4)', async () => {

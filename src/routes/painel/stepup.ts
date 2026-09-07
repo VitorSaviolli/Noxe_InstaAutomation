@@ -33,9 +33,12 @@
  *    `gravar.ts`, que chegaria a **923 linhas** com elas. Nao foram reescritas:
  *    `CAMPOS_SEMPRE_PROTEGIDOS`, `alargaOAlcance` e `camposProtegidos` estao
  *    aqui palavra por palavra como a etapa anterior os deixou, e continuam sendo
- *    chamados de UM lugar so — o funil, por `passarPeloStepUp`. Ruling 63
- *    continua valendo inteiro: nao nasceu um segundo funil, nasceu um endereco
- *    para o que §10.10 descreve junto.
+ *    chamados de UM lugar so em PRODUCAO — o funil, por `passarPeloStepUp`.
+ *    `camposProtegidos` e exportada desde o Ruling 77, para a tabela de §10.10
+ *    ser afirmada sobre ela em vez de por rota; a exportacao nao cria um segundo
+ *    chamador, cria um ponto de medicao. Ruling 63 continua valendo inteiro: nao
+ *    nasceu um segundo funil, nasceu um endereco para o que §10.10 descreve
+ *    junto.
  *
  * As duas estao declaradas no relatorio, com os numeros.
  */
@@ -443,13 +446,17 @@ export interface PedidoDeConferencia {
   /** A mudanca canonica, que o `painel.js` manda para a cerimonia. */
   readonly mudanca: MudancaCanonica
   /**
-   * `true` quando TODOS os campos daquela tela sao protegidos.
+   * Quantas mudancas este UM toque confirma.
    *
-   * §15.4 acolheu a metade certa de uma objecao recusada: em `/painel/mensagem`
-   * nao ha lote a arrastar, porque os tres campos ja exigem step-up sempre — mas
-   * a tela precisa dizer, ANTES do gesto, que aquele toque cobre a tela inteira.
+   * §15.4 quer que a pessoa saiba, antes do gesto, que o toque cobre mais do que
+   * o campo que ela editou. A primeira grafia disto era um booleano
+   * (`cobreATelaInteira`) e a frase dizia "os **tres** campos desta tela" —
+   * verdadeira em `/painel/mensagem` e **falsa** em `/painel/ajustes` com um
+   * unico cooldown baixado, que e onde ela tambem aparecia. Contar e dizer o
+   * numero e a unica versao que nao mente em tela nenhuma, e a frase so sai
+   * quando ha mais de uma mudanca — com uma so, nao ha o que avisar.
    */
-  readonly cobreATelaInteira: boolean
+  readonly mudancasNoToque: number
 }
 
 /**
@@ -492,9 +499,11 @@ export function telaDeConferencia(pedido: PedidoDeConferencia): HtmlSeguro {
 <h2>Confira o que vai mudar</h2>
 <ul class="mudancas">${linhas}</ul>
 ${
-  pedido.cobreATelaInteira
-    ? html`<p>Um toque s&oacute; confirma <strong>os tr&ecirc;s campos desta tela de uma vez</strong>.
-Se voc&ecirc; s&oacute; queria mudar um deles, cancele e volte.</p>`
+  pedido.mudancasNoToque > 1
+    ? html`<p>Um toque s&oacute; confirma <strong>as ${String(
+        pedido.mudancasNoToque,
+      )} mudan&ccedil;as acima de uma vez</strong>. Se voc&ecirc; s&oacute; queria mudar uma delas,
+cancele e volte.</p>`
     : null
 }
 <p>Cada mudan&ccedil;a protegida &eacute; confirmada uma vez. &Eacute; por isso que &eacute; seguro.</p>
@@ -549,8 +558,21 @@ function alargaOAlcance(
   return false
 }
 
-/** Os campos do lote que exigem step-up. Um so ja tranca o lote inteiro. */
-function camposProtegidos(
+/**
+ * Os campos do lote que exigem step-up. Um so ja tranca o lote inteiro.
+ *
+ * **Exportada para ser afirmada DIRETO** (Ruling 77). Ate esta rodada a tabela
+ * de §10.10 so era alcancavel por rota, e foi por isso que mover a recusa de
+ * escopo para antes da cerimonia (Ruling 73) a esvaziou sem ninguem perceber:
+ * seis das sete entradas passaram a ser recusadas por escopo, e a suite
+ * continuou verde afirmando `403` que ja nao vinha daqui. Um teste sobre a
+ * funcao e estritamente mais forte que a versao por HTTP — cobre `mediaScope`,
+ * que nao tem rota dona ate a Task 13 — e imune a mudanca de escopo de rota.
+ *
+ * Continua sendo chamada de UM lugar so em producao: o funil, por
+ * `passarPeloStepUp`, logo abaixo.
+ */
+export function camposProtegidos(
   mudados: readonly CampoDaConfig[],
   antes: EstadoDeComportamento,
   depois: EstadoDeComportamento,
@@ -638,7 +660,7 @@ export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<Resu
       versao: versaoEnviada,
       paraOPost: entrada.rota.caminho,
       mudanca,
-      cobreATelaInteira: mudados.every((campo) => protegidos.includes(campo)),
+      mudancasNoToque: mudados.length,
     })}`
 
   const recusar = async (motivoInterno: string, extras: readonly D1PreparedStatement[]) => ({

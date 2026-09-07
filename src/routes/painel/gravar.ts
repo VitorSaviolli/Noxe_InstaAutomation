@@ -51,8 +51,8 @@ import type { Env } from '../../types/env'
 import {
   type CampoDaConfig,
   type CodigoDeConfirmacao,
-  escopoDeMidias,
   motivoDaRecusa,
+  motivoDeCampoForaDaTela,
   RECUSA_SEM_VALOR,
 } from './dicionario'
 import {
@@ -60,6 +60,7 @@ import {
   CONFIRMADO,
   ESTRUTURAIS_DE_TODA_ROTA,
   type EstadoDeComportamento,
+  estadoDaConfig,
   lerPatchDoCorpo,
   lerVersao,
   type PatchDeEstado,
@@ -81,12 +82,6 @@ import { cookieDeStepUpExpirado, passarPeloStepUp } from './stepup'
 // ---------------------------------------------------------------------------
 // O estado de comportamento: o que entra em `antes`/`depois` (§9.9)
 // ---------------------------------------------------------------------------
-/** O estado de comportamento de uma configuracao efetiva. */
-function estadoDaConfig(config: AutomationConfig): EstadoDeComportamento {
-  const { allowedMediaIds: _derivado, ...comportamento } = config
-  return { ...comportamento, mediaScope: escopoDeMidias(config) }
-}
-
 /**
  * O JSON de `antes`/`depois`, com as chaves em ordem fixa.
  *
@@ -258,10 +253,31 @@ export async function gravarConfiguracao(
   // e um formulario reenviado igual nao e uma.
   if (mudados.length === 0) return redirecionar(`${pedido.para}?ok=sem_mudanca`)
 
-  // Passo 8. Ele vem ANTES da recusa por campo nao gravavel porque §10.10 e
-  // explicito: se QUALQUER campo do lote exige step-up, o lote inteiro exige, e
-  // gravacao parcial e impossivel. A classificacao e a cerimonia sao UMA
-  // chamada, em `stepup.ts`: separa-las daria duas coisas para desencontrar.
+  // **A recusa de ESCOPO vem ANTES da cerimonia** (Ruling 73). O escopo de uma
+  // rota e estatico e conhecido antes de qualquer gesto: pedir a digital para
+  // uma operacao que nao podia dar certo — `403` com a tela de conferencia
+  // mostrando o link literal, e `400` depois do toque — ensina o dono que
+  // digital as vezes nao faz nada, e isso corroi a unica trava que depende de
+  // ele prestar atencao.
+  //
+  // Isto NAO afrouxa o tudo-ou-nada do Ruling 66: aquele e sobre a
+  // CLASSIFICACAO — se qualquer campo do lote exige step-up, o lote inteiro
+  // exige —, e recusar o lote inteiro mais cedo continua sendo tudo-ou-nada.
+  const foraDoEscopo = mudados.filter((campo) => !pedido.campos.includes(campo))
+  if (foraDoEscopo.length > 0) {
+    return await recusa.registrar({
+      acao: 'mudanca_recusada',
+      campos: foraDoEscopo,
+      codigo: 'dados_invalidos',
+      motivoInterno: 'campo_nao_gravavel',
+      explicacao: html`${blocoDaRecusa(
+        foraDoEscopo.map((campo) => ({ campo, motivo: motivoDeCampoForaDaTela(campo) })),
+      )}${await rascunho(false)}`,
+    })
+  }
+
+  // Passo 8. A classificacao e a cerimonia sao UMA chamada, em `stepup.ts`:
+  // separa-las daria duas coisas para desencontrar.
   const passagem = await passarPeloStepUp({
     entrada,
     sessao,
@@ -277,26 +293,16 @@ export async function gravarConfiguracao(
   if ('resposta' in passagem) return passagem.resposta
   const credencialDoStepUp = passagem.credentialId
 
-  // Ruling 70: o que esta rota nao declara, ela nao escreve. Vem DEPOIS do
-  // passo 8 pela ordem de §10.10 — se qualquer campo do lote exige step-up, o
-  // lote inteiro exige —, entao um campo de outra tela e recusado ainda que a
-  // digital feche.
-  const foraDoEscopo = mudados.filter((campo) => !pedido.campos.includes(campo))
-  if (foraDoEscopo.length > 0) {
-    return await recusa.registrar({
-      acao: 'mudanca_recusada',
-      campos: foraDoEscopo,
-      codigo: 'dados_invalidos',
-      motivoInterno: 'campo_nao_gravavel',
-      explicacao: html`${recusaComMotivoUnico(foraDoEscopo, RECUSA_SEM_VALOR.naoGravavel)}${await rascunho(
-        false,
-      )}`,
-    })
-  }
-
   // §10.12: religar exige sessao, ficha E confirmacao explicita na tela. A
-  // conferencia mora aqui, e nao em `handleChave`, porque `enabled` e campo
-  // gravavel e qualquer formulario do painel pode carrega-lo.
+  // conferencia mora aqui, e nao em `handleChave`, porque `enabled` chega ao
+  // funil por MAIS DE UM caminho: `POST /painel/chave`, que o declara em
+  // `CAMPOS_DA_CHAVE`, e `acao=restaurar`, cujo escopo e a uniao gravavel
+  // inteira (Ruling 74). Conferir so no handler da chave deixaria a restauracao
+  // desfazer a parada de emergencia com um clique.
+  //
+  // A frase antiga dizia "qualquer formulario do painel pode carrega-lo", e ela
+  // era verdadeira quando toda rota escrevia todo campo. Depois do Ruling 74 sao
+  // dois veiculos nomeados, e nao qualquer um — Ruling 79.
   if (religa(antes, depois) && corpo.campos.get(CAMPO_DA_CONFIRMACAO) !== CONFIRMADO) {
     return await recusa.registrar({
       acao: 'mudanca_recusada',

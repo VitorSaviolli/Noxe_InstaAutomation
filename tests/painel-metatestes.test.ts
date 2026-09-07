@@ -1,6 +1,25 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
-import { PREFIXO_DA_API, ROTAS } from '../src/routes/painel/rotas'
+import { CAMPOS_DE_AJUSTES } from '../src/routes/painel/ajustes'
+import type { CampoDaConfig } from '../src/routes/painel/dicionario'
+import {
+  CAMPOS_DA_RESTAURACAO,
+  CAMPOS_DE_COMPORTAMENTO,
+  CAMPOS_FORA_DA_RESTAURACAO,
+  type EstadoDeComportamento,
+} from '../src/routes/painel/formulario'
+import { CAMPOS_DA_CHAVE } from '../src/routes/painel/inicio'
+import { CAMPOS_DA_MENSAGEM } from '../src/routes/painel/mensagem'
+import { CAMPOS_DE_PALAVRAS } from '../src/routes/painel/palavras'
+import {
+  PREFIXO_DA_API,
+  ROTA_AJUSTES,
+  ROTA_CHAVE,
+  ROTA_MENSAGEM,
+  ROTA_PALAVRAS,
+  ROTAS,
+} from '../src/routes/painel/rotas'
+import { camposProtegidos } from '../src/routes/painel/stepup'
 import { painelHabilitado } from '../src/services/panel-session'
 import { limparBanco, TABELAS_DO_SCHEMA } from './fixtures/banco'
 import { pedir, responder } from './fixtures/dubles'
@@ -9,18 +28,24 @@ import { pedir, responder } from './fixtures/dubles'
  * META — metatestes.
  *
  * Nao testam uma funcionalidade: testam que o proprio conjunto de testes
- * continua cobrindo o que promete. Faltam META-06 (classificacao de step-up por
- * campo), que chega com a etapa do step-up.
+ * continua cobrindo o que promete.
  *
  * META-01: toda rota registrada exige sessao, salvo a allowlist escrita AQUI.
  * META-02: todo POST autenticado exige ficha CSRF, salvo as excecoes daqui.
  * META-03: toda tabela do schema aparece em `limparBanco()`.
  * META-04: todo binding do wrangler.jsonc existe no ambiente de teste.
  * META-05: `PANEL_SESSION_KEY` e diferente das outras chaves.
+ * META-06: a tabela de §10.10 inteira, afirmada no CLASSIFICADOR (Ruling 77).
  * META-07: o painel entra pelo `default:` e nao engole `/painelzinho` nem o 404.
  * META-08: `PRAGMA table_info` confere o conjunto EXATO de colunas.
  * META-09: todo caminho da tabela e string exata, sob `/painel`, sem variavel.
  * META-10: rota de pagina so com GET declara `csrf: false` e `escreve: false`.
+ * META-11: a UNIAO das listas de campo por rota e o conjunto gravavel da etapa.
+ *
+ * META-06 estava reservado desde a Task 10 com a nota "chega com a etapa do
+ * step-up" — chegou, e chegou como a spec o descreve: uma tabela, nao um
+ * caminho HTTP. META-11 leva o numero seguinte livre porque META-10 ja estava
+ * ocupado quando o Ruling 72 batizou o metateste da uniao.
  */
 
 /** Tabelas de infraestrutura do D1/Miniflare, que nao sao do projeto. */
@@ -529,5 +554,365 @@ describe('META — o painel entra pelo default:', () => {
     expect(corpo).toContain('Página não encontrada.')
     expect(corpo).not.toContain('rota_desconhecida')
     expect(corpo).not.toBe('Not Found')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// META — a classificacao de risco e o escopo de escrita por rota
+// ---------------------------------------------------------------------------
+
+/**
+ * Um estado de comportamento inteiro, com valores FICTICIOS.
+ *
+ * Nao vem de `src/config.ts` nem do banco: a classificacao de §10.10 e uma
+ * funcao pura de `(campo, antes, depois)`, e um estado montado aqui e o unico
+ * que nao muda quando a instalacao de quem roda o teste muda.
+ */
+const ESTADO_BASE: EstadoDeComportamento = {
+  enabled: true,
+  triggerKeywords: ['eu quero'],
+  matchMode: 'exact',
+  caseSensitive: false,
+  normalizeAccents: true,
+  ignorePunctuation: true,
+  processOnlyReels: true,
+  mediaScope: 'selecionadas',
+  publicReplyEnabled: true,
+  publicReplyText: 'Mandei no seu Direct.',
+  privateReplyEnabled: true,
+  privateReplyText: 'Ola, {username}! O link: {link}',
+  destinationUrl: 'https://exemplo.com/antigo',
+  userCooldownHours: 24,
+}
+
+/** Uma entrada da tabela de §10.10: uma direcao de um campo, e o veredito. */
+interface CasoDeRisco {
+  readonly campo: CampoDaConfig
+  /** O que muda no `antes`, sobre o estado base. */
+  readonly antes: Partial<EstadoDeComportamento>
+  /** O que muda no `depois`. Tem de ser diferente do `antes`. */
+  readonly depois: Partial<EstadoDeComportamento>
+  /** Aquela direcao pede a digital? */
+  readonly exige: boolean
+}
+
+/**
+ * A tabela de §10.10 INTEIRA: os catorze campos, cada um nas duas direcoes.
+ *
+ * **Por que aqui e nao por HTTP** (Ruling 77). Ate a rodada 2 esta tabela so era
+ * exercida atraves de `POST /painel/ajustes`, que naquele momento escrevia todo
+ * campo de comportamento. Quando o Ruling 73 moveu a recusa de escopo para antes
+ * da cerimonia e o Ruling 74 encolheu a lista daquela rota, seis das sete
+ * entradas passaram a ser recusadas por ESCOPO — `400 dados_invalidos` — e o
+ * teste que dizia medir a classificacao passou a medir outra coisa. Uma tabela
+ * afirmada sobre a funcao nao tem esse jeito de esvaziar sem ninguem ver.
+ *
+ * E e o unico lugar honesto para `mediaScope` ate a Task 13: a tela dona dele
+ * nao existe (Ruling 68), entao por rota nao ha como afirmar nem a metade
+ * positiva (que nao grava) nem a negativa — o `403` que a suite media vinha do
+ * escopo, e nao do risco.
+ *
+ * As quatro linhas de ALARGAMENTO sao as quatro que §10.10 enumera, palavra por
+ * palavra: `matchMode` para `contains`, cooldown ABAIXO do atual, `mediaScope`
+ * para `todas`, `processOnlyReels` para `false`. Os tres sempre-protegidos
+ * pedem nas duas direcoes. Todo o resto — `enabled` inclusive, e a ausencia
+ * dele e decisao escrita de §10.10 — nao pede em direcao nenhuma.
+ */
+const TABELA_DE_RISCO: readonly CasoDeRisco[] = [
+  // Os quatro alargamentos nomeados por §10.10, e a volta de cada um.
+  {
+    campo: 'matchMode',
+    antes: { matchMode: 'exact' },
+    depois: { matchMode: 'contains' },
+    exige: true,
+  },
+  {
+    campo: 'matchMode',
+    antes: { matchMode: 'contains' },
+    depois: { matchMode: 'exact' },
+    exige: false,
+  },
+  {
+    campo: 'userCooldownHours',
+    antes: { userCooldownHours: 24 },
+    depois: { userCooldownHours: 1 },
+    exige: true,
+  },
+  {
+    campo: 'userCooldownHours',
+    antes: { userCooldownHours: 24 },
+    depois: { userCooldownHours: 48 },
+    exige: false,
+  },
+  {
+    campo: 'mediaScope',
+    antes: { mediaScope: 'selecionadas' },
+    depois: { mediaScope: 'todas' },
+    exige: true,
+  },
+  {
+    campo: 'mediaScope',
+    antes: { mediaScope: 'todas' },
+    depois: { mediaScope: 'selecionadas' },
+    exige: false,
+  },
+  {
+    campo: 'processOnlyReels',
+    antes: { processOnlyReels: true },
+    depois: { processOnlyReels: false },
+    exige: true,
+  },
+  {
+    campo: 'processOnlyReels',
+    antes: { processOnlyReels: false },
+    depois: { processOnlyReels: true },
+    exige: false,
+  },
+
+  // Os tres sempre-protegidos: as DUAS direcoes pedem, porque nao existe
+  // direcao segura em trocar o que a pessoa recebe.
+  {
+    campo: 'destinationUrl',
+    antes: { destinationUrl: 'https://exemplo.com/a' },
+    depois: { destinationUrl: 'https://exemplo.com/b' },
+    exige: true,
+  },
+  {
+    campo: 'destinationUrl',
+    antes: { destinationUrl: 'https://exemplo.com/b' },
+    depois: { destinationUrl: 'https://exemplo.com/a' },
+    exige: true,
+  },
+  {
+    campo: 'privateReplyText',
+    antes: { privateReplyText: 'Um {link}' },
+    depois: { privateReplyText: 'Outro {link}' },
+    exige: true,
+  },
+  {
+    campo: 'privateReplyText',
+    antes: { privateReplyText: 'Outro {link}' },
+    depois: { privateReplyText: 'Um {link}' },
+    exige: true,
+  },
+  {
+    campo: 'publicReplyText',
+    antes: { publicReplyText: 'Um texto.' },
+    depois: { publicReplyText: 'Outro texto.' },
+    exige: true,
+  },
+  {
+    campo: 'publicReplyText',
+    antes: { publicReplyText: 'Outro texto.' },
+    depois: { publicReplyText: 'Um texto.' },
+    exige: true,
+  },
+
+  // `enabled` NAO alarga em direcao nenhuma (§10.10): religar nao muda valor,
+  // e desligar e o freio de emergencia, que tem de ser barato.
+  { campo: 'enabled', antes: { enabled: false }, depois: { enabled: true }, exige: false },
+  { campo: 'enabled', antes: { enabled: true }, depois: { enabled: false }, exige: false },
+
+  // Os sete restantes, nas duas direcoes, e nenhum pede.
+  {
+    campo: 'triggerKeywords',
+    antes: { triggerKeywords: ['eu quero'] },
+    depois: { triggerKeywords: ['eu quero', 'quero o link'] },
+    exige: false,
+  },
+  {
+    campo: 'triggerKeywords',
+    antes: { triggerKeywords: ['eu quero', 'quero o link'] },
+    depois: { triggerKeywords: ['eu quero'] },
+    exige: false,
+  },
+  {
+    campo: 'caseSensitive',
+    antes: { caseSensitive: false },
+    depois: { caseSensitive: true },
+    exige: false,
+  },
+  {
+    campo: 'caseSensitive',
+    antes: { caseSensitive: true },
+    depois: { caseSensitive: false },
+    exige: false,
+  },
+  {
+    campo: 'normalizeAccents',
+    antes: { normalizeAccents: false },
+    depois: { normalizeAccents: true },
+    exige: false,
+  },
+  {
+    campo: 'normalizeAccents',
+    antes: { normalizeAccents: true },
+    depois: { normalizeAccents: false },
+    exige: false,
+  },
+  {
+    campo: 'ignorePunctuation',
+    antes: { ignorePunctuation: false },
+    depois: { ignorePunctuation: true },
+    exige: false,
+  },
+  {
+    campo: 'ignorePunctuation',
+    antes: { ignorePunctuation: true },
+    depois: { ignorePunctuation: false },
+    exige: false,
+  },
+  {
+    campo: 'publicReplyEnabled',
+    antes: { publicReplyEnabled: false },
+    depois: { publicReplyEnabled: true },
+    exige: false,
+  },
+  {
+    campo: 'publicReplyEnabled',
+    antes: { publicReplyEnabled: true },
+    depois: { publicReplyEnabled: false },
+    exige: false,
+  },
+  {
+    campo: 'privateReplyEnabled',
+    antes: { privateReplyEnabled: false },
+    depois: { privateReplyEnabled: true },
+    exige: false,
+  },
+  {
+    campo: 'privateReplyEnabled',
+    antes: { privateReplyEnabled: true },
+    depois: { privateReplyEnabled: false },
+    exige: false,
+  },
+]
+
+/** As quatro rotas que gravam configuracao, cada uma com o escopo que declara. */
+const ESCOPO_POR_ROTA: readonly {
+  readonly caminho: string
+  readonly campos: readonly CampoDaConfig[]
+}[] = [
+  { caminho: ROTA_CHAVE.caminho, campos: CAMPOS_DA_CHAVE },
+  { caminho: ROTA_PALAVRAS.caminho, campos: CAMPOS_DE_PALAVRAS },
+  { caminho: ROTA_AJUSTES.caminho, campos: CAMPOS_DE_AJUSTES },
+  { caminho: ROTA_MENSAGEM.caminho, campos: CAMPOS_DA_MENSAGEM },
+]
+
+/**
+ * Os campos que NENHUMA rota pode escrever nesta etapa.
+ *
+ * `mediaScope` espera a tela dona (Ruling 68); os dois interruptores de canal
+ * esperam um formulario que os emita. Escrito AQUI, e nao derivado do codigo:
+ * uma lista derivada concordaria com qualquer coisa que o codigo dissesse, que
+ * e exatamente o buraco que o Ruling 72 mandou fechar.
+ */
+const FORA_DO_GRAVAVEL: readonly CampoDaConfig[] = [
+  'mediaScope',
+  'publicReplyEnabled',
+  'privateReplyEnabled',
+]
+
+describe('META — a classificacao de risco e o escopo por rota', () => {
+  test('META-06: a tabela de §10.10 inteira, afirmada no classificador', () => {
+    for (const caso of TABELA_DE_RISCO) {
+      const antes: EstadoDeComportamento = { ...ESTADO_BASE, ...caso.antes }
+      const depois: EstadoDeComportamento = { ...ESTADO_BASE, ...caso.depois }
+      const rotulo = `${caso.campo} ${JSON.stringify(antes[caso.campo])}->${JSON.stringify(
+        depois[caso.campo],
+      )}`
+
+      // Contrapositivo por CASO: um `depois` igual ao `antes` nao muda nada, e
+      // a linha passaria afirmando o vazio contra o vazio.
+      expect({ [rotulo]: JSON.stringify(antes[caso.campo]) }).not.toEqual({
+        [rotulo]: JSON.stringify(depois[caso.campo]),
+      })
+
+      expect({ [rotulo]: [...camposProtegidos([caso.campo], antes, depois)] }).toEqual({
+        [rotulo]: caso.exige ? [caso.campo] : [],
+      })
+    }
+  })
+
+  test('META-06: a tabela cobre TODOS os campos de comportamento, nas duas direcoes', () => {
+    // A metade que faz de META-06 um metateste: um campo novo em
+    // `src/config.ts` entra em `CAMPOS_DE_COMPORTAMENTO` sozinho, e a partir
+    // daqui alguem e OBRIGADO a declarar se ele alarga. Sem esta afirmacao, a
+    // tabela acima poderia ficar para tras em silencio, que e como a garantia
+    // se perdeu da primeira vez.
+    expect([...new Set(TABELA_DE_RISCO.map((caso) => caso.campo))].sort()).toEqual(
+      [...CAMPOS_DE_COMPORTAMENTO].sort(),
+    )
+
+    for (const campo of CAMPOS_DE_COMPORTAMENTO) {
+      const casos = TABELA_DE_RISCO.filter((caso) => caso.campo === campo)
+      expect({ [campo]: casos.length }).toEqual({ [campo]: 2 })
+    }
+
+    // E a tabela nao pode ser de um veredito so: quatro alargamentos e tres
+    // sempre-protegidos dao dez casos que EXIGEM, e os outros dezoito nao.
+    expect(TABELA_DE_RISCO.filter((caso) => caso.exige).length).toBe(10)
+    expect(TABELA_DE_RISCO.filter((caso) => !caso.exige).length).toBe(18)
+  })
+
+  test('META-06: um lote misto tranca inteiro, e o classificador nomeia so o protegido', () => {
+    // §10.10 e o Ruling 66: se QUALQUER campo do lote exige, o lote inteiro
+    // exige. Quem decide isso e o funil, olhando se a lista voltou vazia — e
+    // por isso ela nao pode vir vazia quando so um dos dois e protegido.
+    const antes: EstadoDeComportamento = { ...ESTADO_BASE, matchMode: 'exact' }
+    const depois: EstadoDeComportamento = {
+      ...ESTADO_BASE,
+      matchMode: 'contains',
+      triggerKeywords: ['eu quero', 'quero o link'],
+    }
+
+    expect([...camposProtegidos(['triggerKeywords', 'matchMode'], antes, depois)]).toEqual([
+      'matchMode',
+    ])
+  })
+
+  test('META-11: a uniao das listas por rota e EXATAMENTE o conjunto gravavel da etapa', () => {
+    // O ponto unico de guarda que o Ruling 70 destruiu ao apagar a
+    // `CAMPOS_GRAVAVEIS` global, devolvido pelo Ruling 72. O re-revisor provou
+    // o buraco: acrescentar `mediaScope` a lista de `/painel/palavras` deixava
+    // a suite INTEIRA verde, porque so a lista de `/painel/ajustes` estava sob
+    // teste. Daqui em diante, mexer em qualquer uma das quatro passa por aqui.
+    const uniao = [...new Set(ESCOPO_POR_ROTA.flatMap((rota) => [...rota.campos]))].sort()
+
+    expect(uniao).toEqual([...CAMPOS_DA_RESTAURACAO].sort())
+
+    // A igualdade acima sozinha nao basta: acrescentar `mediaScope` a uma lista
+    // de rota E a da restauracao a manteria verde. Estes tres sao nomeados, um
+    // a um, contra a uniao E contra a restauracao.
+    for (const campo of FORA_DO_GRAVAVEL) {
+      expect({ [campo]: uniao.includes(campo) }).toEqual({ [campo]: false })
+      expect({ [campo]: CAMPOS_DA_RESTAURACAO.includes(campo) }).toEqual({ [campo]: false })
+    }
+
+    // E o complemento fecha a conta: os catorze campos sao os onze da uniao
+    // mais estes tres, sem sobra.
+    expect([...CAMPOS_FORA_DA_RESTAURACAO].sort()).toEqual([...FORA_DO_GRAVAVEL].sort())
+    expect(uniao.length + FORA_DO_GRAVAVEL.length).toBe(CAMPOS_DE_COMPORTAMENTO.length)
+
+    // Contrapositivo: nenhuma das quatro listas pode estar vazia — quatro
+    // listas vazias fariam a uniao vazia bater com uma restauracao vazia.
+    for (const rota of ESCOPO_POR_ROTA) {
+      expect({ [rota.caminho]: rota.campos.length }).not.toEqual({ [rota.caminho]: 0 })
+    }
+  })
+
+  test('META-11: as rotas de gravacao da tabela sao exatamente as quatro declaradas aqui', () => {
+    // Sem isto, a uniao acima seria a uniao das rotas que ALGUEM LEMBROU de
+    // listar. A Task 13 acrescenta `/painel/reels` a tabela de rotas, e este
+    // teste e quem a obriga a vir declarar o escopo dela — que e exatamente o
+    // momento em que se quer ser obrigado a olhar.
+    const gravadorasDeConfig = ROTAS.filter(
+      (rota) =>
+        !rota.caminho.startsWith(PREFIXO_DA_API) && rota.escreve && rota.metodos.includes('POST'),
+    )
+
+    expect(gravadorasDeConfig.map((rota) => rota.caminho).sort()).toEqual(
+      ESCOPO_POR_ROTA.map((rota) => rota.caminho).sort(),
+    )
   })
 })

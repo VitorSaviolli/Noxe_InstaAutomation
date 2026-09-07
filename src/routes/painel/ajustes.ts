@@ -34,7 +34,14 @@ import {
   NOME_DO_CAMPO,
   ORIGEM_DOS_AJUSTES,
 } from './dicionario'
-import { CAMPOS_DE_COMPORTAMENTO, lerEstadoGuardado, valorDeFormulario } from './formulario'
+import {
+  CAMPOS_DA_RESTAURACAO,
+  type EstadoDeComportamento,
+  estadoDaConfig,
+  lerEstadoGuardado,
+  restauracaoPossivel,
+  valorDeFormulario,
+} from './formulario'
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import {
@@ -61,32 +68,28 @@ import { telaDoPainel } from './tela'
 const MUDANCAS_NO_HISTORICO = 5
 
 /**
- * Os campos que ESTA tela grava (Ruling 70).
+ * Os campos que o FORMULARIO desta tela grava (Ruling 70).
  *
- * As tres chaves de comparacao, o tipo de publicacao e o intervalo por pessoa
- * sao os controles do formulario. `enabled`, `triggerKeywords` e `matchMode`
- * entram por causa do botao "Voltar a esta versao", que reenvia o `antes`
- * INTEIRO pela rota normal de gravacao (§9.9, Ruling 55) — sem eles o botao
- * recusaria restaurar uma versao que so difere numa palavra-gatilho.
+ * Exatamente os controles que ela emite: as tres chaves de comparacao, o tipo de
+ * publicacao e o intervalo por pessoa. Nada de `enabled`, `triggerKeywords` nem
+ * `matchMode` — cada um deles tem a sua tela, e META-10 confere que a uniao das
+ * quatro listas cobre o conjunto gravavel sem sobra.
  *
- * **O link, os dois textos e `mediaScope` ficam de fora, e a ausencia e a
- * decisao de Ruling 70:** eles sao de `/painel/mensagem` e de `/painel/reels`.
- * A consequencia aceita, e declarada, e que restaurar uma versao que difere no
- * link e recusada aqui — quem restaura o link e a tela que o mostra, com a
- * frase de §15.4 na frente do gesto. O que a lista compra em troca e o escopo:
- * um formulario adulterado desta tela nao consegue gravar o link sob a digital
- * que foi pedida para outra coisa.
+ * O botao "Voltar a esta versao" NAO usa esta lista: ele declara a operacao
+ * `acao=restaurar`, cujo escopo e a uniao inteira (Ruling 74). §9.9 nomeia o que
+ * a restauracao atravessa — mesmo validador, mesmo step-up, allowlist de hoje —
+ * e a lista por rota seria um quarto portao que a spec nao sanciona.
  */
-const CAMPOS_DA_TELA: readonly CampoDaConfig[] = [
-  'enabled',
-  'triggerKeywords',
-  'matchMode',
+export const CAMPOS_DE_AJUSTES: readonly CampoDaConfig[] = [
   'caseSensitive',
   'normalizeAccents',
   'ignorePunctuation',
   'processOnlyReels',
   'userCooldownHours',
 ]
+
+/** O valor de `acao` que declara a operacao de restauracao (Ruling 74). */
+export const RESTAURAR = 'restaurar'
 
 /** Uma linha "nome do ajuste / o que ele quer dizer hoje". */
 function linha(rotulo: string, valor: string): HtmlSeguro {
@@ -251,13 +254,28 @@ function nomesDosCampos(cru: string): string {
  * Um `antes` que nao parseia sai SEM botao: melhor uma linha so de leitura do
  * que um botao que posta um corpo pela metade.
  */
-function linhaDoHistorico(mudanca: MudancaRegistrada, ficha: string, versao: number): HtmlSeguro {
+function linhaDoHistorico(
+  mudanca: MudancaRegistrada,
+  ficha: string,
+  versao: number,
+  hoje: EstadoDeComportamento,
+): HtmlSeguro {
   const estado = lerEstadoGuardado(mudanca.antes)
 
+  // **O botao so sai quando a versao volta INTEIRA** (R-6). `mediaScope` e os
+  // dois interruptores de canal nao sao gravaveis por rota nenhuma nesta etapa,
+  // entao uma versao que difira em qualquer um deles voltaria pela metade — e um
+  // botao que promete recuperacao e recupera parte dela e a mesma promessa
+  // quebrada que §12.4 recusa. Sem botao, e a linha diz por que.
+  const inteira = estado !== null && restauracaoPossivel(estado, hoje)
+
+  // Os campos escondidos sao os da UNIAO gravavel, e nao `CAMPOS_DE_COMPORTAMENTO`:
+  // mandar um campo que nenhuma rota escreve so serviria para a gravacao ser
+  // recusada por ele.
   const escondidos =
     estado === null
       ? null
-      : CAMPOS_DE_COMPORTAMENTO.map(
+      : CAMPOS_DA_RESTAURACAO.map(
           (campo) =>
             html`<input type="hidden" name="${campo}" value="${valorDeFormulario(campo, estado)}">`,
         )
@@ -267,14 +285,18 @@ function linhaDoHistorico(mudanca: MudancaRegistrada, ficha: string, versao: num
     mudanca.campos,
   )}</p>
 ${
-  escondidos === null
+  estado === null
     ? html`<p>N&atilde;o conseguimos ler o que estava salvo nesta vers&atilde;o, ent&atilde;o
 n&atilde;o d&aacute; para voltar a ela por aqui.</p>`
-    : html`<form method="post" action="${ROTA_AJUSTES.caminho}">
+    : inteira
+      ? html`<form method="post" action="${ROTA_AJUSTES.caminho}">
 ${camposDoFormulario(ficha, versao)}
+<input type="hidden" name="acao" value="${RESTAURAR}">
 ${escondidos}
 <button type="submit">Voltar a esta vers&atilde;o</button>
 </form>`
+      : html`<p>Esta vers&atilde;o tinha ajustes que o painel ainda n&atilde;o sabe mudar, ent&atilde;o
+voltar a ela deixaria uma parte para tr&aacute;s. Por isso n&atilde;o h&aacute; bot&atilde;o aqui.</p>`
 }
 </li>`
 }
@@ -284,6 +306,7 @@ function blocoDoHistorico(
   mudancas: readonly MudancaRegistrada[],
   ficha: string,
   versao: number,
+  hoje: EstadoDeComportamento,
 ): HtmlSeguro {
   return html`<section>
 <h2>O que voc&ecirc; mudou por aqui</h2>
@@ -293,7 +316,7 @@ ${
 &uacute;ltimas altera&ccedil;&otilde;es aparecem nesta lista, com um bot&atilde;o para voltar a
 qualquer uma delas.</p>`
     : html`<ul class="historico">${mudancas.map((mudanca) =>
-        linhaDoHistorico(mudanca, ficha, versao),
+        linhaDoHistorico(mudanca, ficha, versao, hoje),
       )}</ul>`
 }
 </section>`
@@ -301,10 +324,21 @@ qualquer uma delas.</p>`
 
 export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
   if (entrada.request.method === 'POST') {
+    // Duas operacoes, uma rota (§7.1: nenhuma rota nova, e o identificador de uma
+    // escrita vai no corpo do POST). O formulario de ajustes escreve os
+    // controles desta tela; o botao "Voltar a esta versao" declara
+    // `acao=restaurar` e escreve a uniao gravavel — que e o escopo que §9.9 da a
+    // restauracao (Ruling 74). A protecao dela nao muda: mesmo validador, mesmo
+    // step-up preso ao conteudo, allowlist de hoje, e a tela de conferencia
+    // mostrando literalmente cada campo que muda.
+    const restaurando =
+      entrada.corpo.familia === 'formulario' && entrada.corpo.campos.get('acao') === RESTAURAR
+
     return await gravarConfiguracao(entrada, {
       para: ROTA_AJUSTES.caminho,
       confirmacao: 'salvo',
-      campos: CAMPOS_DA_TELA,
+      estruturais: ['acao'],
+      campos: restaurando ? CAMPOS_DA_RESTAURACAO : CAMPOS_DE_AJUSTES,
     })
   }
 
@@ -325,7 +359,7 @@ ${linha('Intervalo por pessoa', frasedoIntervalo(global.userCooldownHours))}
 </section>
 ${formularioDosAjustes(global, ficha, snapshot.versao)}
 ${blocoDeCanais(global)}
-${blocoDoHistorico(mudancas, ficha, snapshot.versao)}
+${blocoDoHistorico(mudancas, ficha, snapshot.versao, estadoDaConfig(global))}
 <footer>
 <p>Os ajustes que est&atilde;o valendo agora s&atilde;o ${ORIGEM_DOS_AJUSTES[snapshot.origem]}.</p>
 <p><strong>Diminuir o alcance da automa&ccedil;&atilde;o nunca pede a sua digital ou o seu rosto.

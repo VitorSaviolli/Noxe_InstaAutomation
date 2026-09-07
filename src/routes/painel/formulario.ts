@@ -25,7 +25,12 @@
  */
 import type { AutomationConfig, MatchMode } from '../../config'
 import { MAX_HORAS_DE_COOLDOWN } from '../../services/config-validation'
-import { type CampoDaConfig, type EscopoDeMidias, NOME_DO_CAMPO } from './dicionario'
+import {
+  type CampoDaConfig,
+  type EscopoDeMidias,
+  escopoDeMidias,
+  NOME_DO_CAMPO,
+} from './dicionario'
 import { CAMPO_DA_CONFIRMACAO, CAMPO_DA_DIGITAL, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './guardas'
 
 // ---------------------------------------------------------------------------
@@ -66,6 +71,76 @@ export type PatchDeEstado = Partial<EstadoDeComportamento>
 export const CAMPOS_DE_COMPORTAMENTO: readonly CampoDaConfig[] = (
   Object.keys(NOME_DO_CAMPO) as CampoDaConfig[]
 ).sort()
+
+/**
+ * Os campos que a **restauracao** pode reescrever (Ruling 74).
+ *
+ * §9.9 diz o que o botao "Voltar a esta versao" atravessa, e a lista e fechada:
+ * "o mesmo validador, o **mesmo step-up** e a allowlist de hoje", com UMA recusa
+ * sancionada — se a allowlist encolheu. A lista de campos por ROTA (Ruling 70)
+ * seria um quarto portao que a spec nao nomeia, recusando por um motivo que ela
+ * nao sanciona: uma vez que o link tivesse mudado, toda linha de historico
+ * anterior aquela mudanca ficava irrestauravel, **inclusive as que eram sobre
+ * palavra-gatilho**.
+ *
+ * Entao a restauracao e uma **operacao declarada** — `acao=restaurar`, como
+ * `acao=ligar|desligar` de §7.1 —, e o escopo dela e a uniao gravavel inteira.
+ * A protecao continua sendo onde §9.9 a poe: mesmo validador, mesmo step-up
+ * preso ao conteudo, allowlist de hoje. Para campo protegido a defesa e a tela
+ * de conferencia mais o `op_hash`, que mostram o valor literal antes do gesto;
+ * para campo nao protegido, escrever pela tela errada nao ganha privilegio
+ * nenhum.
+ *
+ * **Esta lista tem de ser exatamente a UNIAO das listas das quatro rotas de
+ * gravacao**, e um metateste afirma isso (META-10, Ruling 72). Sem ele, a
+ * garantia do Ruling 68 — `mediaScope` nao e gravavel nesta etapa — dependeria
+ * de as quatro listas a omitirem, e so uma delas estava sob teste.
+ */
+export const CAMPOS_DA_RESTAURACAO: readonly CampoDaConfig[] = [
+  'enabled',
+  'triggerKeywords',
+  'matchMode',
+  'caseSensitive',
+  'normalizeAccents',
+  'ignorePunctuation',
+  'processOnlyReels',
+  'publicReplyText',
+  'privateReplyText',
+  'destinationUrl',
+  'userCooldownHours',
+]
+
+/**
+ * Os campos que NENHUMA rota grava nesta etapa.
+ *
+ * `mediaScope` espera a tela que e dona dele (Ruling 68); os dois interruptores
+ * de canal esperam um formulario que os emita. A lista existe para o botao de
+ * restaurar poder ser honesto: uma versao que difere em qualquer um deles nao
+ * tem como voltar inteira, e §12.4 nao admite botao que promete e nao cumpre.
+ */
+export const CAMPOS_FORA_DA_RESTAURACAO: readonly CampoDaConfig[] = CAMPOS_DE_COMPORTAMENTO.filter(
+  (campo) => !CAMPOS_DA_RESTAURACAO.includes(campo),
+)
+
+/** O estado de comportamento de uma configuracao efetiva. */
+export function estadoDaConfig(config: AutomationConfig): EstadoDeComportamento {
+  const { allowedMediaIds: _derivado, ...comportamento } = config
+  return { ...comportamento, mediaScope: escopoDeMidias(config) }
+}
+
+/**
+ * Aquela versao guardada volta INTEIRA pelo botao? (Ruling 74, R-6)
+ *
+ * Ela volta quando nao difere de hoje em nenhum campo que ninguem grava. Se
+ * diferir, o botao **nao sai** — e a linha diz por que —, porque um botao que
+ * restaura pela metade e o mesmo tipo de promessa quebrada que §12.4 recusa.
+ */
+export function restauracaoPossivel(
+  guardado: EstadoDeComportamento,
+  hoje: EstadoDeComportamento,
+): boolean {
+  return CAMPOS_FORA_DA_RESTAURACAO.every((campo) => guardado[campo] === hoje[campo])
+}
 
 // ---------------------------------------------------------------------------
 // A leitura do formulario

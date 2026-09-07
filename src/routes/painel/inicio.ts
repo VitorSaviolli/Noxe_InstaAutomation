@@ -26,6 +26,7 @@ import { PainelConfigRepository } from '../../repositories/painel-config-reposit
 import { carregarConfigEfetiva, type SnapshotConfig } from '../../services/config-store'
 import { fichaCsrf } from '../../services/panel-session'
 import type { Env } from '../../types/env'
+import type { CampoDaConfig } from './dicionario'
 import {
   dataEmPortugues,
   escopoDeMidias,
@@ -475,6 +476,14 @@ ${blocoDePendencias(visao)}
 // POST /painel/chave — a chave liga/desliga
 // ---------------------------------------------------------------------------
 
+/**
+ * Os campos que `POST /painel/chave` escreve (Ruling 70).
+ *
+ * UM campo, e e o que o `acao` do corpo traduz. Exportado porque META-10 confere
+ * a uniao das quatro listas contra o conjunto gravavel da etapa.
+ */
+export const CAMPOS_DA_CHAVE: readonly CampoDaConfig[] = ['enabled']
+
 /** As duas acoes que §7.1 declara para esta rota. Nada mais casa. */
 const LIGAR = 'ligar'
 const DESLIGAR = 'desligar'
@@ -505,8 +514,7 @@ export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
   return await gravarConfiguracao(entrada, {
     para: ROTA_INICIO.caminho,
     confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
-    // A chave escreve UM campo, e e o que o `acao` do corpo traduz.
-    campos: ['enabled'],
+    campos: CAMPOS_DA_CHAVE,
     // So `acao` — a confirmacao de §10.12 e estrutural de TODA rota, e quem a
     // exige e o funil, na transicao `desligada -> ligada`. Conferi-la aqui
     // deixava `POST /painel/ajustes` com `enabled=sim` desfazer a parada de

@@ -47,7 +47,7 @@ import { telaDoPainel } from './tela'
  * alem deles. `matchMode` para "basta aparecer no meio" alarga o alcance e pede
  * a digital (§10.10); voltar estreita e nao pede.
  */
-const CAMPOS_DA_TELA: readonly CampoDaConfig[] = ['triggerKeywords', 'matchMode']
+export const CAMPOS_DE_PALAVRAS: readonly CampoDaConfig[] = ['triggerKeywords', 'matchMode']
 
 /** Um exemplo de comentario e o veredito da funcao de producao. */
 interface Exemplo {
@@ -182,7 +182,7 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
       // Ruling 70: os dois controles que o formulario desta tela emite. O link
       // e os textos sao de `/painel/mensagem`, e a lista e o que impede um
       // formulario adulterado daqui de grava-los sob a digital pedida aqui.
-      campos: CAMPOS_DA_TELA,
+      campos: CAMPOS_DE_PALAVRAS,
     })
   }
 

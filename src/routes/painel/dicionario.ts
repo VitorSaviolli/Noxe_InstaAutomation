@@ -202,10 +202,53 @@ export const SELO_PROTEGIDO = 'protegido'
  * a continuacao existe logo abaixo dela, na tela de conferencia, e a frase diz
  * o que de fato acontece.
  */
+/**
+ * Onde cada campo E editavel, para a recusa poder dizer o caminho (Ruling 75).
+ *
+ * `RECUSA_SEM_VALOR.naoGravavel` dizia "Este ajuste **ainda** nao pode ser
+ * mudado por aqui" para tudo o que caia fora da lista da rota — e depois do
+ * Ruling 70 isso passou a alcancar campo que ja e editavel, so que em outra
+ * tela. "Ainda" e falso para o que existe hoje, e mandar a pessoa esperar por
+ * uma tela que ja esta pronta e pior do que nao dizer nada.
+ *
+ * Quem NAO esta neste mapa nao e editavel em lugar nenhum — e ai a frase com
+ * "ainda" e verdadeira.
+ */
+const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
+  enabled: 'no bot\u00e3o do In\u00edcio',
+  triggerKeywords: 'na tela de Palavras',
+  matchMode: 'na tela de Palavras',
+  caseSensitive: 'nos Ajustes finos',
+  normalizeAccents: 'nos Ajustes finos',
+  ignorePunctuation: 'nos Ajustes finos',
+  processOnlyReels: 'nos Ajustes finos',
+  userCooldownHours: 'nos Ajustes finos',
+  destinationUrl: 'na tela da mensagem e do link',
+  privateReplyText: 'na tela da mensagem e do link',
+  publicReplyText: 'na tela da mensagem e do link',
+}
+
+/**
+ * Por que aquele campo nao pode ser gravado POR ESTA rota (Ruling 75).
+ *
+ * Duas frases, e a diferenca importa para quem esta na tela: um campo que mora
+ * em outra tela pede o CAMINHO, e um campo que nao mora em nenhuma pede a
+ * verdade — que ele ainda nao da para mudar.
+ */
+export function motivoDeCampoForaDaTela(campo: string): string {
+  const tela = Object.hasOwn(TELA_DO_CAMPO, campo)
+    ? TELA_DO_CAMPO[campo as CampoDaConfig]
+    : undefined
+
+  if (tela === undefined) return RECUSA_SEM_VALOR.naoGravavel
+  return `Este ajuste \u00e9 mudado ${tela}, e n\u00e3o por aqui.`
+}
+
 export const RECUSA_SEM_VALOR = {
   protegido:
     'Esta mudança pede a sua digital ou o seu rosto: ou ela aumenta o alcance da automação, ou ela troca o que a pessoa recebe. Confira abaixo o que vai mudar e confirme.',
-  naoGravavel: 'Este ajuste ainda não pode ser mudado por aqui.',
+  naoGravavel:
+    'Este ajuste ainda não pode ser mudado pelo painel. A tela que cuida dele chega em uma próxima parte.',
   configIlegivel:
     'Não conseguimos ler os seus ajustes salvos, então nada pode ser gravado por aqui até isso ser resolvido. Quem resolve é quem publicou o projeto, no computador.',
 } as const
