@@ -15,7 +15,7 @@
 import { type HtmlSeguro, html, pagina } from './html'
 
 /** Qual item da barra de baixo esta aceso. Um por tela, sempre. */
-export type Aba = 'inicio' | 'palavras' | 'mensagem' | 'atividade' | 'ajustes'
+export type Aba = 'inicio' | 'reels' | 'palavras' | 'mensagem' | 'atividade' | 'ajustes'
 
 interface ItemDeNavegacao {
   readonly aba: Aba
@@ -38,6 +38,12 @@ interface ItemDeNavegacao {
  */
 const NAVEGACAO: readonly ItemDeNavegacao[] = [
   { aba: 'inicio', para: '/painel', icone: '⌂', palavra: 'Início' },
+  // A primeira das duas trocas que o paragrafo acima anunciou: a Etapa 12 criou
+  // a tela de Reels, entao o item deixou de levar a um `404` e entrou. Sao SEIS
+  // itens ate a segunda troca — o "Mais" de §12.1, que absorve Ajustes e "O que
+  // aconteceu" —, e seis com destino real e melhor do que cinco com um deles
+  // levando a lugar nenhum, que e a regra que este paragrafo ja escrevia.
+  { aba: 'reels', para: '/painel/reels', icone: '▶', palavra: 'Reels' },
   { aba: 'palavras', para: '/painel/palavras', icone: '✎', palavra: 'Palavras' },
   { aba: 'mensagem', para: '/painel/mensagem', icone: '✉', palavra: 'Mensagem' },
   { aba: 'atividade', para: '/painel/atividade', icone: '◷', palavra: 'O que aconteceu' },

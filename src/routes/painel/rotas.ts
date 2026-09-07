@@ -201,6 +201,47 @@ export const ROTA_AJUSTES: RotaDoPainel = {
   gravaConfig: true,
 }
 
+/**
+ * "Meus Reels" — a tela que o dono pediu em primeiro lugar (§3, §12.5).
+ *
+ * `escreve: true` porque o caminho de sucesso do SALVAR grava: o escopo na
+ * linha global e a selecao em `painel_midias`, no mesmo lote. A paginacao e o
+ * POST-que-so-renderiza que §7.1 nomeia — ela nao grava e devolve `200` com a
+ * pagina remontada, porque um `303` perderia o que a pessoa ja marcou.
+ *
+ * `stepUp: false` pela mesma razao das outras quatro: quem classifica e o
+ * CONTEUDO, no funil. `mediaScope` indo para "em todos os meus Reels" e
+ * alargamento e pede a digital; marcar e desmarcar Reel, nao — §10.10 lista
+ * "remover um Reel da lista" entre o que nao exige.
+ */
+export const ROTA_REELS: RotaDoPainel = {
+  caminho: '/painel/reels',
+  metodos: ['GET', 'POST'],
+  sessao: true,
+  csrf: true,
+  stepUp: false,
+  escreve: true,
+  gravaConfig: true,
+}
+
+/**
+ * "Este Reel responde diferente" (§3, §12.5).
+ *
+ * **O Reel vem na QUERY STRING, e nenhum caminho tem segmento variavel**
+ * (§7.1, Ruling 93): `?midia=` e o identificador de uma LEITURA, e o `media_id`
+ * nao e segredo — ele aparece no permalink publico do Reel. Na escrita ele vai
+ * no corpo do POST, como todo identificador de escrita.
+ */
+export const ROTA_REEL: RotaDoPainel = {
+  caminho: '/painel/reel',
+  metodos: ['GET', 'POST'],
+  sessao: true,
+  csrf: true,
+  stepUp: false,
+  escreve: true,
+  gravaConfig: true,
+}
+
 /** "O que aconteceu". `GET` unico, hoje e sempre: ela so le (§7.1). */
 export const ROTA_ATIVIDADE: RotaDoPainel = {
   caminho: '/painel/atividade',
@@ -324,6 +365,8 @@ export const ROTAS: readonly RotaDoPainel[] = [
   ROTA_PALAVRAS,
   ROTA_MENSAGEM,
   ROTA_AJUSTES,
+  ROTA_REELS,
+  ROTA_REEL,
   ROTA_ATIVIDADE,
   ROTA_ENTRAR,
   ROTA_CONVITE,

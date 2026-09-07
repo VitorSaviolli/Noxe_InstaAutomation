@@ -44,6 +44,8 @@ import {
 import { handleChave, handleInicio } from './inicio'
 import { handleMensagem } from './mensagem'
 import { handlePalavras } from './palavras'
+import { handleReel } from './reel'
+import { handleReels } from './reels'
 import {
   CAMINHO_DA_VERIFICACAO,
   CAMINHO_DAS_OPCOES,
@@ -65,6 +67,8 @@ import {
   ROTA_OPCOES_DE_ENTRAR,
   ROTA_OPCOES_DE_STEPUP,
   ROTA_PALAVRAS,
+  ROTA_REEL,
+  ROTA_REELS,
   ROTA_VERIFICAR_ENTRADA,
   type RotaDoPainel,
   tetoDoCorpo,
@@ -147,6 +151,14 @@ export async function routePainel(
 
     case ROTA_AJUSTES.caminho:
       return despachar(request, env, now, ROTA_AJUSTES, handleAjustes)
+
+    // As duas telas de Reels (§12.5). `/painel/reel` casa por caminho EXATO e
+    // le o Reel da query string: nenhum caminho tem segmento variavel (§7.1).
+    case ROTA_REELS.caminho:
+      return despachar(request, env, now, ROTA_REELS, handleReels)
+
+    case ROTA_REEL.caminho:
+      return despachar(request, env, now, ROTA_REEL, handleReel)
 
     case ROTA_ATIVIDADE.caminho:
       return despachar(request, env, now, ROTA_ATIVIDADE, handleAtividade)

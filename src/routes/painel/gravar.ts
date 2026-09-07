@@ -28,16 +28,7 @@
  * essa e a unica escrita que sai de um caminho que nao muda a configuracao.
  */
 import type { AutomationConfig } from '../../config'
-import { PainelAuditoriaRepository } from '../../repositories/painel-auditoria-repository'
-import {
-  type LinhaGravavel,
-  PainelConfigRepository,
-} from '../../repositories/painel-config-repository'
-import {
-  type LinhaDeSessao,
-  PainelSessoesRepository,
-} from '../../repositories/painel-sessoes-repository'
-import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../../services/config-store'
+import { carregarConfigEfetiva } from '../../services/config-store'
 import type { Achado } from '../../services/config-validation'
 import {
   CODIGO_DA_RECUSA,
@@ -45,10 +36,9 @@ import {
   lerAllowlist,
   validarConfigComAllowlist,
 } from '../../services/link-allowlist'
-import { rotacionarSessao } from '../../services/panel-session'
 import { prefixoDeCredencial } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
-import { CAMPO_DA_CONFIRMACAO, COOKIE_DA_SESSAO, cookieDoPainel } from './campos'
+import { CAMPO_DA_CONFIRMACAO } from './campos'
 import {
   type CampoDaConfig,
   type CodigoDeConfirmacao,
@@ -68,6 +58,7 @@ import {
   religa,
 } from './formulario'
 import { type HtmlSeguro, html } from './html'
+import { aplicarMudanca } from './lote'
 import {
   blocoDaRecusa,
   blocoDoRascunho,
@@ -77,27 +68,11 @@ import {
 } from './recusa'
 import { type CodigoDeErro, erro, redirecionar } from './resposta'
 import type { EntradaDaRota } from './router'
-import { cookieDeStepUpExpirado, passarPeloStepUp } from './stepup'
+import { passarPeloStepUp } from './stepup'
 
 // ---------------------------------------------------------------------------
 // O estado de comportamento: o que entra em `antes`/`depois` (§9.9)
 // ---------------------------------------------------------------------------
-/**
- * O JSON de `antes`/`depois`, com as chaves em ordem fixa.
- *
- * **Nenhum metadado de exibicao entra aqui, nem hoje nem quando as linhas de
- * midia chegarem** (§9.9, §15.4): `legenda_curta` e recorte da `caption` do
- * Reel, e `caption` esta na lista de proibidos dos DOIS destinos — a proibicao
- * vence a regra do "estado completo". A protecao e estrutural: a funcao copia
- * de `CAMPOS_DE_COMPORTAMENTO`, e nao do objeto que recebeu, entao um campo a
- * mais na origem nao vaza por descuido.
- */
-function comoJson(estado: EstadoDeComportamento): string {
-  const ordenado: Record<string, unknown> = {}
-  for (const campo of CAMPOS_DE_COMPORTAMENTO) ordenado[campo] = estado[campo]
-  return JSON.stringify(ordenado)
-}
-
 // ---------------------------------------------------------------------------
 // A classificacao de risco de §10.10
 // ---------------------------------------------------------------------------
@@ -193,6 +168,64 @@ export interface PedidoDeGravacao {
    * digital continuava sendo do dono, e cobria outra coisa.
    */
   readonly patchDoHandler?: PatchDeEstado
+  /**
+   * A parte da gravacao que mora em `painel_midias` (Ruling 91).
+   *
+   * **Isto e uma EXTENSAO do funil, e a alternativa recusada era um segundo
+   * funil.** As quatro garantias caras da branch — trava otimista, lote atomico
+   * com a linha de auditoria, step-up preso ao conteudo e "sem log, sem
+   * mudanca" — valem para uma escrita por midia palavra por palavra, e a
+   * migration `0002` ja diz por que: `painel_config.versao` e "contador
+   * monotonico de TODA a configuracao (global + midias)", e `painel_auditoria`
+   * ja tem a coluna `alvo` dimensionada para um `media_id`. Escrever direto no
+   * repositorio de midias seria a segunda grafia das quatro (Ruling 63).
+   *
+   * O que NAO cabia no funil de hoje era uma coisa so: `antes`/`depois` sao o
+   * estado de comportamento da linha GLOBAL. A extensao resolve isso deixando a
+   * tela dizer qual entidade esta mudando — e, para um Reel, o "estado completo
+   * da entidade afetada" de §9.9 e a config EFETIVA daquele Reel: a global com
+   * a sobreposicao por cima. Com ela no lugar de `antes`, a classificacao de
+   * risco, a tela de conferencia, o `op_hash` e o JSON da auditoria continuam
+   * sendo os mesmos, sem uma linha nova em nenhum dos quatro.
+   */
+  readonly midias?: ParteDeMidias
+}
+
+/** A parte de `painel_midias` de uma gravacao (Ruling 91). */
+export interface ParteDeMidias {
+  /**
+   * O `alvo` da linha de auditoria.
+   *
+   * Um `media_id` quando a gravacao e sobre UM Reel; `null` quando ela e sobre
+   * o CONJUNTO — marcar e desmarcar nao tem um alvo, tem um conjunto novo.
+   */
+  readonly alvo: string | null
+  /**
+   * O estado EFETIVO da entidade hoje, quando ela nao e a linha global.
+   *
+   * Ausente, o funil usa o estado da configuracao global, que e o que as
+   * quatro rotas anteriores sempre fizeram.
+   */
+  readonly antes?: EstadoDeComportamento
+  /** Nomes que entram em `campos` da auditoria alem dos campos globais. */
+  readonly campos?: readonly string[]
+  /**
+   * Os statements de `painel_midias`, que entram no MESMO `db.batch()`.
+   *
+   * Cada um carrega a trava de versao na propria clausula `WHERE`
+   * (`TRAVA_DE_VERSAO`, em `painel-midias-repository.ts`) e por isso eles vao
+   * no COMECO do lote: dentro da transacao, `versao` ainda e a de antes da
+   * bump, entao as duas travas casam juntas ou falham juntas.
+   */
+  readonly statements: readonly D1PreparedStatement[]
+  /**
+   * Estes statements mudam alguma coisa de fato?
+   *
+   * O funil responde `?ok=sem_mudanca` quando nada mudou, e um formulario de
+   * Reels reenviado igual nao pode virar gravacao (§9.9). Quem sabe comparar
+   * dois conjuntos de midia e a tela, nao o funil.
+   */
+  readonly mudou: boolean
 }
 
 /**
@@ -229,7 +262,15 @@ export async function gravarConfiguracao(
   // formulario com a que esta no banco AGORA, e um cache de ate um minuto
   // transformaria a trava numa comparacao com o passado.
   const snapshot = await carregarConfigEfetiva(env, now, { ignorarCache: true })
-  const antes = estadoDaConfig(snapshot.global)
+
+  // **O estado GLOBAL e o estado da ENTIDADE sao dois** (Ruling 91). Nas
+  // quatro rotas anteriores eles coincidem, e e por isso que ate aqui havia um
+  // so. Numa gravacao por midia, `antes` e a config EFETIVA daquele Reel — a
+  // global com a sobreposicao por cima, que e o "estado completo da entidade
+  // afetada" que §9.9 manda registrar —, e `estadoGlobal` continua sendo o que
+  // a linha de `painel_config` guarda: ela nao muda, so a `versao` anda.
+  const estadoGlobal = estadoDaConfig(snapshot.global)
+  const { antes, daLinhaGlobal } = entidadeDaGravacao(pedido, estadoGlobal)
   const recusa = new RecusaAuditada(env, now, contexto, snapshot, ator)
 
   // A configuracao salva nao pode ser lida, e o snapshot em vigor e a FABRICA
@@ -289,8 +330,11 @@ export async function gravarConfiguracao(
   const mudados = CAMPOS_DE_COMPORTAMENTO.filter((campo) => mudou(antes[campo], depois[campo]))
 
   // Nada mudou: zero escrita e zero linha de auditoria. §9.9 registra GRAVACAO,
-  // e um formulario reenviado igual nao e uma.
-  if (mudados.length === 0) return redirecionar(`${pedido.para}?ok=sem_mudanca`)
+  // e um formulario reenviado igual nao e uma. A pergunta ganhou uma segunda
+  // metade com a extensao: um formulario de Reels pode nao mexer em campo
+  // nenhum e ainda assim trocar o CONJUNTO de midias marcadas, e quem sabe
+  // comparar dois conjuntos e a tela.
+  if (!mudouAlgumaCoisa(mudados, pedido)) return redirecionar(`${pedido.para}?ok=sem_mudanca`)
 
   // **A recusa de ESCOPO vem ANTES da cerimonia** (Ruling 73). O escopo de uma
   // rota e estatico e conhecido antes de qualquer gesto: pedir a digital para
@@ -302,18 +346,8 @@ export async function gravarConfiguracao(
   // Isto NAO afrouxa o tudo-ou-nada do Ruling 66: aquele e sobre a
   // CLASSIFICACAO — se qualquer campo do lote exige step-up, o lote inteiro
   // exige —, e recusar o lote inteiro mais cedo continua sendo tudo-ou-nada.
-  const foraDoEscopo = mudados.filter((campo) => !pedido.campos.includes(campo))
-  if (foraDoEscopo.length > 0) {
-    return await recusa.registrar({
-      acao: 'mudanca_recusada',
-      campos: foraDoEscopo,
-      codigo: 'dados_invalidos',
-      motivoInterno: 'campo_nao_gravavel',
-      explicacao: html`${blocoDaRecusa(
-        foraDoEscopo.map((campo) => ({ campo, motivo: motivoDeCampoForaDaTela(campo) })),
-      )}${await rascunho(false)}`,
-    })
-  }
+  const recusaDeEscopo = await recusarForaDoEscopo(recusa, mudados, pedido.campos, rascunho)
+  if (recusaDeEscopo !== null) return recusaDeEscopo
 
   // §10.12: religar exige sessao, ficha E confirmacao explicita na tela. A
   // conferencia mora aqui, e nao em `handleChave`, porque `enabled` chega ao
@@ -335,7 +369,13 @@ export async function gravarConfiguracao(
   // Reemitir `confirmar` na tela de conferencia seria a outra saida, e ela e
   // proibida: um gesto que o servidor recarrega sozinho no formulario seguinte
   // deixa de ser um gesto (§10.12). Por isso ele e estrutural de TODA rota.
-  if (religa(antes, depois) && corpo.campos.get(CAMPO_DA_CONFIRMACAO) !== CONFIRMADO) {
+  //
+  // **So na linha GLOBAL** (Ruling 91): §10.12 e sobre a chave da automacao, e
+  // `enabled` numa linha de midia so pode ser `0` ou ausente — tirar a pausa de
+  // um Reel devolve aquele Reel a regra geral, que continua sendo a que o dono
+  // ja autorizou. Exigir a caixa de confirmacao ali pediria o gesto da parada de
+  // emergencia para desfazer uma pausa de um Reel so.
+  if (faltaConfirmarOReligar(daLinhaGlobal, antes, depois, corpo.campos)) {
     return await recusa.registrar({
       acao: 'mudanca_recusada',
       campos: ['enabled'],
@@ -420,6 +460,12 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     entrada,
     sessao,
     pedido,
+    // A linha de `painel_config` recebe o `depois` so quando a gravacao E dela.
+    // Numa gravacao por midia ela e reescrita com os PROPRIOS valores, e o
+    // efeito util e a `versao` — que a migration `0002` define como o contador
+    // de toda a configuracao, global e midias. Escrever `depois` aqui gravaria a
+    // config efetiva de UM Reel por cima da global de todos.
+    ...(daLinhaGlobal ? {} : { linhaGlobal: estadoGlobal }),
     // §9.9: o `ator` e a credencial que AUTORIZOU aquela gravacao, e nao a que
     // abriu a sessao. Hoje as duas coincidem — so ha uma passkey cadastrada nos
     // cenarios de teste —, e e justamente por isso que a distincao tem de estar
@@ -437,6 +483,79 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     versaoResultante: snapshot.versao + 1,
     comStepUp: credencialDoStepUp !== null,
   })
+}
+
+/**
+ * Qual entidade esta gravacao altera (Ruling 91).
+ *
+ * `antes` e o estado EFETIVO da entidade, e `daLinhaGlobal` diz se ela e a linha
+ * de `painel_config`. As quatro rotas anteriores caem sempre no ramo global, que
+ * e por que ate a Task 13 esta pergunta nao existia.
+ */
+function entidadeDaGravacao(
+  pedido: PedidoDeGravacao,
+  estadoGlobal: EstadoDeComportamento,
+): { antes: EstadoDeComportamento; daLinhaGlobal: boolean } {
+  const daEntidade = pedido.midias?.antes
+  if (daEntidade === undefined) return { antes: estadoGlobal, daLinhaGlobal: true }
+  return { antes: daEntidade, daLinhaGlobal: false }
+}
+
+/**
+ * Esta gravacao muda alguma coisa?
+ *
+ * Duas metades desde a extensao: os campos da linha que mudaram, e o conjunto de
+ * midias, que a tela compara porque so ela sabe compara-lo. Um reenvio identico
+ * nao e uma gravacao (§9.9), e vale para os dois.
+ */
+function mudouAlgumaCoisa(mudados: readonly CampoDaConfig[], pedido: PedidoDeGravacao): boolean {
+  if (mudados.length > 0) return true
+  return pedido.midias?.mudou === true
+}
+
+/**
+ * Os campos do lote que ESTA rota nao grava viram a recusa pronta, ou `null`.
+ *
+ * Extraida do funil para a funcao caber no teto de complexidade do Biome. O
+ * comportamento nao mudou de lugar: continua sendo a UNICA recusa de escopo, e
+ * continua acontecendo antes da cerimonia (Ruling 73).
+ */
+async function recusarForaDoEscopo(
+  recusa: RecusaAuditada,
+  mudados: readonly CampoDaConfig[],
+  gravaveis: readonly CampoDaConfig[],
+  rascunho: (reenviavel: boolean) => Promise<HtmlSeguro>,
+): Promise<Response | null> {
+  const foraDoEscopo = mudados.filter((campo) => !gravaveis.includes(campo))
+  if (foraDoEscopo.length === 0) return null
+
+  return await recusa.registrar({
+    acao: 'mudanca_recusada',
+    campos: foraDoEscopo,
+    codigo: 'dados_invalidos',
+    motivoInterno: 'campo_nao_gravavel',
+    explicacao: html`${blocoDaRecusa(
+      foraDoEscopo.map((campo) => ({ campo, motivo: motivoDeCampoForaDaTela(campo) })),
+    )}${await rascunho(false)}`,
+  })
+}
+
+/**
+ * A transicao `desligada -> ligada` chegou sem o gesto de §10.12?
+ *
+ * Extraida do funil para a funcao caber no teto de complexidade do Biome — e a
+ * pergunta continua sendo UMA, com os tres pedacos juntos, porque separar
+ * "religa" de "veio confirmado" daria dois lugares para desencontrar.
+ */
+function faltaConfirmarOReligar(
+  daLinhaGlobal: boolean,
+  antes: EstadoDeComportamento,
+  depois: EstadoDeComportamento,
+  campos: URLSearchParams,
+): boolean {
+  if (!daLinhaGlobal) return false
+  if (!religa(antes, depois)) return false
+  return campos.get(CAMPO_DA_CONFIRMACAO) !== CONFIRMADO
 }
 
 /** O que o passo 7 precisa do funil. */
@@ -514,133 +633,10 @@ async function validarOuRecusar(pedido: PedidoDeValidacao): Promise<Response | n
   })
 }
 
-/** O que os passos 9 e 10 precisam do funil. */
-interface AplicacaoDeMudanca {
-  readonly entrada: EntradaDaRota
-  readonly sessao: LinhaDeSessao
-  readonly pedido: PedidoDeGravacao
-  readonly ator: string
-  readonly antes: EstadoDeComportamento
-  readonly depois: EstadoDeComportamento
-  readonly mudados: readonly CampoDaConfig[]
-  readonly versaoEnviada: number
-  readonly versaoResultante: number
-  /** A gravacao passou pelo step-up? Decide a coluna, a rotacao e os cookies. */
-  readonly comStepUp: boolean
-}
-
-/**
- * Passo 9 e passo 10: UM `db.batch()` e o `303`.
- *
- * O lote tem duas ou tres linhas — configuracao, auditoria e, so quando houve
- * step-up, a rotacao do `sid` (§10.8). Se qualquer parte falhar, todas falham:
- * sem log, sem mudanca, e nada de "grava e depois tenta logar".
- */
-async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Response> {
-  const { entrada, sessao, pedido, antes, depois, mudados, comStepUp } = aplicacao
-  const { env, now, contexto } = entrada
-
-  // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo —
-  // a sessao muda de "conseguiu ler" para "acabou de autorizar". O prazo
-  // absoluto e o que JA estava valendo: SES-01 diz que ele nunca e estendido.
-  // Como a rotacao acontece na mesma requisicao que grava e devolve o `303`, o
-  // cookie novo chega junto com o redirect.
-  const sessaoNova = comStepUp ? await rotacionarSessao(env, sessao.expiraEm) : null
-
-  const lote = [
-    new PainelConfigRepository(env.DB).statementDeGravacao(
-      now,
-      comoLinha(depois),
-      aplicacao.versaoEnviada,
-    ),
-    new PainelAuditoriaRepository(env.DB).statementDeRegistro(
-      {
-        ocorridoEm: now,
-        versao: aplicacao.versaoResultante,
-        origem: 'painel',
-        ator: aplicacao.ator,
-        // §9.9: a coluna diz se AQUELA gravacao passou por step-up. Um `false`
-        // fixo faria a auditoria nao distinguir a troca do link — que so
-        // acontece com a digital — de uma troca de palavra-gatilho.
-        stepUp: comStepUp,
-        acao: 'config_alterada',
-        alvo: null,
-        campos: JSON.stringify(mudados),
-        antes: comoJson(antes),
-        depois: comoJson(depois),
-      },
-      // A metade contraria de "sem log, sem mudanca": a linha de auditoria so
-      // entra se o `UPDATE` acima tiver mesmo alterado a linha de config.
-      { presoAMudanca: true },
-    ),
-  ]
-
-  // TERCEIRA posicao, e `presoAMudanca` diz por que a posicao importa: sem ele,
-  // o `sid` rotacionaria numa gravacao que a trava otimista recusou, e o dono
-  // seria deslogado sem receber o cookie novo. A opcao esta escrita aqui, no
-  // call site, e nao escondida no SQL.
-  if (sessaoNova !== null) {
-    lote.push(
-      new PainelSessoesRepository(env.DB).statementDeRotacao(sessao.sidHash, sessaoNova.sidHash, {
-        presoAMudanca: true,
-      }),
-    )
-  }
-
-  const resultado = await env.DB.batch(lote)
-
-  // §8.8: `meta.changes === 0` e a trava otimista tendo agido entre a leitura e
-  // o lote. Divergencia vira erro duro na tela, nunca sucesso silencioso.
-  if ((resultado[0]?.meta.changes ?? 0) === 0) return erro('versao_desatualizada', contexto)
-
-  // Sem isto o isolate que acabou de gravar continuaria servindo o snapshot
-  // antigo ate o TTL vencer, e a tela mostraria o valor de ANTES logo depois de
-  // o dono salvar — o jeito mais rapido de destruir a confianca dele.
-  invalidarCacheDeConfig()
-
-  // §10.10, fim do passo 4: aplica, **expira o cookie**, rotaciona o `sid`,
-  // responde `303`. Os dois `Set-Cookie` juntos sao o que garante que o mesmo
-  // step-up nao serve para duas gravacoes: o envelope morre, e o `sid` que ele
-  // nomeia deixa de existir.
-  const cookies =
-    sessaoNova === null
-      ? []
-      : [
-          cookieDoPainel(
-            COOKIE_DA_SESSAO,
-            sessaoNova.valor,
-            Math.floor((sessaoNova.expiraEm - now) / 1000),
-          ),
-          cookieDeStepUpExpirado(),
-        ]
-
-  return redirecionar(`${pedido.para}?ok=${pedido.confirmacao}`, {}, cookies)
-}
-
 /** Dois valores do estado sao diferentes? Listas comparam item a item. */
 function mudou(antes: unknown, depois: unknown): boolean {
   if (Array.isArray(antes) && Array.isArray(depois)) {
     return antes.length !== depois.length || antes.some((item, i) => item !== depois[i])
   }
   return antes !== depois
-}
-
-/** O estado de comportamento no formato das colunas de `painel_config`. */
-function comoLinha(estado: EstadoDeComportamento): LinhaGravavel {
-  return {
-    enabled: estado.enabled ? 1 : 0,
-    trigger_keywords: JSON.stringify(estado.triggerKeywords),
-    match_mode: estado.matchMode,
-    case_sensitive: estado.caseSensitive ? 1 : 0,
-    normalize_accents: estado.normalizeAccents ? 1 : 0,
-    ignore_punctuation: estado.ignorePunctuation ? 1 : 0,
-    process_only_reels: estado.processOnlyReels ? 1 : 0,
-    media_scope: estado.mediaScope,
-    public_reply_enabled: estado.publicReplyEnabled ? 1 : 0,
-    public_reply_text: estado.publicReplyText,
-    private_reply_enabled: estado.privateReplyEnabled ? 1 : 0,
-    private_reply_text: estado.privateReplyText,
-    destination_url: estado.destinationUrl,
-    user_cooldown_hours: estado.userCooldownHours,
-  }
 }

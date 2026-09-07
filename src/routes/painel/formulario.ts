@@ -104,6 +104,11 @@ export const CAMPOS_DA_RESTAURACAO: readonly CampoDaConfig[] = [
   'normalizeAccents',
   'ignorePunctuation',
   'processOnlyReels',
+  // A Etapa 12 trouxe a tela dona de `mediaScope` — `/painel/reels` —, e com
+  // ela o campo entrou na uniao gravavel (Ruling 68). Ele NAO e
+  // `allowedMediaIds`: a lista de ids continua derivada das linhas ativas de
+  // `painel_midias` (§9.4), e o gravavel e o escopo.
+  'mediaScope',
   'publicReplyText',
   'privateReplyText',
   'destinationUrl',
@@ -113,10 +118,13 @@ export const CAMPOS_DA_RESTAURACAO: readonly CampoDaConfig[] = [
 /**
  * Os campos que NENHUMA rota grava nesta etapa.
  *
- * `mediaScope` espera a tela que e dona dele (Ruling 68); os dois interruptores
- * de canal esperam um formulario que os emita. A lista existe para o botao de
- * restaurar poder ser honesto: uma versao que difere em qualquer um deles nao
- * tem como voltar inteira, e §12.4 nao admite botao que promete e nao cumpre.
+ * Sao DOIS desde a Etapa 12: os dois interruptores de canal, que esperam um
+ * formulario que os emita (§3 os poe em "Ajustes finos", tela que ja os mostra
+ * em leitura). `mediaScope` saiu daqui quando `/painel/reels` nasceu.
+ *
+ * A lista existe para o botao de restaurar poder ser honesto: uma versao que
+ * difere em qualquer um deles nao tem como voltar inteira, e §12.4 nao admite
+ * botao que promete e nao cumpre.
  */
 export const CAMPOS_FORA_DA_RESTAURACAO: readonly CampoDaConfig[] = CAMPOS_DE_COMPORTAMENTO.filter(
   (campo) => !CAMPOS_DA_RESTAURACAO.includes(campo),

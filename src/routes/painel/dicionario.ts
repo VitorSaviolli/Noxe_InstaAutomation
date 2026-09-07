@@ -164,6 +164,19 @@ export const MOTIVO_DA_RECUSA: Record<string, string> = {
   cooldown_fora_da_faixa: 'A espera precisa ser um número inteiro de horas, de 0 até 8760.',
   nao_e_booleano: 'Este ajuste só aceita sim ou não.',
   dominio_nao_permitido: 'Este endereço não está na lista liberada no deploy.',
+  // --- Os Reels (§12.5) ---
+  reel_desconhecido:
+    'Este Reel não é da sua conta, ou não existe mais. Toque em Atualizar e escolha de novo na lista.',
+  reel_repetido: 'Você marcou o mesmo Reel duas vezes. Marque uma só.',
+  reels_demais: 'Você chegou a 200 Reels, o máximo. Desmarque algum para escolher outro.',
+  reels_novos_demais:
+    'Marque até 20 Reels novos por vez. Salve estes e continue — o que já estava escolhido continua valendo.',
+  selecao_vazia_com_automacao_ligada:
+    'Você escolheu “só nos que eu escolher” e não marcou nenhum Reel. Ou marque pelo menos um, ou desligue a automação — as duas são seguras, mas só uma fica clara no seu painel.',
+  listagem_indisponivel:
+    'Não conseguimos falar com o Instagram agora, então não dá para salvar a sua escolha de Reels. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
+  reel_nao_pode_ligar:
+    'Um Reel só pode ficar parado, nunca ligado por conta própria: a chave geral é quem manda, e é ela que desliga tudo de uma vez.',
 }
 
 /** O motivo daquele codigo, ou a frase geral quando ele nao esta na tabela. */
@@ -223,6 +236,10 @@ const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
   ignorePunctuation: 'nos Ajustes finos',
   processOnlyReels: 'nos Ajustes finos',
   userCooldownHours: 'nos Ajustes finos',
+  // A Etapa 12 quitou esta divida: ate ela, `mediaScope` caia na frase que
+  // promete "a tela que cuida dele chega em uma proxima parte", e a tela chegou.
+  // Frase que mente e defeito, e nao cosmetica (Rulings 75 e 82).
+  mediaScope: 'na tela dos Reels',
   destinationUrl: 'na tela da mensagem e do link',
   privateReplyText: 'na tela da mensagem e do link',
   publicReplyText: 'na tela da mensagem e do link',
@@ -505,3 +522,68 @@ export const PALAVRAS_PROIBIDAS: readonly string[] = [
 export function escopoDeMidias(config: AutomationConfig): EscopoDeMidias {
   return config.allowedMediaIds.includes('*') ? 'todas' : 'selecionadas'
 }
+
+/**
+ * As frases das duas telas de Reels (§3 e §12.5).
+ *
+ * Elas moram aqui pelo mesmo motivo de todas as outras: nenhuma frase de tela
+ * nasce fora do dicionario. E ha uma razao a mais nesta tela — §12.5 escreve
+ * cinco estados especiais palavra por palavra, e uma tela que os reescrevesse
+ * a mao perderia o pedaco que importa em cada um. O pedaco que importa e
+ * sempre o mesmo: **a automacao continua funcionando**. Quem abre a tela de
+ * Reels e ve um erro precisa saber, na mesma frase, que nada do que ele salvou
+ * parou de valer.
+ *
+ * A palavra "sobreposicao" nao aparece em lugar nenhum (§3), e nem as tres da
+ * lista de proibidas que estariam a um passo daqui.
+ */
+export const TELA_DOS_REELS = {
+  titulo: 'Meus Reels',
+  /** §12.5, conta sem Reels. */
+  semReels:
+    'Não encontramos nenhum Reel nesta conta. A automação só responde em Reels. Se você acabou de publicar, espere alguns minutos e toque em Atualizar.',
+  /** §12.5, Instagram nao respondeu. A segunda metade e a que acalma. */
+  metaMuda:
+    'Não conseguimos falar com o Instagram agora. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
+  /** §12.5, a lista salva exibida no lugar da listagem que nao veio. */
+  salvoPorVoce: 'salvo por você',
+  /** §12.5, linha de midia invalida no banco. O campo entra no fim. */
+  reelParado: 'Este Reel está parado por um problema na configuração dele:',
+  reelParadoComoResolver: 'Abra “Este Reel responde diferente” e corrija.',
+  /** §12.5, linhas orfas. A mesma frase que o aviso do validador ja usa. */
+  orfas:
+    'Encontramos escolhas de Reels sem uma configuração salva. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
+  /** §12.5, cursor vencido. */
+  cursorVencido:
+    'A lista ficou velha enquanto esta página estava aberta. Toque em Atualizar. O que você já marcou está guardado nesta tela.',
+  /** §3, Reel apagado no Instagram. Ele NAO some da lista. */
+  reelApagado: 'Este Reel não existe mais',
+  tirarDaLista: 'Tirar da lista',
+  /** §3, miniatura vencida. Nao impede nada. */
+  miniaturaVencida:
+    'as miniaturas venceram — é normal, elas duram pouco. Nada da sua configuração foi perdido.',
+  /** §12.5, as quatro paginas renderam quase nada. */
+  poucosReels: 'Estas últimas publicações não são Reels — toque de novo para continuar procurando.',
+  /** §12.5, o teto chegando. */
+  quaseNoTeto: 'Você está perto do máximo de 200 Reels escolhidos.',
+  /** §12.5, o selo de quem tem regras proprias. */
+  regrasProprias: 'Regras próprias',
+  /** §12.5, abrir “responder diferente” num Reel que nao esta na lista. */
+  foraDaLista:
+    'Estas regras não vão valer ainda. Este Reel não está na sua lista de Reels escolhidos.',
+  incluirNaLista: 'Incluir este Reel na lista',
+  /** §3, o rotulo do que a listagem nao conseguiu confirmar (§15.2, pend. 7). */
+  videoOuReel: 'vídeo/Reel',
+  /** §3, o botao de marcar em lote. O numero e o unico que a tela promete. */
+  marcarOsDesta: 'Marcar os',
+  marcarOsDestaFim: 'desta lista',
+  carregarMais: 'Carregar mais',
+  atualizar: 'Atualizar',
+  /** §3, a tela de UM Reel. */
+  tituloDoReel: 'Este Reel responde diferente',
+  seguirRegraGeral: 'Voltar tudo a seguir a regra geral',
+  pausarEsteReel: 'Parar a automação só neste Reel',
+  religarEsteReel: 'Voltar a responder neste Reel',
+  /** §3, o resumo de uma frase antes de salvar. */
+  seguindoOGeral: 'Este Reel segue a regra geral em tudo.',
+} as const

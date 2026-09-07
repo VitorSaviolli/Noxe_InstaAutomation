@@ -15,12 +15,16 @@ import {
 import { CAMPOS_DA_CHAVE } from '../src/routes/painel/inicio'
 import { CAMPOS_DA_MENSAGEM } from '../src/routes/painel/mensagem'
 import { CAMPOS_DE_PALAVRAS } from '../src/routes/painel/palavras'
+import { CAMPOS_DO_REEL } from '../src/routes/painel/reel'
+import { CAMPOS_DOS_REELS } from '../src/routes/painel/reels'
 import {
   PREFIXO_DA_API,
   ROTA_AJUSTES,
   ROTA_CHAVE,
   ROTA_MENSAGEM,
   ROTA_PALAVRAS,
+  ROTA_REEL,
+  ROTA_REELS,
   ROTAS,
 } from '../src/routes/painel/rotas'
 import { camposProtegidos, jsonCanonico } from '../src/routes/painel/stepup'
@@ -49,11 +53,18 @@ import esteArquivo from './painel-metatestes.test.ts?raw'
  * META-12: todo campo tem UMA frase de recusa, e a frase certa (Ruling 82).
  * META-13: esperar a recusa de step-up num campo de endereco exige allowlist.
  * META-14: a varredura de META-13 nao se deixa enganar por comentario.
+ * META-15: as rotas que gravam CONFIGURACAO sao exatamente as declaradas aqui.
  *
  * META-06 estava reservado desde a Task 10 com a nota "chega com a etapa do
  * step-up" — chegou, e chegou como a spec o descreve: uma tabela, nao um
  * caminho HTTP. META-11 leva o numero seguinte livre porque META-10 ja estava
  * ocupado quando o Ruling 72 batizou o metateste da uniao.
+ *
+ * **META-15 nasceu na Etapa 12 desfazendo uma colisao de numeracao**: ate ela,
+ * o metateste das rotas de gravacao tambem se chamava META-11, herdado do mesmo
+ * batismo errado do Ruling 72. Dois testes com o mesmo nome fazem qualquer
+ * documento que os cite apontar para o errado. Ele leva o proximo numero livre,
+ * e nada do que ele afirma mudou por causa do nome.
  *
  * META-13 e META-14 chegaram na etapa 12c, e sao de uma familia diferente das
  * doze anteriores: elas nao medem `src/`, medem `tests/`. §13.2 lista os nove
@@ -811,21 +822,24 @@ const ESCOPO_POR_ROTA: readonly {
   { caminho: ROTA_PALAVRAS.caminho, campos: CAMPOS_DE_PALAVRAS },
   { caminho: ROTA_AJUSTES.caminho, campos: CAMPOS_DE_AJUSTES },
   { caminho: ROTA_MENSAGEM.caminho, campos: CAMPOS_DA_MENSAGEM },
+  { caminho: ROTA_REELS.caminho, campos: CAMPOS_DOS_REELS },
+  { caminho: ROTA_REEL.caminho, campos: CAMPOS_DO_REEL },
 ]
 
 /**
  * Os campos que NENHUMA rota pode escrever nesta etapa.
  *
- * `mediaScope` espera a tela dona (Ruling 68); os dois interruptores de canal
- * esperam um formulario que os emita. Escrito AQUI, e nao derivado do codigo:
- * uma lista derivada concordaria com qualquer coisa que o codigo dissesse, que
- * e exatamente o buraco que o Ruling 72 mandou fechar.
+ * **A lista encolheu na Etapa 12, e a mudanca e a tarefa inteira do lado do
+ * metateste** (Ruling 68): `mediaScope` saiu porque `/painel/reels` nasceu como
+ * a tela dona dele. Sobraram os dois interruptores de canal, que esperam um
+ * formulario que os emita — §3 os poe em "Ajustes finos", tela que ja os mostra
+ * em leitura, e nenhuma etapa de §14 nomeia o interruptor.
+ *
+ * Escrito AQUI, e nao derivado do codigo: uma lista derivada concordaria com
+ * qualquer coisa que o codigo dissesse, que e exatamente o buraco que o Ruling
+ * 72 mandou fechar.
  */
-const FORA_DO_GRAVAVEL: readonly CampoDaConfig[] = [
-  'mediaScope',
-  'publicReplyEnabled',
-  'privateReplyEnabled',
-]
+const FORA_DO_GRAVAVEL: readonly CampoDaConfig[] = ['publicReplyEnabled', 'privateReplyEnabled']
 
 describe('META — a classificacao de risco e o escopo por rota', () => {
   test('META-06: a tabela de §10.10 inteira, afirmada no classificador', () => {
@@ -908,21 +922,21 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
 
     expect(uniao).toEqual([...CAMPOS_DA_RESTAURACAO].sort())
 
-    // A igualdade acima sozinha nao basta: acrescentar `mediaScope` a uma lista
-    // de rota E a da restauracao a manteria verde. Estes tres sao nomeados, um
-    // a um, contra a uniao E contra a restauracao.
+    // A igualdade acima sozinha nao basta: acrescentar um campo a uma lista de
+    // rota E a da restauracao a manteria verde. Os que ninguem grava sao
+    // nomeados, um a um, contra a uniao E contra a restauracao.
     for (const campo of FORA_DO_GRAVAVEL) {
       expect({ [campo]: uniao.includes(campo) }).toEqual({ [campo]: false })
       expect({ [campo]: CAMPOS_DA_RESTAURACAO.includes(campo) }).toEqual({ [campo]: false })
     }
 
-    // E o complemento fecha a conta: os catorze campos sao os onze da uniao
-    // mais estes tres, sem sobra.
+    // E o complemento fecha a conta: os catorze campos sao os doze da uniao
+    // mais estes dois, sem sobra.
     expect([...CAMPOS_FORA_DA_RESTAURACAO].sort()).toEqual([...FORA_DO_GRAVAVEL].sort())
     expect(uniao.length + FORA_DO_GRAVAVEL.length).toBe(CAMPOS_DE_COMPORTAMENTO.length)
 
-    // Contrapositivo: nenhuma das quatro listas pode estar vazia — quatro
-    // listas vazias fariam a uniao vazia bater com uma restauracao vazia.
+    // Contrapositivo: nenhuma das listas pode estar vazia — listas vazias
+    // fariam a uniao vazia bater com uma restauracao vazia.
     for (const rota of ESCOPO_POR_ROTA) {
       expect({ [rota.caminho]: rota.campos.length }).not.toEqual({ [rota.caminho]: 0 })
     }
@@ -977,12 +991,22 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
       expect({ [campo]: ehCaminho(frase) }).toEqual({ [campo]: false })
     }
 
-    // E o unico campo que a promessa antiga ainda cobre: `mediaScope` e a
-    // Etapa 12 de §14, e para ele "chega em uma proxima parte" e verdade.
-    expect(motivoDeCampoForaDaTela('mediaScope')).toBe(RECUSA_SEM_VALOR.naoGravavel)
+    // **O campo que a promessa antiga cobria era `mediaScope`, e a Etapa 12 a
+    // quitou.** Ate ela, "a tela que cuida dele chega em uma proxima parte" era
+    // verdade — a Etapa 12 de §14 era o futuro. Agora `/painel/reels` existe, e
+    // a mesma frase passou a MENTIR: ela mandaria a pessoa esperar por uma tela
+    // que ja esta pronta e a um toque de distancia. Mesma familia dos Rulings 75
+    // e 82, e o conserto e o mesmo — o campo mudou de mapa, e a frase que sobra
+    // e a do CAMINHO.
+    expect(motivoDeCampoForaDaTela('mediaScope')).not.toBe(RECUSA_SEM_VALOR.naoGravavel)
+    expect(ehCaminho(motivoDeCampoForaDaTela('mediaScope'))).toBe(true)
 
     // Contrapositivo de cobertura: os catorze campos estao repartidos entre as
-    // tres frases, sem sobra e sem um campo em duas.
+    // frases, sem sobra e sem um campo em duas. `ainda_nao` cai a ZERO nesta
+    // etapa, e a queda e a garantia: enquanto ela era 1, havia um campo que o
+    // painel mandava esperar. Ela volta a ser diferente de zero no dia em que
+    // `AutomationConfig` ganhar um campo que nenhuma tela mostra — e ai o
+    // laco de `CAMPOS_DA_RESTAURACAO` acima e quem cobra o mapa.
     const porFrase = CAMPOS_DE_COMPORTAMENTO.map((campo) => {
       const frase = motivoDeCampoForaDaTela(campo)
       if (ehCaminho(frase)) return 'caminho'
@@ -995,14 +1019,22 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
       so_leitura: porFrase.filter((qual) => qual === 'so_leitura').length,
       ainda_nao: porFrase.filter((qual) => qual === 'ainda_nao').length,
       nenhuma: porFrase.filter((qual) => qual === 'nenhuma').length,
-    }).toEqual({ caminho: CAMPOS_DA_RESTAURACAO.length, so_leitura: 2, ainda_nao: 1, nenhuma: 0 })
+    }).toEqual({ caminho: CAMPOS_DA_RESTAURACAO.length, so_leitura: 2, ainda_nao: 0, nenhuma: 0 })
   })
 
-  test('META-11: as rotas de gravacao da tabela sao exatamente as quatro declaradas aqui', () => {
+  test('META-15: as rotas que gravam configuracao sao exatamente as declaradas aqui', () => {
+    // **O nome mudou na Etapa 12, e a mudanca e um conserto de batismo.** Ate
+    // ela existiam DOIS testes chamados META-11 — heranca do Ruling 72, que
+    // batizou o segundo com o numero do primeiro. Dois testes com o mesmo nome
+    // fazem qualquer documento que os cite apontar para o errado, e o custo
+    // aparece no dia em que alguem for procurar "o META-11" e achar o outro.
+    // META-15 e o proximo numero livre; nada do que ele afirma mudou por causa
+    // do nome.
+    //
     // Sem isto, a uniao acima seria a uniao das rotas que ALGUEM LEMBROU de
-    // listar. A Task 13 acrescenta `/painel/reels` a tabela de rotas, e este
-    // teste e quem a obriga a vir declarar o escopo dela — que e exatamente o
-    // momento em que se quer ser obrigado a olhar.
+    // listar. A Etapa 12 acrescentou `/painel/reels` e `/painel/reel` a tabela
+    // de rotas, e este teste e quem obrigou as duas a vir declarar o escopo
+    // delas — que e exatamente o momento em que se quer ser obrigado a olhar.
     //
     // **O predicado pergunta `gravaConfig`, e nao `escreve`** (Ruling 84). A
     // primeira grafia media a coisa errada: `rotas.ts` define `escreve` como
@@ -1032,6 +1064,50 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     expect(gravadorasDeConfig.map((rota) => rota.caminho).sort()).toEqual(
       ESCOPO_POR_ROTA.map((rota) => rota.caminho).sort(),
     )
+
+    // **O CONTRAPOSITIVO, que fecha o furo M-2 da re-revisao da Task 12.**
+    //
+    // Tudo acima parte de `gravaConfig`, e `gravaConfig` e DECLARACAO, nao
+    // medicao: uma rota que chamasse `gravarConfiguracao` com
+    // `gravaConfig: false` saia do laco e escapava do metateste da uniao —
+    // exatamente a omissao silenciosa que este teste existe para impedir. A
+    // Etapa 12 foi a primeira que podia explorar o furo, entao e ela quem o
+    // fecha.
+    //
+    // A guarda barata, e sem ler fonte nenhuma: **toda rota de pagina com
+    // `escreve: true` e `POST` tem de declarar `gravaConfig: true`, ou estar
+    // nesta lista curta e NOMEADA**. Ela nao prova que a rota nao chama o funil
+    // — prova que ninguem consegue acrescentar uma rota de escrita de pagina
+    // sem passar por aqui, que e o portao que faltava. E ela erra para o lado de
+    // EXIGIR: uma rota nova que grave outra coisa tem de ser escrita nesta lista
+    // por quem a criou, com o nome dela a vista de quem revisa.
+    //
+    // §7.1 declara as duas excecoes de hoje como POST, e as Tasks 14 e 15 as
+    // registram: `/painel/aparelhos` grava passkey e `/painel/sair` apaga
+    // sessao. Nenhuma das duas tem campo de configuracao para declarar, e o
+    // contrapositivo do teste acima — nenhuma lista de rota pode estar vazia —
+    // tornaria insatisfazivel exigir escopo delas.
+    const SEM_CONFIGURACAO: readonly string[] = ['/painel/aparelhos', '/painel/sair']
+
+    const dePaginaQueEscrevem = ROTAS.filter(
+      (rota) =>
+        rota.escreve && rota.metodos.includes('POST') && !rota.caminho.startsWith(PREFIXO_DA_API),
+    )
+
+    for (const rota of dePaginaQueEscrevem) {
+      expect({
+        [rota.caminho]: rota.gravaConfig || SEM_CONFIGURACAO.includes(rota.caminho),
+      }).toEqual({ [rota.caminho]: true })
+    }
+
+    // E a lista de excecoes nao pode virar despejo: cada nome dela so vale
+    // enquanto for uma rota de verdade OU ainda nao existir. Um nome que sobre
+    // depois de a rota virar gravadora de configuracao a tiraria do laco de
+    // cima em silencio.
+    for (const nome of SEM_CONFIGURACAO) {
+      const rota = ROTAS.find((candidata) => candidata.caminho === nome)
+      expect({ [nome]: rota?.gravaConfig ?? false }).toEqual({ [nome]: false })
+    }
   })
 })
 

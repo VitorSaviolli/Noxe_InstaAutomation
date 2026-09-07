@@ -6,6 +6,7 @@ import { gravarConfiguracao } from '../src/routes/painel/gravar'
 import { handleChave } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
 import { handlePalavras } from '../src/routes/painel/palavras'
+import { handleReels } from '../src/routes/painel/reels'
 import {
   ROTA_AJUSTES,
   ROTA_CHAVE,
@@ -13,6 +14,7 @@ import {
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_STEPUP,
   ROTA_PALAVRAS,
+  ROTA_REELS,
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
 import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
@@ -175,6 +177,12 @@ const PALAVRAS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_PALAVRAS,
   handler: handlePalavras,
 }
+/** A tela dona de `mediaScope`, que nasceu na Etapa 12 (Ruling 68). */
+const REELS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
+  rota: ROTA_REELS,
+  handler: handleReels,
+}
+
 /** A rota dona de `enabled` — a unica que o declara fora da restauracao. */
 const CHAVE: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_CHAVE,
@@ -797,7 +805,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await linhaDeConfig())?.user_cooldown_hours).toBe(1)
   })
 
-  test('STEP-10: `mediaScope` nao e gravavel por rota nenhuma nesta etapa (Ruling 68)', async () => {
+  test('STEP-10: `mediaScope` so e gravavel pela tela dona, e alargar pede a digital', async () => {
     // **Este teste media a coisa errada, e a rodada 2 provou** (Ruling 77). Ele
     // dizia afirmar "alargar o escopo pede a digital" e conferia um `403` que
     // vinha do escopo de `/painel/ajustes`, e nao da classificacao de risco —
@@ -807,9 +815,22 @@ describe('STEP — step-up preso ao conteudo', () => {
     //
     // A classificacao de `mediaScope` — as DUAS direcoes — e afirmada em
     // META-06, direto sobre `camposProtegidos`. O que fica aqui e o que so o
-    // HTTP prova, e e a garantia do Ruling 68: **nenhuma rota escreve
-    // `mediaScope` nesta etapa**, nem com a digital. A tela dona dele,
-    // `/painel/reels`, chega na Task 13, e com ela a metade positiva.
+    // HTTP prova.
+    //
+    // **A metade POSITIVA venceu na Etapa 12** (Ruling 68). Ate ela, a tela dona
+    // de `mediaScope` nao existia e este teste so podia afirmar a metade
+    // negativa, com a positiva escrita como adiada. `/painel/reels` nasceu, e as
+    // duas metades passam a valer juntas:
+    //
+    //   1. as tres telas que NAO sao donas dele continuam recusando por ESCOPO
+    //      — `400`, sem pedir digital nenhuma;
+    //   2. a tela DONA aceita, e alargar para "em todos os meus Reels" pede a
+    //      digital, porque §10.10 lista `mediaScope -> 'todas'` como
+    //      alargamento do envelope de alcance.
+    //
+    // Sem a metade 2, a etapa entregaria a tela e ninguem saberia se o campo
+    // dela chega a ser gravavel; sem a metade 1, a lista por rota do Ruling 70
+    // deixaria de ser afirmada onde ela importa.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     const sessao = await abrirSessao(aparelho.credentialId)
 
@@ -829,6 +850,27 @@ describe('STEP — step-up preso ao conteudo', () => {
       'mudanca_recusada',
       'mudanca_recusada',
     ])
+
+    // A metade positiva, pela tela dona. O segundo POST e dirigido pelo
+    // `<form id="confirmar">` RENDERIZADO (Ruling 81) — `comDigital` cuida
+    // disso, e e ele quem prende a tela de conferencia ao funil que a le.
+    //
+    // **A Meta nao e tocada neste caminho**, e por isso o handler entra sem
+    // duble: sem nenhum Reel marcado, `salvarSelecao` nao tem id novo para
+    // revalidar e nao chama `me/media`. O que este teste mede e a gravacao de
+    // `mediaScope`, e um duble aqui so acrescentaria peca sem afirmar nada.
+    const { conferencia, envio } = await comDigital(REELS, 'mediaScope=todas', sessao, aparelho)
+
+    expect({ sem: conferencia.status, com: envio.status }).toEqual({ sem: 403, com: 303 })
+    expect((await linhaDeConfig())?.media_scope).toBe('todas')
+
+    // E a linha de auditoria diz que AQUELA gravacao passou pela digital.
+    const ultima = (await auditoria()).at(-1)
+    expect({ acao: ultima?.acao, campos: ultima?.campos, step_up: ultima?.step_up }).toEqual({
+      acao: 'config_alterada',
+      campos: '["mediaScope"]',
+      step_up: 1,
+    })
   })
 
   test('STEP-11: desligar a automacao NAO exige step-up', async () => {

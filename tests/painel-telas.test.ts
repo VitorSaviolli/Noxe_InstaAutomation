@@ -1126,14 +1126,32 @@ describe('TELA — celular e acessibilidade', () => {
     }
   })
 
-  test('TELA-26: a barra de baixo tem cinco itens, cada um com icone E palavra', async () => {
+  test('TELA-26: a barra de baixo tem seis itens, cada um com icone E palavra', async () => {
+    // **O numero mudou na Etapa 12, e a FORMA que este teste guarda nao.**
+    //
+    // §12.1 descreve a barra como **Inicio · Reels · Palavras · Mensagem ·
+    // Mais**, cinco itens. A barra de hoje ja divergia dessa lista: "Mais" nao
+    // existe, e no lugar dele estao "Ajustes" e "O que aconteceu", as duas telas
+    // que ele vai absorver. O docblock de `tela.ts` ja escrevia a regra que
+    // decide isto: um item que leva a um `404` e pior do que um item a menos,
+    // e as trocas acontecem nas etapas que criam aquelas telas.
+    //
+    // A Etapa 12 fez a PRIMEIRA das duas trocas — a tela de Reels existe, entao
+    // o item entrou. Tirar "O que aconteceu" ou "Ajustes" para manter cinco
+    // deixaria uma tela pronta sem entrada na barra, que e a mesma promessa
+    // quebrada ao contrario. Sao seis ate a segunda troca, o "Mais" das Tasks 14
+    // e 15, e ai a conta volta a cinco.
+    //
+    // O que este teste existe para guardar continua intacto e e o laco abaixo:
+    // **icone E palavra em todo item**, porque §12.1 proibe navegacao so por
+    // icone. Nenhum item novo pode entrar sem os dois.
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
 
     const corpo = await corpoDa(TELA_INICIO, cookie)
     const itens = [...corpo.matchAll(/<a href="[^"]*" class="item[^"]*"[^>]*>(.*?)<\/a>/g)]
 
-    expect(itens).toHaveLength(5)
+    expect(itens).toHaveLength(6)
     for (const item of itens) {
       const dentro = item[1] ?? ''
       expect(dentro).toContain('class="icone" aria-hidden="true"')

@@ -17,6 +17,8 @@ import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
 import { handlePalavras } from '../src/routes/painel/palavras'
+import { handleReel } from '../src/routes/painel/reel'
+import { handleReels } from '../src/routes/painel/reels'
 import { erro } from '../src/routes/painel/resposta'
 import {
   ROTA_AJUSTES,
@@ -24,6 +26,8 @@ import {
   ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_PALAVRAS,
+  ROTA_REEL,
+  ROTA_REELS,
   ROTAS,
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
@@ -31,7 +35,13 @@ import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
 import { carregarConfigEfetiva, invalidarCacheDeConfig } from '../src/services/config-store'
 import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/services/panel-session'
 import { prefixoDeCredencial } from '../src/services/webauthn/verificar'
-import { gravarConfig, LINHA_DE_CONFIG_VALIDA, ligarConta, limparBanco } from './fixtures/banco'
+import {
+  gravarConfig,
+  gravarMidia,
+  LINHA_DE_CONFIG_VALIDA,
+  ligarConta,
+  limparBanco,
+} from './fixtures/banco'
 import {
   AGORA,
   capturarConsole,
@@ -173,7 +183,17 @@ const GRAVADORAS: readonly { rota: RotaDoPainel; handler: HandlerDoPainel }[] = 
   { rota: ROTA_PALAVRAS, handler: handlePalavras },
   { rota: ROTA_AJUSTES, handler: handleAjustes },
   { rota: ROTA_MENSAGEM, handler: handleMensagem },
+  // **As duas telas de Reels entraram na Etapa 12**, e elas entram no FIM pela
+  // mesma razao que `/painel/mensagem`: os indices que o resto desta suite ja
+  // usa nao podem andar. GRAV-01 compara os dois conjuntos ordenados, entao a
+  // ordem daqui nao afrouxa a conferencia — e e ele quem obriga toda rota nova
+  // de pagina que grava a aparecer nesta lista.
+  { rota: ROTA_REELS, handler: handleReels },
+  { rota: ROTA_REEL, handler: handleReel },
 ]
+
+/** O Reel FICTICIO das duas telas novas. Dezoito digitos, como os de verdade. */
+const REEL_DE_TESTE = '178414000000000001'
 
 /**
  * Um corpo valido para cada rota que grava, para os lacos da tabela.
@@ -189,6 +209,13 @@ const CORPO_VALIDO: Record<string, string> = {
   [ROTA_PALAVRAS.caminho]: `triggerKeywords=${encodeURIComponent(PALAVRA_NOVA)}`,
   [ROTA_AJUSTES.caminho]: 'userCooldownHours=48',
   [ROTA_MENSAGEM.caminho]: '',
+  // O de `/painel/reels` e VAZIO pela razao gemea da mensagem: sem nenhum Reel
+  // marcado e sem escopo novo, o unico `303` que ela produz e o
+  // `?ok=sem_mudanca` — que e exatamente a regra de forma que GRAV-01 afirma, e
+  // ele nao gasta nenhuma chamada a Meta. A metade que grava de verdade vive em
+  // `tests/painel-midias.test.ts`, que e a suite dona do assunto (§13.1).
+  [ROTA_REELS.caminho]: '',
+  [ROTA_REEL.caminho]: `acao=pausar&midia=${REEL_DE_TESTE}`,
 }
 
 function postar(
@@ -770,6 +797,10 @@ describe('GRAV — a forma da gravacao', () => {
       await limparBanco(env.DB)
       invalidarCacheDeConfig()
       await gravarConfig(env.DB)
+      // A linha de Reel existe em TODA volta, e nao so na de `/painel/reel`: um
+      // `if` por rota aqui seria a primeira coisa a divergir da lista quando a
+      // proxima tela entrasse. Ela e inerte para as outras cinco.
+      await gravarMidia(env.DB, REEL_DE_TESTE)
       const sessao = await abrirSessao()
 
       const resposta = await gravar(alvo, CORPO_VALIDO[alvo.rota.caminho] ?? '', sessao)
@@ -1366,10 +1397,16 @@ describe('GRAV — a forma da gravacao', () => {
   test('GRAV-36: a versao que NAO volta inteira nao ganha botao, e a linha diz por que', async () => {
     // O contrapositivo de GRAV-35, e a garantia que faltava: o botao so sai
     // quando a versao guardada difere de hoje apenas em campo que ALGUMA rota
-    // escreve. `mediaScope` e os dois interruptores de canal nao sao gravaveis
-    // nesta etapa (Ruling 68), entao uma versao que difira num deles voltaria
-    // pela metade — e um botao que promete recuperacao e recupera parte dela e
-    // a promessa quebrada que §12.4 recusa.
+    // escreve.
+    //
+    // **O campo de exemplo mudou na Etapa 12, e a expectativa nao.** Ate ela,
+    // quem representava "campo que ninguem grava" era `mediaScope`; agora
+    // `/painel/reels` e a tela dona dele e ele entrou na uniao gravavel (Ruling
+    // 68). Sobraram os dois interruptores de canal, que §3 poe em "Ajustes
+    // finos" e que nenhuma etapa de §14 nomeia — e e um deles que este teste
+    // passa a usar. A garantia afirmada e a mesma: uma versao que difira num
+    // campo que ninguem grava voltaria pela metade, e um botao que promete
+    // recuperacao e recupera parte dela e a promessa quebrada que §12.4 recusa.
     //
     // A mutacao que este teste mata: fazer `restauracaoPossivel` devolver sempre
     // `true`. Ela sobrevivia a suite inteira — o botao passava a sair para toda
@@ -1379,14 +1416,14 @@ describe('GRAV — a forma da gravacao', () => {
     const sessao = await abrirSessao()
 
     // Duas linhas: a de cima difere so no link (volta inteira), a de baixo
-    // difere tambem no escopo de midias (nao volta). Uma linha so nao provaria
-    // a distincao — provaria apenas que a tela as vezes nao tem botao.
+    // difere tambem no interruptor do Direct (nao volta). Uma linha so nao
+    // provaria a distincao — provaria apenas que a tela as vezes nao tem botao.
     const soOLink = {
       ...ESTADO_GUARDADO_DA_LINHA_VALIDA,
       destinationUrl: `https://${DOMINIO_DE_TESTE}/antigo`,
     }
-    const tambemOEscopo = { ...soOLink, mediaScope: 'selecionadas' }
-    for (const antes of [soOLink, tambemOEscopo]) {
+    const tambemOCanal = { ...soOLink, privateReplyEnabled: false }
+    for (const antes of [soOLink, tambemOCanal]) {
       await env.DB.prepare(
         `INSERT INTO painel_auditoria
            (ocorrido_em, versao, origem, ator, step_up, acao, alvo, campos, antes, depois)

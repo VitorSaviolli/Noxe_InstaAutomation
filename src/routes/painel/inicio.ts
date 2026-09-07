@@ -39,7 +39,7 @@ import {
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
-import { ROTA_CHAVE, ROTA_INICIO } from './rotas'
+import { ROTA_CHAVE, ROTA_INICIO, ROTA_REELS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { type Aba, type Moldura, telaDoPainel } from './tela'
 
@@ -119,10 +119,10 @@ export async function contaConectada(db: D1Database): Promise<boolean> {
  * unico que faz a automacao recusar disparar mesmo com tudo o mais certo
  * (`link_nao_configurado`, `automation.ts`).
  *
- * Duas pendencias saem SEM botao, e a ausencia e decisao: a tela de Reels
- * nasce na etapa dela, e conectar a conta e um passo do assistente, no
- * computador. Um botao que leva a um `404`, ou a lugar nenhum, ensina a
- * desconfiar dos outros botoes da mesma lista.
+ * UMA pendencia sai SEM botao, e a ausencia e decisao: conectar a conta e um
+ * passo do assistente, no computador. Um botao que leva a um `404`, ou a lugar
+ * nenhum, ensina a desconfiar dos outros botoes da mesma lista. A dos Reels
+ * tinha a mesma forma ate a Etapa 12, e ganhou o botao junto com a tela.
  */
 function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Pendencia[] {
   const { global } = snapshot
@@ -143,10 +143,16 @@ function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Penden
   }
 
   if (escopoDeMidias(global) === 'selecionadas' && global.allowedMediaIds.length === 0) {
+    // **A frase mudou na Etapa 12, e a mudanca e uma divida quitada.** Ela dizia
+    // "a tela de escolher os Reels chega junto com a proxima parte do painel", e
+    // a tela chegou: mandar a pessoa esperar por uma tela pronta e a mesma
+    // familia de defeito dos Rulings 75 e 82. Com ela existindo, a pendencia
+    // ganha o botao que a resolve — que e o que §3 pede de toda pendencia cujo
+    // caminho ja exista.
     lista.push({
       texto:
-        'Você escolheu “só nos Reels que eu escolher”, mas não marcou nenhum. A tela de escolher os Reels chega junto com a próxima parte do painel.',
-      acao: null,
+        'Você escolheu “só nos Reels que eu escolher”, mas não marcou nenhum, então a automação não responde em lugar nenhum.',
+      acao: { rotulo: 'Escolher os Reels', para: ROTA_REELS.caminho },
     })
   }
 
@@ -462,6 +468,7 @@ ${blocoDePendencias(visao)}
 <section>
 <h2>Onde mexer</h2>
 <ul>
+<li><a href="${ROTA_REELS.caminho}">Em quais Reels a automa&ccedil;&atilde;o responde</a></li>
 <li><a href="/painel/palavras">As palavras que ligam a automa&ccedil;&atilde;o</a></li>
 <li><a href="/painel/mensagem">A mensagem e o link</a></li>
 <li><a href="/painel/ajustes">Ajustes finos</a></li>

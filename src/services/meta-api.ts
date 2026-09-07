@@ -2,6 +2,7 @@ import type {
   ApiError,
   ApiResult,
   MediaInfoResponse,
+  MediaListResponse,
   PrivateReplyResponse,
   PublicReplyResponse,
 } from '../types/meta'
@@ -32,6 +33,26 @@ export const REQUIRED_SCOPES = [
 
 /** Teto conservador: a Meta nao documenta limite do texto de reply. */
 export const MAX_REPLY_LENGTH = 2000
+
+/**
+ * Itens por pagina de `me/media` (§12.5).
+ *
+ * Uma pagina = UMA chamada = 1 subrequest. O filtro de Reels e feito no
+ * Worker, porque a Meta nao oferece filtro server-side por REELS: pedir menos
+ * itens so faria mais paginas para achar o mesmo tanto de Reel.
+ */
+export const ITENS_POR_PAGINA_DE_MIDIAS = 25
+
+/**
+ * Os campos que a listagem pede, numa string so.
+ *
+ * `thumbnail_url` entra porque a tela precisa da miniatura, e sai da memoria
+ * quando a resposta e montada: ele NUNCA vai para o D1 (§12.5). `caption` e
+ * `media_product_type` entram para a tela nao precisar de uma chamada extra
+ * por item — a proibicao de §12.5 que mais custa se for esquecida.
+ */
+const CAMPOS_DA_LISTAGEM =
+  'id,media_type,media_product_type,caption,permalink,thumbnail_url,timestamp'
 
 /** Private reply so e aceita ate 7 dias apos a criacao do comentario. */
 export const PRIVATE_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
@@ -180,6 +201,23 @@ export class MetaApiClient {
         message: { text: text.slice(0, MAX_REPLY_LENGTH) },
       }),
     })
+  }
+
+  /**
+   * Uma pagina da listagem de midias da conta (§12.5).
+   *
+   * `after` e o cursor da pagina anterior. Ele **nunca** vai para o D1:
+   * cursores sao temporarios, e guarda-los e bug futuro.
+   */
+  async listMedia(opcoes: { after?: string } = {}): Promise<ApiResult<MediaListResponse>> {
+    const busca = new URLSearchParams({
+      fields: CAMPOS_DA_LISTAGEM,
+      limit: String(ITENS_POR_PAGINA_DE_MIDIAS),
+    })
+    if (opcoes.after !== undefined && opcoes.after !== '') busca.set('after', opcoes.after)
+
+    const url = `${HOST_GRAPH}/${this.apiVersion}/me/media?${busca.toString()}`
+    return call<MediaListResponse>(url, { method: 'GET', headers: this.headers() })
   }
 
   /**
