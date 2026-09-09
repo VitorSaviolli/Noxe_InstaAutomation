@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { PainelAuditoriaRepository } from '../src/repositories/painel-auditoria-repository'
 import { escapeHtml } from '../src/routes/legal'
 import { handleAjustes, RESTAURAR } from '../src/routes/painel/ajustes'
+import { handleAparelhos } from '../src/routes/painel/aparelhos'
 import { CAMPO_DA_CONFIRMACAO } from '../src/routes/painel/campos'
 import {
   CONFIRMACOES,
@@ -14,6 +15,7 @@ import {
 } from '../src/routes/painel/dicionario'
 import { CAMPOS_DA_RESTAURACAO, CAMPOS_DE_COMPORTAMENTO } from '../src/routes/painel/formulario'
 import { codigoDaRecusaDeValidacao } from '../src/routes/painel/gravar'
+import { handleSair } from '../src/routes/painel/guardas'
 import { handleChave, handleInicio } from '../src/routes/painel/inicio'
 import { handleMensagem } from '../src/routes/painel/mensagem'
 import { esquecerAListagem } from '../src/routes/painel/midias'
@@ -23,12 +25,14 @@ import { handleReels } from '../src/routes/painel/reels'
 import { erro } from '../src/routes/painel/resposta'
 import {
   ROTA_AJUSTES,
+  ROTA_APARELHOS,
   ROTA_CHAVE,
   ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_PALAVRAS,
   ROTA_REEL,
   ROTA_REELS,
+  ROTA_SAIR,
   ROTAS,
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
@@ -192,6 +196,19 @@ const GRAVADORAS: readonly { rota: RotaDoPainel; handler: HandlerDoPainel }[] = 
   // de pagina que grava a aparecer nesta lista.
   { rota: ROTA_REELS, handler: handleReels },
   { rota: ROTA_REEL, handler: handleReel },
+  // **`/painel/aparelhos` entrou na Etapa 13**, e ela entra aqui pela regra que
+  // o comentario acima ja escrevia: GRAV-01 compara os dois conjuntos
+  // ordenados, entao toda rota nova de PAGINA que grava e obrigada a aparecer
+  // nesta lista. Ela e a primeira gravadora que NAO grava configuracao
+  // (`gravaConfig: false`, e o nome dela esta na lista `SEM_CONFIGURACAO` do
+  // META-15 desde antes de existir): o que ela grava e quem entra.
+  { rota: ROTA_APARELHOS, handler: handleAparelhos },
+  // **`POST /painel/sair` entrou na rodada de revisao da Etapa 13**, pela mesma
+  // regra: §7.1 sempre a declarou, o handler nasceu agora, e o conjunto
+  // ordenado logo abaixo obriga toda rota de PAGINA que grava a aparecer aqui.
+  // Ela e a segunda gravadora sem configuracao — o que ela grava e o `DELETE`
+  // da propria linha de sessao, com a auditoria no mesmo lote.
+  { rota: ROTA_SAIR, handler: handleSair },
 ]
 
 /** O Reel FICTICIO das duas telas novas. Dezoito digitos, como os de verdade. */
@@ -222,6 +239,16 @@ const CORPO_VALIDO: Record<string, string> = {
   // `tests/painel-midias.test.ts`, que e a suite dona do assunto (§13.1).
   [ROTA_REELS.caminho]: '',
   [ROTA_REEL.caminho]: `acao=pausar&midia=${REEL_DE_TESTE}`,
+  // A UNICA das tres acoes de `/painel/aparelhos` que nao pede step-up — e a
+  // escolha e a propria garantia de §10.13: "sair de todos os aparelhos" e a
+  // direcao segura, e um `303` sem digital nenhuma e o que ela promete. As duas
+  // protegidas (`remover_passkey` e `gerar_codigos`) vivem em
+  // `tests/painel-recuperacao.test.ts`, que e a suite dona do assunto (§13.1).
+  [ROTA_APARELHOS.caminho]: 'acao=sair_de_tudo',
+  // Vazio, e nao por economia: `POST /painel/sair` nao tem campo nenhum alem
+  // da ficha CSRF (§10.13). Quem ela apaga e a sessao do cookie que veio, e um
+  // identificador no corpo seria um jeito de mandar embora a sessao de outro.
+  [ROTA_SAIR.caminho]: '',
 }
 
 function postar(

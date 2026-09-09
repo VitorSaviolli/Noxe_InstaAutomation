@@ -346,7 +346,7 @@ npm run check
 npm run deploy
 ```
 
-O `npm run check` roda lint, checagem de tipos e os **125 testes** antes de
+O `npm run check` roda lint, checagem de tipos e os **822 testes** antes de
 publicar.
 
 > **Vai aparecer aviso sobre segredo faltando durante os testes — é esperado.**
@@ -1127,7 +1127,7 @@ Para automatizar **só a sua conta**, isso não é exigido.
 | `npm run typecheck` | Checagem de tipos |
 | `npm run lint` / `npm run lint:fix` | Lint |
 | `npm run format` | Formatação |
-| `npm run test` / `npm run test:watch` | Testes (**125 testes**, em 6 arquivos) |
+| `npm run test` / `npm run test:watch` | Testes (**822 testes**, em 25 arquivos) |
 | `npm run test:webhook` | Simula um webhook contra o servidor local |
 | `npm run db:migrate:local` | Aplica migrações no D1 local |
 | `npm run db:migrate:remote` | Aplica migrações no D1 de produção |
@@ -1162,7 +1162,7 @@ Para automatizar **só a sua conta**, isso não é exigido.
 | `src/utils/normalize.ts`, `templates.ts`, `hash.ts` | Normalização de texto, templates, SHA-256 |
 | `migrations/0001_initial.sql` | Esquema do D1 |
 | `scripts/` | `gerar-segredos.mjs` e `simular-webhook.mjs` |
-| `tests/` | Suíte de testes: **125 testes** em 6 arquivos |
+| `tests/` | Suíte de testes: **822 testes** em 25 arquivos |
 
 ---
 

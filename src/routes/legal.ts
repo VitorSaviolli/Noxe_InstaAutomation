@@ -204,6 +204,26 @@ uma conta profissional do Instagram, usando exclusivamente a API oficial da Meta
   <li>Senhas — a aplicação nunca solicita senha do Instagram.</li>
 </ul>
 
+<h2>O painel administrativo</h2>
+<ul>
+  <li><strong>O histórico das suas próprias mudanças</strong> — quando você altera a
+      configuração pelo painel, o registro dessa alteração fica guardado no
+      <em>seu</em> banco de dados, na sua conta da Cloudflare. Ele existe para
+      você poder ver o que mudou e voltar atrás.</li>
+  <li><strong>O nome de usuário na tela "O que aconteceu"</strong> — essa tela abre
+      <em>sem</em> consultar o Instagram. Somente <strong>quando você pede</strong>, tocando no
+      botão que busca os nomes, o painel pergunta ao Instagram, naquele momento, o
+      @ de quem comentou nos comentários listados. Esse nome é usado apenas para
+      desenhar a página e <strong>não é guardado</strong>: ele não vai para o banco
+      de dados, não vai para os registros, e desaparece quando a página termina de
+      carregar.</li>
+  <li><strong>Metadados de requisição registrados pela Cloudflare</strong> — a Cloudflare,
+      que hospeda esta aplicação, registra dados técnicos de cada acesso (como
+      endereço IP e identificador da requisição). Isso acontece na infraestrutura
+      dela, fora do controle deste código, e a retenção é definida pela
+      Cloudflare.</li>
+</ul>
+
 <h2>Compartilhamento</h2>
 <p>Nenhum dado é vendido, cedido ou compartilhado com terceiros. A comunicação
 ocorre apenas entre esta aplicação e a API oficial da Meta.</p>

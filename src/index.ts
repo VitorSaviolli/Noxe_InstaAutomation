@@ -46,6 +46,7 @@ import {
   handleOAuthCallback,
   handleSubscribe,
 } from './routes/oauth'
+import { handleZerarAcesso } from './routes/painel/aparelhos'
 import {
   CAMINHO_DA_PARADA,
   CAMINHO_DO_FORMULARIO,
@@ -159,7 +160,11 @@ export default {
 
     switch (url.pathname) {
       case '/health':
-        return handleHealth(env)
+        // O `request` vai junto porque `/health` responde DUAS resolucoes da
+        // mesma pergunta sobre o painel: tres valores a quem chega anonimo,
+        // seis a quem manda o `SETUP_ADMIN_TOKEN` (§11.9). Sem ele a rota nunca
+        // sairia do lado publico, e o assistente perderia o recado exato.
+        return handleHealth(env, now, request)
 
       case '/privacy-policy':
         return handlePrivacyPolicy()
@@ -201,6 +206,15 @@ export default {
       case '/setup/painel/codigos':
         return handleGerarCodigos(request, env, now)
 
+      // O ultimo recurso quando o dono perdeu todos os aparelhos E o papel dos
+      // codigos (§7.1, §10.8). Ela apaga sessoes e, com `?tudo=1`, tambem as
+      // credenciais — e NAO toca `account_tokens`: a conexao com o Instagram nao
+      // e acesso ao painel, e derruba-la junto faria uma rota de recuperacao de
+      // acesso desligar a automacao. Como a irma acima, ela e do assistente
+      // local, autenticada por Bearer, e por isso nao entra no painel.
+      case '/setup/painel/zerar':
+        return handleZerarAcesso(request, env, now)
+
       // O painel inteiro entra POR AQUI, e por nenhum outro lugar (§11.1).
       //
       // Nao existe `startsWith('/painel')` avaliado antes deste ponto, e essa
@@ -225,7 +239,14 @@ export default {
    * Trigger definido para o projeto.
    */
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runScheduledTasks(env, Date.now()))
+    // O `.catch` nao e decoracao: `runScheduledTasks` isola cada etapa, mas uma
+    // rejeicao fora delas viraria unhandled rejection dentro do `waitUntil` e
+    // sumiria sem log — a mesma cegueira que este commit existe para fechar.
+    ctx.waitUntil(
+      runScheduledTasks(env, Date.now()).catch((cause) => {
+        console.error('cron:', 'falhou', cause instanceof Error ? cause.message : cause)
+      }),
+    )
   },
 } satisfies ExportedHandler<Env>
 
@@ -379,15 +400,41 @@ async function reagendarExcedente(
   }
 }
 
-/** Tarefas do cron: renovacao do token e reprocessamento de pendentes. */
+/**
+ * Uma etapa do cron, isolada das outras.
+ *
+ * Sem isto a primeira rejeicao derruba as etapas seguintes em silencio, porque
+ * `scheduled` entrega o conjunto a `ctx.waitUntil` e ninguem observa a promessa.
+ * Desde §16.1 o cron nao e mais faxina: ele e o caminho de entrega de todo
+ * comentario a partir do sexto de cada lote, entao um soluco do D1 na renovacao
+ * do token nao pode levar a fila de pendentes junto.
+ *
+ * O log segue a forma de §11.7 — argumentos separados, NUNCA template string
+ * com dado variavel dentro.
+ */
+async function executarEtapa(nome: string, etapa: () => Promise<void>): Promise<void> {
+  try {
+    await etapa()
+  } catch (cause) {
+    console.error('cron:', nome, cause instanceof Error ? cause.message : cause)
+  }
+}
+
+/**
+ * Tarefas do cron: renovacao do token e reprocessamento de pendentes.
+ *
+ * A ORDEM e load-bearing e nao pode virar `Promise.allSettled`: `retryPending`
+ * le o token que `maybeRefreshToken` pode ter acabado de rotacionar. O que se
+ * ganha aqui e tolerancia a falha por etapa, nao paralelismo.
+ */
 export async function runScheduledTasks(
   env: Env,
   now: number,
   deps: BatchDeps = DEFAULT_BATCH_DEPS,
 ): Promise<void> {
-  await maybeRefreshToken(env, now)
-  await retryPending(env, now, deps)
-  await podarAuditoria(env)
+  await executarEtapa('token', () => maybeRefreshToken(env, now))
+  await executarEtapa('pendentes', () => retryPending(env, now, deps))
+  await executarEtapa('auditoria', () => podarAuditoria(env))
 }
 
 /**
@@ -419,14 +466,27 @@ async function podarAuditoria(env: Env): Promise<void> {
 }
 
 async function maybeRefreshToken(env: Env, now: number): Promise<void> {
-  const record = await new TokensRepository(env.DB).get()
-  if (!record) return
-
-  if (!shouldRefresh(record.expires_at, record.last_refreshed_at, record.created_at, now)) {
-    return
-  }
-
   try {
+    // Esta leitura ficava FORA do try: uma falha do D1 aqui escapava da funcao
+    // inteira e, antes de `executarEtapa`, levava junto a fila e a poda.
+    const record = await new TokensRepository(env.DB).get()
+    if (!record) return
+
+    // O prazo VENCIDO nao e "nada a fazer": `shouldRefresh` responde `false`
+    // aos dois casos opostos — "ainda cedo" e "tarde demais" —, e o segundo e o
+    // fim da linha. A Meta nao renova token expirado, entao o cron nunca mais
+    // tenta e a conta fica morta em silencio. O `console.warn` e o unico rastro
+    // que existe disso, e e por ele que o dono descobre que precisa reconectar
+    // pelo assistente. Formato de §11.7: argumentos separados.
+    if (now >= record.expires_at) {
+      console.warn('cron:', 'token_vencido', 'reconecte a conta pelo assistente')
+      return
+    }
+
+    if (!shouldRefresh(record.expires_at, record.last_refreshed_at, record.created_at, now)) {
+      return
+    }
+
     const credencial = await loadAccessToken(env)
     if (!credencial) return
 
@@ -442,6 +502,28 @@ async function maybeRefreshToken(env: Env, now: number): Promise<void> {
   } catch (cause) {
     console.error('Falha ao renovar o token:', cause instanceof Error ? cause.message : cause)
   }
+}
+
+/**
+ * Falhas que sao da CONTA, e nao daquele comentario.
+ *
+ * A diferenca decide o que se escreve no banco. `isRetryable` responde "vale
+ * outra tentativa AGORA?", e para estes tres a resposta e nao — o que levava
+ * `reentregar` a marcar `failed`, que e TERMINAL. Com o token morto, a
+ * varredura marcava failed os dez pendentes do tique e os apagava do mundo por
+ * um problema que nao era deles: quem digitou a palavra-gatilho nunca receberia
+ * o Direct, nem depois de o dono reconectar a conta.
+ *
+ * Sao os mesmos codigos que `classify` produz para 190, 401 e 403
+ * (`src/services/meta-api.ts`) — token revogado por troca de senha, checkpoint
+ * ou conta restringida. Todos passam quando o dono reconecta, e nenhum melhora
+ * por insistir: continuar o laco martelando uma conta ja sinalizada e como um
+ * aviso vira bloqueio.
+ */
+const FALHAS_DE_CONTA: readonly string[] = ['TOKEN_INVALIDO', 'NAO_AUTORIZADO', 'PROIBIDO']
+
+function ehFalhaDeConta(shortCode: string): boolean {
+  return FALHAS_DE_CONTA.includes(shortCode)
 }
 
 async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<void> {
@@ -486,13 +568,22 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
       continue
     }
 
-    await reentregar(registro, {
+    const falhaDaConta = await reentregar(registro, {
       api,
       repo,
       config,
       igUserId: credencial.igUserId,
       now,
     })
+
+    // Mesmo enquadramento do portao de configuracao acima: parar e REVERSIVEL.
+    // O resto de `pendentes` fica exatamente como esta — `retry_pending`, sem
+    // gastar tentativa e sem custar consulta — e a proxima varredura entrega
+    // quando o dono reconectar.
+    if (falhaDaConta !== null) {
+      console.warn('cron:', 'conta_parada', falhaDaConta)
+      break
+    }
   }
 
   if (barrados > 0) {
@@ -508,6 +599,10 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
  *
  * O texto do comentario e o username nao sao guardados (coleta minima), entao
  * a nova tentativa reenvia so o Direct — a etapa que faltou.
+ *
+ * Devolve o `shortCode` quando a falha e da CONTA e o registro foi deixado
+ * intacto, para quem chama abandonar o resto da fila. `null` em todo o resto,
+ * inclusive na falha deste comentario, que ja foi gravada aqui.
  */
 async function reentregar(
   registro: CommentRecord,
@@ -518,7 +613,7 @@ async function reentregar(
     igUserId: string
     now: number
   },
-): Promise<void> {
+): Promise<string | null> {
   const { api, repo, config, now } = deps
 
   // Aqui havia um `.replace('{link}', ...)` cru: trocava so a PRIMEIRA
@@ -533,18 +628,23 @@ async function reentregar(
   const envio = await api.sendPrivateReply(deps.igUserId, registro.comment_id, texto)
 
   if (!envio.ok) {
+    const { shortCode } = envio.error
+
+    // A conta parou: NAO e falha deste comentario e nao pode virar `failed`,
+    // que e terminal. Sai sem escrever nada — o registro segue `retry_pending`.
+    if (ehFalhaDeConta(shortCode)) return shortCode
+
     // Mesma escada do caminho inline: ate MAX_ATTEMPTS com espera exponencial.
     // Antes de §16.1 so chegava aqui quem ja tinha falhado uma entrega; agora
     // chega todo comentario a partir do sexto de cada lote, e um 500
     // transitorio da Meta perderia o comentario de vez. (§16.1)
-    const { shortCode } = envio.error
     if (isRetryable(shortCode) && registro.attempt_count < MAX_ATTEMPTS) {
       const nextRetryAt = computeNextRetry(registro.attempt_count, now)
       await repo.scheduleRetry(registro.comment_id, nextRetryAt, shortCode, now)
     } else {
       await repo.markStatus(registro.comment_id, 'failed', now, shortCode)
     }
-    return
+    return null
   }
 
   await repo.markPrivateSent(registro.comment_id, envio.data.message_id ?? null, now)
@@ -552,9 +652,15 @@ async function reentregar(
   const resposta = await api.replyToComment(registro.comment_id, config.publicReplyText)
   if (resposta.ok) {
     await repo.markCompleted(registro.comment_id, resposta.data.id, now)
-  } else {
-    await repo.markStatus(registro.comment_id, 'uncertain', now, resposta.error.shortCode)
+    return null
   }
+
+  await repo.markStatus(registro.comment_id, 'uncertain', now, resposta.error.shortCode)
+
+  // O Direct DESTE registro ja saiu e o estado ja foi gravado, entao nao ha o
+  // que preservar aqui — mas se a conta parou, o proximo da fila sofreria a
+  // mesma coisa. Avisa quem chama para abandonar o resto.
+  return ehFalhaDeConta(resposta.error.shortCode) ? resposta.error.shortCode : null
 }
 
 export { automationConfig }

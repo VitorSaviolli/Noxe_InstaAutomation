@@ -9,12 +9,27 @@
  *   node scripts/configurar.mjs      # abre o menu
  *   node scripts/configurar.mjs 3    # vai direto para a etapa 3
  *
- * POR QUE UM ASSISTENTE LOCAL E NAO UM PAINEL NA INTERNET:
- * os segredos ja vivem nesta maquina. Um painel publicado na internet capaz
- * de editar o texto do Direct viraria, se invadido, uma maquina de golpe
- * operando em nome da conta legitima. Aqui nada e exposto: o script roda no
- * seu computador e so fala com o SEU Worker.
+ * O QUE ESTE ASSISTENTE FAZ, E O QUE O PAINEL FAZ:
+ * este script cuida do que exige a SUA maquina — gerar segredos, cadastra-los
+ * na Cloudflare, fazer o primeiro login OAuth e conferir o deploy. O painel
+ * administrativo, que roda no seu Worker, cuida do dia a dia: palavra-gatilho,
+ * textos, link, quais Reels respondem, e o historico do que aconteceu.
  *
+ * POR QUE O PAINEL PODE EXISTIR SEM VIRAR UMA MAQUINA DE GOLPE. Um painel na
+ * internet capaz de editar o texto do Direct seria, se invadido, exatamente
+ * isso. As quatro travas que impedem esse desfecho:
+ *
+ *   1. So entra com PASSKEY (digital, rosto ou chave fisica). Nao existe senha
+ *      para vazar, para reusar ou para alguem adivinhar.
+ *   2. Mudar o texto do Direct ou o link exige um SEGUNDO gesto de biometria,
+ *      preso AO CONTEUDO daquela mudanca: aprovar uma coisa nao aprova outra.
+ *   3. O link so pode apontar para os dominios do ALLOWED_LINK_DOMAINS, e essa
+ *      lista mora no wrangler.jsonc — mudar exige o repositorio e a credencial
+ *      de deploy, que e o que um painel invadido nao tem.
+ *   4. O codigo de parada desliga tudo SEM sessao e SEM passkey, de qualquer
+ *      aparelho, inclusive com a cota do Worker estourada.
+ *
+ * Os segredos continuam vivendo so aqui: o painel nunca os le nem os mostra.
  * Nenhum segredo e impresso na tela sem voce pedir, e o que voce digita como
  * senha nao aparece enquanto e digitado.
  */
@@ -155,10 +170,19 @@ function descreverFalhaDeRede(falha) {
 }
 
 /** Faz GET em {base}/health e devolve o JSON ja interpretado. */
-async function consultarSaude(base) {
+/**
+ * Consulta `/health`.
+ *
+ * Com `token`, manda `Authorization: Bearer` — e ai o campo `painel` vem com os
+ * SEIS valores em vez dos tres publicos. O assistente e o unico lugar que ja
+ * tem esse token (foi ele quem o cadastrou), e e por isso que ele consegue
+ * dizer em portugues o que fazer, em vez de so "sem acesso".
+ */
+async function consultarSaude(base, token) {
   try {
     const resposta = await fetch(`${base}/health`, {
       signal: AbortSignal.timeout(LIMITE_REDE_MS),
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
     })
     if (!resposta.ok) {
       return { ok: false, erro: `O Worker respondeu com o codigo ${resposta.status}.` }
@@ -211,7 +235,7 @@ async function obterUrlDoWorker(rl) {
 // Etapa 1 - segredos
 // ---------------------------------------------------------------------------
 
-/** Gera os 3 segredos que o projeto sabe gerar sozinho. */
+/** Gera os 4 segredos que o projeto sabe gerar sozinho. */
 function gerarSegredos() {
   return {
     // base64url: vai em header e query, entao nao pode ter + / =
@@ -219,10 +243,22 @@ function gerarSegredos() {
     // base64 puro: e o formato exigido pela chave AES-GCM de 32 bytes.
     TOKEN_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     SETUP_ADMIN_TOKEN: randomBytes(32).toString('base64url'),
+    // Raiz das quatro subchaves do painel. Sem ela o painel responde 503.
+    PANEL_SESSION_KEY: randomBytes(32).toString('base64url'),
   }
 }
 
-/** Monta o conteudo do .dev.vars preservando o META_APP_SECRET ja existente. */
+/**
+ * Monta o conteudo do .dev.vars.
+ *
+ * O META_APP_SECRET e preservado porque vem da Meta e o assistente nao sabe
+ * gera-lo. As chaves geradas sao trocadas de proposito — e o que a etapa 1 faz.
+ *
+ * A lista abaixo e a AUTORIDADE deste arquivo: toda chave gerada precisa
+ * aparecer aqui, senao ela some de quem ja a tinha. Foi o que acontecia com a
+ * PANEL_SESSION_KEY, exigida em `secrets.required` do wrangler.jsonc e ausente
+ * daqui: re-rodar a etapa 1 derrubava o painel local para 503.
+ */
 function montarDevVars(segredos) {
   const appSecretAtual = lerChaveDeArquivo(CAMINHO_DEV_VARS, 'META_APP_SECRET') ?? ''
   return [
@@ -236,6 +272,7 @@ function montarDevVars(segredos) {
     `META_WEBHOOK_VERIFY_TOKEN=${segredos.META_WEBHOOK_VERIFY_TOKEN}`,
     `TOKEN_ENCRYPTION_KEY=${segredos.TOKEN_ENCRYPTION_KEY}`,
     `SETUP_ADMIN_TOKEN=${segredos.SETUP_ADMIN_TOKEN}`,
+    `PANEL_SESSION_KEY=${segredos.PANEL_SESSION_KEY}`,
     '',
   ].join('\n')
 }
@@ -261,12 +298,13 @@ async function gravarDevVars(rl, segredos) {
 
 async function etapaSegredos(rl) {
   titulo('Etapa 1 - Gerar os segredos do projeto')
-  console.log('O projeto usa 4 segredos. Tres deles sao valores aleatorios que este')
-  console.log('assistente cria agora. O quarto, o META_APP_SECRET, NAO pode ser gerado')
+  console.log('O projeto usa 5 segredos. Quatro deles sao valores aleatorios que este')
+  console.log('assistente cria agora. O quinto, o META_APP_SECRET, NAO pode ser gerado')
   console.log('aqui: ele e emitido pela Meta e voce copia do painel do seu app.\n')
   console.log('  META_WEBHOOK_VERIFY_TOKEN  confirma que o webhook e mesmo seu')
   console.log('  TOKEN_ENCRYPTION_KEY       cifra o token da conta guardado no banco')
   console.log('  SETUP_ADMIN_TOKEN          protege as rotas /setup/*')
+  console.log('  PANEL_SESSION_KEY          sem ela o painel responde 503 e nao existe')
   console.log('  META_APP_SECRET            vem do painel da Meta (nao e gerado aqui)')
 
   const segredos = gerarSegredos()
@@ -857,6 +895,134 @@ function etapaVerificar() {
 }
 
 // ---------------------------------------------------------------------------
+// Etapa 6 - conferir o painel
+// ---------------------------------------------------------------------------
+
+/**
+ * O que dizer para cada um dos seis estados de `corpo.painel`.
+ *
+ * Cada entrada tem o diagnostico e o PROXIMO PASSO. Um estado sem proximo passo
+ * seria so um codigo com cara de frase: quem abre este assistente nao programa,
+ * e "sem_passkey" na tela nao ajuda ninguem.
+ */
+const RECADO_DO_PAINEL = {
+  desativado: {
+    diagnostico: 'O painel ainda nao esta ligado. Falta cadastrar os segredos.',
+    passos: [
+      'Rode a opcao 1 deste assistente para gerar os segredos, e confira que a',
+      'PANEL_SESSION_KEY foi cadastrada em producao:',
+      '  npx wrangler secret list',
+      'Confira tambem se o PANEL_RP_ID do wrangler.jsonc esta preenchido com o',
+      'endereco do seu Worker, sem "https://" e sem barra no fim.',
+    ],
+  },
+  sem_passkey: {
+    diagnostico: 'O painel esta ligado mas ninguem consegue entrar. Gere um convite agora.',
+    passos: [
+      'Rode:  npm run gerar:convite',
+      'Abra o link no CELULAR e cadastre a sua digital ou o seu rosto.',
+      'O convite comum vale so enquanto nao existe nenhuma passkey: assim que a',
+      'primeira nascer, ele para de funcionar sozinho.',
+    ],
+  },
+  sem_codigo_parada: {
+    diagnostico: 'Voce ainda nao tem botao de panico. Gere os codigos.',
+    passos: [
+      'O codigo de parada desliga a automacao SEM precisar entrar no painel —',
+      'e o que salva o dia se voce perder o celular com a passkey.',
+      'Gere os codigos pelo painel, na tela de Aparelhos, ou pelo assistente.',
+      'Anote no papel. Eles aparecem UMA vez so.',
+    ],
+  },
+  pronto_arquivo: {
+    diagnostico: 'Tudo certo. A configuracao ainda vem do arquivo.',
+    passos: [
+      'O painel esta pronto, mas quem manda hoje e o src/config.ts.',
+      'Salve uma vez em qualquer tela do painel para ele passar a mandar.',
+    ],
+  },
+  pronto_banco: {
+    diagnostico: 'Tudo certo. A configuracao VIVE NO PAINEL.',
+    passos: [
+      'Editar o src/config.ts aqui no computador nao muda mais nada:',
+      'quem manda agora e o que esta salvo no painel.',
+      'Para mudar palavra-gatilho, texto ou link, use o painel.',
+    ],
+  },
+  pronto_parado: {
+    diagnostico: 'A automacao esta parada por um campo invalido.',
+    passos: [
+      'Abra o painel para ver QUAL campo. A tela nomeia o campo e diz o que',
+      'esperava encontrar.',
+      'Enquanto isso a automacao nao responde ninguem — parar e sempre menos',
+      'perigoso do que enviar um link que voce nao conferiu.',
+    ],
+  },
+}
+
+/** Os tres valores publicos, para quando o token nao foi informado. */
+const RECADO_PUBLICO = {
+  desativado: RECADO_DO_PAINEL.desativado,
+  sem_acesso: {
+    diagnostico: 'O painel esta ligado, mas ainda falta alguma coisa para usa-lo.',
+    passos: [
+      'Sem o SETUP_ADMIN_TOKEN o /health nao diz O QUE falta — e isso e de',
+      'proposito: a resposta publica nao pode entregar o instante em que um',
+      'convite ainda funciona.',
+      'Rode esta opcao de novo informando o token para ver o recado exato.',
+    ],
+  },
+  pronto: {
+    diagnostico: 'O painel esta pronto para uso.',
+    passos: ['Informe o SETUP_ADMIN_TOKEN para saber de onde vem a configuracao.'],
+  },
+}
+
+async function etapaPainel(rl) {
+  titulo('Etapa 6 - Conferir o painel')
+  console.log('Esta opcao pergunta ao SEU Worker em que estado o painel esta,')
+  console.log('e diz em portugues o que fazer a seguir.\n')
+
+  const base = await obterUrlDoWorker(rl)
+  if (!base) return
+
+  // O token e opcional de proposito: sem ele a consulta ainda funciona e devolve
+  // os tres valores publicos. Melhor um recado vago do que uma etapa que a
+  // pessoa nao consegue rodar por nao achar o token agora.
+  const token = await obterTokenAdmin(rl)
+
+  console.log(`\nConsultando ${base}/health ...\n`)
+  const resultado = await consultarSaude(base, token)
+  if (!resultado.ok) {
+    erro(resultado.erro)
+    console.log('    Se o Worker ainda nao foi publicado, rode antes: npm run deploy')
+    return
+  }
+
+  const estado = resultado.dados?.painel
+  if (typeof estado !== 'string') {
+    erro('Este Worker respondeu sem o campo "painel".')
+    console.log('    Ele esta rodando uma versao anterior ao painel administrativo.')
+    console.log('    Publique a versao atual com: npm run deploy')
+    return
+  }
+
+  const recado = RECADO_DO_PAINEL[estado] ?? RECADO_PUBLICO[estado]
+  if (!recado) {
+    erro(`Nao conheco o estado "${estado}".`)
+    console.log('    Provavelmente este assistente esta mais velho que o Worker.')
+    return
+  }
+
+  console.log(`  ${recado.diagnostico}\n`)
+  for (const linha of recado.passos) console.log(`    ${linha}`)
+
+  if (!token) {
+    console.log('\n  (Sem o SETUP_ADMIN_TOKEN o /health responde de forma resumida.)')
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Menu
 // ---------------------------------------------------------------------------
 
@@ -885,6 +1051,11 @@ const OPCOES = [
     codigo: '5',
     nome: 'Verificar se esta tudo pronto para publicar no GitHub',
     executar: etapaVerificar,
+  },
+  {
+    codigo: '6',
+    nome: 'Conferir o painel (em que estado ele esta, e o que fazer)',
+    executar: etapaPainel,
   },
 ]
 

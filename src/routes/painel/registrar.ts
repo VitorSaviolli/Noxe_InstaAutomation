@@ -31,7 +31,10 @@ import {
   type OrigemDeRegistro,
   PainelCredenciaisRepository,
 } from '../../repositories/painel-credenciais-repository'
-import { PainelSessoesRepository } from '../../repositories/painel-sessoes-repository'
+import {
+  FALHAS_DE_STEPUP_ATE_APAGAR,
+  PainelSessoesRepository,
+} from '../../repositories/painel-sessoes-repository'
 import { bytesToBase64Url } from '../../security/base64url'
 import { timingSafeEqual } from '../../security/constant-time'
 import { hmacSha256 } from '../../security/signed-envelope'
@@ -69,6 +72,7 @@ import {
 } from './guardas'
 import { cabecalhos } from './html'
 import { type CodigoDeErro, ERROS } from './resposta'
+import { cookieDeStepUpExpirado, exigirStepUp, opHash } from './stepup'
 
 // ---------------------------------------------------------------------------
 // Contrato
@@ -133,27 +137,73 @@ export interface DepsDoRegistro {
    */
   limitador?: Limitador
   /**
-   * O step-up do modo `sessao` (§10.4 passo 1, §10.10).
+   * O step-up do modo `sessao` (§10.4 passo 1, §10.10, §10.13).
    *
-   * **O padrao RECUSA, e a recusa e a resposta certa por enquanto.** O
-   * verificador de verdade — `op_hash` recalculado no servidor a partir da
-   * mudanca canonica `{ acao: "adicionar_passkey" }` — nasce com a etapa do
-   * step-up, junto de `json_canonico`; escrever aqui uma segunda versao dele
-   * criaria duas especificacoes do mesmo hash, que e exatamente o bug
-   * intermitente que §10.10 manda evitar. Ate la o ramo existe, e conferido
-   * quanto a sessao e quanto a ficha CSRF, e falha FECHADO no passo do
-   * step-up: cadastrar passkey nova pela sessao ainda nao tem tela, e uma
-   * autorizacao que nao da para verificar nao pode ser concedida.
+   * Ate a Etapa 12 o padrao RECUSAVA: o verificador de verdade — `op_hash`
+   * recalculado no servidor a partir da mudanca canonica
+   * `{ acao: "adicionar_passkey" }` — nao existia, e escrever aqui uma segunda
+   * versao dele criaria duas especificacoes do mesmo hash. Agora ele existe, e
+   * o padrao e ELE: `conferirAdicaoDePasskey`, logo abaixo, chama o MESMO
+   * `exigirStepUp` do funil de gravacao, com o `op_hash` calculado pela MESMA
+   * `opHash`.
+   *
+   * O parametro continua existindo porque `painel-convite.test.ts` injeta um
+   * duble para exercitar o ramo `sessao` sem montar uma cerimonia inteira.
    */
   conferirStepUp?: (entrada: {
     request: Request
     env: Env
     sidHash: string
     now: number
+    /** A assertion serializada, como o corpo JSON a trouxe. */
+    digital: string
   }) => Promise<boolean>
 }
 
-const SEM_STEP_UP_AINDA = async (): Promise<boolean> => false
+/**
+ * O step-up de `{ acao: "adicionar_passkey" }` (§10.13).
+ *
+ * **A mudanca canonica nao tem campos, e a ausencia e o desenho**: nao ha
+ * conteudo a amarrar — a passkey nova ainda nem foi criada, e o que ela vai ser
+ * e decidido pelo autenticador depois. O que o `op_hash` prende aqui e a
+ * OPERACAO: uma digital colhida para trocar o link do Direct nao serve para
+ * cadastrar um aparelho novo, porque `{"acao":"config",...}` e
+ * `{"acao":"adicionar_passkey"}` sao textos diferentes e produzem hashes
+ * diferentes (§10.10, o `acao` que entra no JSON canonico existe para isto).
+ *
+ * Sao **dois** gestos de biometria seguidos — um para autorizar, um para criar
+ * —, e a tela avisa antes: "confirme que e voce" e depois "crie a chave nova".
+ */
+async function conferirAdicaoDePasskey(entrada: {
+  request: Request
+  env: Env
+  sidHash: string
+  now: number
+  digital: string
+}): Promise<boolean> {
+  if (entrada.digital === '') return false
+
+  const veredito = await exigirStepUp({
+    request: entrada.request,
+    env: entrada.env,
+    now: entrada.now,
+    sidHash: entrada.sidHash,
+    digital: entrada.digital,
+    // Recalculado AQUI, no servidor. Um `op_hash` que chegasse pelo corpo
+    // autorizaria qualquer coisa (§10.10).
+    opHashDeAgora: await opHash({ acao: 'adicionar_passkey', campos: {} }),
+  })
+
+  if (!veredito.ok) {
+    // O motivo vai para o log do dono; ao cliente, `step_up_necessario` e mais
+    // nada — separar os casos daria um oraculo para descobrir qual metade da
+    // trava ainda falta quebrar (§10.10).
+    console.warn('painel:', 'registro_recusado', veredito.motivo)
+    return false
+  }
+
+  return true
+}
 
 // ---------------------------------------------------------------------------
 // As respostas
@@ -389,7 +439,7 @@ export function handlePaginaDeConvite(request: Request, env: Env): Response {
 type PedidoDeOpcoes =
   | { readonly tipo: 'convite'; readonly convite: string }
   | { readonly tipo: 'recuperacao'; readonly codigo: string }
-  | { readonly tipo: 'sessao' }
+  | { readonly tipo: 'sessao'; readonly digital: string }
 
 function lerPedidoDeOpcoes(corpo: unknown): PedidoDeOpcoes | null {
   if (typeof corpo !== 'object' || corpo === null) return null
@@ -401,7 +451,13 @@ function lerPedidoDeOpcoes(corpo: unknown): PedidoDeOpcoes | null {
   if (lido.tipo === 'recuperacao' && typeof lido.codigo === 'string') {
     return { tipo: 'recuperacao', codigo: lido.codigo }
   }
-  if (lido.tipo === 'sessao') return { tipo: 'sessao' }
+  // A digital do step-up de `{ acao: "adicionar_passkey" }` viaja no CORPO, e
+  // nao num cookie: ela e uma assertion, e o cookie desta cerimonia carrega o
+  // envelope (o desafio e o `op_hash`), nunca a resposta. Ausente vira `''`, e
+  // `''` recusa no passo do step-up — nao ha ramo em que ela "nao precisa".
+  if (lido.tipo === 'sessao') {
+    return { tipo: 'sessao', digital: typeof lido.digital === 'string' ? lido.digital : '' }
+  }
 
   return null
 }
@@ -506,12 +562,42 @@ async function montarOpcoes(
     excluir: desteEndereco.map((linha) => linha.credentialId),
   })
 
-  return Response.json(options, {
-    headers: {
-      ...cabecalhos('api'),
-      'set-cookie': cookieDoPainel(COOKIE_DO_DESAFIO, bilhete, Math.floor(options.timeout / 1000)),
-    },
-  })
+  // Dois `Set-Cookie` no ramo `sessao`, e por isso um `Headers` em vez do
+  // objeto literal: um `Record<string, string>` so tem uma chave `set-cookie`, e
+  // a segunda comeria a primeira em silencio.
+  const cabecalhosDaResposta = new Headers(cabecalhos('api'))
+  cabecalhosDaResposta.append(
+    'set-cookie',
+    cookieDoPainel(COOKIE_DO_DESAFIO, bilhete, Math.floor(options.timeout / 1000)),
+  )
+
+  // §10.10, fim do passo 4: **expira o cookie** na requisicao que usa o
+  // envelope. E o mesmo par de `Set-Cookie` de `lote.ts` — a metade que faltava
+  // aqui.
+  //
+  // O que a ausencia dela causava: `exigirStepUp` e SEM ESTADO (confere MAC,
+  // prazo, `sid`, `op_hash` e a assinatura — nada marca o envelope como usado),
+  // entao o `Max-Age=0` E o consumo. Sem ele, o par (cookie + assertion)
+  // continuava fechando pelo resto dos 120 s; e como a mudanca canonica de
+  // `adicionar_passkey` nao tem alvo nem campos (`{"acao":"adicionar_passkey"}`
+  // e sempre o mesmo texto), toda repeticao fechava e cada uma emitia um bilhete
+  // de registro NOVO — uma digital do dono valendo por ate dez cadastros de
+  // passkey, que e literalmente o "modo privilegiado por 120 s" que §10.10
+  // recusa por escrito.
+  //
+  // So no ramo `sessao`: convite e recuperacao nao tem envelope a matar, e um
+  // `Max-Age=0` disparado a esmo seria um carimbo cego em vez de um consumo.
+  //
+  // Custo para quem cancela a biometria da CRIACAO: um step-up a mais. O
+  // `painel.js` ja recomeca a cerimonia inteira a cada clique em "cadastrar
+  // este aparelho" (`adicionarAparelho` chama `colherDigital` antes de
+  // `cadastrar`), entao nao ha beco sem saida — so um toque a mais numa
+  // operacao rara, que e exatamente o preco que §10.10 diz aceitar.
+  if (autorizacao.tipo === 'sessao') {
+    cabecalhosDaResposta.append('set-cookie', cookieDeStepUpExpirado())
+  }
+
+  return Response.json(options, { headers: cabecalhosDaResposta })
 }
 
 /**
@@ -565,7 +651,7 @@ async function autorizar(
     case 'recuperacao':
       return await autorizarPorCodigo(pedido.codigo, env)
     case 'sessao':
-      return await autorizarPorSessao(request, env, now, deps)
+      return await autorizarPorSessao(pedido.digital, request, env, now, deps)
   }
 }
 
@@ -652,21 +738,44 @@ async function autorizarPorConvite(
  * **Nada e consumido aqui.** O consumo, com `changes === 1`, e de `/verificar`.
  */
 async function autorizarPorCodigo(bruto: string, env: Env): Promise<ResultadoDaAutorizacao> {
+  const hashCodigo = await conferirCodigoDeRecuperacao(bruto, env)
+  if (hashCodigo === null) return { recusa: 'credencial_invalida' }
+
+  return { autorizacao: { tipo: 'recuperacao', hashCodigo } }
+}
+
+/**
+ * Um codigo de recuperacao confere? Devolve o HMAC dele, ou `null`.
+ *
+ * **Exportada porque sao DUAS portas para o mesmo segredo, e uma so
+ * conferencia.** `GET+POST /painel/entrar/codigo` (§15.3, decisao 1) confere o
+ * codigo para RENDERIZAR a tela "crie a chave nova neste aparelho", e esta rota
+ * o confere para emitir o bilhete de registro. Duas implementacoes da mesma
+ * conferencia divergiriam na primeira vez que uma delas ganhasse um passo — e o
+ * passo mais provavel de divergir e a normalizacao, que e o que faz `O` virar
+ * `0` no codigo que a pessoa digita do papel sob estresse.
+ *
+ * **Nada e consumido aqui**, nas duas portas: o consumo, com `changes === 1`, e
+ * de `/painel/api/registrar/verificar` e de nenhum outro lugar (§10.11). Uma
+ * conferencia que queimasse o codigo faria abrir a tela por engano custar um dos
+ * seis codigos do papel.
+ *
+ * O formato exato e validado ANTES de qualquer consulta (0 leitura), e so entao
+ * vem 1 leitura e 0 escrita: `normalizarCodigo` recusa tudo o que nao for 20
+ * caracteres do alfabeto, e e por isso que lixo digitado nao toca o D1 (§11.3).
+ * `conferirCodigo` nao sai no primeiro acerto e a lista vazia percorre o mesmo
+ * laco de uma lista cheia — codigo errado e codigo inexistente sao o mesmo
+ * caminho (CONV-11).
+ */
+export async function conferirCodigoDeRecuperacao(bruto: string, env: Env): Promise<string | null> {
   const normalizado = normalizarCodigo(bruto, 'recuperacao')
-  if (normalizado === null) return { recusa: 'credencial_invalida' }
+  if (normalizado === null) return null
 
   const chaveDosCodigos = await derivarSubchave(env.PANEL_SESSION_KEY, 'codigos')
   const vivos = await new PainelCodigosRepository(env.DB).hashesVivos('recuperacao')
-  if (!(await conferirCodigo(normalizado, 'recuperacao', chaveDosCodigos, vivos))) {
-    return { recusa: 'credencial_invalida' }
-  }
+  if (!(await conferirCodigo(normalizado, 'recuperacao', chaveDosCodigos, vivos))) return null
 
-  return {
-    autorizacao: {
-      tipo: 'recuperacao',
-      hashCodigo: await hashDoCodigo(chaveDosCodigos, 'recuperacao', normalizado),
-    },
-  }
+  return await hashDoCodigo(chaveDosCodigos, 'recuperacao', normalizado)
 }
 
 /**
@@ -679,8 +788,17 @@ async function autorizarPorCodigo(bruto: string, env: Env): Promise<ResultadoDaA
  *
  * Ordem: sessao (1 HMAC) -> ficha (1 HMAC) -> step-up. Nenhuma consulta ao D1
  * ate o step-up fechar, e por isso um cookie forjado nao custa banco nenhum.
+ *
+ * A UNICA excecao e a RECUSA de step-up, que paga 1 leitura e 1 escrita em
+ * `punirFalhaDeStepUp` — e ela nao contradiz a frase acima: para chegar la o
+ * cookie de sessao ja fechou o HMAC e a ficha ja fechou o dela, entao quem
+ * provoca a escrita e alguem que apresentou uma sessao NOSSA. E o mesmo
+ * desempate que §9.9 usa para permitir a linha de auditoria de fracasso: "a
+ * requisicao e autenticada, portanto a escrita ja esta limitada por uma
+ * credencial".
  */
 async function autorizarPorSessao(
+  digital: string,
   request: Request,
   env: Env,
   now: number,
@@ -697,8 +815,16 @@ async function autorizarPorSessao(
     return { recusa: 'csrf_invalido' }
   }
 
-  const conferir = deps.conferirStepUp ?? SEM_STEP_UP_AINDA
-  if (!(await conferir({ request, env, sidHash: sessao.sidHash, now }))) {
+  const conferir = deps.conferirStepUp ?? conferirAdicaoDePasskey
+  if (!(await conferir({ request, env, sidHash: sessao.sidHash, now, digital }))) {
+    // A recusa CONTA e deixa rastro (§10.10). Sem estas duas escritas, quem
+    // roubou o cookie de sessao — ou um XSS que alcanca a ficha CSRF — martelava
+    // assertions forjadas aqui indefinidamente: o contador nunca subia, a sessao
+    // nunca era apagada na decima, e nenhuma linha registrava a sequencia. A
+    // MESMA sequencia contra /painel/aparelhos derruba a sessao em 10 tentativas
+    // e deixa 10 linhas de rastro; era a mesma trava com duas grafias, e uma
+    // delas nao gravava nada.
+    await punirFalhaDeStepUp(env, sessao.sidHash, now, digital === '')
     return { recusa: 'step_up_necessario' }
   }
 
@@ -710,6 +836,73 @@ async function autorizarPorSessao(
   }
 
   return { autorizacao: { tipo: 'sessao', credencialId: linha.credentialId } }
+}
+
+/**
+ * As duas escritas que §10.10 manda fazer quando o step-up e recusado.
+ *
+ *   - **linha `stepup_recusado` em `painel_auditoria`**, sempre. "Uma tentativa
+ *     de gravacao recusada por step-up ausente ou invalido tambem gera linha de
+ *     auditoria." Sem ela, dez tentativas de cadastrar uma passkey em nome do
+ *     dono nao aparecem em lugar nenhum que a investigacao alcance.
+ *   - **`painel_sessoes.falhas_stepup`**, e na DECIMA a sessao e apagada.
+ *
+ * A separacao entre as duas recusas e a MESMA de `passarPeloStepUp`
+ * (`aparelhos.ts`), de proposito — duas grafias da mesma regra divergem na
+ * primeira vez que uma delas ganha um passo: a falha INVALIDA incrementa o
+ * contador, a AUSENTE nao. Ausente e o primeiro envio, o caminho normal de quem
+ * apertou o botao; punir isso derrubaria a sessao de quem so cancelou a
+ * biometria dez vezes.
+ *
+ * **Sem linha de sessao, nada acontece.** O contador vive NA linha e o `ator` de
+ * §9.9 sai do `credential_id` dela: sem a linha nao ha o que incrementar nem
+ * como nomear quem tentou, e gravar uma linha anonima seria escrita provocada
+ * por quem nao tem sessao, na cota que o painel divide com o webhook. Quem
+ * chegou ate aqui com o cookie fechando mas sem linha ja recebe
+ * `sessao_ausente` no passo seguinte de `autorizarPorSessao`.
+ *
+ * A auditoria e o UPDATE viajam no mesmo `db.batch()` pela regra de ouro de
+ * §8.8: sem log, sem mudanca. E o `campos` carrega `["adicionar_passkey"]`, o
+ * nome da operacao recusada — a mesma grafia que `aparelhos.ts` escreve com
+ * `JSON.stringify([mudanca.acao])`.
+ */
+async function punirFalhaDeStepUp(
+  env: Env,
+  sidHash: string,
+  now: number,
+  ausente: boolean,
+): Promise<void> {
+  const sessoes = new PainelSessoesRepository(env.DB)
+  const linha = await sessoes.buscarPorHash(sidHash)
+  if (linha === null) return
+
+  const registro = new PainelAuditoriaRepository(env.DB).statementDeRegistro({
+    ocorridoEm: now,
+    // `0` pelo mesmo motivo de `passkey_registrada`: nenhuma configuracao mudou,
+    // e perguntar a versao custaria uma leitura fora do orcamento desta rota.
+    versao: 0,
+    origem: 'painel',
+    // Nunca o `credential_id` cru — os tres destinos veem o prefixo (§10.13).
+    ator: `passkey:${await prefixoDeCredencial(linha.credentialId)}`,
+    // Recusa nunca e passagem: ou o step-up faltou, ou nao fechou.
+    stepUp: false,
+    acao: 'stepup_recusado',
+    alvo: null,
+    campos: JSON.stringify(['adicionar_passkey']),
+    antes: null,
+    depois: null,
+  })
+
+  if (ausente) {
+    await registro.run()
+    return
+  }
+
+  const decima = linha.falhasStepup + 1 >= FALHAS_DE_STEPUP_ATE_APAGAR
+  await env.DB.batch([
+    registro,
+    decima ? sessoes.statementDeApagar(sidHash) : sessoes.statementDeFalhaDeStepup(sidHash),
+  ])
 }
 
 // ---------------------------------------------------------------------------

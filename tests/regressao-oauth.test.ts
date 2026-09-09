@@ -1,9 +1,11 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { TokensRepository } from '../src/repositories/tokens-repository'
+import { isAdmin } from '../src/routes/oauth'
 import { decrypt } from '../src/security/encryption'
 import { createState, STATE_TTL_MS, validateState } from '../src/security/oauth-state'
 import { storeAccessToken } from '../src/services/token-manager'
+import type { Env } from '../src/types/env'
 import { limparBanco } from './fixtures/banco'
 import {
   AGORA,
@@ -347,3 +349,59 @@ async function contarCodigos(): Promise<number> {
   }>()
   return linha?.total ?? -1
 }
+
+/**
+ * REG-ADMIN — o comparador unico das rotas administrativas.
+ *
+ * `isAdmin` e a UNICA porta de `/setup/authorize`, `/setup/subscribe`,
+ * `/setup/painel/codigos` e `/setup/painel/zerar`. As duas ultimas nasceram
+ * depois deste arquivo, e a segunda delas apaga o acesso ao painel inteiro —
+ * entao o que esta funcao aceita virou uma pergunta mais cara do que era.
+ */
+describe('REG-ADMIN — isAdmin nao aceita segredo vazio', () => {
+  /** Um `Env` de teste com o admin token trocado. Nada real aqui. */
+  function envCom(token: string | undefined): Env {
+    return { ...env, SETUP_ADMIN_TOKEN: token } as unknown as Env
+  }
+
+  function comBearer(valor: string): Request {
+    return new Request(`${RAIZ}/setup/subscribe`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${valor}` },
+    })
+  }
+
+  test('REG-ADMIN-01: o token correto continua entrando', () => {
+    expect(isAdmin(comBearer(ADMIN), envCom(ADMIN))).toBe(true)
+  })
+
+  test('REG-ADMIN-02: token errado nao entra', () => {
+    expect(isAdmin(comBearer('nao-e-o-token'), envCom(ADMIN))).toBe(false)
+  })
+
+  test('REG-ADMIN-03: segredo VAZIO nao autentica ninguem, nem com Bearer vazio', () => {
+    // O caso e um `wrangler secret put` que recebeu Enter sem nada. Sem esta
+    // guarda, `timingSafeEqual('', '')` compara zero bytes com zero bytes e
+    // devolve true — e um `Authorization: Bearer ` sem nada depois abriria as
+    // quatro rotas, entre elas a que apaga o acesso ao painel.
+    expect(isAdmin(comBearer(''), envCom(''))).toBe(false)
+    expect(isAdmin(comBearer('qualquer-coisa'), envCom(''))).toBe(false)
+  })
+
+  test('REG-ADMIN-04: segredo AUSENTE nao autentica, nem com a palavra "undefined"', () => {
+    // Ausente, o binding chega `undefined`, e o encoder o transforma no texto
+    // "undefined". Sem a guarda, quem mandasse exatamente essa palavra entrava.
+    expect(isAdmin(comBearer(''), envCom(undefined))).toBe(false)
+    expect(isAdmin(comBearer('undefined'), envCom(undefined))).toBe(false)
+  })
+
+  test('REG-ADMIN-05: sem cabecalho, e sem o prefixo Bearer, nao entra', () => {
+    const semNada = new Request(`${RAIZ}/setup/subscribe`, { method: 'POST' })
+    const semPrefixo = new Request(`${RAIZ}/setup/subscribe`, {
+      method: 'POST',
+      headers: { authorization: ADMIN },
+    })
+    expect(isAdmin(semNada, envCom(ADMIN))).toBe(false)
+    expect(isAdmin(semPrefixo, envCom(ADMIN))).toBe(false)
+  })
+})

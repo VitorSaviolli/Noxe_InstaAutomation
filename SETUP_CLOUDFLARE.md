@@ -31,8 +31,8 @@ endereço para colar.
   não tem, cria no passo 1.3.
 - Cerca de 40 minutos sem pressa.
 
-**O que você ainda NÃO precisa:** nada do painel da Meta. Dos quatro segredos do
-projeto, três você gera na sua própria máquina (passo 6) e só um
+**O que você ainda NÃO precisa:** nada do painel da Meta. Dos cinco segredos do
+projeto, quatro você gera na sua própria máquina (passo 6) e só um
 (`META_APP_SECRET`) vem da Meta — ele é cadastrado no fim, já dentro do
 `SETUP_META.md`. Ou seja: você percorre este documento inteiro de ida, sem
 precisar voltar.
@@ -252,23 +252,24 @@ problema — o Wrangler controla quais já foram aplicadas.
 
 ---
 
-## 6. Cadastrar os 4 segredos
+## 6. Cadastrar os 5 segredos
 
-São **quatro** segredos. Eles não ficam no `wrangler.jsonc` nem no Git — vão
+São **cinco** segredos. Eles não ficam no `wrangler.jsonc` nem no Git — vão
 direto para o cofre da Cloudflare pelo comando `wrangler secret put`.
 
 | Segredo | Para que serve | De onde vem |
 |---|---|---|
 | `META_WEBHOOK_VERIFY_TOKEN` | Senha do handshake do webhook (o `hub.verify_token`) | você gera |
 | `TOKEN_ENCRYPTION_KEY` | Chave AES-GCM 256 que cifra o token do Instagram guardado no D1 | você gera |
-| `SETUP_ADMIN_TOKEN` | Protege as rotas administrativas `/setup/authorize` e `/setup/subscribe` | você gera |
+| `SETUP_ADMIN_TOKEN` | Protege as rotas `/setup/*` **e** assina os convites de registro do painel e gera os códigos. **Quem tem este token cadastra uma passkey** | você gera |
+| `PANEL_SESSION_KEY` | Raiz das subchaves do painel administrativo. **Sem ela o painel responde 503 e não existe** | você gera |
 | `META_APP_SECRET` | Valida a assinatura `X-Hub-Signature-256` dos webhooks e faz a troca do code do OAuth | painel da Meta |
 
-Repare na última coluna: **três você gera agora, na sua máquina**. Só o
+Repare na última coluna: **quatro você gera agora, na sua máquina**. Só o
 `META_APP_SECRET` vem do painel da Meta, e por isso ele é o último da fila
-(item 6.5) — não trave aqui esperando por ele.
+(item 6.6) — não trave aqui esperando por ele.
 
-### 6.1 Gerar os três valores aleatórios
+### 6.1 Gerar os quatro valores aleatórios
 
 O projeto já traz um gerador pronto. Este é o caminho recomendado:
 
@@ -276,9 +277,9 @@ O projeto já traz um gerador pronto. Este é o caminho recomendado:
 npm run gerar:segredos
 ```
 
-Ele imprime os três valores já no formato certo. Isso importa: o
+Ele imprime os quatro valores já no formato certo. Isso importa: o
 `TOKEN_ENCRYPTION_KEY` tem formato obrigatório (**32 bytes aleatórios
-codificados em base64**) e os outros dois precisam ser seguros para viajar em
+codificados em base64**) e os outros três precisam ser seguros para viajar em
 cabeçalho HTTP. O script cuida disso; um valor digitado à mão, não.
 
 De propósito, ele **não grava nada em arquivo nenhum**. Copie a saída para o seu
@@ -337,7 +338,38 @@ cabeçalho `Authorization: Bearer ...` quando você chamar `/setup/authorize` e
 `/setup/subscribe`. Quem tiver esse valor consegue iniciar a autorização da sua
 conta.
 
-### 6.5 `META_APP_SECRET` — o único que não é você quem gera
+> ⚠️ **Com o painel, este token ficou MAIS importante, não menos.** Ele deixou de
+> proteger só o OAuth: agora é também a chave que **assina os convites de
+> registro** (`npm run gerar:convite`) e a credencial que **gera os códigos de
+> recuperação e de parada**. Em uma frase: **quem tem este token cadastra uma
+> passkey no seu painel** — e quem cadastra uma passkey entra.
+>
+> É por isso que a chave de sessão (`PANEL_SESSION_KEY`, logo abaixo) é um
+> segredo **separado**: assim, rotacionar este token não derruba os seus
+> aparelhos, e um convite vazado não entrega a chave das sessões. Nunca use o
+> mesmo valor nos dois.
+
+### 6.5 `PANEL_SESSION_KEY`
+
+```bash
+npx wrangler secret put PANEL_SESSION_KEY
+```
+
+É a raiz das quatro subchaves do painel administrativo (sessão, desafio, CSRF e
+códigos). **Enquanto ela não estiver cadastrada, o painel responde 503 e é como
+se não existisse** — o Worker publica normalmente, o webhook funciona, e só o
+painel fica fora do ar. Se você publicou e o painel não abre, é quase sempre
+isto.
+
+Ela **não pode repetir** o `SETUP_ADMIN_TOKEN` nem o `TOKEN_ENCRYPTION_KEY`:
+rotacionar o token administrativo não pode derrubar as suas sessões, e vazar um
+convite não pode entregar a chave das sessões. Mínimo de 32 caracteres.
+
+> ⚠️ Trocar esta chave **desconecta todos os aparelhos** e invalida os códigos
+> de recuperação e os de parada de emergência. As passkeys já cadastradas não
+> são afetadas — você entra de novo com a mesma passkey.
+
+### 6.6 `META_APP_SECRET` — o único que não é você quem gera
 
 Este vem do painel da Meta: é a **chave secreta do app do Instagram**. Se você
 ainda não criou o app (o normal, se está seguindo a ordem recomendada), **pule
@@ -373,8 +405,8 @@ Neste ponto do guia é esperado ver **três** nomes na lista. O quarto,
 
 ## 7. Rodar os testes
 
-Antes de publicar, confirme que está tudo verde. A suíte tem **125 testes**,
-distribuídos em 6 arquivos dentro da pasta `tests/`.
+Antes de publicar, confirme que está tudo verde. A suíte tem **822 testes**,
+distribuídos em 25 arquivos dentro da pasta `tests/`.
 
 ```bash
 npm test
@@ -733,7 +765,7 @@ npm run typecheck         # checagem de tipos
 npm run lint              # lint
 npm run lint:fix          # lint corrigindo o que dá
 npm run format            # formatação
-npm test                  # roda os 125 testes
+npm test                  # roda os 822 testes
 npm run test:watch        # testes em modo watch
 npm run test:webhook      # simula um webhook contra o servidor local
 npm run db:migrate:local  # migrations no banco local
@@ -759,7 +791,7 @@ src/types/                     env.ts, meta.ts
 src/utils/                     normalize.ts, templates.ts, hash.ts
 migrations/0001_initial.sql
 scripts/                       gerar-segredos.mjs, simular-webhook.mjs
-tests/                         125 testes em 6 arquivos
+tests/                         822 testes em 25 arquivos
 ```
 
 ### Hosts da Meta — cada etapa usa um host diferente

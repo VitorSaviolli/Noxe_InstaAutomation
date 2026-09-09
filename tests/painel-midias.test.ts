@@ -34,7 +34,7 @@ import { ROTA_REEL, ROTA_REELS, ROTAS } from '../src/routes/painel/rotas'
 import { despachar } from '../src/routes/painel/router'
 import { invalidarCacheDeConfig } from '../src/services/config-store'
 import { emitirSessao, fichaCsrf, PRAZO_OCIOSO_DE_SESSAO_MS } from '../src/services/panel-session'
-import { gravarConfig, gravarMidia, ligarConta, limparBanco } from './fixtures/banco'
+import { gravarConfig, gravarMidia, gravarMidias, ligarConta, limparBanco } from './fixtures/banco'
 import {
   AGORA,
   bytesComprimidos,
@@ -453,7 +453,7 @@ describe('MID — Reels e automacoes por midia', () => {
 
     // 200 ja salvos, e mais um marcado: 201.
     const jaSalvos = idsFicticios(200)
-    for (const id of jaSalvos) await gravarMidia(env.DB, id)
+    await gravarMidias(env.DB, jaSalvos)
     const falsa = new MetaDeListagem([pagina([], null)], { conhecidos: [REEL_A] })
 
     const corpo = [
@@ -866,14 +866,14 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     const todos = idsFicticios(TETO_DE_MIDIAS)
     const paginaCheia = todos.slice(0, 25).map((id) => item(id))
 
-    for (const id of todos.slice(0, 25)) await gravarMidia(env.DB, id)
+    await gravarMidias(env.DB, todos.slice(0, 25))
     const comum = await (
       await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))
     ).text()
 
     expect(new TextEncoder().encode(comum).length).toBeLessThanOrEqual(TETO_DE_UMA_PAGINA_DE_REELS)
 
-    for (const id of todos.slice(25)) await gravarMidia(env.DB, id)
+    await gravarMidias(env.DB, todos.slice(25))
     esquecerAListagem()
     const noTeto = await (
       await telaDeReels(sessao, new MetaDeListagem([pagina(paginaCheia, 'proxima')]))

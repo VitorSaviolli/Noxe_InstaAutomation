@@ -36,10 +36,12 @@ import {
 } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
 import { COOKIE_DA_SESSAO, COOKIE_DO_DESAFIO, cookieDoPainel, lerCookie } from './campos'
-import { zerarLimite } from './guardas'
-import { html, pagina } from './html'
+import { fraseDeConfirmacao } from './dicionario'
+import { CAMINHO_DE_ENTRAR, zerarLimite } from './guardas'
+import { type HtmlSeguro, html, pagina } from './html'
+import { conferirCodigoDeRecuperacao } from './registrar'
 import { type ContextoDoErro, erro, json } from './resposta'
-import { ROTA_INICIO } from './rotas'
+import { ROTA_ENTRAR_CODIGO, ROTA_INICIO } from './rotas'
 import type { EntradaDaRota } from './router'
 
 /**
@@ -94,11 +96,21 @@ const SEGUNDOS_DO_DESAFIO = Math.floor(PRAZO_DE_ENVELOPE_MS.entrar / 1000)
  *
  * Nenhuma interpolacao: o texto e constante, e e o que o torna seguro.
  */
-export function handlePaginaDeEntrar(): Response {
+export function handlePaginaDeEntrar(entrada: EntradaDaRota): Response {
+  // A faixa de `?ok=`, e ela existe aqui por UM caso: "sair de todos os
+  // aparelhos" (§10.13) apaga a propria sessao de quem apertou, entao o `303`
+  // dela nao tem como voltar para `/painel/aparelhos` — a tela seguinte, para
+  // aquela pessoa, e esta. A consulta e a uma lista FECHADA de codigos, e e ela,
+  // e nao o escape, que impede a query string de virar conteudo da pagina.
+  const confirmacao = fraseDeConfirmacao(new URL(entrada.request.url).searchParams.get('ok'))
+
   return pagina({
     titulo: 'Entrar no painel',
     comScript: true,
-    corpo: html`<h1>Entrar no painel</h1>
+    corpo: html`${
+      confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`
+    }
+<h1>Entrar no painel</h1>
 <p>Use a digital, o rosto ou o PIN deste aparelho. N&atilde;o h&aacute; senha para digitar.</p>
 <form id="entrar" method="dialog">
 <button type="submit">Entrar com a digital</button>
@@ -106,6 +118,9 @@ export function handlePaginaDeEntrar(): Response {
 <p><a href="${DESTINO_DEPOIS_DO_LOGIN}">Continuar</a> &mdash; se voc&ecirc; abriu este painel por um
 link de outro aplicativo e j&aacute; estava conectado, este bot&atilde;o leva voc&ecirc; direto ao
 in&iacute;cio.</p>
+<p><a href="${ROTA_ENTRAR_CODIGO.caminho}">Entrar com um c&oacute;digo de
+recupera&ccedil;&atilde;o</a> &mdash; para quando voc&ecirc; n&atilde;o tem nenhum aparelho
+cadastrado por perto.</p>
 <p><a href="/painel/parar">Parar a automa&ccedil;&atilde;o com o c&oacute;digo do papel</a></p>
 <noscript>
 <p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Funcionam assim mesmo:
@@ -114,6 +129,142 @@ emerg&ecirc;ncia, e todo salvamento que <strong>n&atilde;o</strong> pede a digit
 Reels, apagar palavras, testar um coment&aacute;rio, ver a pr&eacute;via e desligar a
 automa&ccedil;&atilde;o. O que exige JavaScript &eacute; a leitura da sua digital: cadastrar
 aparelho, entrar por digital e confirmar mudan&ccedil;as protegidas.</p>
+</noscript>`,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// GET + POST /painel/entrar/codigo — a entrada por codigo de recuperacao
+// ---------------------------------------------------------------------------
+
+/** O nome do campo do codigo, nos dois lugares em que ele aparece. */
+const CAMPO_DO_CODIGO = 'codigo'
+
+/**
+ * `GET+POST /painel/entrar/codigo` (§7.1, §10.11, §15.3 decisao 1).
+ *
+ * **Esta rota NAO emite sessao, e esse "nao" e o contrato inteiro dela.** Um
+ * codigo de recuperacao so permite CADASTRAR UMA CHAVE NOVA — ele nunca vira
+ * senha, nem direta nem indiretamente. O POST daqui faz **1 leitura**, **nao
+ * consome** o codigo e renderiza a tela "crie a chave nova neste aparelho"; a
+ * sessao continua nascendo em um lugar so, de uma assertion de login com `UV`
+ * conferido (§10.7), e o consumo do codigo, com `changes === 1`, continua sendo
+ * de `POST /painel/api/registrar/verificar`.
+ *
+ * Se o codigo fosse queimado aqui, abrir a tela por engano — ou um F5 no
+ * caminho errado — custaria um dos seis codigos do papel, e o dono descobriria
+ * isso no pior dia possivel.
+ *
+ * **Custo do fracasso: 0 escritas.** Codigo malformado nem chega ao banco
+ * (`normalizarCodigo` recusa antes); codigo errado custa a mesma 1 leitura de
+ * um codigo inexistente e percorre o mesmo laco (CONV-11). A rota corre sob a
+ * familia `codigo` do limitador, que o roteador aplica no passo 5 — e como a
+ * linha da tabela e uma so para os dois metodos, abrir a tela tambem conta no
+ * balde. Cabe: sao 30 por minuto por IP (§7.4), e a pessoa abre a tela uma vez
+ * e digita o codigo do papel.
+ */
+export async function handleEntrarPorCodigo(entrada: EntradaDaRota): Promise<Response> {
+  const { request, env, corpo, contexto } = entrada
+
+  if (request.method !== 'POST') return paginaDoCodigo()
+
+  if (corpo.familia !== 'formulario') return erro('corpo_invalido', contexto)
+
+  const digitado = corpo.campos.get(CAMPO_DO_CODIGO) ?? ''
+  const hashCodigo = await conferirCodigoDeRecuperacao(digitado, env)
+
+  if (hashCodigo === null) {
+    // A frase e a canonica de §11.4 e a `explicacao` traz o formulario de volta:
+    // uma recusa que obriga a pessoa a achar o caminho outra vez, com o papel na
+    // mao, e a hora errada para cobrar navegacao. O `motivoInterno` e um codigo
+    // fechado — nunca o que foi digitado (§11.7).
+    return erro('codigo_incorreto', {
+      ...contexto,
+      motivoInterno: 'codigo_de_recuperacao_recusado',
+      explicacao: formularioDoCodigo(),
+    })
+  }
+
+  return paginaDaChaveNova(digitado)
+}
+
+/** O formulario do codigo. Ele aparece na tela limpa e dentro da recusa. */
+function formularioDoCodigo(): HtmlSeguro {
+  return html`<form method="post" action="${ROTA_ENTRAR_CODIGO.caminho}">
+<label for="${CAMPO_DO_CODIGO}">Digite um dos c&oacute;digos do papel</label>
+<input id="${CAMPO_DO_CODIGO}" name="${CAMPO_DO_CODIGO}" type="text" autocomplete="off"
+autocapitalize="characters" spellcheck="false" enterkeyhint="done" required
+inputmode="text" maxlength="40">
+<button type="submit">Continuar</button>
+</form>
+<p>Os h&iacute;fens n&atilde;o fazem diferen&ccedil;a, e mai&uacute;sculas e min&uacute;sculas
+tamb&eacute;m n&atilde;o. Pode digitar do jeito que estiver escrito no papel.</p>`
+}
+
+/**
+ * A tela do codigo. **Zero consulta ao D1** e nenhuma interpolacao: o texto e
+ * constante, e e o que o torna seguro.
+ */
+function paginaDoCodigo(): Response {
+  return pagina({
+    titulo: 'Entrar com um código de recuperação',
+    corpo: html`<h1>Entrar com um c&oacute;digo de recupera&ccedil;&atilde;o</h1>
+<p>Use isto quando voc&ecirc; n&atilde;o tiver nenhum aparelho cadastrado por perto &mdash; celular
+perdido, quebrado ou formatado.</p>
+${formularioDoCodigo()}
+<p><strong>O c&oacute;digo n&atilde;o abre o painel sozinho.</strong> Ele serve para cadastrar
+<strong>este</strong> aparelho; depois voc&ecirc; entra com a digital dele, como sempre. Cada
+c&oacute;digo vale uma vez s&oacute;, e usar um deles <strong>cancela todos os
+outros</strong> &mdash; se algu&eacute;m mais viu a sua lista, ela para de valer nesse
+instante.</p>
+<p><a href="${CAMINHO_DE_ENTRAR}">Voltar</a></p>`,
+  })
+}
+
+/**
+ * "Crie a chave nova neste aparelho" — a tela que o codigo VALIDO abre.
+ *
+ * O codigo volta num campo escondido porque a cerimonia de §10.4 precisa dele
+ * no CORPO do POST para `/painel/api/registrar/opcoes`, e la ele e conferido de
+ * novo, do zero: nada nesta pagina autoriza coisa alguma, e um campo escondido
+ * adulterado so consegue um codigo que nao confere. **Ele nunca vai para a URL**
+ * (§7.1: codigo de recuperacao e material de sessao, e material de sessao nao
+ * entra em query string nem em `Referer`), e a resposta carrega `private,
+ * no-store` como toda pagina do painel.
+ *
+ * Os dois avisos de §10.14 sao os MESMOS da pagina do convite, e sao
+ * obrigatorios antes de todo cadastro: trocar o endereco do painel e
+ * re-registro e nao migracao, e chave de seguranca sem PIN nao entra.
+ */
+function paginaDaChaveNova(codigo: string): Response {
+  return pagina({
+    titulo: 'Cadastrar este aparelho',
+    comScript: true,
+    corpo: html`<h1>Cadastrar este aparelho</h1>
+<p>O c&oacute;digo confere. Agora crie a chave <strong>deste</strong> aparelho: o telefone vai pedir
+a sua digital, o rosto ou o PIN.</p>
+<form id="registrar" method="dialog" data-tipo="recuperacao">
+<input type="hidden" name="${CAMPO_DO_CODIGO}" value="${codigo}">
+<label for="apelido">Como voc&ecirc; chama este aparelho</label>
+<input id="apelido" name="apelido" type="text" maxlength="40" autocomplete="off"
+enterkeyhint="done" required>
+<button type="submit">Cadastrar este aparelho</button>
+</form>
+<p><strong>Ao terminar, todos os outros c&oacute;digos da sua lista deixam de valer</strong> e
+qualquer sess&atilde;o aberta &eacute; encerrada. Gere um conjunto novo de c&oacute;digos assim que
+entrar.</p>
+<h2>Antes de cadastrar, duas coisas importantes</h2>
+<p><strong>O endere&ccedil;o deste painel fica gravado dentro da sua digital.</strong> Se um dia o
+endere&ccedil;o mudar, este aparelho precisa ser cadastrado de novo &mdash; n&atilde;o d&aacute;
+para migrar, e n&atilde;o &eacute; defeito: &eacute; assim que a digital protege voc&ecirc; de um
+site falso com outro endere&ccedil;o.</p>
+<p><strong>Chave de seguran&ccedil;a sem PIN n&atilde;o entra.</strong> O painel exige
+confirma&ccedil;&atilde;o de quem voc&ecirc; &eacute; &mdash; digital, rosto ou PIN &mdash; em toda
+entrada. Uma chavinha USB que apenas "toca" e n&atilde;o pede PIN vai ser recusada.</p>
+<noscript>
+<p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Cadastrar a digital
+precisa dele. Abra esta p&aacute;gina num navegador com JavaScript ligado e digite o c&oacute;digo
+de novo &mdash; ele continua valendo, porque nada foi gasto at&eacute; aqui.</p>
 </noscript>`,
   })
 }

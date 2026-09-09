@@ -471,27 +471,12 @@ export async function handleGerarCodigos(
     })
   }
 
-  const sorteados = sortearConjunto()
-  const chaveDosCodigos = await derivarSubchave(env.PANEL_SESSION_KEY, 'codigos')
-
-  const paraGravar: CodigoParaGravar[] = []
-  for (const codigo of sorteados.recuperacao) {
-    paraGravar.push({
-      hash: await hashDoCodigo(chaveDosCodigos, 'recuperacao', codigo),
-      tipo: 'recuperacao',
-      versaoHash: VERSAO_DO_HASH,
-    })
-  }
-  paraGravar.push({
-    hash: await hashDoCodigo(chaveDosCodigos, 'parada', sorteados.parada),
-    tipo: 'parada',
-    versaoHash: VERSAO_DO_HASH,
-  })
+  const conjunto = await conjuntoNovoDeCodigos(env, now)
 
   // UM lote: o `DELETE` do conjunto antigo, os sete `INSERT` e a linha de
   // auditoria. Se qualquer parte falhar, nao sobra meio conjunto no banco.
   await env.DB.batch([
-    ...new PainelCodigosRepository(env.DB).statementsDeSubstituicao(paraGravar, now),
+    ...conjunto.statements,
     new PainelAuditoriaRepository(env.DB).statementDeRegistro({
       ocorridoEm: now,
       // `0` porque este evento nao muda a configuracao: perguntar a versao
@@ -510,8 +495,8 @@ export async function handleGerarCodigos(
 
   return Response.json(
     {
-      recuperacao: sorteados.recuperacao.map(formatarCodigo),
-      parada: formatarCodigo(sorteados.parada),
+      recuperacao: conjunto.recuperacao.map(formatarCodigo),
+      parada: formatarCodigo(conjunto.parada),
       instrucoes:
         'Anote estes codigos no papel agora. Eles nao serao mostrados de novo, e gerar um ' +
         'conjunto novo invalida este.',
@@ -541,6 +526,58 @@ function chaveDeSessaoPresente(env: Env): boolean {
     typeof env.PANEL_SESSION_KEY === 'string' &&
     env.PANEL_SESSION_KEY.length >= MINIMO_DA_CHAVE_DE_SESSAO
   )
+}
+
+/**
+ * Um conjunto NOVO de codigos: seis de recuperacao e um de parada (§10.11).
+ *
+ * Devolve os codigos em CLARO **e** os statements que gravam so os HMAC deles.
+ * Os dois juntos, e nao em duas funcoes: quem grava tem de ser exatamente quem
+ * sorteou, ou existiria um instante em que o banco guarda o hash de um conjunto
+ * e o dono anota outro.
+ *
+ * **Exportada porque §10.11 declara DUAS portas para a mesma operacao**: o
+ * assistente, por `POST /setup/painel/codigos` com Bearer, e a tela de
+ * Aparelhos, por `POST /painel/aparelhos` com `acao=gerar_codigos`, sessao e
+ * step-up. Duas grafias do sorteio divergiriam no dia em que uma delas mudasse
+ * o alfabeto, o tamanho ou a `versao_hash` — e a divergencia so apareceria no
+ * pior dia do projeto, com o papel na mao e o codigo recusado.
+ *
+ * Os statements comecam pelo `DELETE` do conjunto antigo, no MESMO lote: nao
+ * existe instante com os dois conjuntos vivos. A linha de auditoria e
+ * responsabilidade de quem chama, porque o `ator` e o que difere entre as duas
+ * portas — `'assistente'` la, a passkey que assinou aqui.
+ */
+export async function conjuntoNovoDeCodigos(
+  env: Env,
+  now: number,
+): Promise<{
+  readonly recuperacao: readonly string[]
+  readonly parada: string
+  readonly statements: D1PreparedStatement[]
+}> {
+  const sorteados = sortearConjunto()
+  const chaveDosCodigos = await derivarSubchave(env.PANEL_SESSION_KEY, 'codigos')
+
+  const paraGravar: CodigoParaGravar[] = []
+  for (const codigo of sorteados.recuperacao) {
+    paraGravar.push({
+      hash: await hashDoCodigo(chaveDosCodigos, 'recuperacao', codigo),
+      tipo: 'recuperacao',
+      versaoHash: VERSAO_DO_HASH,
+    })
+  }
+  paraGravar.push({
+    hash: await hashDoCodigo(chaveDosCodigos, 'parada', sorteados.parada),
+    tipo: 'parada',
+    versaoHash: VERSAO_DO_HASH,
+  })
+
+  return {
+    recuperacao: sorteados.recuperacao,
+    parada: sorteados.parada,
+    statements: new PainelCodigosRepository(env.DB).statementsDeSubstituicao(paraGravar, now),
+  }
 }
 
 /**

@@ -35,15 +35,29 @@ export class PainelCodigosRepository {
    * `criado_em`/`usado_em` na resposta so aumentariam a chance de alguem
    * imprimir a linha inteira em algum log.
    *
-   * `usado_em` NAO entra no filtro de proposito: o codigo de parada nao e de
-   * uso unico (§10.12), e o de recuperacao confere o uso unico na hora de
-   * consumir, com `WHERE hash = ? AND usado_em IS NULL`, que e atomico.
+   * **`usado_em` entra no filtro so para `recuperacao`, e a assimetria e o
+   * ponto.** O codigo de PARADA nao e de uso unico (§10.12): filtra-lo faria o
+   * freio de emergencia parar de funcionar na segunda vez que o dono precisasse
+   * dele — o pior momento possivel para descobrir isso.
+   *
+   * O de RECUPERACAO e de uso unico, e a unicidade continua garantida no
+   * CONSUMO, com `WHERE hash = ? AND usado_em IS NULL` exigindo
+   * `changes === 1` — atomico, e e ele que impede o reuso. O filtro aqui nao
+   * substitui aquela trava; ele conserta outra coisa: sem ele, um codigo JA
+   * GASTO passava nesta porta, o dono percorria a cerimonia WebAuthn inteira —
+   * dois gestos de biometria e uma chave nova criada no aparelho — e so no fim
+   * levava `credencial_invalida`, sem nenhuma pista de que o problema era o
+   * codigo. Recusar aqui custa zero consulta a mais e diz a verdade na primeira
+   * tela.
    */
   async hashesVivos(tipo: TipoDeCodigo): Promise<string[]> {
-    const resultado = await this.db
-      .prepare('SELECT hash FROM painel_codigos WHERE tipo = ? AND invalidado_em IS NULL')
-      .bind(tipo)
-      .all<{ hash: string }>()
+    // Uma leitura so, nos dois casos — o que §10.11 orca para o POST do codigo.
+    const sql =
+      tipo === 'recuperacao'
+        ? 'SELECT hash FROM painel_codigos WHERE tipo = ? AND invalidado_em IS NULL AND usado_em IS NULL'
+        : 'SELECT hash FROM painel_codigos WHERE tipo = ? AND invalidado_em IS NULL'
+
+    const resultado = await this.db.prepare(sql).bind(tipo).all<{ hash: string }>()
 
     if (resultado.success !== true) {
       throw new Error('D1_ERROR: a leitura dos codigos do painel nao reportou sucesso')

@@ -62,11 +62,37 @@ export interface RotaDoPainel {
    */
   readonly stepUp: boolean
   /**
-   * `true` quando a rota GRAVA no D1 no caminho de sucesso (§7.1, §15.4).
+   * `true` quando **a ROTA** grava no D1 no caminho de sucesso (§7.1, §15.4).
    *
    * O campo existe por causa dos **POSTs que so renderizam** — a paginacao dos
    * Reels, o teste de palavra e a previa da mensagem. Sem ele, o metateste da
    * regra de forma nasceria contra o proprio desenho.
+   *
+   * **A palavra "rota" e o recorte, e ela deixou de ser obvia.** O campo fala do
+   * que aquele HANDLER faz com o conteudo do produto — `painel_config`,
+   * `painel_midias`, `account_tokens`, `painel_auditoria`, uma sessao emitida.
+   * Ele NAO fala da **escrituracao de sessao** que a guarda comum executa no
+   * passo 9 da escada: o `UPDATE painel_sessoes SET vista_em, ociosa_ate` que
+   * §10.8 orca em "no maximo 1 a cada 15 min", e que roda em TODA rota com
+   * `sessao: true` — inclusive nas duas que declaram `escreve: false` aqui,
+   * `/painel` e `/painel/atividade`. Sem esse recorte, a frase "grava no D1 no
+   * caminho de sucesso" tornaria este campo falso nas duas.
+   *
+   * **Por que o recorte, e nao um `escreve: true` nelas.** O valor deste campo
+   * esta na trava que ele arma — **toda rota com `escreve: false` executa zero
+   * escritas no D1** (§11.1, com o contador de §13.4). Se a escrituracao da
+   * guarda contasse, toda rota autenticada seria obrigada a declarar
+   * `escreve: true`, o campo viraria uma segunda grafia de `sessao` e o laco
+   * pararia de separar o que existe para separar: a tela que so LE (§6, "o
+   * painel le, nao age") da tela que MUDA a instalacao do dono. A trava fica
+   * mais forte com o recorte, e nao mais fraca — o que ela passa a exigir e que
+   * a unica escrita de uma rota `escreve: false` seja EXATAMENTE aquele
+   * `UPDATE`, conferido por statement inteiro, e nao "poucas escritas".
+   *
+   * Quem prende as duas metades disso hoje e TELA-19 em
+   * `tests/painel-telas.test.ts`, que roda as sete telas nos DOIS estados da
+   * janela de 15 min: zero escrita com a janela fresca, e uma unica —
+   * conferida SQL a SQL — na primeira visita depois dela.
    *
    * O metateste afirma as duas metades, e cada uma no seu tempo: **toda rota
    * com `escreve: false` executa zero escritas no D1** vale desde agora, com o
@@ -242,7 +268,14 @@ export const ROTA_REEL: RotaDoPainel = {
   gravaConfig: true,
 }
 
-/** "O que aconteceu". `GET` unico, hoje e sempre: ela so le (§7.1). */
+/**
+ * "O que aconteceu". `GET` unico, hoje e sempre: ela so le (§7.1).
+ *
+ * "So le" e sobre o CONTEUDO, como em `/painel`: nem esta rota nem o Inicio
+ * gravam linha de produto nenhuma. A escrituracao de sessao do passo 9 (§10.8)
+ * acontece nas duas, e ela nao e desta rota — e da guarda comum, e o docblock de
+ * `escreve` explica por que a diferenca e o que da valor ao campo.
+ */
 export const ROTA_ATIVIDADE: RotaDoPainel = {
   caminho: '/painel/atividade',
   metodos: ['GET'],
@@ -264,6 +297,99 @@ export const ROTA_ENTRAR: RotaDoPainel = {
   csrf: false,
   stepUp: false,
   escreve: false,
+  gravaConfig: false,
+}
+
+/**
+ * A entrada por codigo de recuperacao (§7.1, §10.11, §15.3 decisao 1).
+ *
+ * **`escreve: false`, e esse `false` E o contrato desta rota.** O POST daqui
+ * faz **1 leitura** e **nao consome** o codigo: ele so confere e renderiza a
+ * tela "crie a chave nova neste aparelho". Um codigo de recuperacao **nunca
+ * vira sessao**, nem direta nem indiretamente — quem consome o codigo, com
+ * `changes === 1`, e `POST /painel/api/registrar/verificar`, e quem emite
+ * sessao continua sendo so o login. Um `escreve: true` aqui seria a primeira
+ * pista de que alguem passou a gravar nesta rota.
+ *
+ * `sessao: false` porque ela existe justamente para quem NAO consegue entrar; o
+ * caminho esta na allowlist de §13.2, escrita dentro do metateste. `csrf: false`
+ * pela consequencia direta: nao ha sessao de onde derivar a ficha. As camadas 1,
+ * 2, 4 e 5 de §10.9 continuam valendo — origem exata, `content-type` de
+ * formulario, zero CORS —, e a camada 3 nao tem o que proteger num POST que nao
+ * grava e nao autentica.
+ */
+export const ROTA_ENTRAR_CODIGO: RotaDoPainel = {
+  caminho: '/painel/entrar/codigo',
+  metodos: ['GET', 'POST'],
+  sessao: false,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+  gravaConfig: false,
+}
+
+/**
+ * Aparelhos e codigos de recuperacao (§3, §7.1, §10.13).
+ *
+ * `escreve: true` porque as tres acoes do POST gravam: `remover_passkey` apaga
+ * a credencial e as sessoes dela, `sair_de_tudo` apaga `painel_sessoes` inteira
+ * e `gerar_codigos` substitui o conjunto de codigos — as tres com a linha de
+ * auditoria no MESMO lote (§8.8).
+ *
+ * `gravaConfig: false` e a resposta a OUTRA pergunta (Ruling 84): nenhuma delas
+ * chama `gravarConfiguracao`, e nenhuma tem escopo de campos de configuracao
+ * para declarar. E por isso que `/painel/aparelhos` esta nomeado na lista
+ * `SEM_CONFIGURACAO` do META-15 desde antes de existir.
+ *
+ * **`stepUp: false`, e as tres acoes tem exigencias DIFERENTES** — que e
+ * exatamente por que o campo da tabela nao serve aqui. §7.1: step-up "sim em
+ * `remover_passkey` e `gerar_codigos`; **nao** em `sair_de_tudo`". Quem
+ * classifica e o CONTEUDO, dentro do handler, pelo mesmo desenho de §10.10 que
+ * ja vale nas telas de configuracao: desligar e barato, e cobrar biometria de
+ * quem esta se protegendo puniria o uso correto (§15.4).
+ */
+export const ROTA_APARELHOS: RotaDoPainel = {
+  caminho: '/painel/aparelhos',
+  metodos: ['GET', 'POST'],
+  sessao: true,
+  csrf: true,
+  stepUp: false,
+  escreve: true,
+  gravaConfig: false,
+}
+
+/**
+ * "Sair deste aparelho" (§7.1, §10.8, §10.13).
+ *
+ * **`POST` sem `GET`, e sem tela propria**, como a chave liga/desliga: ela e
+ * uma acao, e a tela que a oferece e a de Aparelhos — §10.13 lista os tres
+ * formularios daquela pagina, e este e um deles. Um `GET` aqui seria uma tela
+ * que so pode dizer "clique para sair", e um logout alcancavel por link seria
+ * um logout que qualquer `<img src>` de terceiro dispara.
+ *
+ * **`escreve: true` pela unica escrita dela**: o `DELETE` da linha desta
+ * sessao, mais a linha de auditoria, no MESMO lote (§8.8). E o `303` dela
+ * aponta para `/painel/entrar`, e nao para a tela que a chamou: a acao apaga a
+ * sessao de quem apertou, e §7.1 ja abre essa excecao para `sair_de_tudo`.
+ *
+ * **`stepUp: false`, e §7.1 escreve o `nao` na tabela dela.** Sair e a direcao
+ * segura de §10.10, junto de desligar a automacao e de "sair de todos os
+ * aparelhos": cobrar biometria de quem esta se protegendo puniria o uso
+ * correto, e o pior abuso possivel e derrubar uma sessao que o dono reabre
+ * com a digital.
+ *
+ * `gravaConfig: false` responde a OUTRA pergunta (Ruling 84): esta rota nao
+ * chama `gravarConfiguracao` e nao tem campo de configuracao nenhum para
+ * declarar. E por isso que `/painel/sair` ja estava nomeada na lista
+ * `SEM_CONFIGURACAO` do META-15 desde antes de existir.
+ */
+export const ROTA_SAIR: RotaDoPainel = {
+  caminho: '/painel/sair',
+  metodos: ['POST'],
+  sessao: true,
+  csrf: true,
+  stepUp: false,
+  escreve: true,
   gravaConfig: false,
 }
 
@@ -368,7 +494,10 @@ export const ROTAS: readonly RotaDoPainel[] = [
   ROTA_REELS,
   ROTA_REEL,
   ROTA_ATIVIDADE,
+  ROTA_APARELHOS,
+  ROTA_SAIR,
   ROTA_ENTRAR,
+  ROTA_ENTRAR_CODIGO,
   ROTA_CONVITE,
   ROTA_OPCOES_DE_ENTRAR,
   ROTA_VERIFICAR_ENTRADA,

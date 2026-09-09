@@ -26,16 +26,37 @@
  * Cloudflare e por data center e eventualmente consistente `[C]`, entao um
  * atacante distribuido multiplica qualquer teto por trezentos. A defesa dos
  * codigos sao os bits de entropia deles (§10.11, §10.12), nunca esta camada.
+ *
+ * **A UNICA rota que mora aqui e `POST /painel/sair`**, e ela mora aqui porque
+ * e a metade contraria do passo 9: `exigirSessaoViva` afirma que a linha e a
+ * autoridade, e `handleSair` e quem apaga a linha. As duas leem e escrevem a
+ * mesma coluna e o mesmo prazo — separa-las em dois arquivos seria a receita
+ * para uma mudar sem a outra.
  */
+import { PainelAuditoriaRepository } from '../../repositories/painel-auditoria-repository'
 import {
   type LinhaDeSessao,
   PainelSessoesRepository,
 } from '../../repositories/painel-sessoes-repository'
 import { timingSafeEqual } from '../../security/constant-time'
-import { fichaCsrf, origemDoPainel, validarSessao } from '../../services/panel-session'
+import {
+  fichaCsrf,
+  origemDoPainel,
+  PRAZO_OCIOSO_DE_SESSAO_MS,
+  validarSessao,
+} from '../../services/panel-session'
+import { prefixoDeCredencial } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
-import { CABECALHO_DA_FICHA, CAMPO_DA_FICHA, COOKIE_DA_SESSAO, lerCookie } from './campos'
+import {
+  CABECALHO_DA_FICHA,
+  CAMPO_DA_FICHA,
+  COOKIE_DA_SESSAO,
+  cookieDoPainel,
+  lerCookie,
+} from './campos'
+import type { CodigoDeConfirmacao } from './dicionario'
 import { type ContextoDoErro, erro, redirecionar } from './resposta'
+import type { EntradaDaRota } from './router'
 
 // ---------------------------------------------------------------------------
 // A porta
@@ -661,9 +682,12 @@ export type PortaDeSessaoViva = { readonly linha: LinhaDeSessao } | { readonly r
  * ocioso (`ociosa_ate`, 2 h deslizante). Uma sessao ociosa demais e recusada
  * mesmo dentro das 12 h — e o celular esquecido na mesa.
  *
- * A gravacao de `vista_em` NAO acontece aqui: ela e no maximo 1 a cada 15 min
- * (§10.8) e chega com a etapa que precisa dela. Uma escrita por requisicao e
- * exatamente o que o desenho recusa.
+ * **E aqui que a janela DESLIZA**, com a escrita que §10.8 orca: no maximo 1 a
+ * cada 15 min. Ela nao existia, e a ausencia dela nao era economia — era o
+ * prazo ocioso virando um segundo prazo absoluto, mais curto: `ociosa_ate` era
+ * gravado uma unica vez, no login, e quem usasse o painel sem parar era jogado
+ * para `/painel/entrar` exatamente 2 h depois de entrar, no meio do trabalho.
+ * O prazo de 12 h que §10.8 chama de absoluto era, na pratica, inalcancavel.
  */
 export async function exigirSessaoViva(
   db: D1Database,
@@ -671,10 +695,162 @@ export async function exigirSessaoViva(
   now: number,
   contexto: ContextoDoErro,
 ): Promise<PortaDeSessaoViva> {
-  const linha = await new PainelSessoesRepository(db).buscarPorHash(sidHash)
+  const repositorio = new PainelSessoesRepository(db)
+  const linha = await repositorio.buscarPorHash(sidHash)
   if (linha === null || now > linha.expiraEm || now > linha.ociosaAte) {
     return { recusa: recusarSemSessao(contexto) }
   }
 
-  return { linha }
+  // A escrita vem DEPOIS da recusa, e a ordem e a garantia: uma sessao morta
+  // nao ganha folego por ter sido visitada. Antes do `if`, um cookie de uma
+  // sessao ociosa ha tres horas ressuscitaria a linha dela.
+  if (now - linha.vistaEm < INTERVALO_DE_VISTA_MS) return { linha }
+
+  // O teto do prazo absoluto: `ociosa_ate` nunca ultrapassa `expira_em`. A
+  // guarda confere os dois, entao nada mudaria hoje — mas a linha passaria a
+  // ANUNCIAR uma janela que a sessao nao tem, e a poda do cron (`DELETE ...
+  // WHERE expira_em < ? OR ociosa_ate < ?`) e outra leitora dessa coluna.
+  const ociosaAte = Math.min(now + PRAZO_OCIOSO_DE_SESSAO_MS, linha.expiraEm)
+
+  try {
+    await repositorio.marcarVista(sidHash, now, ociosaAte)
+  } catch (cause) {
+    // **Esta escrita e escrituracao, e escrituracao nao derruba tela.** Sem o
+    // `try`, a rejeicao subia ate o `catch` de `despachar` e virava
+    // `500 falha_interna` — e como a escrita mora na guarda COMUM, as sete telas
+    // de leitura caiam juntas. O cenario nao e hipotetico: a cota de 100.000
+    // escritas/dia do D1 e a MESMA do webhook (§5.3), entao um Reel que viralize
+    // pode esgota-la, e a primeira visita depois de 15 min tirava do dono
+    // justamente a tela "O que aconteceu" — onde ele iria olhar por que.
+    //
+    // Engolir e a direcao SEGURA: a janela deixa de deslizar nesta requisicao e
+    // a sessao morre no prazo que a linha JA anuncia. Ninguem ganha folego.
+    //
+    // Formato de §11.7: argumentos separados, nunca template string com dado
+    // variavel dentro.
+    console.warn(
+      'painel:',
+      'indisponivel',
+      'vista_nao_gravada',
+      cause instanceof Error ? cause.message : cause,
+    )
+
+    // Devolve a linha ANTIGA, e isto e load-bearing: devolver `vistaEm: now`
+    // depois de a escrita falhar faria a resposta anunciar uma janela que o
+    // banco nao tem — exatamente o defeito que o comentario do `Math.min` acima
+    // existe para impedir.
+    return { linha }
+  }
+
+  // A linha DEVOLVIDA carrega os valores novos: o handler que a recebe le
+  // `ociosaAte` do mesmo objeto, e devolver o valor velho faria a tela e o
+  // banco discordarem dentro da mesma requisicao.
+  return { linha: { ...linha, vistaEm: now, ociosaAte } }
 }
+
+/**
+ * De quanto em quanto tempo `vista_em` pode ser regravado: **15 min** (§10.8).
+ *
+ * O numero e a troca inteira: uso intenso do painel nao pode virar uma escrita
+ * por requisicao (a cota do D1 e a mesma do webhook), e a janela ociosa de 2 h
+ * nao pode deixar de deslizar. Com 15 min, uma hora de uso continuo custa no
+ * maximo 4 escritas e o pior caso da janela e "2 h desde algum instante nos
+ * ultimos 15 min" — dentro do que §10.8 desenha.
+ *
+ * Mora AQUI, e nao ao lado dos dois prazos em `panel-session.ts`, porque ele
+ * nao e prazo de sessao: e a cadencia da unica escrita que esta guarda faz, e
+ * quem o le e so ela. Os dois prazos continuam vindo de la, importados — duas
+ * grafias do prazo ocioso fariam a sessao morrer cedo ou tarde demais, que sao
+ * os dois defeitos que ninguem reporta.
+ */
+export const INTERVALO_DE_VISTA_MS = 15 * 60 * 1000
+
+// ---------------------------------------------------------------------------
+// POST /painel/sair — "sair deste aparelho" (§7.1, §10.8, §10.13)
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /painel/sair`: apaga a linha DESTA sessao, e so dela (§10.8).
+ *
+ * **A rota existia em §7.1 e em §10.8 e nao existia no codigo.** O `switch` do
+ * roteador nao tinha o `case`, entao quem seguisse o endereco publicado levava
+ * `404 rota_desconhecida`, e o unico jeito de encerrar a propria sessao passou
+ * a ser "sair de todos os aparelhos" — que derruba tambem o celular de quem so
+ * queria sair do computador emprestado.
+ *
+ * **Mora em `guardas.ts` porque e a metade contraria de `exigirSessaoViva`.**
+ * Aquela funcao afirma "a linha e a autoridade"; esta e a que apaga a linha, e
+ * ler as duas juntas e o que impede que uma mude sem a outra. A tela que a
+ * chama e a de Aparelhos (§10.13), mas o efeito nao e sobre aparelho nenhum:
+ * e sobre esta sessao.
+ *
+ * **Sem step-up**, e §7.1 e literal nisso: sair e a direcao segura de §10.10,
+ * e cobrar biometria de quem esta se protegendo puniria o uso correto. Sessao
+ * e ficha CSRF, que o roteador ja exigiu pela tabela.
+ *
+ * **O `303` aponta para `/painel/entrar`**, pela mesma razao de `sair_de_tudo`:
+ * a acao apaga a sessao de quem apertou, e um `303` para qualquer tela do
+ * painel cairia no `303` do passo 6 da escada — dois redirects para chegar ao
+ * mesmo lugar.
+ *
+ * `Clear-Site-Data` acompanha o cookie morto porque §10.8 o nomeia, e com a
+ * ressalva que a propria spec escreve: suporte irregular no Safari, entao ele
+ * e **reforco, nunca a defesa**. A defesa e a linha apagada — a partir dela o
+ * cookie nao vale mais em navegador nenhum.
+ */
+export async function handleSair(entrada: EntradaDaRota): Promise<Response> {
+  const { env, now, sessao } = entrada
+
+  // `sessao` e `null` so em rota sem portao de sessao, e esta declara
+  // `sessao: true`. O ramo existe porque o tipo o admite, e a direcao e a
+  // segura: sem linha para apagar, nao ha o que auditar.
+  if (sessao === null) return redirecionar(CAMINHO_DE_ENTRAR)
+
+  await env.DB.batch([
+    new PainelSessoesRepository(env.DB).statementDeApagar(sessao.sidHash),
+    new PainelAuditoriaRepository(env.DB).statementDeRegistro(
+      {
+        ocorridoEm: now,
+        // `0` porque nada aqui muda configuracao, o mesmo `0` de `login` e de
+        // `codigos_gerados` (§9.9): perguntar a versao atual custaria uma
+        // leitura de `painel_config` que esta rota nao tem no orcamento.
+        versao: 0,
+        origem: 'painel',
+        ator: `passkey:${await prefixoDeCredencial(sessao.credentialId)}`,
+        stepUp: false,
+        acao: 'sessao_encerrada',
+        alvo: null,
+        campos: JSON.stringify([ACAO_DE_SAIR]),
+        antes: null,
+        depois: null,
+      },
+      // "Sem mudanca, sem log" (§8.8): se a linha ja tiver sido apagada por
+      // outra aba, por "sair de todos" ou pela remocao da passkey, o `DELETE`
+      // altera zero linhas e a auditoria nao afirma um encerramento que nao
+      // aconteceu. `changes()` responde sobre o statement ANTERIOR, e por isso
+      // a ordem deste lote e parte da garantia.
+      { presoAMudanca: true },
+    ),
+  ])
+
+  return redirecionar(
+    `${CAMINHO_DE_ENTRAR}?ok=${CONFIRMACAO_DE_SAIDA}`,
+    {
+      'clear-site-data': '"cookies"',
+    },
+    [cookieDoPainel(COOKIE_DA_SESSAO, '', 0)],
+  )
+}
+
+/** O nome que a coluna `campos` da auditoria carrega para esta acao (§9.9). */
+const ACAO_DE_SAIR = 'sair'
+
+/**
+ * O `?ok=` que a tela de entrar le depois da saida (§7.1, §12.2).
+ *
+ * A frase mora no dicionario, que e a lista FECHADA de codigos: a tela procura
+ * o codigo la e escreve a frase DE LA, e um `?ok=` desconhecido nao mostra
+ * faixa nenhuma. E essa consulta, e nao o escape, que impede a query string de
+ * virar conteudo da pagina.
+ */
+const CONFIRMACAO_DE_SAIDA: CodigoDeConfirmacao = 'saiu'

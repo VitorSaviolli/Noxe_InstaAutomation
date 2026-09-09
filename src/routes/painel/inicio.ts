@@ -12,10 +12,17 @@
  *
  * **Custo: 3 subrequests ao D1** (§12.10): a linha de sessao, que o roteador
  * ja fez, o `db.batch()` da configuracao — um lote inteiro vale UM subrequest
- * — e a pergunta sobre a conta. Sao 4 no estado DESLIGADA, e so nele: a data da
- * ultima parada por codigo, que §10.12 exige na confirmacao de religar.
- * `ignorarCache: true` porque mostrar ao dono um valor mais velho que o salvo
- * destroi a confianca mais rapido que qualquer defeito.
+ * — e `perguntasDoInicio`, que responde DUAS coisas numa instrucao so: a conta
+ * do Instagram e quantos codigos de recuperacao ainda valem. Sao 4 no estado
+ * DESLIGADA, e so nele: a data da ultima parada por codigo, que §10.12 exige na
+ * confirmacao de religar. `ignorarCache: true` porque mostrar ao dono um valor
+ * mais velho que o salvo destroi a confianca mais rapido que qualquer defeito.
+ *
+ * **O aviso bloqueante de §10.11 abre esta tela**, e ele nasceu aqui pelo lugar
+ * onde §10.11 o pediu: "o **painel** abre com aviso bloqueante". A faixa
+ * vermelha de "zero codigos" so existia em `/painel/aparelhos`, que e a unica
+ * tela sem item na barra de baixo — depois de uma recuperacao o dono ficava
+ * sem rede de seguranca e sem nada que ele visse dizendo isso.
  *
  * Este arquivo tambem hospeda `POST /painel/chave`, a chave liga/desliga de
  * §7.1: ela nao tem tela propria e o `303` dela aponta para `/painel?ok=`, que
@@ -39,7 +46,7 @@ import {
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
-import { ROTA_CHAVE, ROTA_INICIO, ROTA_REELS } from './rotas'
+import { ROTA_APARELHOS, ROTA_CHAVE, ROTA_INICIO, ROTA_REELS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { type Aba, type Moldura, telaDoPainel } from './tela'
 
@@ -84,6 +91,21 @@ export interface Panorama {
  * leitura nao tem motivo nenhum para trazer esse campo para a memoria do
  * isolate. O mesmo padrao de `routes/health.ts`.
  *
+ * **`expires_at > ?` e a metade que faltava, e a ausencia dela era uma
+ * mentira.** A pergunta era so "existe linha?", e a linha continua existindo
+ * depois de o token morrer: um token longo do Instagram vale 60 dias, e quem
+ * troca a senha, cai num checkpoint ou fica sem renovar por dois meses tem a
+ * linha intacta e nada sendo entregue. As seis telas do painel afirmavam
+ * "Conectada. A automacao consegue falar com o Instagram para enviar" a quem
+ * nao tinha mais conta nenhuma — e §12.1 regra 3 proibe exatamente isso.
+ * `shouldRefresh` era o UNICO lugar do projeto que olhava `expires_at`, e ele
+ * DESISTE quando o prazo passa (`if (now >= expiresAt) return false`): nao
+ * havia nem renovacao, nem aviso, nem tela dizendo a verdade.
+ *
+ * O `now` vem por parametro, e nao de `Date.now()`: e a mesma regra dos
+ * repositorios — quem compara relogio no painel sao as rotas, que ja recebem
+ * o instante da requisicao.
+ *
  * A falha e tratada como "nao conectada", e a direcao e a segura: dizer
  * "conectada" quando nao da para saber e exatamente a promessa que §12.1
  * regra 3 proibe.
@@ -95,10 +117,11 @@ export interface Panorama {
  * literal: detalhe tecnico vai para o `console`, nunca para a tela. Uma linha
  * so, no formato de `despachar`, para nao amplificar log.
  */
-export async function contaConectada(db: D1Database): Promise<boolean> {
+export async function contaConectada(db: D1Database, now: number): Promise<boolean> {
   try {
     const linha = await db
-      .prepare('SELECT 1 AS ligada FROM account_tokens WHERE id = 1')
+      .prepare(`SELECT 1 AS ligada FROM account_tokens WHERE ${CONTA_VIVA}`)
+      .bind(now)
       .first<{ ligada: number }>()
     return linha !== null
   } catch (cause) {
@@ -109,6 +132,77 @@ export async function contaConectada(db: D1Database): Promise<boolean> {
       cause instanceof Error ? cause.message : cause,
     )
     return false
+  }
+}
+
+/**
+ * O predicado de "a conta ainda fala com o Instagram", numa grafia so.
+ *
+ * Ele vive em duas consultas — a de `contaConectada`, que as outras cinco telas
+ * chamam, e a do Inicio, que pergunta as duas coisas de uma vez — e duas
+ * grafias divergiriam no dia em que uma delas ganhasse um `AND`. Uma tela
+ * dizendo "conectada" e a outra "nao esta" na mesma instalacao e pior que as
+ * duas erradas juntas.
+ */
+const CONTA_VIVA = 'id = 1 AND expires_at > ?'
+
+/**
+ * Um codigo de recuperacao que AINDA da para usar (§10.11).
+ *
+ * As duas colunas, e nao so `invalidado_em`: o consumo marca `usado_em` no
+ * codigo usado e `invalidado_em` em todos os outros, no mesmo lote. Contar so
+ * `invalidado_em IS NULL` faria a tela achar que ha um codigo valendo
+ * justamente depois de uma recuperacao — o codigo ja queimado.
+ */
+const CODIGO_UTILIZAVEL = "tipo = 'recuperacao' AND usado_em IS NULL AND invalidado_em IS NULL"
+
+/** O que o Inicio pergunta ao D1 alem da configuracao, numa consulta so. */
+export interface PerguntasDoInicio {
+  readonly conta: boolean
+  /**
+   * Quantos codigos de recuperacao ainda valem, ou `null` quando nao deu para
+   * saber. `null` NAO e zero: §12.1 regra 3 proibe afirmar o que nao se sabe, e
+   * "voce esta sem rede de seguranca" e uma afirmacao e tanto para fazer a
+   * partir de um D1 que nao respondeu.
+   */
+  readonly codigos: number | null
+}
+
+/**
+ * As duas perguntas do Inicio, num **unico** `SELECT` — e um unico subrequest.
+ *
+ * §12.10 orca **3 subrequests** para esta tela (a linha da sessao, o lote da
+ * configuracao e esta pergunta), e TELA-20 trava o numero. O aviso de §10.11
+ * precisava de uma contagem de `painel_codigos` que a tela nao tinha: um
+ * segundo `prepare` custaria o quarto subrequest, e um lote a mais quebraria a
+ * premissa da conta de TELA-20. Duas subconsultas escalares dentro da MESMA
+ * instrucao respondem as duas perguntas pelo preco de uma.
+ *
+ * A falha vira "nao conectada" e "nao deu para saber" — as duas na direcao
+ * segura de §12.1 regra 3, e cada uma para o seu lado: afirmar "conectada" sem
+ * saber esconde uma automacao muda, e afirmar "sem codigos" sem saber acende um
+ * alarme falso na tela que mais precisa ser levada a serio.
+ */
+export async function perguntasDoInicio(db: D1Database, now: number): Promise<PerguntasDoInicio> {
+  try {
+    const linha = await db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM account_tokens WHERE ${CONTA_VIVA}) AS conta,
+                (SELECT COUNT(*) FROM painel_codigos WHERE ${CODIGO_UTILIZAVEL}) AS codigos`,
+      )
+      .bind(now)
+      .first<{ conta: number; codigos: number }>()
+
+    if (linha === null) return { conta: false, codigos: null }
+    return { conta: linha.conta > 0, codigos: linha.codigos }
+  } catch (cause) {
+    console.warn(
+      'painel:',
+      'indisponivel',
+      'inicio_nao_verificado',
+      cause instanceof Error ? cause.message : cause,
+    )
+    return { conta: false, codigos: null }
   }
 }
 
@@ -292,6 +386,37 @@ export function blocoDeAvisos(panorama: Panorama): HtmlSeguro {
   )}`
 }
 
+/**
+ * O aviso bloqueante de §10.11: **"gere um novo conjunto de codigos agora"**.
+ *
+ * **Por que ele mora no Inicio.** A faixa vermelha existia so em
+ * `/painel/aparelhos`, que e — por decisao declarada no cabecalho daquele
+ * arquivo — a UNICA tela sem item na barra de baixo: o acesso a ela e um `<li>`
+ * no fim desta pagina. Depois de uma recuperacao, §10.11 invalida em bloco
+ * todos os outros codigos, e o dono ficava com ZERO codigo utilizavel sem que
+ * nada que ele visse dissesse isso. O desfecho e o trancamento que os seis
+ * codigos existem para impedir: o proximo aparelho que quebrar deixa o painel
+ * sem aparelho E sem codigo, e a unica saida vira `POST /setup/painel/zerar` na
+ * maquina que publicou o projeto. §10.11 e literal — "**o painel** abre com
+ * aviso bloqueante" —, e o painel abre aqui.
+ *
+ * **`null` nao acende o aviso.** Quando a consulta falhou nao ha resposta, e
+ * §12.1 regra 3 proibe afirmar o que nao se sabe: uma faixa vermelha que
+ * aparece por indisponibilidade do D1 ensina o dono a ignorar a faixa vermelha.
+ *
+ * A frase e a MESMA da tela de Aparelhos, de proposito: quem seguir o link
+ * precisa reconhecer o que leu, e duas frases para o mesmo estado sao duas
+ * chances de uma delas envelhecer.
+ */
+export function blocoDosCodigos(codigos: number | null): HtmlSeguro {
+  if (codigos === null || codigos > 0) return html``
+
+  return html`<p class="faixa faixa-erro" role="alert"><strong>Voc&ecirc; n&atilde;o tem nenhum
+c&oacute;digo de recupera&ccedil;&atilde;o valendo.</strong> Gere um conjunto novo agora e anote no
+papel. Sem eles, perder todos os aparelhos significa perder o painel.
+<a class="acao" href="${ROTA_APARELHOS.caminho}">Gerar c&oacute;digos novos</a></p>`
+}
+
 /** A frase de "ainda com os ajustes de fabrica" (§12.6). Nao e erro. */
 export function blocoDeFabrica(panorama: Panorama): HtmlSeguro {
   if (!panorama.aindaDeFabrica) return html``
@@ -460,8 +585,10 @@ automa&ccedil;&atilde;o de novo, com os ajustes que est&atilde;o salvos.</label>
  */
 export async function handleInicio(entrada: EntradaDaRota): Promise<Response> {
   const snapshot = await configDaTela(entrada.env, entrada.now)
-  const conta = await contaConectada(entrada.env.DB)
-  const visao = panorama(snapshot, conta)
+  // UMA consulta para as DUAS perguntas: a conta e a contagem de codigos de
+  // recuperacao. O orcamento de §12.10 continua em 3 subrequests.
+  const perguntas = await perguntasDoInicio(entrada.env.DB, entrada.now)
+  const visao = panorama(snapshot, perguntas.conta)
 
   const paradaEm = snapshot.global.enabled
     ? null
@@ -469,6 +596,11 @@ export async function handleInicio(entrada: EntradaDaRota): Promise<Response> {
 
   const corpo = html`<h1>In&iacute;cio</h1>
 ${blocoDeConfirmacao(entrada.request)}
+${
+  // ANTES do estado grande, e nao no rodape ao lado do link: §10.11 pede um
+  // aviso BLOQUEANTE, e um aviso que exige rolagem nao bloqueia nada.
+  blocoDosCodigos(perguntas.codigos)
+}
 ${blocoDeEstado(visao)}
 ${blocoDaChave(snapshot, await fichaDaTela(entrada), paradaEm)}
 ${blocoDeAvisos(visao)}
@@ -482,6 +614,12 @@ ${blocoDePendencias(visao)}
 <li><a href="/painel/mensagem">A mensagem e o link</a></li>
 <li><a href="/painel/ajustes">Ajustes finos</a></li>
 <li><a href="/painel/atividade">O que aconteceu</a></li>
+<!-- A tela dos aparelhos nao tem item na barra de baixo: §12.1 desenha SEIS
+     itens e a setima vaga so nasce com o "Mais". Sem este link ela ficaria sem
+     porta de entrada nenhuma, e uma tela que existe e ninguem alcanca e a
+     mesma classe de promessa quebrada que §13.1 chama de defeito. -->
+<li><a href="${ROTA_APARELHOS.caminho}">Aparelhos e c&oacute;digos de
+recupera&ccedil;&atilde;o</a></li>
 </ul>
 </section>`
 

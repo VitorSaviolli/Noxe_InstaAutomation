@@ -9,8 +9,13 @@
  *   1. WebAuthn: `navigator.credentials.get()` e `.create()`, SEMPRE dentro de
  *      um clique (o Safari exige gesto do usuario; chamar no `onload` quebra em
  *      iOS) e sempre com `userVerification: "required"`.
- *   2. Ler o token do convite do FRAGMENTO (`location.hash`), limpar a barra de
- *      enderecos com `history.replaceState` e mandar o token no CORPO do POST.
+ *   2. Levar a AUTORIZACAO do cadastro ate `/painel/api/registrar/opcoes`, nas
+ *      tres formas de §10.4: o token do convite lido do FRAGMENTO
+ *      (`location.hash`, limpando a barra com `history.replaceState`), o codigo
+ *      de recuperacao que o servidor devolveu num campo escondido, e — na tela
+ *      de Aparelhos — a digital do step-up de `adicionar_passkey`. Sao tres
+ *      origens do mesmo trabalho, e nao tres trabalhos: o que muda e de onde a
+ *      autorizacao vem, e nunca o que este arquivo faz com ela.
  *   3. O passo 3 de §10.10: pedir as options do step-up, ler a digital e por a
  *      assertion serializada num campo escondido **do mesmo formulario**, que e
  *      entao submetido para a rota de escrita normal.
@@ -105,6 +110,68 @@
       : 'Não foi possível confirmar. Tente de novo.'
   }
 
+  /**
+   * A assertion do jeito que o Worker a le, nos DOIS lugares que a produzem:
+   * o login e o step-up.
+   *
+   * Duas copias divergiriam no dia em que uma delas ganhasse um campo, e o
+   * defeito apareceria como `credencial_invalida` sem explicacao — que e
+   * exatamente a resposta que a fronteira da assertion da para tudo (§10.3).
+   */
+  function assertionSerializada(credencial) {
+    return {
+      id: credencial.id,
+      type: credencial.type,
+      clientDataJSON: paraTexto(credencial.response.clientDataJSON),
+      authenticatorData: paraTexto(credencial.response.authenticatorData),
+      signature: paraTexto(credencial.response.signature),
+      userHandle:
+        credencial.response.userHandle === null
+          ? null
+          : paraTexto(credencial.response.userHandle),
+    }
+  }
+
+  /** A leitura da digital em si, com `userVerification: "required"` sempre. */
+  function lerDigital(opcoes) {
+    return navigator.credentials.get({
+      publicKey: {
+        challenge: paraBytes(opcoes.challenge),
+        rpId: opcoes.rpId,
+        allowCredentials: [],
+        userVerification: 'required',
+        timeout: opcoes.timeout,
+      },
+    })
+  }
+
+  /**
+   * O passo 2 e o 3 de §10.10: pede o envelope daquela mudanca e le a digital.
+   *
+   * Devolve a assertion SERIALIZADA, ou `null` quando o Worker recusou — nesse
+   * caso a frase ja foi mostrada e quem chamou nao tem mais nada a fazer.
+   *
+   * A mudanca canonica e insumo, e vem sempre do SERVIDOR (do `data-mudanca`
+   * que a tela de conferencia escreveu) ou de uma constante deste arquivo.
+   * Monta-la a partir dos campos do formulario seria uma segunda grafia dos
+   * leitores do funil.
+   */
+  function colherDigital(mudanca, ficha) {
+    return pedir(
+      '/painel/api/stepup/opcoes',
+      { operacao: mudanca.acao, mudanca: mudanca },
+      ficha,
+    ).then(function (inicio) {
+      if (!inicio.ok) {
+        avisar(frase(inicio.dados))
+        return null
+      }
+      return lerDigital(inicio.dados).then(function (credencial) {
+        return JSON.stringify({ credencial: assertionSerializada(credencial) })
+      })
+    })
+  }
+
   // -------------------------------------------------------------------------
   // Trabalho 1: entrar com a digital
   // -------------------------------------------------------------------------
@@ -116,30 +183,10 @@
         return
       }
 
-      var opcoes = inicio.dados
-      return navigator.credentials
-        .get({
-          publicKey: {
-            challenge: paraBytes(opcoes.challenge),
-            rpId: opcoes.rpId,
-            allowCredentials: [],
-            userVerification: 'required',
-            timeout: opcoes.timeout,
-          },
-        })
+      return lerDigital(inicio.dados)
         .then(function (credencial) {
           return pedir('/painel/api/entrar/verificar', {
-            credencial: {
-              id: credencial.id,
-              type: credencial.type,
-              clientDataJSON: paraTexto(credencial.response.clientDataJSON),
-              authenticatorData: paraTexto(credencial.response.authenticatorData),
-              signature: paraTexto(credencial.response.signature),
-              userHandle:
-                credencial.response.userHandle === null
-                  ? null
-                  : paraTexto(credencial.response.userHandle),
-            },
+            credencial: assertionSerializada(credencial),
           })
         })
         .then(function (fim) {
@@ -173,12 +220,22 @@
     return decodeURIComponent(achado[1])
   }
 
-  function cadastrar(convite, apelido) {
-    return pedir('/painel/api/registrar/opcoes', {
-      tipo: 'convite',
-      convite: convite,
-      apelido: apelido,
-    }).then(function (inicio) {
+  /**
+   * A cerimonia de cadastro (§10.4, §10.5).
+   *
+   * `pedido` e a AUTORIZACAO — `{tipo:'convite', convite}`,
+   * `{tipo:'recuperacao', codigo}` ou `{tipo:'sessao', digital}` — e ela e a
+   * unica coisa que muda entre as tres telas que cadastram aparelho. `ficha` so
+   * viaja no modo `sessao`, que e o unico com sessao viva de onde deriva-la
+   * (§10.9, camada 3).
+   */
+  function cadastrar(pedido, apelido, ficha) {
+    var corpo = { apelido: apelido }
+    for (var chave in pedido) {
+      if (Object.prototype.hasOwnProperty.call(pedido, chave)) corpo[chave] = pedido[chave]
+    }
+
+    return pedir('/painel/api/registrar/opcoes', corpo, ficha).then(function (inicio) {
       if (!inicio.ok) {
         avisar(frase(inicio.dados))
         return
@@ -229,6 +286,25 @@
     })
   }
 
+  /**
+   * Cadastrar outro aparelho a partir de uma sessao viva (§10.13).
+   *
+   * **Sao dois gestos de biometria, e a tela avisa antes**: o primeiro autoriza
+   * (`{acao:'adicionar_passkey'}`, preso ao `op_hash` daquela operacao), o
+   * segundo cria a chave nova. Sem o primeiro, cadastrar um aparelho seria a
+   * unica operacao do painel que um painel invadido faria sozinho — e ela e
+   * justamente a que da acesso permanente.
+   */
+  var MUDANCA_DE_ADICIONAR = { acao: 'adicionar_passkey' }
+
+  function adicionarAparelho(formulario, apelido) {
+    var ficha = formulario.getAttribute('data-ficha') || ''
+    return colherDigital(MUDANCA_DE_ADICIONAR, ficha).then(function (digital) {
+      if (digital === null) return
+      return cadastrar({ tipo: 'sessao', digital: digital }, apelido, ficha)
+    })
+  }
+
   // -------------------------------------------------------------------------
   // Trabalho 3: confirmar uma mudanca protegida (§10.10, passo 3)
   // -------------------------------------------------------------------------
@@ -266,43 +342,10 @@
       return
     }
 
-    return pedir(
-      '/painel/api/stepup/opcoes',
-      { operacao: mudanca.acao, mudanca: mudanca },
-      ficha.value,
-    ).then(function (inicio) {
-      if (!inicio.ok) {
-        avisar(frase(inicio.dados))
-        return
-      }
-
-      var opcoes = inicio.dados
-      return navigator.credentials
-        .get({
-          publicKey: {
-            challenge: paraBytes(opcoes.challenge),
-            rpId: opcoes.rpId,
-            allowCredentials: [],
-            userVerification: 'required',
-            timeout: opcoes.timeout,
-          },
-        })
-        .then(function (credencial) {
-          alvo.value = JSON.stringify({
-            credencial: {
-              id: credencial.id,
-              type: credencial.type,
-              clientDataJSON: paraTexto(credencial.response.clientDataJSON),
-              authenticatorData: paraTexto(credencial.response.authenticatorData),
-              signature: paraTexto(credencial.response.signature),
-              userHandle:
-                credencial.response.userHandle === null
-                  ? null
-                  : paraTexto(credencial.response.userHandle),
-            },
-          })
-          formulario.submit()
-        })
+    return colherDigital(mudanca, ficha.value).then(function (digital) {
+      if (digital === null) return
+      alvo.value = digital
+      formulario.submit()
     })
   }
 
@@ -343,14 +386,32 @@
 
   var deRegistrar = document.getElementById('registrar')
   if (deRegistrar !== null) {
+    // O token do convite e lido AGORA, e nao dentro do clique: `tokenDoConvite`
+    // limpa a barra de enderecos, e limpa-la so no primeiro clique deixaria o
+    // token vivo num print de tela ate la.
     var convite = tokenDoConvite()
+    var tipo = deRegistrar.getAttribute('data-tipo') || 'convite'
+
     ligar(deRegistrar, function () {
+      var campo = document.getElementById('apelido')
+      var apelido = campo === null ? '' : campo.value
+
+      if (tipo === 'sessao') return adicionarAparelho(deRegistrar, apelido)
+
+      if (tipo === 'recuperacao') {
+        var doCodigo = deRegistrar.querySelector('input[name="codigo"]')
+        if (doCodigo === null) {
+          avisar('Não foi possível continuar. Digite o código de novo.')
+          return
+        }
+        return cadastrar({ tipo: 'recuperacao', codigo: doCodigo.value }, apelido)
+      }
+
       if (convite === null) {
         avisar('Este link de convite não está completo. Peça um link novo.')
         return
       }
-      var campo = document.getElementById('apelido')
-      return cadastrar(convite, campo === null ? '' : campo.value)
+      return cadastrar({ tipo: 'convite', convite: convite }, apelido)
     })
   }
 })()

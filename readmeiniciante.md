@@ -407,7 +407,11 @@ Ele abre um menu com cinco etapas:
 
 **Ele não substitui os dois guias detalhados** ([SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md) e [SETUP_META.md](SETUP_META.md)) — ele caminha ao lado deles. Use os dois juntos: o guia mostra as telas, o assistente cuida do que é chato de digitar.
 
-> **Por que um assistente no terminal e não um site bonitinho com telas?** Porque um painel na internet capaz de mudar o texto do seu Direct viraria, se alguém invadisse, uma máquina de golpe falando em nome da sua conta — com a sua resposta pública dando credibilidade ao golpe. O assistente roda **só no seu computador**, com os segredos que já estão aqui, e não expõe nada na internet.
+> **Então eu vou ter que usar o terminal para sempre?** Não. O assistente cuida do que **só** a sua máquina pode fazer: gerar os segredos, cadastrá-los na Cloudflare e fazer o primeiro login do Instagram. Depois disso, o dia a dia é no **painel**, pelo celular: palavra-gatilho, textos, link, quais Reels respondem, e o histórico do que aconteceu.
+>
+> **E um painel na internet não é perigoso?** Seria, se fosse um painel comum. Um painel capaz de mudar o texto do seu Direct viraria, se alguém invadisse, uma máquina de golpe falando em nome da sua conta — com a sua resposta pública dando credibilidade ao golpe. É por isso que este tem quatro travas: **(1)** só entra com passkey — digital, rosto ou chave física —, então não existe senha para vazar ou adivinhar; **(2)** mudar o texto do Direct ou o link exige um **segundo** gesto de biometria, preso àquela mudança específica, de modo que aprovar uma coisa não aprova outra; **(3)** o link só pode apontar para os domínios que você autorizou no arquivo de configuração, e mudar essa lista exige o repositório mais a chave de publicação — as duas coisas que um painel invadido não tem; **(4)** o código de parada desliga tudo de qualquer aparelho, sem senha e sem precisar entrar no painel.
+>
+> Os segredos continuam vivendo **só no seu computador**: o painel nunca os lê nem os mostra.
 
 Você pode fechar e voltar quando quiser. Para ir direto a uma etapa:
 
@@ -431,7 +435,7 @@ Aqui está o resumo do caminho, para você saber onde está pisando:
 | `npx wrangler d1 create noxe-insta-automation` | Cria o banco de dados. **Ele imprime um `database_id` na tela — copie e cole no `wrangler.jsonc`** |
 | `npm run db:migrate:local` | Monta as tabelas no banco de testes da sua máquina |
 | `npm run db:migrate:remote` | Monta as tabelas no banco de verdade, na Cloudflare |
-| `npx wrangler secret put NOME` | Guarda um segredo no cofre da Cloudflare. Você repete isso **4 vezes**, uma por segredo |
+| `npx wrangler secret put NOME` | Guarda um segredo no cofre da Cloudflare. Você repete isso **5 vezes**, uma por segredo |
 | `npm run deploy` | Publica. **Ele imprime a sua URL — anote!** |
 
 ### Três coisas que costumam confundir aqui
@@ -446,7 +450,11 @@ Mas o arquivo `wrangler.jsonc` usa `:` no lugar do `=`. **Copie só o texto long
 
 **2. Ao cadastrar um segredo, a tela não mostra o que você digita.** Isso é de propósito, para ninguém ler por cima do seu ombro. Cole o valor e aperte Enter mesmo com a tela parecendo vazia. Não é travamento.
 
-**3. Você só consegue cadastrar 3 dos 4 segredos agora.** O quarto (`META_APP_SECRET`) vem do painel da Meta, que é a próxima etapa. Não fique travado esperando por ele.
+**3. Você só consegue cadastrar 4 dos 5 segredos agora.** O quinto (`META_APP_SECRET`) vem do painel da Meta, que é a próxima etapa. Não fique travado esperando por ele.
+
+> Um dos quatro é o `PANEL_SESSION_KEY`. Se você esquecer dele, tudo publica e
+> funciona — menos o painel, que responde 503 como se não existisse. É o esquecimento
+> mais comum, e o mais confuso de diagnosticar depois.
 
 ### Sua URL
 
@@ -608,7 +616,7 @@ Quem for te ajudar vai precisar de:
 >
 > Ao pedir ajuda, **jamais** cole o conteúdo do arquivo `.env`, nem o `META_APP_SECRET`, nem qualquer valor de segredo, nem um token. Quem tiver esses valores consegue mandar mensagem em nome da sua conta.
 >
-> Se você colou por engano em algum lugar público: **troque os 4 segredos imediatamente**. O passo a passo está no [SECURITY.md](SECURITY.md).
+> Se você colou por engano em algum lugar público: **troque os 5 segredos imediatamente**. O passo a passo está no [SECURITY.md](SECURITY.md).
 
 ---
 

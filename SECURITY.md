@@ -438,11 +438,17 @@ Esta seção existe para ser honesta. São pontos que uma auditoria do código e
 
 Para cada item: qual é o risco real, e por que hoje ele é aceitável.
 
-### 7.1 Não existe rate limiting em nenhum endpoint
+### 7.1 O rate limiting existe só no painel, é opcional, e não é o que protege os segredos
 
-**O risco.** Nenhuma rota tem limite de requisições por origem — nem mesmo as que comparam segredo (`/setup/authorize`, `/setup/subscribe`, o handshake do webhook). Qualquer pessoa pode disparar milhares de requisições contra elas.
+**O que existe.** Três limitadores cobrem as portas do painel que alguém poderia martelar: entrar e registrar por convite, digitar código de recuperação, e a parada de emergência. São baldes **separados** de propósito — um bot batendo na tela de entrar não pode consumir a cota de que você precisa para digitar o código de parada numa emergência.
 
-**Por que é aceitável hoje.** Adivinhar o segredo por força bruta é inviável: `SETUP_ADMIN_TOKEN` e `META_WEBHOOK_VERIFY_TOKEN` são gerados com 32 bytes aleatórios de fonte criptográfica, ou seja, **256 bits de entropia** (veja `scripts/gerar-segredos.mjs`). Não existe volume de tentativas que chegue perto disso. O dano possível é outro, e é de custo, não de invasão: um atacante consegue **queimar a sua cota** do plano gratuito da Cloudflare com requisições inúteis. Se isso incomodar, a defesa não está no código — está no painel da Cloudflare, com uma regra de WAF ou Rate Limiting na frente do Worker.
+**O que não existe, e por quê.** `/setup/authorize`, `/setup/subscribe` e o handshake do webhook continuam **sem** limite. No webhook isso é decisão explícita, não descuido: aplicar limite ali faria a Meta receber `429`, desistir da reentrega e **perder comentários em silêncio** — o remédio seria pior que a doença.
+
+**Os limitadores são opcionais, e o desenho não depende deles.** Se os três bindings `ratelimits` do `wrangler.jsonc` forem apagados, o painel continua correto: um limitador de reserva, por janela dentro do próprio Worker, assume no lugar. Mas leia o parágrafo seguinte antes de decidir que isso basta.
+
+**O que o rate limiting NÃO faz por você.** O contador do binding é **por data center** e eventualmente consistente; o limitador de reserva conta dentro de um servidor só e por endereço de IP. Contra uma pessoa tentando de um endereço, ele segura. Contra tráfego distribuído — muitos endereços ao mesmo tempo, que é o que um ataque de verdade faz — a proteção de cota é praticamente nula. **A segurança dos segredos não vem daqui, vem da entropia deles**: `SETUP_ADMIN_TOKEN` e `META_WEBHOOK_VERIFY_TOKEN` têm 32 bytes aleatórios de fonte criptográfica (256 bits — veja `scripts/gerar-segredos.mjs`), e os códigos de recuperação têm 100 bits. Não existe volume de tentativas que chegue perto disso.
+
+**O risco residual continua sendo de custo, não de invasão.** Um atacante consegue **queimar a sua cota** de 100.000 requisições/dia do plano gratuito com requisições inúteis, e o dia em que ela acaba é o dia em que a automação para de responder. O que cadastrar os três bindings compra é exatamente isso, e não segurança: o contador passa a ser da Cloudflare, aplicado **antes** de a sua cota ser gasta. Se quiser mais que isso, a defesa não está no código — está no painel da Cloudflare, com uma regra de WAF ou Rate Limiting na frente do Worker.
 
 ### 7.2 O limite de 512 KB só vale depois que o corpo já está na memória
 
@@ -516,7 +522,7 @@ Se estiver em dúvida se algo se encaixa, relate assim mesmo. É melhor receber 
 
 Estes casos já são conhecidos e não precisam de relato:
 
-- **Ausência de rate limiting.** Já documentado na seção 7.1, com a razão de ser aceitável e o caminho de mitigação (regra na Cloudflare, não no código).
+- **Limite de tentativas fraco ou ausente fora do painel.** Já documentado na seção 7.1: os limitadores existem só nas portas do painel, são opcionais, protegem **cota** e não segredo, e a ausência deles no webhook é decisão explícita — limitar ali faria a Meta desistir da reentrega e perder comentários em silêncio. O caminho de mitigação é uma regra na Cloudflare, não código.
 - **Falta de cabeçalhos de segurança nas páginas estáticas.** `/health`, `/privacy-policy` e `/data-deletion` são páginas sem qualquer campo de entrada e sem dado sensível. Ausência de CSP, HSTS ou `X-Frame-Options` ali não leva a nada explorável.
 - **Qualquer coisa que exija acesso prévio à conta Cloudflare do operador.** Quem já entrou no painel pode trocar o código do Worker e ler os secrets — não há defesa possível no código contra isso, e a seção 1 já assume esse limite. O mesmo vale para acesso prévio ao painel da Meta ou à máquina de quem faz o deploy.
 - **Relatos gerados por scanner automático sem demonstração de impacto.** Uma saída de ferramenta colada sem análise não é um relato.
@@ -556,13 +562,13 @@ Rode isto **toda vez**, mesmo em mudança pequena. Mudança pequena é exatament
 npm run check       # roda lint + typecheck + test, em sequencia
 npm run typecheck   # tipos
 npm run lint        # lint
-npm run test        # 125 testes devem passar
+npm run test        # 822 testes devem passar
 ```
 
 - [ ] `npm run check` passa
 - [ ] `npm run typecheck` sem erros
 - [ ] `npm run lint` limpo
-- [ ] `npm run test` — os 125 testes passando
+- [ ] `npm run test` — os 822 testes passando
 
 ### Placeholders trocados pelos seus valores
 
@@ -629,6 +635,27 @@ Estes itens ainda estão sem resolução e afetam segurança ou conformidade. Re
 1. **`destinationUrl` em `src/config.ts`** vem de fábrica como `[COLOQUE_O_SEU_LINK_AQUI]`. Enquanto estiver assim, a automação enviaria o placeholder no lugar do link real.
 2. **`CONTATO_EMAIL` e `NOME_RESPONSAVEL` em `src/routes/legal.ts`** são placeholders. As páginas públicas `/privacy-policy` e `/data-deletion` dependem deles. Leia a seção 6.4 antes de decidir qual e-mail colocar ali.
 3. **Confirmar a origem do `META_APP_ID` / `META_APP_SECRET`.** No fluxo **Instagram Login**, os valores válidos são o *ID do app do Instagram* e a *Chave secreta do app do Instagram* da tela **Casos de uso > Personalizar** — **não** os de *Configurações > Básico*. É preciso confirmar que os valores configurados hoje vieram da tela certa.
+
+### O que ainda não foi verificado na plataforma
+
+**Situação em 08/09/2026.** Catorze suposições sobre o comportamento da Cloudflare e da Meta sustentam frases deste projeto. Nenhuma delas bloqueia código — cada uma bloqueia uma **frase**. Elas estão listadas aqui porque a regra é não prometer na documentação o que não foi verificado, e um "não testado" escrito vale mais que uma afirmação confiante e errada.
+
+| # | Suposição | Situação hoje |
+|---|---|---|
+| 1 | `public/painel/parar/index.html` é servido em `GET /painel/parar` (sem barra) | **Não testado em produção.** Se falhar, use `/painel/parar/` **com** barra e corrija a URL em toda a documentação. |
+| 2 | `_headers` funciona em Workers Static Assets | **Não testado.** Nada quebra se falhar: a página de parada não tem script nem interpolação. |
+| 3 | Funções JSON1 (`json_valid`, `json_type`, `json_array_length`) no D1 | **Verde nos testes locais** — a suíte aplica a migration `0002` com esses `CHECK` e passa. **Não confirmado no D1 de produção.** Se falhar, remova só esses predicados; `length(...)` e o validador continuam. |
+| 4 | `db.batch()` é transação implícita e conta como 1 subrequest | **Não testado.** A ordem de escrita já é defensiva, e divergência em `changes` vira erro duro. |
+| 5 | `exactOptionalPropertyTypes: true` sem ruído no resto do código | **Não adotado.** O `tsconfig.json` fica em `strict` + `noUncheckedIndexedAccess`. O reforço equivalente vive no operador `in` (`src/routes/painel/gravar.ts:278`). |
+| 6 | Binding `ratelimits` disponível no plano gratuito | **Não testado — e por isso não prometido em lugar nenhum.** A seção 7.1 diz explicitamente que o painel funciona sem ele. |
+| 7 | `media_product_type` e `caption` vêm na listagem com Instagram Login | **Não testado em conta real.** Se falharem, filtre por `media_type=VIDEO` e rotule "vídeo/Reel" — **nunca** uma chamada extra por item. |
+| 8 | Ler um nó de comentário por id devolve `username` | **Não testado em conta real.** A tela "O que aconteceu" já degrada sozinha: sem o @, a lista sobe com horário e resultado. |
+| 9 | Cloudflare Access em `.workers.dev` | **Não testado.** É camada opcional e nunca virou requisito. |
+| 10 | Retenção dos Workers Logs no plano gratuito | **Não testado.** Por isso a política de privacidade diz "retenção definida pela Cloudflare", sem número. |
+| 11 | `__Host-` em navegadores antigos de celular | **Não medido.** Não há plano B aceitável: o prefixo fica. |
+| 12 | CPU da carga fria com 200 mídias dentro dos 10 ms | **Não medido em produção.** Se estourar, o teto cai para 100 e o teste de teto muda de número junto. |
+| 13 | Invocação de cron conta contra as 100.000 requisições/dia | **Não confirmado.** A aritmética assume que **sim** (288 invocações/dia, 0,29% do teto) — ou seja, assume o pior caso. |
+| 14 | Reconhecer "tabela inexistente" pela mensagem de erro do D1 | **Não testado.** O remédio primário continua sendo a ordem documentada do deploy: migration **antes** do código. |
 
 ---
 

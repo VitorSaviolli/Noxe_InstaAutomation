@@ -139,6 +139,39 @@ export async function gravarConfig(
     .run()
 }
 
+/**
+ * Grava MUITAS linhas de `painel_midias` numa viagem so.
+ *
+ * Existe por causa de MID-11 e do teste do teto de HTML, que precisam de 200
+ * linhas ANTES de comecar a medir o que realmente lhes interessa. Com um
+ * `INSERT` por vez esse preparo levava ~5s — em cima do teto padrao de 5000ms
+ * do vitest —, e o resultado era o pior tipo de teste: verde quando rodava
+ * sozinho, vermelho quando rodava junto com os outros. Um teste que responde a
+ * carga da maquina mente nos dois sentidos.
+ *
+ * `db.batch()` conta como UMA operacao, que e o mesmo motivo pelo qual o codigo
+ * de producao junta as escritas dele num lote so.
+ *
+ * So as quatro colunas obrigatorias: quem precisa de sobreposicao continua
+ * usando `gravarMidia`, uma linha por vez.
+ */
+export async function gravarMidias(
+  db: D1Database,
+  mediaIds: readonly string[],
+  ativo = 1,
+): Promise<void> {
+  if (mediaIds.length === 0) return
+  await db.batch(
+    mediaIds.map((mediaId) =>
+      db
+        .prepare(
+          'INSERT INTO painel_midias (media_id, ativo, criado_em, atualizado_em) VALUES (?, ?, ?, ?)',
+        )
+        .bind(mediaId, ativo, AGORA, AGORA),
+    ),
+  )
+}
+
 /** Grava uma linha de `painel_midias`. As colunas ausentes ficam `NULL`. */
 export async function gravarMidia(
   db: D1Database,

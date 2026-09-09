@@ -61,10 +61,10 @@ export const automationConfig: AutomationConfig = {
   publicReplyEnabled: true,
   publicReplyText: 'Enviei as informações no seu Direct.',
   privateReplyEnabled: true,
-  privateReplyText: 'Olá, {username}! Aqui está o link que você pediu: {link}',
-  // TROQUE pelo seu link (https://...). Enquanto isto nao mudar a automacao
-  // nao dispara: o placeholder abaixo conta como "link nao configurado".
-  destinationUrl: '[COLOQUE_O_SEU_LINK_AQUI]',
+  privateReplyText: 'Segue o link como prometido😊 {link}',
+  // Link real da Noxelora. Se algum dia voltar a ser um placeholder entre
+  // colchetes, a automacao para de disparar por seguranca.
+  destinationUrl: 'https://noxelora.com.br',
   userCooldownHours: 24,
 }
 

@@ -396,3 +396,57 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.95em;
 }
+
+/* Aparelhos e codigos. Estado nunca e SO cor: a tela escreve a palavra, e a
+   cor abaixo apenas reforca o que o texto ja diz (§12.9). */
+.faixa-ok {
+  border-left-color: var(--acento);
+  color: var(--acento);
+}
+
+.aparelhos,
+.codigos {
+  padding: 0;
+  list-style: none;
+}
+
+.aparelho,
+.conferencia,
+.conferir-aparelho,
+.aviso-do-endereco {
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
+  background: var(--fundo-cartao);
+}
+
+.salvo,
+.e-este {
+  color: var(--acento);
+  font-weight: 600;
+}
+
+.so-aqui {
+  color: var(--aviso);
+  font-weight: 600;
+}
+
+.endereco-antigo,
+.datas {
+  color: var(--texto-fraco);
+}
+
+/* Monoespacado: o prefixo do sha256 (nunca o id inteiro) e os codigos, onde
+   confundir 0/O ou 1/l custa uma tentativa. */
+.identificacao,
+.codigos li {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--texto-fraco);
+}
+
+.codigos li {
+  padding: 0.25rem 0;
+  color: var(--texto);
+  font-size: 1.05rem;
+}

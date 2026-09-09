@@ -171,7 +171,7 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
   }
 
   const snapshot = await configDaTela(entrada.env, entrada.now)
-  const visao = panorama(snapshot, await contaConectada(entrada.env.DB))
+  const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const { global } = snapshot
 
   const corpo = html`<h1>A mensagem e o link</h1>

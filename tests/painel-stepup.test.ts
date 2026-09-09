@@ -1583,8 +1583,14 @@ describe('STEP — step-up preso ao conteudo', () => {
       expect(trocada.status).toBe(400)
       expect(trocada.headers.get('set-cookie')).toBe(null)
 
-      // E uma operacao que nenhuma rota de escrita sabe consumir tambem nao.
-      const semConsumidor = await pedirOpcoes(sessao, { acao: 'remover_passkey', alvo: 'x' })
+      // E uma acao FORA da lista tambem nao. Ate a Etapa 12 o exemplo aqui era
+      // `remover_passkey`, "uma operacao que nenhuma rota de escrita sabe
+      // consumir" — a Etapa 13 deu consumidor as tres que faltavam
+      // (`adicionar_passkey`, `remover_passkey`, `gerar_codigos`), e manter o
+      // exemplo antigo mediria o oposto do que a frase promete. A trava
+      // afirmada continua sendo a mesma: `OPERACOES_ACEITAS` e uma lista, e o
+      // que nao esta nela nao vira envelope.
+      const semConsumidor = await pedirOpcoes(sessao, { acao: 'operacao_inventada', alvo: 'x' })
       expect(semConsumidor.status).toBe(400)
     } finally {
       console.parar()

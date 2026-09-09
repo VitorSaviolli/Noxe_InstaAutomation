@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
+import { handleAtividade } from '../src/routes/painel/atividade'
 import {
   handleOpcoesDeEntrar,
   handlePaginaDeEntrar,
@@ -10,18 +11,22 @@ import { cabecalhos } from '../src/routes/painel/html'
 import { handleInicio } from '../src/routes/painel/inicio'
 import { TETO_DO_CORPO_DA_API } from '../src/routes/painel/registrar'
 import {
+  ROTA_ATIVIDADE,
   ROTA_ENTRAR,
   ROTA_INICIO,
   ROTA_OPCOES_DE_ENTRAR,
+  ROTA_OPCOES_DE_STEPUP,
   ROTA_VERIFICAR_ENTRADA,
   ROTAS,
   type RotaDoPainel,
   TETO_DO_CORPO_DE_FORMULARIO,
 } from '../src/routes/painel/rotas'
-import { despachar, routePainel } from '../src/routes/painel/router'
+import { despachar, type HandlerDoPainel, routePainel } from '../src/routes/painel/router'
+import { handleOpcoesDeStepUp } from '../src/routes/painel/stepup'
 import { PRAZO_DE_ENVELOPE_MS } from '../src/security/signed-envelope'
 import {
   emitirSessao,
+  fichaCsrf,
   PRAZO_ABSOLUTO_DE_SESSAO_MS,
   PRAZO_OCIOSO_DE_SESSAO_MS,
 } from '../src/services/panel-session'
@@ -1196,6 +1201,105 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
       expect({ [rota.caminho]: contador.escritas, status: resposta.status < 500 }).toEqual({
         [rota.caminho]: 0,
         status: true,
+      })
+    }
+
+    // **A METADE QUE FALTAVA, e sem ela o laco acima nao provava o que o nome
+    // promete.** `pedirDaRota` monta a requisicao SEM cookie, entao toda rota com
+    // `sessao: true` era recusada no passo 6 e o que se media era a RECUSA — uma
+    // escrita dentro do handler de `/painel` ou de `/painel/atividade` passava
+    // por aqui sem uma linha vermelha. O laco abaixo abre a rota de verdade.
+    //
+    // A sessao nasce com `vista_em = AGORA` de proposito: nesse estado a
+    // escrituracao de §10.8 nao grava (o intervalo de 15 min nao venceu), entao
+    // o "zero escritas" continua sendo afirmacao limpa sobre o HANDLER. O estado
+    // retomado — em que a guarda grava uma vez — e afirmado por TELA-19, que
+    // separa escrita de CONTEUDO de escrituracao de SESSAO.
+    //
+    // **Nenhuma rota fica de fora, e a primeira versao deste laco excluia a que
+    // MAIS faltava.** Ela dispensava as rotas com `csrf: true` alegando que a
+    // suite de step-up cobria a unica delas — mas aquela suite nao conta escrita
+    // nenhuma, entao a exclusao era um buraco com cara de nota de rodape. A ficha
+    // e derivavel aqui (`fichaCsrf`), e na familia `json` ela viaja no cabecalho
+    // `x-painel-csrf`; com sessao viva e ficha valida a rota passa os quatro
+    // portoes e chega ao handler, que e onde a pergunta "escreveu?" tem sentido.
+    /** O handler de cada rota deste laco, para `despachar` conseguir abri-la. */
+    const HANDLER_DA_ROTA: Record<string, HandlerDoPainel> = {
+      [ROTA_INICIO.caminho]: handleInicio,
+      [ROTA_ATIVIDADE.caminho]: handleAtividade,
+      [ROTA_OPCOES_DE_STEPUP.caminho]: handleOpcoesDeStepUp,
+    }
+
+    const comSessao = semEscrita.filter((rota) => rota.sessao)
+
+    // Contrapositivo: se um dia nenhuma rota casar o filtro, o laco passaria
+    // calado — e era exatamente essa a forma do defeito que ele conserta.
+    expect(comSessao.map((rota) => rota.caminho)).toEqual([
+      ROTA_INICIO.caminho,
+      ROTA_ATIVIDADE.caminho,
+      ROTA_OPCOES_DE_STEPUP.caminho,
+    ])
+
+    for (const rota of comSessao) {
+      await limparBanco(env.DB)
+      invalidarBaldesDeReserva()
+
+      const sessao = await emitirSessao(env, AGORA)
+      await env.DB.prepare(
+        `INSERT INTO painel_sessoes
+           (sid_hash, credential_id, rp_id, criada_em, expira_em, ociosa_ate, vista_em, falhas_stepup)
+         VALUES (?, 'cred', ?, ?, ?, ?, ?, 0)`,
+      )
+        .bind(
+          sessao.sidHash,
+          env.PANEL_RP_ID,
+          AGORA,
+          sessao.expiraEm,
+          AGORA + PRAZO_OCIOSO_DE_SESSAO_MS,
+          AGORA,
+        )
+        .run()
+
+      const cookie = `__Host-painel_sessao=${sessao.valor}`
+      const ehGet = rota.metodos.includes('GET')
+
+      // A familia `json` leva a ficha no cabecalho `x-painel-csrf`; a `pagina`,
+      // em campo escondido. So a primeira aparece aqui.
+      const requisicao = ehGet
+        ? pedir(rota.caminho, { cookie })
+        : new Request(`${RAIZ}${rota.caminho}`, {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              origin: RAIZ,
+              cookie,
+              'x-painel-csrf': await fichaCsrf(env, sessao.sidHash),
+            },
+            body: '{}',
+          })
+
+      const contador = new D1Contador(env.DB)
+      // `despachar` e nao `responder`: o Worker inteiro calcula `now` com
+      // `Date.now()`, e uma sessao gravada com o `AGORA` fixo do fixture
+      // pareceria expirada — era 303, e a rota continuaria sem abrir, que e o
+      // defeito que este laco existe para consertar. As tres rotas daqui passam
+      // por `despachar` em producao, entao nada e contornado.
+      const resposta = await despachar(
+        requisicao,
+        ambienteCom({ DB: comoD1(contador) }),
+        AGORA,
+        rota,
+        HANDLER_DA_ROTA[rota.caminho] as HandlerDoPainel,
+      )
+
+      // **A afirmacao e ZERO ESCRITA, e ela vale em qualquer desfecho.** O status
+      // esperado difere porque as duas telas ABREM (200) e a rota de step-up
+      // recebe corpo vazio de proposito — ela chega ao handler, valida e recusa.
+      // Chegar ao handler e o que importa: e o que a versao anterior deste laco
+      // nao conseguia, porque parava no portao de sessao.
+      expect({ [rota.caminho]: contador.escritas }).toEqual({ [rota.caminho]: 0 })
+      expect({ [rota.caminho]: ehGet ? resposta.status : resposta.status < 500 }).toEqual({
+        [rota.caminho]: ehGet ? 200 : true,
       })
     }
   })

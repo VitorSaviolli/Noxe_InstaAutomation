@@ -31,7 +31,21 @@ function texto(mensagem: string, status: number): Response {
 export function isAdmin(request: Request, env: Env): boolean {
   const header = request.headers.get('authorization')
   if (!header?.startsWith('Bearer ')) return false
-  return timingSafeEqual(header.slice('Bearer '.length), env.SETUP_ADMIN_TOKEN)
+
+  // **Segredo vazio nunca autentica ninguem.** `timingSafeEqual` compara o
+  // tamanho primeiro, entao com `SETUP_ADMIN_TOKEN` valendo string vazia um
+  // `Authorization: Bearer ` sem nada depois casaria — zero bytes contra zero
+  // bytes — e abriria as QUATRO rotas que dependem desta funcao, entre elas a
+  // destrutiva `/setup/painel/zerar`, que apaga o acesso ao painel inteiro.
+  //
+  // Ausente, o binding chega `undefined`, e ai o encoder o transforma no texto
+  // "undefined" (9 bytes), que ja nao casa com vazio. O buraco e so o do valor
+  // vazio de verdade — um `wrangler secret put` que recebeu Enter sem nada —,
+  // e e barato demais para ficar em aberto.
+  const esperado = env.SETUP_ADMIN_TOKEN ?? ''
+  if (esperado.length === 0) return false
+
+  return timingSafeEqual(header.slice('Bearer '.length), esperado)
 }
 
 /** Monta o redirect_uri absoluto a partir da URL da requisicao. */

@@ -27,8 +27,14 @@ import type { LinhaDeSessao } from '../../repositories/painel-sessoes-repository
 import { painelHabilitado } from '../../services/panel-session'
 import type { Env } from '../../types/env'
 import { handleAjustes } from './ajustes'
+import { handleAparelhos } from './aparelhos'
 import { handleAtividade } from './atividade'
-import { handleOpcoesDeEntrar, handlePaginaDeEntrar, handleVerificarEntrada } from './entrar'
+import {
+  handleEntrarPorCodigo,
+  handleOpcoesDeEntrar,
+  handlePaginaDeEntrar,
+  handleVerificarEntrada,
+} from './entrar'
 import {
   CORPO_VAZIO,
   type CorpoDaRota,
@@ -37,6 +43,7 @@ import {
   exigirSessao,
   exigirSessaoViva,
   type FamiliaDeLimite,
+  handleSair,
   type Limitador,
   lerCorpoCapado,
   limitar,
@@ -59,9 +66,11 @@ import {
   formatoDaRota,
   PREFIXO_DA_API,
   ROTA_AJUSTES,
+  ROTA_APARELHOS,
   ROTA_ATIVIDADE,
   ROTA_CHAVE,
   ROTA_ENTRAR,
+  ROTA_ENTRAR_CODIGO,
   ROTA_INICIO,
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_ENTRAR,
@@ -69,6 +78,7 @@ import {
   ROTA_PALAVRAS,
   ROTA_REEL,
   ROTA_REELS,
+  ROTA_SAIR,
   ROTA_VERIFICAR_ENTRADA,
   type RotaDoPainel,
   tetoDoCorpo,
@@ -163,8 +173,29 @@ export async function routePainel(
     case ROTA_ATIVIDADE.caminho:
       return despachar(request, env, now, ROTA_ATIVIDADE, handleAtividade)
 
+    // Aparelhos e codigos de recuperacao (§10.13). Sem familia de limitador,
+    // pela mesma razao de `/painel/api/stepup/opcoes`: ela corre com sessao
+    // viva e ficha CSRF, e quem martela step-up ja tem o teto de
+    // `falhas_stepup`, que apaga a sessao na decima.
+    case ROTA_APARELHOS.caminho:
+      return despachar(request, env, now, ROTA_APARELHOS, handleAparelhos)
+
+    // "Sair deste aparelho" (§10.8). Sem familia de limitador, como as duas
+    // acima: ela corre com sessao viva e ficha CSRF, e o pior que a repeticao
+    // faz e apagar uma linha que ja nao existe.
+    case ROTA_SAIR.caminho:
+      return despachar(request, env, now, ROTA_SAIR, handleSair)
+
     case ROTA_ENTRAR.caminho:
       return despachar(request, env, now, ROTA_ENTRAR, handlePaginaDeEntrar)
+
+    // A entrada por codigo de recuperacao (§10.11). A familia e `codigo`, e ela
+    // vale para os DOIS metodos desta linha: a tabela mapeia rota, e nao metodo,
+    // e o GET custa 0 consulta — cobrar o balde dele nao tira nada de ninguem.
+    case ROTA_ENTRAR_CODIGO.caminho:
+      return despachar(request, env, now, ROTA_ENTRAR_CODIGO, handleEntrarPorCodigo, {
+        limite: 'codigo',
+      })
 
     case ROTA_OPCOES_DE_ENTRAR.caminho:
       return despachar(request, env, now, ROTA_OPCOES_DE_ENTRAR, handleOpcoesDeEntrar, {

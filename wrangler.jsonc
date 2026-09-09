@@ -44,9 +44,22 @@
     }
   ],
 
-  // UM unico cron: varre retry_pending e checa se o token precisa renovar.
+  // UM unico cron: varre retry_pending, checa o token e poda a auditoria.
+  //
+  // A CADA 5 MINUTOS, e o numero e derivado do backoff, nao escolhido a gosto.
+  // `computeNextRetry` agenda 1min, 4min e 16min (`src/services/automation.ts`);
+  // com o cron a cada 15, os dois primeiros degraus eram engolidos inteiros — um
+  // comentario que pedia 1 minuto esperava ate 15, e o de 4 tambem. Retentar
+  // rapido importa aqui: a private reply so e aceita por 7 dias, e uma falha de
+  // rede no primeiro minuto e exatamente o caso que a espera curta existe para
+  // resolver.
+  //
+  // Custo: 288 invocacoes por dia em vez de 96. O teto do plano gratuito e de
+  // 100.000 requisicoes/dia — 0,29% dele. E o cron sai cedo sem escrever nada
+  // quando a fila esta vazia (`findRetryPending` devolve zero e `retryPending`
+  // retorna antes de qualquer gravacao), entao tique ocioso nao custa escrita.
   "triggers": {
-    "crons": ["*/15 * * * *"]
+    "crons": ["*/5 * * * *"]
   },
 
   // Apenas configuracao NAO secreta. Segredos vao por `wrangler secret put`.

@@ -70,7 +70,7 @@ Melhor descobrir os limites agora do que depois de gastar duas horas na instala�
 - **Não burla nem aumenta os limites da Meta.** A Meta permite **um Direct por comentário**, dentro de uma **janela de 7 dias** a partir do comentário, e **750 chamadas por hora** por conta. Esses tetos são da plataforma; o projeto os respeita e não tem como contorná-los.
 - **Não gera conteúdo.** Ele não escreve legenda, não cria Reel, não responde de forma "inteligente". Os textos são os que você escrever no arquivo de configuração — sempre os mesmos.
 - **Não gerencia várias contas ao mesmo tempo.** Uma instalação atende **uma** conta do Instagram. Para uma segunda conta, você publica um segundo Worker, com banco e app próprios.
-- **Não tem painel web.** Nenhuma tela para clicar, nenhuma área administrativa. A configuração é feita editando um arquivo de texto e publicando de novo.
+- **Não tem contas de usuário.** O projeto **tem** painel web, mas ele é de uma pessoa só: você entra com a sua passkey, e não existe cadastro, convite de equipe nem níveis de permissão. Para outra pessoa administrar, ela cadastra uma passkey no **mesmo** painel — não há como dar acesso parcial a ninguém.
 - **Não funciona com conta pessoal.** A conta do Instagram precisa ser **profissional** (Comercial ou Criador de conteúdo). Conta pessoal não tem acesso à API.
 - **Não manda Direct para quem nunca comentou.** A Meta identifica o destinatário pelo **ID do comentário**. Sem comentário, não existe permissão para enviar mensagem — não dá para importar lista, nem disparar para seguidores.
 - **Não substitui o App Review quando você ultrapassar o uso básico.** Automatizar **a sua própria conta** funciona com Standard Access, sem revisão. Atender contas de terceiros ou clientes exige Advanced Access, que passa por App Review e verificação de negócio na Meta.
@@ -245,7 +245,7 @@ Se você nunca usou git, leia esta seção inteira. Ela evita o único erro dest
 
 ### O que são os segredos
 
-Quatro valores funcionam como senha do projeto. Quem tiver eles em mãos consegue disparar Directs em seu nome ou ler o token da sua conta:
+Cinco valores funcionam como senha do projeto. Quem tiver eles em mãos consegue disparar Directs em seu nome ou ler o token da sua conta:
 
 | Segredo | Para que serve |
 |---|---|
@@ -253,6 +253,7 @@ Quatro valores funcionam como senha do projeto. Quem tiver eles em mãos consegu
 | `META_WEBHOOK_VERIFY_TOKEN` | Senha que você inventa e repete no painel da Meta, usada no aperto de mão do webhook. |
 | `TOKEN_ENCRYPTION_KEY` | Chave que cifra o access token antes de ele ser gravado no banco. |
 | `SETUP_ADMIN_TOKEN` | Protege as rotas `/setup/*` para que só você consiga iniciar o login. |
+| `PANEL_SESSION_KEY` | Raiz das subchaves do painel administrativo. Sem ela o painel responde 503 e não existe. |
 
 Em produção eles vivem na Cloudflare, cadastrados com `npx wrangler secret put NOME`. Para rodar na sua máquina, eles ficam em dois arquivos que existem **só no seu computador**:
 
@@ -362,10 +363,13 @@ Como o Direct é o passo que pode dar errado e é o passo que realmente entrega 
 
 ### O cron (tarefa periódica)
 
-Existe um único cron configurado no `wrangler.jsonc` (`*/15 * * * *`, a cada 15 minutos) que faz duas coisas:
+Existe um único cron configurado no `wrangler.jsonc` (`*/5 * * * *`, a cada 5 minutos) que faz três coisas:
 
 - varre os comentários que ficaram pendentes de retentativa;
-- verifica se o token de acesso precisa ser renovado.
+- verifica se o token de acesso precisa ser renovado;
+- poda o histórico de auditoria do painel para o teto de retenção.
+
+O intervalo de 5 minutos vem da espera entre uma tentativa e a seguinte, que é de 1, 4 e 16 minutos. Com o cron a cada 15, os dois primeiros degraus não existiam na prática: quem precisava esperar 1 minuto esperava até 15. Um tique que encontra a fila vazia não escreve nada no banco.
 
 Sobre os tokens, o que você precisa saber:
 
@@ -506,7 +510,7 @@ noxe-insta-automation/
 │       ├── templates.ts                 Substitui os placeholders `{username}` e `{link}` nos textos
 │       └── hash.ts                      Gera o SHA-256 do IGSID do autor (o identificador em claro nunca é gravado)
 │
-└── tests/                               125 testes em 6 arquivos, cobrindo normalização, templates, segurança, repositórios, webhook e a automação
+└── tests/                               822 testes em 25 arquivos, cobrindo normalização, templates, segurança, repositórios, webhook, a automação e o painel administrativo
     ├── automation.test.ts
     ├── normalize.test.ts
     ├── repositories.test.ts
@@ -521,7 +525,24 @@ noxe-insta-automation/
 
 ## 8. Como configurar o gatilho
 
-Para trocar a palavra que dispara a automação você edita **um único lugar**: o campo `triggerKeywords` em `src/config.ts`. Não precisa mexer em mais nada.
+> ### 🔑 Antes de editar arquivo: existe um painel, e ele tem a palavra final
+>
+> O projeto tem um **painel administrativo** no seu próprio Worker, em `/painel`, feito para o celular. Por ele você troca a palavra-gatilho, os textos, o link, escolhe quais Reels respondem e vê o histórico do que aconteceu — sem editar arquivo e sem publicar de novo.
+>
+> **A regra de quem manda é simples, e vale a pena entender antes de se confundir:**
+>
+> | Situação | Quem manda |
+> |---|---|
+> | Você nunca salvou nada no painel | O `src/config.ts` — os valores de fábrica deste arquivo |
+> | Você salvou **uma vez** no painel | O **painel**. A partir daí, editar `src/config.ts` e publicar **não muda mais nada** |
+>
+> Não é um bug: é a resposta a "por que eu mudei o arquivo, publiquei, e continua o texto antigo?". Para saber em qual dos dois estados você está, rode `npm run configurar` e escolha a opção **6. Conferir o painel** — ela pergunta ao seu Worker e responde em português.
+>
+> **Para entrar no painel** você precisa de uma passkey (a digital ou o rosto do celular). O primeiro cadastro é por convite: `npm run gerar:convite`. Leia [SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md) — em especial o que ele diz sobre o `SETUP_ADMIN_TOKEN`, que é quem assina esse convite.
+>
+> ⚠️ **O painel consome a mesma cota gratuita que a automação.** O teto do plano gratuito da Cloudflare é de **100.000 requisições por dia**, e ele é compartilhado: cada tela aberta, cada botão "Atualizar", cada tentativa de login conta ali. Em uso normal isso é irrelevante — o painel em uso pesado foi orçado em cerca de **240 requisições por dia**, contra o cron em **288** —, e sobram mais de 99.000 para o webhook do Instagram. Mas duas consequências práticas valem a pena: a tela "O que aconteceu" **não** atualiza sozinha (não há polling; o botão é explícito e de propósito), e o dia em que essa cota acabar é o dia em que a automação para de responder. É por isso que o **código de parada de emergência** funciona sem sessão, sem passkey e a partir de um arquivo estático que não passa pelo Worker: ele precisa responder justamente quando todo o resto não responde.
+
+Para trocar a palavra que dispara a automação **pelo arquivo**, você edita **um único lugar**: o campo `triggerKeywords` em `src/config.ts`. Não precisa mexer em mais nada — e vale enquanto você não tiver salvado nada no painel.
 
 ### Uma palavra
 
@@ -605,6 +626,10 @@ Use `contains` apenas quando você quiser mesmo casar uma variedade de frases e 
 
 Serve para quando um Reel específico precisa de um gatilho ou de um link diferente do padrão. A entrada que citar aquele `mediaId` **sobrepõe** a configuração global — e só os campos que você escrever; o resto continua vindo da global.
 
+> **Pelo painel isso é mais fácil, e é onde a maioria das pessoas deve fazer.** A tela de Reels lista as suas mídias com a miniatura e a legenda, e você **escolhe clicando** — sem precisar descobrir o `mediaId` de 17 ou 18 dígitos em lugar nenhum. Vale a mesma regra da seção 8: depois que você salvar uma vez no painel, é ele que manda, e a lista abaixo em `src/config.ts` deixa de ter efeito.
+>
+> O formato em arquivo continua documentado aqui porque ele é quem vale **antes** do primeiro salvamento, e porque é o que você lê para entender como a sobreposição funciona.
+
 ```ts
 export const mediaAutomations: MediaAutomation[] = [
   {
@@ -638,14 +663,15 @@ Todos são rodados de dentro da pasta do projeto.
 |---|---|
 | `npm run configurar` | Assistente que conduz a configuração inicial passo a passo no terminal. |
 | `npm run verificar` | Confere que nenhum segredo está prestes a ir para o Git. Rode antes do primeiro `git push`. |
-| `npm run gerar:segredos` | Gera valores aleatórios para 3 dos 4 segredos (o `META_APP_SECRET` vem do painel da Meta). |
+| `npm run gerar:segredos` | Gera valores aleatórios para 4 dos 5 segredos (o `META_APP_SECRET` vem do painel da Meta). |
+| `npm run gerar:convite` | Gera o link de convite para cadastrar a **primeira passkey** do painel. Abra no celular. O convite comum vale só enquanto não existir nenhuma passkey — assim que a primeira nascer, ele para de funcionar sozinho. |
 | `npm run dev` | Sobe o Worker localmente para testar (`wrangler dev`). |
 | `npm run deploy` | Publica o Worker na Cloudflare (`wrangler deploy`). |
 | `npm run typecheck` | Confere os tipos do TypeScript sem gerar arquivos. Cobre `src/`; a pasta `tests/` fica de fora. |
 | `npm run lint` | Roda o Biome em `src`, `tests` e `scripts` — só nos arquivos `.ts`. Os scripts `.mjs` não são analisados. |
 | `npm run lint:fix` | Roda o Biome corrigindo automaticamente o que der. |
 | `npm run format` | Formata o código. |
-| `npm run test` | Roda a suíte de testes uma vez (125 testes). |
+| `npm run test` | Roda a suíte de testes uma vez (822 testes). |
 | `npm run test:watch` | Roda os testes em modo contínuo, reagindo a cada alteração. |
 | `npm run test:webhook` | Envia um webhook falso, já assinado, contra o Worker local. Bom para testar sem depender da Meta. |
 | `npm run db:migrate:local` | Aplica as migrações no banco D1 **local**. |
@@ -665,7 +691,7 @@ Esta seção existe para deixar explícito: **o projeto foi desenhado para caber
 |---|---|
 | **Cloudflare Workers (plano Free)** | Executa o código. Só roda quando chega um comentário ou quando o cron dispara — não existe servidor ligado 24h. |
 | **Cloudflare D1 (plano Free)** | Banco SQLite gerenciado. Guarda o claim de cada comentário, o cooldown por usuário e o token cifrado. O volume de dados é minúsculo: algumas linhas curtas por comentário. |
-| **Cron Triggers (incluso no Workers Free)** | Uma única execução a cada 15 minutos, que varre pendências e renova o token. |
+| **Cron Triggers (incluso no Workers Free)** | Uma única execução a cada 5 minutos, que varre pendências, renova o token e poda a auditoria do painel. |
 
 Não há nada de pago envolvido: nenhum banco externo, nenhuma fila, nenhum serviço de terceiros com mensalidade. A API da Meta usada aqui também não é cobrada.
 
@@ -681,7 +707,7 @@ O que dá para afirmar com segurança é a **ordem de grandeza do seu consumo**:
 
 - Um cenário movimentado para uma conta individual é de **~100 comentários por dia**.
 - Cada comentário processado faz **no máximo 3 subrequests** para a Meta (Direct, resposta pública e, quando necessário, uma consulta de apoio).
-- Isso dá algo na casa de **~100 invocações e ~300 chamadas externas por dia**, mais 96 execuções do cron (uma a cada 15 minutos).
+- Isso dá algo na casa de **~100 invocações e ~300 chamadas externas por dia**, mais 288 execuções do cron (uma a cada 5 minutos, ou 0,29% do teto diário).
 
 O limite diário de requisições do plano Free da Cloudflare é ordens de grandeza maior que isso — estamos falando de uma fração minúscula do que o plano gratuito oferece. Um Worker que responde webhook de uma conta de Instagram é, em volume, um dos usos mais leves que existem na plataforma. Mesmo que seus comentários dobrem ou decupliquem, você continua muito longe do teto.
 

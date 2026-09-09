@@ -247,13 +247,22 @@ export function mudancaDeConfig(patch: PatchDeEstado, alvo?: string): MudancaCan
 /**
  * As operacoes que a cerimonia aceita HOJE.
  *
- * So `config`, porque so ela tem rota de escrita capaz de consumir o envelope.
- * As tres de §10.10 que faltam — `adicionar_passkey`, `remover_passkey` e
- * `gerar_codigos` — chegam com a tela dos aparelhos. Emitir envelope para uma
- * operacao que ninguem sabe verificar seria codigo sem tela, e a lista curta
- * aqui e o que impede que ele nasca sem revisao.
+ * Ate a Etapa 12 era so `config`, porque so ela tinha rota de escrita capaz de
+ * consumir o envelope: emitir envelope para uma operacao que ninguem sabe
+ * verificar seria codigo sem tela (§13.1). A Etapa 13 deu consumidor as outras
+ * tres — `adicionar_passkey` em `POST /painel/api/registrar/opcoes` no modo
+ * `sessao` (§10.4 passo 1, §10.13) e `remover_passkey` e `gerar_codigos` em
+ * `POST /painel/aparelhos` —, e por isso elas entram AGORA e nao antes.
+ *
+ * A lista continua sendo a trava: uma quinta acao so passa a valer aqui depois
+ * que existir a rota que recalcula o `op_hash` dela do proprio corpo recebido.
  */
-const OPERACOES_ACEITAS: readonly AcaoDeMudanca[] = ['config']
+const OPERACOES_ACEITAS: readonly AcaoDeMudanca[] = [
+  'config',
+  'adicionar_passkey',
+  'remover_passkey',
+  'gerar_codigos',
+]
 
 /**
  * O `Max-Age` do cookie de step-up, DERIVADO do prazo do envelope.

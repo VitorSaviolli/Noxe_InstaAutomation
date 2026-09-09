@@ -187,7 +187,7 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
   }
 
   const snapshot = await configDaTela(entrada.env, entrada.now)
-  const visao = panorama(snapshot, await contaConectada(entrada.env.DB))
+  const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const { global } = snapshot
 
   const fichas = global.triggerKeywords.map((palavra) => html`<li class="ficha">${palavra}</li>`)

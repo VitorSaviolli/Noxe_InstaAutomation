@@ -19,6 +19,10 @@ const segredos = {
   META_WEBHOOK_VERIFY_TOKEN: base64url(32),
   TOKEN_ENCRYPTION_KEY: base64(32),
   SETUP_ADMIN_TOKEN: base64url(32),
+  // Raiz das subchaves do painel. Sem ela o painel responde 503 e nao existe,
+  // entao ela e gerada aqui junto das outras: quem seguir o guia a risca nao
+  // pode publicar sem a chave do recurso principal.
+  PANEL_SESSION_KEY: base64url(32),
 }
 
 console.log('Segredos gerados. Guarde no gerenciador de senhas ANTES de cadastrar.\n')

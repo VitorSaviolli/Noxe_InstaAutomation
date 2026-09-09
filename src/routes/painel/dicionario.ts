@@ -18,6 +18,7 @@
  * `mediaScope`, que nao existe em `AutomationConfig` e por isso entra a mao.
  */
 import type { AutomationConfig, MatchMode } from '../../config'
+import type { CommentStatus } from '../../repositories/comments-repository'
 import type { OrigemConfig } from '../../services/config-store'
 
 /**
@@ -125,6 +126,21 @@ export const CONFIRMACOES = {
   ligada: 'A automação está ligada de novo.',
   desligada: 'A automação está desligada. Nada do que você salvou foi perdido.',
   sem_mudanca: 'Nada mudou: o que você enviou já era o que estava salvo.',
+  // Os tres da Etapa 13. `saiu_de_tudo` e `saiu` sao os dois `?ok=` que NAO sao
+  // lidos pela tela que recebeu o POST: as duas acoes de sair apagam a propria
+  // sessao de quem apertou, entao um `303` para `/painel/aparelhos` cairia no
+  // `303` do passo 6 da escada e a frase morreria no caminho. Os dois apontam
+  // para `/painel/entrar`, que e a tela onde a pessoa esta a partir daquele
+  // instante — e e la que a frase precisa aparecer para o gesto nao parecer
+  // uma falha (§10.13).
+  //
+  // As frases sao DIFERENTES de proposito: quem sai deste aparelho precisa
+  // saber que os outros continuam dentro, e quem saiu de todos precisa saber
+  // que derrubou tambem o proprio celular. Uma frase so para as duas acoes
+  // apagaria justamente a diferenca entre elas (§10.8, §10.13).
+  aparelho_removido: 'Pronto, o aparelho foi removido. Ele não entra mais neste painel.',
+  saiu: 'Você saiu deste aparelho. Os outros aparelhos continuam entrando normalmente.',
+  saiu_de_tudo: 'Você saiu de todos os aparelhos. Entre de novo quando quiser.',
 } as const
 
 export type CodigoDeConfirmacao = keyof typeof CONFIRMACOES
@@ -655,3 +671,94 @@ export const TELA_DOS_REELS = {
   /** O que o botao acrescenta ao proprio rotulo, para dizer o que vai acontecer. */
   vaiPedirADigital: '(vai pedir a sua digital)',
 } as const
+
+// ---------------------------------------------------------------------------
+// O resultado de cada comentario atendido (§12.6)
+// ---------------------------------------------------------------------------
+
+/** O par que a tela mostra por linha: o icone E a palavra, nunca so um deles. */
+export interface ResultadoNaTela {
+  /** §12.9: icone sozinho nao e estado. Ele vem SEMPRE ao lado da frase. */
+  readonly icone: string
+  readonly frase: string
+}
+
+/**
+ * `processed_comments.status` -> a frase de §12.6, uma por valor de `CommentStatus`.
+ *
+ * **O enum que governa esta tela e `CommentStatus`, e ele NAO e o dos motivos
+ * de ignorar.** `SkipReason` e `ProcessOutcome` (`automation.ts`) sao resultados
+ * em memoria do processamento e nao chegam a coluna nenhuma — o material de
+ * origem misturava os tres numa citacao so. Quem a tela le e `status`, e a
+ * unica lista fechada que responde por ele e a de
+ * `src/repositories/comments-repository.ts` (§15.3, decisao 7). Um dicionario de
+ * `SkipReason` aqui prometeria linhas que o banco nunca teve.
+ *
+ * **A trava e de TIPO**, como a de `NOME_DO_CAMPO`: `Record<CommentStatus, …>`
+ * nao compila com um membro faltando, entao um valor novo no enum quebra o
+ * `tsc` antes de qualquer teste — e sem ele a tela imprimiria o nome tecnico
+ * cru, que e o defeito que §12.7 proibe em letras.
+ *
+ * **Hoje so cinco destes oito existem no banco, e a frase honesta e a que a
+ * tela escreve.** O unico `INSERT` em `processed_comments` e o `claimComment`,
+ * que grava `processing`, e em `processComment` **todo** `skipped` acontece
+ * ANTES dele: comentario ignorado nao deixa linha nenhuma. `received` e
+ * `ignored` estao declarados no tipo e nao sao escritos em lugar nenhum de
+ * `src/`. As oito frases continuam obrigatorias assim mesmo — `processing` E o
+ * valor que o claim grava e pode ser lido numa corrida real, e um valor de enum
+ * sem frase e o bug que a tela mostraria como texto cru. O que nenhum teste
+ * pode afirmar, sob pena de virar promessa falsa, e que todo valor traduzido
+ * aparece em producao (§13.1).
+ *
+ * **A hora nao entra em `retry_pending`, e a ausencia e a mesma decisao de
+ * `dataEmPortugues`.** §12.6 escreve "Vamos tentar de novo as 14:35", e o
+ * relogio do Worker e UTC: o fuso da instalacao nao esta em lugar nenhum do
+ * contrato de ambiente, e uma hora tres horas errada numa tela que existe para
+ * explicar e pior que nenhuma hora. Quem quiser a data da proxima tentativa a
+ * monta com `dataEmPortugues(next_retry_at)`, que e o que a tela faz.
+ */
+export const RESULTADO_DO_COMENTARIO: Record<CommentStatus, ResultadoNaTela> = {
+  completed: { icone: '✓', frase: 'Direct enviado e comentário respondido' },
+  private_sent: {
+    icone: '⏳',
+    frase: 'Direct enviado. A resposta no comentário ainda não saiu',
+  },
+  uncertain: {
+    icone: '▲',
+    frase:
+      'Direct enviado, mas não conseguimos confirmar a resposta pública. A pessoa recebeu o link',
+  },
+  retry_pending: { icone: '⏳', frase: 'Não deu na primeira. Vamos tentar de novo' },
+  failed: { icone: '✕', frase: 'Não conseguimos enviar' },
+  processing: { icone: '⏳', frase: 'Estamos enviando agora' },
+  received: { icone: '⏳', frase: 'Recebemos e vamos processar' },
+  ignored: { icone: '–', frase: 'Não era um caso de responder' },
+}
+
+/**
+ * A frase de um `status` que a tabela acima nao conhece.
+ *
+ * Ela existe porque a coluna e TEXT e a tela le o que estiver la: uma linha
+ * gravada por uma versao futura, ou corrompida, nao pode virar o nome tecnico
+ * impresso na tela (§12.7). A direcao e a mesma de `motivoDaRecusa` — frase
+ * generica em vez de texto cru — e nao a de `traduzirAviso`, que nomeia o campo.
+ */
+export const RESULTADO_DESCONHECIDO: ResultadoNaTela = {
+  icone: '–',
+  frase: 'Não conseguimos dizer o que aconteceu com este comentário',
+}
+
+/**
+ * A traducao de um `status` vindo do banco, como funcao PURA.
+ *
+ * Recebe `string` e nao `CommentStatus` de proposito: o argumento vem de uma
+ * coluna TEXT, e prometer o tipo estreito aqui seria afirmar sobre o banco uma
+ * coisa que so o `INSERT` de hoje garante. A trava de tipo que importa e a do
+ * `Record` acima, e ela continua valendo.
+ */
+export function resultadoNaTela(status: string): ResultadoNaTela {
+  const conhecido: ResultadoNaTela | undefined = (
+    RESULTADO_DO_COMENTARIO as Record<string, ResultadoNaTela>
+  )[status]
+  return conhecido ?? RESULTADO_DESCONHECIDO
+}

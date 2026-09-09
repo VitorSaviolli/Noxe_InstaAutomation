@@ -359,7 +359,7 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
   }
 
   const snapshot = await configDaTela(entrada.env, entrada.now)
-  const visao = panorama(snapshot, await contaConectada(entrada.env.DB))
+  const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const mudancas = await new PainelAuditoriaRepository(entrada.env.DB).ultimasMudancas(
     MUDANCAS_NO_HISTORICO,
   )

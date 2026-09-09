@@ -330,13 +330,19 @@ Reels, abrir a tela da mensagem, trocar o link com a digital, conferir a ativida
 
 ```
 100.000 requisições/dia
-  -     96  cron a cada 15 minutos   [V] assumindo que invocação agendada conta como requisição
+  -    288  cron a cada 5 minutos    [V] assumindo que invocação agendada conta como requisição
   -    240  painel em uso pesado
-  = 99.664  sobram para o webhook do Instagram
+  = 99.472  sobram para o webhook do Instagram
 ```
 
 Em escrita no banco: salvar uma tela custa 2 escritas; a parada de emergência custa 2; um login
 custa 3. O dia a dia do dono são dezenas de escritas, contra 100.000. **O painel não é o problema.**
+
+> **Correção de 2026-09-08 — o cron passou de 15 para 5 minutos.** O bloco acima dizia 96
+> invocações. O intervalo de 15 minutos engolia inteiros os dois primeiros degraus da espera de
+> `computeNextRetry` (1 min, 4 min, 16 min): quem pedia 1 minuto esperava até 15. A conta foi de
+> 96 para 288 invocações por dia — 0,29% do teto, contra 0,10% —, e a conclusão do parágrafo não
+> muda. Um tique com a fila vazia sai antes de qualquer escrita.
 
 Do lado da automação, por comentário atendido: 5 consultas ao banco e cerca de 7 linhas escritas
 `[C]`. Isso dá teto de aproximadamente **14.000 comentários atendidos por dia**, folgado.
@@ -1008,7 +1014,7 @@ DELETE FROM painel_auditoria WHERE id <= ?;
 ```
 
 Lê no máximo 501 linhas pelo rowid e só escreve quando há o que apagar. Entra em
-`runScheduledTasks`, que já roda a cada 15 minutos `[C]` — assim a poda **nunca** entra no caminho de
+`runScheduledTasks`, que já roda a cada 5 minutos `[C]` — assim a poda **nunca** entra no caminho de
 gravação do painel. É a única poda de `painel_auditoria` no projeto.
 
 No mesmo cron, guardada por uma leitura de `painel_estado.atualizado_em` para rodar no máximo a cada
@@ -2742,19 +2748,52 @@ aviso; estado **nunca** só por cor; contraste mínimo 4.5:1 nos dois temas; foc
 
 ### 12.10 Orçamento por tela
 
-| Tela | Invocações | Consultas D1 | Chamadas à Meta |
+> **Emenda ratificada em 2026-09-09.** Os números abaixo são os MEDIDOS, e não os orçados na
+> primeira redação. Quem mede é `TELA-20` em `tests/painel-telas.test.ts`, que percorre as sete
+> telas de leitura contando subrequests no D1 real. As três divergências corrigidas estão nomeadas
+> depois da tabela; nenhuma delas é mudança de comportamento, e o pior caso continua folgado
+> contra o teto de 50.
+
+| Tela | Invocações | Consultas D1 (janela fresca → após 15 min) | Chamadas à Meta |
 |---|---|---|---|
 | Entrar | 1 | **0** | 0 |
-| Início | 1 | 3 | 0 |
-| Meus Reels | 1 | 3 | **1 a 4** por toque em "Carregar mais" |
-| Palavras / Mensagem / Ajustes | 1 | 2 | 0 |
-| O que aconteceu (20 linhas) | 1 | **5** | **até 20** |
+| Início | 1 | 3 → 4 | 0 |
+| Meus Reels | 1 | 3 → 4 | **1 a 4** por toque em "Carregar mais" |
+| Este Reel | 1 | 3 → 4 | 0 |
+| Palavras | 1 | 3 → 4 | 0 |
+| Mensagem | 1 | 3 → 4 | 0 |
+| Ajustes | 1 | 4 → 5 | 0 |
+| O que aconteceu (abertura) | 1 | 4 → 5 | 0 |
+| O que aconteceu (toque em "Atualizar") | 1 | 5 → 6 `[C]` | **até 20** |
 | Prévia / caixa de teste | 1 | 1 | 0 |
 | Salvar qualquer coisa | 1 (+1 do redirect) | 2 leituras + 1–2 escritas | 0, exceto revalidar até 20 ids novos |
 | Parada com código errado | 1 | 1 leitura, 0 escrita | 0 |
 
-O pior caso do painel (a tela de atividade cheia) usa 25 dos 50 subrequests. O gargalo do projeto
-continua sendo outro e é **anterior ao painel**: o `processEvents` do webhook pode estourar as 50
+**A segunda coluna tem DOIS números porque a escrituração de sessão de §10.8 mora na guarda
+comum.** Ela soma +1 consulta e +1 escrita a toda tela autenticada, e no máximo uma vez a cada 15
+minutos por sessão — é a cadência de `vista_em`/`ociosa_ate`. "Entrar" e a parada de emergência
+ficam fora da regra porque nenhuma das duas tem sessão. A nota é uma só, e não um número por
+linha, de propósito: repetir o +1 em nove lugares garante que um deles fique para trás no dia em
+que a cadência mudar.
+
+As três divergências entre a redação original e o medido:
+
+1. **A escrituração de sessão não estava somada em lugar nenhum.** A tabela orçava a tela e §10.8
+   orçava a cadência da escrita, e as duas contas nunca se encontraram. É a coluna
+   `→ após 15 min` inteira.
+2. **Palavras, Mensagem e Ajustes pagavam 2 na redação e pagam 3 e 4.** O terceiro subrequest é a
+   pergunta sobre a conta, que a barra do topo exige desde que §12.1 passou a querer a barra IGUAL
+   em toda tela — sem ela a barra diria "Ligada e respondendo" numa instalação que não consegue
+   enviar nada. O quarto, só em Ajustes, é o bloco de histórico da Etapa 10. Este número já
+   estava velho antes desta rodada, e o laço antigo o media sem dizer que divergia.
+3. **"O que aconteceu" virou duas linhas.** A abertura simples paga 4; o 5 da redação original vale
+   para o toque em "Atualizar", que é outra invocação. O `→ 6` daquela linha é derivado da nota
+   acima e não é medido por `TELA-20`, que abre as telas sem `?acao=atualizar` — marcado `[C]`
+   por isso.
+
+O pior caso do painel é o toque em "Atualizar" com a tela cheia: 5 consultas + até 20 chamadas à
+Meta + 1 da escrituração de sessão = **26 dos 50 subrequests**. O gargalo do projeto continua
+sendo outro e é **anterior ao painel**: o `processEvents` do webhook pode estourar as 50
 consultas num lote com 10 ou mais comentários `[C]` — ver §16.
 
 ---

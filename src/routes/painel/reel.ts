@@ -319,7 +319,7 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
 
   const global = estadoDaConfig(snapshot.global)
   const efetivo = estadoEfetivo(snapshot.global, sobreposicao)
-  const visao = panorama(snapshot, await contaConectada(env.DB))
+  const visao = panorama(snapshot, await contaConectada(env.DB, now))
   const ficha = await fichaDaTela(entrada)
 
   const corpo = html`<h1>${TELA_DOS_REELS.tituloDoReel}</h1>

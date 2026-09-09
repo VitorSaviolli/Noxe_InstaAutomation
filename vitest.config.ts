@@ -161,5 +161,26 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
+    // UM arquivo de cada vez, e a razao e MEDIDA, nao gosto (2026-09-09).
+    //
+    // Cada arquivo de teste sobe o seu proprio workerd. Rodando varios ao mesmo
+    // tempo, isolates de verdade disputam CPU e sockets, e o portao unico
+    // passou a mentir de tres jeitos na mesma tarde:
+    //
+    //   - `ECONNRESET` matando um worker inteiro: 26 arquivos "passaram" e 50
+    //     testes simplesmente nao rodaram. Verde por nao ter olhado, que e o
+    //     pior estado possivel de uma trava.
+    //   - dois testes de teto (`TELA-19`, `TELA-20`) estourando os 5000ms
+    //     padrao por espera, e nao por defeito.
+    //   - o mesmo `npm run check` dando resultado diferente a cada execucao,
+    //     que e o que treina uma equipe a rodar de novo em vez de investigar.
+    //
+    // E serial e mais RAPIDO aqui, o que encerra a discussao: 31,9s de teste
+    // contra 175,6s em paralelo, na mesma arvore. O paralelismo cobrava
+    // contencao e nao entregava nada em troca.
+    //
+    // Se um dia esta suite rodar numa maquina com muitos nucleos ociosos, meca
+    // antes de tirar esta linha: o numero de cima e o que precisa ser batido.
+    fileParallelism: false,
   },
 })

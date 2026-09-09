@@ -184,6 +184,33 @@ export class PainelSessoesRepository {
       .bind(sidHash)
   }
 
+  /**
+   * Carimba `vista_em` e desliza `ociosa_ate` (§10.8).
+   *
+   * **Grava, e nao devolve statement**, e essa e a UNICA escrita do painel que
+   * sai sozinha: ela nao acompanha mudanca nenhuma. §8.8 exige a linha de
+   * auditoria ao lado de toda MUDANCA — e um "esta sessao continua sendo
+   * usada" nao e mudanca de estado do produto: nao existe acao para ele na
+   * lista fechada de §9.9, e uma linha de auditoria a cada 15 min de uso
+   * afogaria as 500 linhas de retencao com ruido.
+   *
+   * **Os dois valores juntos, num `UPDATE` so.** `vista_em` e o relogio que
+   * decide QUANDO a proxima escrita pode acontecer (no maximo 1 a cada 15 min,
+   * §10.8) e `ociosa_ate` e o prazo que a guarda confere. Gravar so um dos
+   * dois daria ou uma janela que nao desliza, ou uma escrita por requisicao.
+   *
+   * **`WHERE sid_hash = ?` e nada mais.** Sem condicao de prazo: quem ja
+   * conferiu os dois prazos e a guarda que chama isto, com o `now` da
+   * requisicao. Uma segunda grafia da regra aqui seria uma segunda verdade
+   * sobre quando uma sessao morre.
+   */
+  async marcarVista(sidHash: string, vistaEm: number, ociosaAte: number): Promise<void> {
+    await this.db
+      .prepare('UPDATE painel_sessoes SET vista_em = ?, ociosa_ate = ? WHERE sid_hash = ?')
+      .bind(vistaEm, ociosaAte, sidHash)
+      .run()
+  }
+
   /** Apaga UMA sessao. E o que a decima falha de step-up faz (§10.10). */
   statementDeApagar(sidHash: string): D1PreparedStatement {
     return this.db.prepare('DELETE FROM painel_sessoes WHERE sid_hash = ?').bind(sidHash)
@@ -199,5 +226,36 @@ export class PainelSessoesRepository {
    */
   statementDeApagarTodas(): D1PreparedStatement {
     return this.db.prepare('DELETE FROM painel_sessoes')
+  }
+
+  /**
+   * Apaga as sessoes ABERTAS POR uma credencial (§10.13).
+   *
+   * "Remover uma passkey apaga as sessoes dela" e a metade que faz da remocao
+   * uma revogacao de verdade: sem ela, o aparelho removido continuaria dentro do
+   * painel ate o prazo ocioso de 2 h vencer — e duas horas de acesso depois de
+   * uma revogacao explicita e a diferenca entre "removi" e "vou remover".
+   *
+   * Vai no MESMO lote do `DELETE` da credencial, e `presoAMudanca` e o que
+   * impede o pior desfecho desse lote: a regra da ultima passkey mora DENTRO do
+   * `DELETE` da credencial (§10.13), entao ela pode alterar zero linhas sem o
+   * `db.batch()` rejeitar nada — e sem esta condicao as sessoes daquele aparelho
+   * morreriam mesmo com a remocao recusada. O dono seria deslogado por uma
+   * remocao que nunca aconteceu, na tela que existe para ele nao se trancar
+   * para fora.
+   *
+   * `changes()` vale a contagem do statement IMEDIATAMENTE anterior, entao a
+   * ordem do lote e parte da garantia — ver o comentario da cadeia em
+   * `aparelhos.ts`, que e quem monta este lote.
+   */
+  statementDeApagarDaCredencial(
+    credentialId: string,
+    opcoes: { presoAMudanca?: boolean } = {},
+  ): D1PreparedStatement {
+    const sql = opcoes.presoAMudanca
+      ? 'DELETE FROM painel_sessoes WHERE credential_id = ? AND changes() > 0'
+      : 'DELETE FROM painel_sessoes WHERE credential_id = ?'
+
+    return this.db.prepare(sql).bind(credentialId)
   }
 }

@@ -151,7 +151,7 @@ Ela varre o repositório e avisa se algum segredo escapou para um arquivo versio
 
 **Testes são obrigatórios para qualquer mudança de comportamento.** Correção de texto na documentação não precisa; qualquer coisa que altere o que o Worker faz, precisa.
 
-A suíte hoje tem **125 testes em 6 arquivos**, dentro da pasta `tests/`:
+A suíte hoje tem **822 testes em 25 arquivos**, dentro da pasta `tests/`:
 
 | Arquivo | Cobre |
 |---|---|

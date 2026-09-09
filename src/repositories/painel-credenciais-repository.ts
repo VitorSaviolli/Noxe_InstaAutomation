@@ -277,6 +277,142 @@ export class PainelCredenciaisRepository {
         credencial.criadoEm,
       )
   }
+
+  /**
+   * As linhas que a tela de Aparelhos desenha (§3, §10.13). UMA leitura.
+   *
+   * Traz TODAS, e nao so as do `rp_id` de hoje, pelo mesmo motivo de
+   * `listarTodas`: §10.14 manda a tela listar as credenciais de um endereco
+   * antigo como "endereco antigo" em vez de escondê-las. Uma passkey que o
+   * navegador nao aceita mais continua sendo uma linha no banco do dono, e uma
+   * tela que a omite deixa o dono sem entender por que o teto de dez se aproxima.
+   *
+   * **`chave_publica_jwk` NAO vem, e a ausencia e decisao.** Ela nao tem uso
+   * nenhum na tela, e a coluna mais gorda da tabela viajando para um HTML e
+   * exatamente o tipo de dado que acaba impresso num log de depuracao. O
+   * `credential_id` vem porque a remocao precisa dele no corpo do POST — e a
+   * TELA nunca o escreve inteiro (§10.13), so o prefixo de 8 hex.
+   */
+  async listarParaATela(): Promise<LinhaDeAparelho[]> {
+    const resultado = await this.db
+      .prepare(
+        `SELECT credential_id, rp_id, apelido, origem_registro, backup_eligible, backup_state,
+                criado_em, usado_em
+           FROM painel_credenciais
+          ORDER BY criado_em ASC`,
+      )
+      .all<{
+        credential_id: string
+        rp_id: string
+        apelido: string
+        origem_registro: string
+        backup_eligible: number
+        backup_state: number
+        criado_em: number
+        usado_em: number | null
+      }>()
+
+    if (resultado.success !== true) {
+      throw new Error('D1_ERROR: a leitura dos aparelhos do painel nao reportou sucesso')
+    }
+
+    return (resultado.results ?? []).map((linha) => ({
+      credentialId: linha.credential_id,
+      rpId: linha.rp_id,
+      apelido: linha.apelido,
+      origemRegistro: linha.origem_registro,
+      backupElegivel: linha.backup_eligible === 1,
+      backupAtivo: linha.backup_state === 1,
+      criadoEm: linha.criado_em,
+      usadoEm: linha.usado_em,
+    }))
+  }
+
+  /**
+   * A remocao de UMA credencial, com a regra da ultima DENTRO da instrucao
+   * (§10.13).
+   *
+   * A subconsulta e avaliada dentro do mesmo `DELETE`, e o D1 e SQLite com
+   * escritor unico: nao existe intervalo em que duas remocoes concorrentes leiam
+   * "duas" e apaguem as duas. Conferir a contagem antes, em JavaScript, seria a
+   * corrida classica — duas abas abertas apagariam a ultima passkey e trancariam
+   * o dono para fora do proprio painel, que e o unico estado do qual so um codigo
+   * de recuperacao tira.
+   *
+   * `meta.changes === 0` significa "nao removeu", e quem traduz isso para a
+   * frase "cadastre outro aparelho antes" e a rota — o repositorio nao conhece
+   * frase de tela.
+   *
+   * **A contagem considera so o `rp_id` do parametro** (§10.13, §10.14):
+   * credenciais de um endereco antigo sao inuteis para entrar e podem ser
+   * removidas livremente, inclusive todas. Contar todas as linhas faria uma
+   * credencial morta segurar a remocao de uma viva.
+   *
+   * **O `rp_id` entra na CONTAGEM, e nunca no casamento da linha a apagar.** A
+   * grafia anterior era a de §10.13 ao pe da letra — `AND rp_id = ?` junto com
+   * a subconsulta —, e essa forma so descreve o caso comum: com o `rp_id` de
+   * hoje nos dois lugares, uma credencial de endereco ANTIGO nunca satisfaz o
+   * `WHERE` e o `DELETE` altera zero linhas. A rota traduzia isso para
+   * `409 ultima_passkey` — "Cadastre outra passkey antes de remover esta" — com
+   * passkeys de sobra na tabela, e como os passos seguintes do lote sao presos
+   * a mudanca, nao sobrava nem linha de auditoria nem revogacao das sessoes: a
+   * revogacao sumia sem rastro. A tela, enquanto isso, desenhava o botao e
+   * escrevia "pode ser removido sem medo". O celular perdido no endereco antigo
+   * ficava no banco para sempre — e voltaria a entrar se o painel um dia
+   * voltasse aquele endereco.
+   *
+   * A forma de agora diz a regra inteira em UMA instrucao, que e o que a
+   * atomicidade exige: ou a linha nao e do endereco de hoje — e ai sai livre,
+   * inclusive a ultima delas —, ou ela e, e ai a contagem do endereco de hoje
+   * precisa ser maior que 1. Os dois `?` de `rpId` sao o MESMO valor de
+   * proposito (`env.PANEL_RP_ID`, nunca um `rp_id` vindo da requisicao): quem
+   * apagar a diferenca entre "o endereco de hoje" e "o endereco da linha"
+   * reintroduz o defeito acima.
+   */
+  statementDeRemocao(credentialId: string, rpIdAtual: string): D1PreparedStatement {
+    return this.db
+      .prepare(
+        `DELETE FROM painel_credenciais
+          WHERE credential_id = ?
+            AND ( rp_id <> ?
+                  OR (SELECT COUNT(*) FROM painel_credenciais WHERE rp_id = ?) > 1 )`,
+      )
+      .bind(credentialId, rpIdAtual, rpIdAtual)
+  }
+
+  /**
+   * `POST /setup/painel/zerar` (§7.1, §10.8): apaga TODAS as credenciais.
+   *
+   * Sem `WHERE`: a rota administrativa existe para o caso em que nao ha mais
+   * como entrar, e um filtro por `rp_id` deixaria de fora justamente as
+   * credenciais do endereco antigo, que sao as que sobram quando o painel
+   * mudou de endereco. Ela **nao** toca `account_tokens` — a conexao com o
+   * Instagram nao e acesso ao painel, e derruba-la junto faria uma rota de
+   * recuperacao de acesso desligar a automacao (regressao escrita em §13.2).
+   */
+  statementDeApagarTodas(): D1PreparedStatement {
+    return this.db.prepare('DELETE FROM painel_credenciais')
+  }
+}
+
+/**
+ * Uma linha da tela de Aparelhos.
+ *
+ * `backupElegivel`/`backupAtivo` sao as flags BE/BS lidas no registro (§10.5,
+ * passo 6). Elas existem aqui por um motivo de PRODUTO e nao de protocolo: sao
+ * a diferenca entre "esta salvo na conta do celular, se voce trocar de aparelho
+ * continua entrando" e "existe so neste aparelho, se ele quebrar este acesso se
+ * perde" (§3) — a informacao que mais importa na tela inteira.
+ */
+export interface LinhaDeAparelho {
+  credentialId: string
+  rpId: string
+  apelido: string
+  origemRegistro: string
+  backupElegivel: boolean
+  backupAtivo: boolean
+  criadoEm: number
+  usadoEm: number | null
 }
 
 /**

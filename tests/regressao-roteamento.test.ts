@@ -1,14 +1,18 @@
 import { createExecutionContext, env, waitOnExecutionContext } from 'cloudflare:test'
 import { beforeEach, describe, expect, test } from 'vitest'
 import worker, { processEvents, runScheduledTasks } from '../src/index'
+import { comoPublico, type EstadoDoPainel, type EstadoPublicoDoPainel } from '../src/routes/health'
+import { contaConectada } from '../src/routes/painel/inicio'
 import type { CommentEvent } from '../src/types/meta'
 import { ligarConta, limparBanco } from './fixtures/banco'
 import {
   AGORA,
+  capturarConsole,
   comoApi,
   comoD1,
   configDeTeste,
   D1Contador,
+  MetaComContaParada,
   MetaFalsa,
   MetaQueFalha,
   pedir,
@@ -101,13 +105,155 @@ describe('REG — o roteador antes do painel', () => {
     expect(comBarra.headers.get('location')).toBeNull()
   })
 
-  test('REG-27: /health continua com o mesmo corpo', async () => {
+  /**
+   * As TRES metades de §11.9, e a do meio e a que importa.
+   *
+   * `/health` e publica: nao tem Bearer, nao tem cookie, e qualquer anonimo a
+   * consulta em laco de graca. Por isso o campo `painel` tem duas resolucoes da
+   * MESMA pergunta, e a diferenca e a autorizacao.
+   */
+  const PAINEL_PUBLICOS = ['desativado', 'sem_acesso', 'pronto']
+  const PAINEL_DETALHADOS = [
+    'desativado',
+    'sem_passkey',
+    'sem_codigo_parada',
+    'pronto_arquivo',
+    'pronto_banco',
+    'pronto_parado',
+  ]
+
+  test('REG-27b: sem Bearer, corpo.painel e um dos TRES valores publicos', async () => {
+    const corpo = (await (await responderComEnv(pedir('/health'))).json()) as Record<
+      string,
+      unknown
+    >
+
+    expect(PAINEL_PUBLICOS).toContain(corpo.painel)
+
+    // O banco de teste esta vazio: nao ha credencial para o `rp_id` atual, e o
+    // estado detalhado e `sem_passkey`. O publico tem de mostrar o MESCLADO.
+    expect(corpo.painel).toBe('sem_acesso')
+  })
+
+  test('REG-27c: com Bearer valido, corpo.painel e um dos SEIS valores', async () => {
+    const corpo = (await (
+      await responderComEnv(pedir('/health', { authorization: 'Bearer admin-token-de-teste' }))
+    ).json()) as Record<string, unknown>
+
+    expect(PAINEL_DETALHADOS).toContain(corpo.painel)
+    expect(corpo.painel).toBe('sem_passkey')
+
+    // E nenhum campo novo entrou junto com a autorizacao.
+    expect(Object.keys(corpo).sort()).toEqual(['configurado', 'painel', 'status', 'webhook'])
+  })
+
+  test('REG-27d: `sem_passkey` NUNCA aparece numa resposta sem Bearer', async () => {
+    // O motivo nao e pudor: o convite comum funciona exatamente enquanto nao
+    // existe nenhuma credencial, e some quando a primeira passkey nasce.
+    // Publicar `sem_passkey` a anonimo entrega, por polling de graca, o instante
+    // preciso em que um convite interceptado ainda vale.
+    const semNada = await responderComEnv(pedir('/health'))
+    const comBearerErrado = await responderComEnv(
+      pedir('/health', { authorization: 'Bearer token-errado' }),
+    )
+
+    for (const resposta of [semNada, comBearerErrado]) {
+      const corpo = (await resposta.json()) as Record<string, unknown>
+      expect(corpo.painel).not.toBe('sem_passkey')
+      expect(corpo.painel).not.toBe('sem_codigo_parada')
+      expect(PAINEL_PUBLICOS).toContain(corpo.painel)
+    }
+  })
+
+  test('REG-27f: a fusao de SEIS para TRES de §11.9 esta inteira, valor por valor', () => {
+    // **REG-27d nao prendia isto, e a diferenca importa.** Ele afirmava que o
+    // valor publico esta na lista dos tres e que nao e `sem_passkey` — o que
+    // `pronto` tambem satisfaz. Ou seja: trocar a fusao de `sem_codigo_parada`
+    // de `sem_acesso` para `pronto` passava verde, e essa e justamente a fusao
+    // que §11.9 explica ser a PROTECAO ("junto com `sem_passkey` ele descreve o
+    // grau de desamparo do painel para quem nao tem nada").
+    //
+    // Um mapa exaustivo num `toEqual` unico afirma as duas metades de uma vez: o
+    // destino de cada um dos seis, e que sao exatamente seis. Um valor novo no
+    // enum sem linha aqui quebra — que e o mesmo criterio do dicionario de
+    // `CommentStatus`.
+    const fusao: Record<EstadoDoPainel, EstadoPublicoDoPainel> = {
+      desativado: comoPublico('desativado'),
+      sem_passkey: comoPublico('sem_passkey'),
+      sem_codigo_parada: comoPublico('sem_codigo_parada'),
+      pronto_arquivo: comoPublico('pronto_arquivo'),
+      pronto_banco: comoPublico('pronto_banco'),
+      pronto_parado: comoPublico('pronto_parado'),
+    }
+
+    expect(fusao).toEqual({
+      desativado: 'desativado',
+      // Os DOIS graus de desamparo colapsam no mesmo valor, e e a fusao que
+      // impede o anonimo de saber quando um convite interceptado ainda vale.
+      sem_passkey: 'sem_acesso',
+      sem_codigo_parada: 'sem_acesso',
+      // Os tres `pronto_*` colapsam nao por ameaca, mas porque um enum que muda
+      // de TAMANHO conforme quem pergunta e mais facil de testar do que um que
+      // muda de conteudo.
+      pronto_arquivo: 'pronto',
+      pronto_banco: 'pronto',
+      pronto_parado: 'pronto',
+    })
+  })
+
+  test('REG-27e: `corpo.painel` concorda com o 503 real das telas, nos TRES pisos', async () => {
+    // **O defeito que este teste prende foi meu, e ele mentia exatamente onde
+    // doi.** A primeira versao do campo `painel` reescreveu o predicado de
+    // habilitacao a mao e conferia comprimento ZERO de dois bindings.
+    // `painelHabilitado` (§10.2) — quem de fato decide o `503` de toda rota do
+    // painel — exige TRES pisos. Entre os dois havia uma faixa inteira de
+    // configuracao (uma chave de 31 caracteres, um caractere perdido no
+    // copiar-e-colar) em que toda tela respondia `503 painel_desativado` e esta
+    // rota respondia `pronto`; o assistente, que le daqui, mandava o dono ficar
+    // tranquilo. §11.9 abre dizendo que NAO existe `/painel/diagnostico`: este
+    // campo e o unico diagnostico do subsistema.
+    //
+    // A afirmacao nao e sobre o predicado — e sobre a CONCORDANCIA entre as duas
+    // respostas. Reescrever o degrau por fora de `painelHabilitado` volta a
+    // ficar vermelho aqui, seja qual for a grafia nova.
+    const abaixoDoPiso: ReadonlyArray<{ nome: string; patch: Record<string, unknown> }> = [
+      { nome: 'chave de sessao com 31', patch: { PANEL_SESSION_KEY: 'a'.repeat(31) } },
+      { nome: 'admin token com 19', patch: { SETUP_ADMIN_TOKEN: 'b'.repeat(19) } },
+      { nome: 'rp_id vazio', patch: { PANEL_RP_ID: '' } },
+      { nome: 'chave de sessao ausente', patch: { PANEL_SESSION_KEY: undefined } },
+    ]
+
+    for (const caso of abaixoDoPiso) {
+      const ambiente = { ...env, ...caso.patch } as unknown as typeof env
+
+      const tela = await responder(pedir('/painel'), ambiente)
+      const saude = await responder(pedir('/health'), ambiente)
+      const corpo = (await saude.json()) as Record<string, unknown>
+
+      // A tela nao existe...
+      expect({ [caso.nome]: tela.status }).toEqual({ [caso.nome]: 503 })
+      // ...entao o diagnostico tem de dizer isso, e nao "pronto".
+      expect({ [caso.nome]: corpo.painel }).toEqual({ [caso.nome]: 'desativado' })
+    }
+
+    // Contrapositivo, e ele e obrigatorio: com o ambiente INTEIRO o campo NAO e
+    // `desativado` — senao um degrau que devolvesse sempre `desativado` passaria
+    // neste laco sem provar nada.
+    const inteiro = (await (await responderComEnv(pedir('/health'))).json()) as Record<
+      string,
+      unknown
+    >
+    expect(inteiro.painel).not.toBe('desativado')
+  })
+
+  test('REG-27: /health continua com o mesmo corpo, mais UM campo', async () => {
     const resposta = await responderComEnv(pedir('/health'))
     const corpo = (await resposta.json()) as Record<string, unknown>
 
-    // O conjunto EXATO de campos. A etapa que acrescentar o campo do painel
-    // acrescenta exatamente um, e e aqui que isso fica visivel.
-    expect(Object.keys(corpo).sort()).toEqual(['configurado', 'status', 'webhook'])
+    // O conjunto EXATO de campos. A etapa do painel acrescentou EXATAMENTE um,
+    // `painel`, e ele mora na RAIZ — irmao de `status` e `webhook`, nunca
+    // dentro de `configurado`. E aqui que um campo a mais fica visivel.
+    expect(Object.keys(corpo).sort()).toEqual(['configurado', 'painel', 'status', 'webhook'])
     expect(corpo.status).toBe('ok')
     expect(corpo.webhook).toBe('/webhooks/instagram')
 
@@ -368,5 +514,273 @@ describe('§16.1 — a retentativa do cron tem a mesma escada do caminho inline'
     })
 
     expect((await registro('comment-esgotado'))?.status).toBe('failed')
+  })
+})
+
+describe('a conta parada nao pode queimar a fila do cron', () => {
+  beforeEach(async () => {
+    await limparBanco(env.DB)
+    await ligarConta(env, AGORA)
+  })
+
+  /** Grava um pendente pronto para a varredura. */
+  async function pendente(commentId: string): Promise<void> {
+    await env.DB.prepare(
+      `INSERT INTO processed_comments
+         (comment_id, media_id, commenter_scoped_id_hash, status,
+          attempt_count, next_retry_at, created_at, updated_at)
+       VALUES (?, 'media-1', ?, 'retry_pending', 0, ?, ?, ?)`,
+    )
+      .bind(commentId, `hash-${commentId}`, AGORA, AGORA, AGORA)
+      .run()
+  }
+
+  async function registro(commentId: string) {
+    return env.DB.prepare(
+      'SELECT status, attempt_count FROM processed_comments WHERE comment_id = ?',
+    )
+      .bind(commentId)
+      .first<{ status: string; attempt_count: number }>()
+  }
+
+  test('token invalido deixa o pendente intacto em vez de marcar failed', async () => {
+    await pendente('comment-token-morto')
+
+    await runScheduledTasks(env, AGORA, {
+      createApi: () => comoApi(new MetaComContaParada()),
+      resolveConfig: () => configDeTeste(),
+    })
+
+    // `TOKEN_INVALIDO` nao esta em `isRetryable`, e o ramo `else` marcava
+    // `failed`, que e TERMINAL: o comentario de quem digitou a palavra-gatilho
+    // era apagado do mundo por um problema da CONTA. Parar e reversivel — o
+    // dono reconecta e a varredura seguinte entrega.
+    const linha = await registro('comment-token-morto')
+    expect(linha?.status).toBe('retry_pending')
+    expect(linha?.attempt_count).toBe(0)
+  })
+
+  test('a varredura abandona o resto da fila na primeira falha de conta', async () => {
+    await pendente('comment-a')
+    await pendente('comment-b')
+    await pendente('comment-c')
+
+    const api = new MetaComContaParada()
+    await runScheduledTasks(env, AGORA, {
+      createApi: () => comoApi(api),
+      resolveConfig: () => configDeTeste(),
+    })
+
+    // Um unico Direct tentado, e nao tres: insistir contra uma conta ja
+    // sinalizada e como um aviso vira bloqueio.
+    expect(api.tentativasDeDirect).toBe(1)
+
+    for (const id of ['comment-a', 'comment-b', 'comment-c']) {
+      expect((await registro(id))?.status).toBe('retry_pending')
+    }
+  })
+
+  test('403 na conta tem o mesmo tratamento que o token invalido', async () => {
+    await pendente('comment-proibido')
+
+    await runScheduledTasks(env, AGORA, {
+      createApi: () => comoApi(new MetaComContaParada('PROIBIDO')),
+      resolveConfig: () => configDeTeste(),
+    })
+
+    expect((await registro('comment-proibido'))?.status).toBe('retry_pending')
+  })
+
+  test('uma etapa do cron que estoura nao derruba as seguintes', async () => {
+    await pendente('comment-sobrevivente')
+
+    // `resolveConfig` estourando simula a falha DENTRO de `retryPending`: sem
+    // `executarEtapa`, a rejeicao subia por `runScheduledTasks` e levava junto
+    // a poda da auditoria, sem uma linha de log.
+    await expect(
+      runScheduledTasks(env, AGORA, {
+        createApi: () => comoApi(new MetaFalsa()),
+        resolveConfig: () => {
+          throw new Error('config indisponivel')
+        },
+      }),
+    ).resolves.toBeUndefined()
+
+    expect((await registro('comment-sobrevivente'))?.status).toBe('retry_pending')
+  })
+})
+/**
+ * O token que venceu.
+ *
+ * `expires_at` existia desde a 0001 e era lido por UM lugar so — `shouldRefresh`
+ * —, que responde `false` tanto para "ainda cedo" quanto para "tarde demais". O
+ * resultado e que o prazo vencido nao produzia nem renovacao, nem aviso, nem
+ * tela dizendo a verdade: a linha continuava em `account_tokens`, e todo mundo
+ * que perguntava "tem conta?" perguntava so isso.
+ *
+ * Um token longo do Instagram vale 60 dias. Quem troca a senha, cai num
+ * checkpoint ou passa dois meses sem o cron rodar tem a linha intacta e nada
+ * sendo entregue — e via, nas seis telas do painel, "Conectada. A automacao
+ * consegue falar com o Instagram para enviar".
+ */
+describe('o token vencido nao pode passar por conta conectada', () => {
+  /** Um instante depois dos 60 dias que `ligarConta` grava. */
+  const DEPOIS_DO_PRAZO = AGORA + 61 * 24 * 60 * 60 * 1000
+
+  beforeEach(async () => {
+    await limparBanco(env.DB)
+    await ligarConta(env, AGORA)
+  })
+
+  test('o painel diz "nao conectada" depois de o prazo passar', async () => {
+    // Contrapositivo primeiro: a MESMA linha, perguntada dentro do prazo,
+    // responde conectada. Sem ele o teste passaria com um `SELECT` quebrado.
+    expect(await contaConectada(env.DB, AGORA)).toBe(true)
+
+    expect(await contaConectada(env.DB, DEPOIS_DO_PRAZO)).toBe(false)
+  })
+
+  test('o limite e o instante exato de `expires_at`, e nao um arredondamento', async () => {
+    const linha = await env.DB.prepare('SELECT expires_at FROM account_tokens WHERE id = 1').first<{
+      expires_at: number
+    }>()
+    const vence = linha?.expires_at ?? 0
+    expect(vence).toBeGreaterThan(AGORA)
+
+    // Um milissegundo antes ainda vale; no instante do vencimento, nao vale
+    // mais. `expires_at > ?` e um `>=` disfarcado seriam indistinguiveis em
+    // qualquer teste que nao encoste no limite.
+    expect(await contaConectada(env.DB, vence - 1)).toBe(true)
+    expect(await contaConectada(env.DB, vence)).toBe(false)
+  })
+
+  test('/health nao responde `contaAutorizada` para um token morto', async () => {
+    // **O UNICO teste desta suite ancorado no relogio real, e a excecao tem
+    // motivo.** `/health` entra por `worker.fetch`, que calcula o proprio
+    // `now = Date.now()` — nenhum parametro atravessa a rota. `AGORA` e
+    // novembro de 2023, entao um token gravado com ele ja nasce vencido do
+    // ponto de vista de `//health`, e a versao anterior deste teste falhava
+    // no CONTRAPOSITIVO, nao na garantia. Congelar o relogio com fake timers
+    // resolveria por fora o que a rota decide por dentro, e esconderia
+    // exatamente o acoplamento que interessa aqui.
+    const agoraReal = Date.now()
+    const SESSENTA_E_UM_DIAS = 61 * 24 * 60 * 60 * 1000
+
+    await limparBanco(env.DB)
+    await ligarConta(env, agoraReal)
+
+    const dentro = await (await responderComEnv(pedir('/health'))).json()
+    expect(dentro).toMatchObject({ configurado: { contaAutorizada: true } })
+
+    // A MESMA conta, gravada 61 dias antes: os 60 dias de `ligarConta` ja
+    // passaram, e a linha continua la.
+    await limparBanco(env.DB)
+    await ligarConta(env, agoraReal - SESSENTA_E_UM_DIAS)
+
+    const fora = await (await responderComEnv(pedir('/health'))).json()
+    expect(fora).toMatchObject({ configurado: { contaAutorizada: false } })
+  })
+
+  test('o cron avisa no console em vez de desistir calado', async () => {
+    await limparBanco(env.DB)
+    await ligarConta(env, AGORA - 61 * 24 * 60 * 60 * 1000)
+
+    const console = capturarConsole()
+    try {
+      await runScheduledTasks(env, AGORA, {
+        createApi: () => comoApi(new MetaFalsa()),
+        resolveConfig: () => configDeTeste(),
+      })
+    } finally {
+      console.parar()
+    }
+
+    expect(console.linhas.join(' ')).toContain('token_vencido')
+  })
+
+  test('um token dentro do prazo nao gera o aviso', async () => {
+    // O contrapositivo do teste acima: sem ele, um `console.warn` incondicional
+    // passaria pelos dois.
+    const console = capturarConsole()
+    try {
+      await runScheduledTasks(env, AGORA, {
+        createApi: () => comoApi(new MetaFalsa()),
+        resolveConfig: () => configDeTeste(),
+      })
+    } finally {
+      console.parar()
+    }
+
+    expect(console.linhas.join(' ')).not.toContain('token_vencido')
+  })
+})
+
+/**
+ * O indice da varredura do cron (migration 0006).
+ *
+ * O indice parcial some sem barulho: se o `WHERE` de `findRetryPending` deixar
+ * de implicar o predicado dele — trocar o literal `'retry_pending'` por um `?`
+ * ligado em tempo de execucao basta —, o SQLite volta ao scan de tabela e
+ * NENHUM outro teste muda de cor. O plano de consulta e a unica coisa que
+ * percebe.
+ */
+describe('a varredura do cron continua indo pelo indice', () => {
+  beforeEach(async () => {
+    await limparBanco(env.DB)
+  })
+
+  /** O plano de consulta daquele SQL, numa linha so. */
+  async function plano(sql: string, ...valores: unknown[]): Promise<string> {
+    const { results } = await env.DB.prepare(`EXPLAIN QUERY PLAN ${sql}`)
+      .bind(...valores)
+      .all<{ detail: string }>()
+    return (results ?? []).map((linha) => linha.detail).join(' | ')
+  }
+
+  test('`findRetryPending` usa o indice parcial, e nao varre a tabela', async () => {
+    const detalhe = await plano(
+      `SELECT * FROM processed_comments
+        WHERE status = 'retry_pending' AND next_retry_at IS NOT NULL
+          AND next_retry_at <= ?
+        ORDER BY next_retry_at ASC
+        LIMIT ?`,
+      AGORA,
+      10,
+    )
+
+    expect(detalhe).toContain('idx_comments_retry_pendentes')
+    expect(detalhe).not.toContain('SCAN processed_comments')
+  })
+
+  test('o indice e mesmo PARCIAL, e nao um composto com o nome novo', async () => {
+    // O teste acima casa por NOME, e nome nao e garantia: um
+    // `(status, next_retry_at)` chamado `idx_comments_retry_pendentes` passaria
+    // por ele inteiro e pagaria de volta as tres escritas que a 0006 existe
+    // para nao pagar. O que separa os dois e a clausula `WHERE` na definicao.
+    const linha = await env.DB.prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?",
+    )
+      .bind('idx_comments_retry_pendentes')
+      .first<{ sql: string }>()
+
+    const definicao = (linha?.sql ?? '').replace(/\s+/g, ' ')
+
+    expect(definicao).toContain("WHERE status = 'retry_pending'")
+    // E `status` NAO pode voltar como coluna indexada: dentro do indice ela e
+    // constante, e uma entrada que a repetisse seria maior sem ordenar nada.
+    expect(definicao).toContain('(next_retry_at)')
+  })
+
+  test('o indice antigo saiu, e o cooldown por autor manteve o dele', async () => {
+    const { results } = await env.DB.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'processed_comments'",
+    ).all<{ name: string }>()
+    const nomes = (results ?? []).map((linha) => linha.name)
+
+    // Dois indices ao mesmo tempo nao dariam erro nenhum — so pagariam a
+    // escrita que a 0006 existe para nao pagar.
+    expect(nomes).not.toContain('idx_comments_retry')
+    expect(nomes).toContain('idx_comments_retry_pendentes')
+    expect(nomes).toContain('idx_comments_commenter')
   })
 })

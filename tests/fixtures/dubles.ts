@@ -215,7 +215,7 @@ export class MetaFalsa {
 }
 
 /** Entrega o duble onde o codigo de producao espera um MetaApiClient. */
-export function comoApi(falsa: MetaFalsa | MetaQueFalha): MetaApiClient {
+export function comoApi(falsa: MetaFalsa | MetaQueFalha | MetaComContaParada): MetaApiClient {
   return falsa as unknown as MetaApiClient
 }
 
@@ -238,6 +238,42 @@ export class MetaQueFalha {
         subcode: null,
         message: 'indisponivel',
         shortCode: 'HTTP_500',
+      },
+    }
+  }
+
+  async replyToComment(_comment: string, _message: string) {
+    return { ok: true as const, data: { id: 'reply-1' } }
+  }
+
+  async getMediaInfo(mediaId: string) {
+    return { ok: true as const, data: { id: mediaId, media_product_type: 'REELS' } }
+  }
+}
+
+/**
+ * Duble da Meta cuja CONTA parou: token revogado, 401 ou 403.
+ *
+ * `TOKEN_INVALIDO` nao esta em `isRetryable`, e era exatamente por isso que a
+ * varredura marcava `failed` — terminal — um comentario que nao tinha nada de
+ * errado. Conta o numero de tentativas para o teste provar que a fila e
+ * abandonada na primeira, em vez de martelar uma conta ja sinalizada.
+ */
+export class MetaComContaParada {
+  tentativasDeDirect = 0
+
+  constructor(private readonly shortCode: string = 'TOKEN_INVALIDO') {}
+
+  async sendPrivateReply(_ig: string, _comment: string, _text: string) {
+    this.tentativasDeDirect++
+    return {
+      ok: false as const,
+      error: {
+        status: 401,
+        code: 190,
+        subcode: null,
+        message: 'token invalido',
+        shortCode: this.shortCode,
       },
     }
   }
