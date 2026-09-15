@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="fotoparareadme.png" alt="noxe instaautomation" width="100%">
+</p>
+
 # noxe-insta-automation
 
 [![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
