@@ -1,18 +1,18 @@
 /**
- * `GET, POST /painel/reels` — "Meus Reels", a tela que o dono pediu primeiro.
+ * `GET, POST /painel/reels`, "Meus Reels", a tela que o dono pediu primeiro.
  *
  * Ela cabe numa frase (§3): **em quais Reels a automacao responde**. Duas
- * opcoes — "Em todos os meus Reels" ou "So nos que eu escolher" — e, embaixo, a
+ * opcoes, "Em todos os meus Reels" ou "So nos que eu escolher", e, embaixo, a
  * lista com miniatura, legenda cortada, data e uma caixa de marcar, com a area
  * de toque sendo o **cartao inteiro**.
  *
  * **Tres operacoes, uma rota** (§7.1: nenhuma rota nova, e o identificador de
  * uma escrita vai no corpo do POST):
  *
- *   - `GET`                  — a primeira pagina da listagem
- *   - `POST` sem `acao`      — SALVA: o escopo na linha global e a selecao em
+ *   - `GET`                 , a primeira pagina da listagem
+ *   - `POST` sem `acao`     , SALVA: o escopo na linha global e a selecao em
  *                              `painel_midias`, no MESMO lote (Ruling 91)
- *   - `POST acao=carregar`   — a paginacao, que **so renderiza**: zero escrita,
+ *   - `POST acao=carregar`  , a paginacao, que **so renderiza**: zero escrita,
  *                              `200` com a pagina remontada. Um `303` perderia o
  *                              que a pessoa ja marcou (§7.1, §12.5)
  *
@@ -20,7 +20,7 @@
  * trata campo que nao casa como erro de digitacao ou cliente adulterado.
  *
  * **Custo: os 3 subrequests que §12.10 orca, e o desvio acabou.** A linha de
- * sessao, o lote da configuracao e `account_tokens` — mais as chamadas a Meta
+ * sessao, o lote da configuracao e `account_tokens`, mais as chamadas a Meta
  * **so quando o cache de 10 minutos de §12.5 esta frio**. §12.1 regra 5 e
  * `[C]`-dura: "sem buscar lista a cada render; Atualizar e sempre um botao
  * explicito", e o botao existe desde a rodada 1.
@@ -30,18 +30,18 @@
  *   1. a pergunta sobre a conta saiu da propria listagem. `buscarPagina` ja le
  *      `account_tokens` para carregar o token, e `contaConectada` lia a MESMA
  *      tabela de novo na mesma renderizacao;
- *   2. `painel_midias` INTEIRA — com as inativas, que §12.5 manda esta tela
- *      mostrar — viaja no `db.batch()` da configuracao, e um `batch` vale UM
+ *   2. `painel_midias` INTEIRA, com as inativas, que §12.5 manda esta tela
+ *      mostrar, viaja no `db.batch()` da configuracao, e um `batch` vale UM
  *      subrequest. Ate a rodada 1 ela era uma consulta propria, declarada como
  *      desvio de §12.10; o desvio saiu do TELA-20 junto com a consulta.
  *
  * **O argumento que sustentava o desvio nao se sustentava.** Ele dizia que
  * juntar as leituras "acoplaria a falha do `account_tokens` a listagem, virando
- * `500` onde hoje ha tela degradada". A re-revisao mediu: ja era `500` —
+ * `500` onde hoje ha tela degradada". A re-revisao mediu: ja era `500`,
  * `buscarPagina` sempre chamou `loadAccessToken`, que nao tem `try/catch`. A
  * tela degradada e a de `/painel/atividade`. E juntar `painel_midias` ao lote
  * nao acopla falha nova: e a mesma transacao e o mesmo modo de falha que a
- * configuracao ja tinha, que cai em `parado_por_erro` — melhor do que o `500`
+ * configuracao ja tinha, que cai em `parado_por_erro`, melhor do que o `500`
  * que `lerTodas` produzia.
  *
  * A paginacao usa as MESMAS linhas: ela precisa saber o que ja esta salvo para
@@ -102,7 +102,7 @@ import { telaDoPainel } from './tela'
  * Os campos que ESTA rota grava na linha global (Ruling 70).
  *
  * UM campo, e ele e a razao de a tela existir: `mediaScope`. `allowedMediaIds`
- * NAO esta aqui e nunca vai estar — ele e derivado das linhas ativas de
+ * NAO esta aqui e nunca vai estar, ele e derivado das linhas ativas de
  * `painel_midias` (§9.4), e a selecao entra pela extensao do funil, nao pelo
  * patch de estado.
  */
@@ -127,7 +127,7 @@ const CAMPO_DA_SELECAO = 'mediaIds'
 interface EscolhaDaTela {
   /** Os ids marcados, sem repeticao e em ordem estavel. */
   readonly marcados: readonly string[]
-  /** Os ids que a tela mostrou — o que a pessoa podia desmarcar. */
+  /** Os ids que a tela mostrou, o que a pessoa podia desmarcar. */
   readonly vistos: readonly string[]
   readonly cursor: string | null
   /** `true` quando algum id do corpo nao tem a forma de `media_id`. */
@@ -140,7 +140,7 @@ interface EscolhaDaTela {
  * Le os ids do corpo SEM nunca chamar `Number()` (Ruling 90).
  *
  * `ehMediaIdValido` e a mesma funcao que a leitura do banco usa: `^[0-9]{5,25}$`
- * sobre a STRING. Um id que nao casa e recusado, e nunca corrigido — §9.2
+ * sobre a STRING. Um id que nao casa e recusado, e nunca corrigido, §9.2
  * proibe conserto, e aqui o conserto casaria a configuracao com outro Reel.
  */
 function lerEscolha(campos: URLSearchParams): EscolhaDaTela {
@@ -215,7 +215,7 @@ interface DesenhoDaTela {
  *
  * **Uma funcao para os dois**, e nao duas: §12.5 manda a paginacao
  * "re-renderizar a pagina inteira no servidor", e duas montagens divergiriam na
- * primeira faixa que so uma delas ganhasse — e a que ficasse para tras seria a
+ * primeira faixa que so uma delas ganhasse, e a que ficasse para tras seria a
  * do caminho que a pessoa usa quando tem muitos Reels.
  */
 async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
@@ -224,7 +224,7 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   const salvas = midiasSalvasDo(snapshot)
   const ficha = await fichaDaTela(entrada)
 
-  // A primeira pagina vem do cache de §12.5; a paginacao, nao — "Carregar mais"
+  // A primeira pagina vem do cache de §12.5; a paginacao, nao, "Carregar mais"
   // e um toque explicito, e §12.10 ja orca as chamadas a Meta dele.
   const buscada =
     desenho.cursor === null
@@ -233,7 +233,7 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   const listagem = buscada.listagem
 
   // **A pergunta sobre a conta sai da PROPRIA listagem, e nao de uma segunda
-  // consulta.** `buscarPagina` ja carregou o token — e `sem_conta` e o que ele
+  // consulta.** `buscarPagina` ja carregou o token, e `sem_conta` e o que ele
   // devolve quando nao existe linha em `account_tokens`. Chamar
   // `contaConectada` aqui lia a MESMA tabela duas vezes na mesma renderizacao,
   // e o segundo subrequest saia do orcamento de §12.10 sem responder nada que
@@ -246,7 +246,7 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   const reels = listagem.ok ? listagem.reels : []
   const naListagem = new Set(reels.map((reel) => reel.mediaId))
 
-  // §12.5: o Reel apagado no Instagram NAO some da lista — ele fica cinza, com
+  // §12.5: o Reel apagado no Instagram NAO some da lista, ele fica cinza, com
   // "Este Reel nao existe mais". Sumir em silencio faria a pessoa achar que
   // continua ativo. So vale quando a listagem VEIO: com a Meta muda, ausencia
   // nao e prova de nada.
@@ -255,7 +255,7 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
   // publicacoes e um toque para em quatro paginas (§12.5); com `paging.next`
   // ainda de pe, o Reel que nao apareceu simplesmente nao chegou a ser
   // perguntado. Sem esta condicao, um dono com trinta Reels escolhidos abria a
-  // tela e lia "Este Reel nao existe mais" em vinte deles — uma afirmacao FALSA
+  // tela e lia "Este Reel nao existe mais" em vinte deles, uma afirmacao FALSA
   // sobre o Instagram dele, que e o que §12.1 regra 6 proibe, e o cartao vinha
   // com o botao de tirar da lista ao lado. Era tambem o que mais pesava no
   // orcamento de HTML de §12.9: um `<li>` inteiro por Reel nunca perguntado.
@@ -297,14 +297,14 @@ ${listagem.ok && listagem.proximoCursor !== null ? maisPagina(listagem.proximoCu
  *     o que vale e o banco;
  *   - **`ATUALIZAR`: a UNIAO do que a tela carregou com o que ja esta ativo.**
  *     O formulario daquele botao so reemite o que o banco ainda nao sabe, entao
- *     numa tela recem-aberta ele carrega um array VAZIO — e `[] ?? ativos` e
+ *     numa tela recem-aberta ele carrega um array VAZIO, e `[] ?? ativos` e
  *     `[]`, porque o `??` nao dispara em array vazio. Sem a uniao, tocar
  *     Atualizar desmarcava os Reels salvos e, junto, descartava os campos
  *     escondidos que preservavam os que estao fora da pagina: o Salvar seguinte
  *     gravava `ativo = 0` neles, com `303 ?ok=salvo` e faixa verde;
  *   - `CARREGAR`: exatamente o que a tela carregou, e nada mais. Ali o
  *     formulario reemite a escolha INTEIRA (`escondidosDaEscolha`), entao um
- *     array vazio significa mesmo "a pessoa desmarcou tudo" — e uniao ali
+ *     array vazio significa mesmo "a pessoa desmarcou tudo", e uniao ali
  *     desfaria a desmarcacao dela.
  *
  * **Por que a uniao, e nao emitir a escolha inteira no formulario do
@@ -312,8 +312,8 @@ ${listagem.ok && listagem.proximoCursor !== null ? maisPagina(listagem.proximoCu
  * SENTIDO do botao: desmarcar um Reel salvo e tocar em Atualizar passaria a
  * levar a desmarcacao junto, e o botao deixaria de ser "joga fora o retrato
  * velho, o retrato do banco e o que fica". O custo em bytes nao decide nada
- * aqui — a pagina inteira no teto de 200 Reels sao 39 KB crus e ~2,5 KB
- * comprimidos (MID-27) —, quem decide e o que o botao promete.
+ * aqui, a pagina inteira no teto de 200 Reels sao 39 KB crus e ~2,5 KB
+ * comprimidos (MID-27), quem decide e o que o botao promete.
  */
 function marcadosDesta(desenho: DesenhoDaTela, ativos: readonly string[]): readonly string[] {
   const daTela = desenho.marcadosNaTela
@@ -454,7 +454,7 @@ async function salvarSelecao(
       const metadados = revalidados.get(id)
       // Reel que ja tinha linha: so volta a ficar ativo. Os metadados de tela
       // dele continuam sendo os que a listagem gravou, e sobrescreve-los com o
-      // vazio que `getMediaInfo` devolve apagaria a legenda salva — que e
+      // vazio que `getMediaInfo` devolve apagaria a legenda salva, que e
       // justamente o que a tela mostra quando o Instagram nao responde.
       return metadados === undefined
         ? midias.statementDeReativar(now, snapshot.versao, id)
@@ -491,7 +491,7 @@ function escopoPedido(campos: URLSearchParams | null): 'todas' | 'selecionadas' 
  * recusada: salvar um Reel que nao se conseguiu confirmar e escrever no banco
  * um id que pode nao ser da conta.
  *
- * Um id que a conta nao conhece nao vira `null` — ele simplesmente nao entra no
+ * Um id que a conta nao conhece nao vira `null`, ele simplesmente nao entra no
  * mapa, e quem chama grava a linha sem metadados. **Isso nao afrouxa nada**: a
  * unica forma de um id chegar aqui e por um campo escondido, e o Reel que a
  * pessoa marcou de verdade sempre volta com a resposta da conta dela.

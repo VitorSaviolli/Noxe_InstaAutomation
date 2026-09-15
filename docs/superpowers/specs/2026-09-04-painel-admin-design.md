@@ -1,4 +1,4 @@
-# Painel administrativo do noxe-insta-automation — projeto completo
+# Painel administrativo do noxe-insta-automation: projeto completo
 
 Documento único de projeto. Ele consolida treze documentos de pesquisa e arbitragem e substitui
 todos eles: **nada além deste arquivo precisa ser consultado para implementar**.
@@ -13,18 +13,18 @@ divergências resolvidas está em §15.3.
 
 ---
 
-# PARTE 1 — PARA O DONO
+# PARTE 1: PARA O DONO
 
 ## 1. O problema, e o que muda na prática
 
-Hoje, para mudar qualquer coisa no comportamento da automação — a palavra que aciona, o texto do
-Direct, o link entregue, em quais Reels ela vale — é preciso abrir um arquivo de código
+Hoje, para mudar qualquer coisa no comportamento da automação, a palavra que aciona, o texto do
+Direct, o link entregue, em quais Reels ela vale, é preciso abrir um arquivo de código
 (`src/config.ts`), editar TypeScript à mão e publicar o projeto de novo a partir do computador.
 Duas dessas coisas nem o assistente local (`node scripts/configurar.mjs`) sabe fazer: escolher os
 Reels e criar regras diferentes por Reel só existem editando código na mão.
 
-Depois deste projeto, existe um endereço na internet — servido pelo próprio Worker, no mesmo
-domínio da automação — onde a pessoa entra pelo celular, com a digital ou o Face ID, e muda tudo
+Depois deste projeto, existe um endereço na internet, servido pelo próprio Worker, no mesmo
+domínio da automação: onde a pessoa entra pelo celular, com a digital ou o Face ID, e muda tudo
 isso clicando. Sem senha, sem e-mail, sem redeploy, sem computador.
 
 O que muda, em uma frase por item:
@@ -35,7 +35,7 @@ O que muda, em uma frase por item:
 - **Regras diferentes por Reel.** "Neste Reel aqui o link é outro" vira uma tela, não um bloco de
   TypeScript.
 - **Palavras-gatilho com teste.** A pessoa escreve um comentário de mentirinha e vê, na hora, se
-  aquilo acionaria — usando exatamente a mesma função que o Worker usa de verdade.
+  aquilo acionaria: usando exatamente a mesma função que o Worker usa de verdade.
 - **Prévia da mensagem.** Vê o Direct como a pessoa vai receber, antes de salvar.
 - **Um botão de desligar em toda tela.** E uma página separada, sem login, que só sabe desligar,
   para o dia em que nada mais funcionar.
@@ -69,7 +69,7 @@ pior cenário, e o desenho inteiro gira em torno dele. Três travas respondem:
 
 1. **Trava de conteúdo (allowlist de domínios).** Existe uma lista de domínios permitidos, definida
    no momento de publicar o projeto, dentro do repositório. O painel **não pode** apontar o link
-   para fora dessa lista, e a mesma trava vale para endereços escritos dentro do texto do Direct —
+   para fora dessa lista, e a mesma trava vale para endereços escritos dentro do texto do Direct,
    senão bastaria escrever a URL do golpe na mensagem. Mudar essa lista exige o repositório e a
    credencial de deploy da Cloudflare, que é justamente o que um painel invadido não tem.
 2. **Trava de gesto (re-autenticação por operação).** Trocar o link, o texto do Direct ou a resposta
@@ -81,12 +81,12 @@ pior cenário, e o desenho inteiro gira em torno dele. Três travas respondem:
    **para** em vez de entregar o link errado.
 
 A honestidade que precisa estar escrita: hoje, editar o texto do Direct exige repositório **mais**
-credencial de deploy. O painel encurta esse caminho — passa a exigir a passkey do dono. A allowlist
+credencial de deploy. O painel encurta esse caminho, passa a exigir a passkey do dono. A allowlist
 é a compensação, não um extra opcional. Sem allowlist configurada, o painel **recusa** qualquer
 alteração de link e de texto, e diz isso na tela.
 
 **(iii) "Nada é exposto: o script só fala com o SEU Worker."** Continua verdadeiro. O painel é
-servido pelo próprio Worker, na mesma origem — o que, aliás, é requisito técnico do login por
+servido pelo próprio Worker, na mesma origem, o que, aliás, é requisito técnico do login por
 passkey. Não existe servidor de terceiro no meio, nem antes nem depois.
 
 O manifesto de `configurar.mjs:12-19` precisa ser reescrito para "por que o painel é seguro", e
@@ -99,28 +99,28 @@ essa reescrita é item de entrega (§14, etapa 15).
 | 1 | **A tela é HTML montado pelo Worker**, não uma "casca" estática com JavaScript buscando dados | é o único desenho em que o teste automático consegue provar que nenhum valor do banco chega à tela sem ser neutralizado; e os cabeçalhos de segurança viram código, não configuração |
 | 2 | **O painel entra por último no roteamento** | assim é estruturalmente impossível uma rota nova do painel passar na frente do webhook do Instagram e quebrá-lo em silêncio |
 | 3 | **Três arquivos de migração de banco**, cada um numa etapa de entrega | um arquivo só obrigaria a editar um arquivo já aplicado, que é a operação que o banco não percebe e que quebra só em produção |
-| 4 | **A re-autenticação vale para uma operação, presa ao conteúdo** — não para uma janela de 5 minutos | com janela, um painel invadido faz N mudanças dentro dela; preso ao conteúdo, faz zero |
+| 4 | **A re-autenticação vale para uma operação, presa ao conteúdo**, não para uma janela de 5 minutos | com janela, um painel invadido faz N mudanças dentro dela; preso ao conteúdo, faz zero |
 | 5 | **O Worker gera os códigos de recuperação e de parada**, e os mostra uma única vez | é o que permite guardar os códigos com uma "pimenta" secreta, tornando um vazamento do banco inútil para quem quiser testar códigos |
 | 6 | **O histórico guarda o valor antigo e o novo, no seu próprio banco; o log da Cloudflare nunca guarda valor nenhum** | o histórico de links e textos é a única prova documental de um sequestro de painel; o log sai do controle do dono e por isso não recebe valor algum |
 | 7 | **A parada de emergência responde de forma clara** (três frases possíveis), em vez de responder sempre igual | esconder o resultado não esconderia nada do atacante (a automação para de responder, e isso se vê de fora) e esconderia tudo da pessoa leiga digitando um código de um papel sob estresse |
-| 8 | **Campo inválido para a automação; não existe conserto automático** | consertar é seguro numa direção e perigoso na outra, e não dá para saber qual é qual na hora da leitura — parar é sempre menos permissivo, e nunca entrega um link diferente do que a tela mostra |
+| 8 | **Campo inválido para a automação; não existe conserto automático** | consertar é seguro numa direção e perigoso na outra, e não dá para saber qual é qual na hora da leitura, parar é sempre menos permissivo, e nunca entrega um link diferente do que a tela mostra |
 
 ### 2.3 A decisão do dono sobre a tela "O que aconteceu"
 
 **Decidido: a tela mostra o @ de quem acionou, buscando ao vivo no Instagram, sem armazenar nada de
 novo.** Ao abrir a tela, para cada linha exibida, o painel pergunta ao Instagram quem escreveu
-aquele comentário e mostra o @. Nada disso é gravado — nem no banco, nem em cache, nem em log.
+aquele comentário e mostra o @. Nada disso é gravado, nem no banco, nem em cache, nem em log.
 Fechou a tela, acabou.
 
 Consequências que o dono precisa saber, e que estão detalhadas em §12.6:
 
 - **A lista envelhece para "sem nome" sozinha.** Se o comentário foi apagado, ou o perfil sumiu, ou
-  a pessoa bloqueou a conta, a linha continua aparecendo com "@ indisponível — o comentário foi
+  a pessoa bloqueou a conta, a linha continua aparecendo com "@ indisponível, o comentário foi
   apagado" e o resultado intacto. Nunca some.
 - **Custa cota do Instagram**, a mesma cota que a automação usa para responder. Por isso: 20 linhas
   por página, botão "Atualizar" explícito, e **nenhuma** atualização automática.
 - **A política de privacidade ganha uma frase**, e só. O cabeçalho do código-fonte, que promete que
-  o username **não é armazenado**, continua verdadeiro sem ressalva — porque continua não sendo.
+  o username **não é armazenado**, continua verdadeiro sem ressalva, porque continua não sendo.
 
 Alternativas descartadas, registradas como decisão tomada:
 
@@ -138,7 +138,7 @@ Alternativas descartadas, registradas como decisão tomada:
 São oito telas com login, três sem login, e uma página de emergência. Cada tela cabe numa frase; se
 precisar de duas, ela está fazendo coisa demais.
 
-### Início — "está funcionando?"
+### Início: "está funcionando?"
 
 Um estado grande, em cor, ícone e palavra (nunca só cor): **Ligada e respondendo** (verde),
 **Ligada, mas nada vai ser enviado** (âmbar), **Desligada** (cinza). Abaixo, a lista de pendências,
@@ -152,17 +152,17 @@ segurança e ninguém fica sabendo. A tela é o que torna isso visível.
 
 E um botão vermelho, grande, na primeira dobra: **DESLIGAR TUDO**.
 
-### Meus Reels — a prioridade número um
+### Meus Reels: a prioridade número um
 
 Duas opções: **"Em todos os meus Reels"** (inclusive nos que você publicar depois) ou **"Só nos que
 eu escolher"** (Reels novos ficam de fora até você marcar). Abaixo, a lista com miniatura, legenda
-cortada, data, número de comentários e uma caixa de marcar — e a área de toque é o cartão inteiro,
+cortada, data, número de comentários e uma caixa de marcar, e a área de toque é o cartão inteiro,
 não a caixinha.
 
 Detalhes que importam para não mentir para a pessoa:
 
 - O botão de marcar em lote **não** se chama "Selecionar todos". Chama-se **"Marcar os 12 desta
-  lista"**, com o número do que já está carregado na tela — porque é o único número que a tela pode
+  lista"**, com o número do que já está carregado na tela, porque é o único número que a tela pode
   prometer. Quem quer literalmente todos usa a opção de cima, que é uma regra permanente.
 - "Carregar mais" não promete quantidade, porque quantos Reels saem de uma página do Instagram só se
   sabe depois de filtrar. Quem posta muita foto pode ter três Reels em vinte e cinco publicações.
@@ -170,14 +170,14 @@ Detalhes que importam para não mentir para a pessoa:
   botão "Tirar da lista". Sumir em silêncio faria a pessoa achar que continua ativo.
 - Miniatura quebrada não impede nada: o Instagram assina os endereços de imagem e eles vencem em
   pouco tempo `[C]`. Quando isso acontece, aparece um bloco cinza com as primeiras palavras da
-  legenda, o cartão continua selecionável, e uma faixa explica: *"as miniaturas venceram — é normal,
+  legenda, o cartão continua selecionável, e uma faixa explica: *"as miniaturas venceram, é normal,
   elas duram pouco. Nada da sua configuração foi perdido."*
 
 ### Este Reel responde diferente
 
 A palavra "sobreposição" nunca aparece. Cada linha mostra o que vale hoje e oferece trocar só aquela
 linha: *"● Usar as mesmas de sempre (eu quero, quero o link)"* ou *"○ Usar outras só neste Reel"*.
-O valor herdado fica escrito entre parênteses e muda sozinho se a regra geral mudar — e a tela avisa
+O valor herdado fica escrito entre parênteses e muda sozinho se a regra geral mudar, e a tela avisa
 que é assim. Antes de salvar, um resumo de uma frase: *"Neste Reel muda só o link. Todo o resto
 segue a regra geral."* E um botão **"Voltar tudo a seguir a regra geral"**, que não pede digital,
 porque desfazer é sempre a direção segura.
@@ -187,21 +187,21 @@ porque desfazer é sempre a direção segura.
 Lista de palavras em fichas, campo para adicionar, e a escolha do modo de comparação escrita sem
 jargão:
 
-- **"O comentário tem que ser só isso"** (recomendado) — responde a "eu quero", "Eu Quero!",
+- **"O comentário tem que ser só isso"** (recomendado), responde a "eu quero", "Eu Quero!",
   "eu querô"; não responde a "eu quero muito isso".
-- **"Basta aparecer no meio do comentário"** — responde a tudo acima **e também**, com o rótulo
+- **"Basta aparecer no meio do comentário"**: responde a tudo acima **e também**, com o rótulo
   honesto *"responde também, e talvez você não queira"*: "não é isso que eu quero", "eu quero saber
   o preço".
 
 Os exemplos são gerados com a palavra que a pessoa escolheu, não com exemplos genéricos, e a frase
-sobre acentos e maiúsculas é gerada a partir dos ajustes reais dela — uma explicação que mente é
+sobre acentos e maiúsculas é gerada a partir dos ajustes reais dela, uma explicação que mente é
 pior do que nenhuma.
 
 E uma caixa de teste: escreva um comentário de mentirinha, toque em Testar, e a tela diz
-**"✓ Este comentário aciona (casou com 'eu quero')"** ou **"✕ Este comentário não aciona"** — usando
+**"✓ Este comentário aciona (casou com 'eu quero')"** ou **"✕ Este comentário não aciona"**, usando
 a função de produção, não uma cópia.
 
-### A mensagem e o link — a tela protegida
+### A mensagem e o link: a tela protegida
 
 Texto do Direct, link de destino e resposta pública no comentário. Os três campos levam cadeado e a
 palavra "protegido", e o botão diz o que vai acontecer: **"Salvar (vai pedir a sua digital)"**.
@@ -212,7 +212,7 @@ uma trava do próprio programa, e é proposital: se um dia alguém invadir o seu
 não consegue apontar o seu link para um site de golpe."*
 
 E a prévia, em formato de balão de conversa, mostrando o Direct como a pessoa vai receber e a
-resposta pública como vai aparecer no comentário — renderizada pelo servidor, com a mesma função que
+resposta pública como vai aparecer no comentário, renderizada pelo servidor, com a mesma função que
 envia de verdade. A prévia mostra os efeitos reais da limpeza de texto: se a pessoa colar algo de um
 editor com caracteres invisíveis, ela vê o resultado limpo antes de salvar, não depois de um cliente
 reclamar.
@@ -220,21 +220,21 @@ reclamar.
 ### O que aconteceu
 
 Os três estados grandes, as pendências, e a lista dos últimos comentários **atendidos**: o @ de quem
-comentou, o horário e o resultado traduzido para português — "✓ Direct enviado e comentário
+comentou, o horário e o resultado traduzido para português, "✓ Direct enviado e comentário
 respondido", "⏳ Direct enviado. A resposta no comentário ainda não saiu", "⏳ Não deu na primeira.
 Vamos tentar de novo às 14:35". Vinte linhas por página, botão "Ver mais", botão "Atualizar". Nunca
 sozinho, nunca automático.
 
 E uma frase honesta, impressa na própria tela, porque o contrário seria prometer o que o programa não
-guarda: *"Aqui aparecem os comentários que a automação atendeu. Comentários que ela ignorou — por não
+guarda: *"Aqui aparecem os comentários que a automação atendeu. Comentários que ela ignorou, por não
 serem de um Reel da sua lista, por não terem nenhuma das suas palavras, ou porque a pessoa já tinha
-recebido — não deixam registro, e por isso não aparecem aqui."* A explicação técnica dessa escolha,
+recebido: não deixam registro, e por isso não aparecem aqui."* A explicação técnica dessa escolha,
 com a conta que a sustenta, está em §12.6.
 
 ### Aparelhos e códigos de recuperação
 
 Lista dos aparelhos que conseguem entrar, com apelido, data de cadastro, último uso e o aviso que
-mais importa: **"✓ Está salvo na conta do celular — se você trocar de aparelho, continua entrando"**
+mais importa: **"✓ Está salvo na conta do celular, se você trocar de aparelho, continua entrando"**
 ou **"▲ Existe só neste aparelho. Se ele quebrar ou for formatado, este acesso se perde"**. Botão
 para cadastrar outro aparelho, e a área dos seis códigos de recuperação. Nunca dá para remover o
 último aparelho.
@@ -283,10 +283,10 @@ requisição que o plano gratuito impõe*.
 | **Queimar as leituras do banco** varrendo o painel | Nenhuma rota sem login consulta o banco antes de uma assinatura fechar. As três rotas que recebem código digitado fazem 1 leitura e 0 escrita, e só depois de conferir o formato | Leitura marginal, muito longe do teto diário |
 | **Queimar as 100.000 requisições por dia do Worker** | Superfície mínima; três arquivos estáticos fora da cota; limitadores de tentativa opcionais | **FICA, e é o maior risco residual do projeto.** Ver §5.3 |
 | **Enumerar quais credenciais existem** | O login não devolve lista de credenciais; a lista de exclusão só sai depois de uma autorização válida | **Nenhum** |
-| **Descobrir, de fora, o instante em que o painel ainda não tem dono** — que é a janela em que um convite `pre=0` interceptado funciona | `GET /health` é uma rota **pública** `[C]`, e por isso o campo `painel` só distingue `sem_passkey` de `sem_codigo_parada` sob `Authorization: Bearer`. Sem Bearer, os dois somem no valor mesclado `sem_acesso`, que também cobre o painel já cadastrado (§11.9) | **Fica um resto pequeno:** `sem_acesso` ainda diz "ninguém entrou ainda **ou** falta o código de parada". Não separa os dois, que é o que o atacante precisaria |
+| **Descobrir, de fora, o instante em que o painel ainda não tem dono**, que é a janela em que um convite `pre=0` interceptado funciona | `GET /health` é uma rota **pública** `[C]`, e por isso o campo `painel` só distingue `sem_passkey` de `sem_codigo_parada` sob `Authorization: Bearer`. Sem Bearer, os dois somem no valor mesclado `sem_acesso`, que também cobre o painel já cadastrado (§11.9) | **Fica um resto pequeno:** `sem_acesso` ainda diz "ninguém entrou ainda **ou** falta o código de parada". Não separa os dois, que é o que o atacante precisaria |
 | **Vazamento do banco** (backup, engano) | A sessão é guardada como digest, não como cookie; os códigos são guardados com uma pimenta secreta; a chave pública da passkey não é segredo | **Nada utilizável** sem a chave de sessão, que é secret da Cloudflare |
-| **Análise de tempo de resposta** | Toda comparação de segredo passa por comparação de tempo constante | O comprimento ainda vaza, e todos os códigos têm tamanho fixo — irrelevante aqui |
-| **Máquina do dono comprometida** | — | **Fora do escopo de qualquer desenho.** Quem tem a máquina tem os segredos e o deploy |
+| **Análise de tempo de resposta** | Toda comparação de segredo passa por comparação de tempo constante | O comprimento ainda vaza, e todos os códigos têm tamanho fixo, irrelevante aqui |
+| **Máquina do dono comprometida** |: | **Fora do escopo de qualquer desenho.** Quem tem a máquina tem os segredos e o deploy |
 | **Reapresentar o mesmo desafio de login dentro de 2 minutos** | Desafio de uso efêmero, cookie preso ao navegador, HTTPS, origem conferida | **Fica**, e é assumido: sem gravar nada não existe uso único de verdade. A janela é de 120 segundos |
 | **Aparelho desbloqueado na mão de outra pessoa** | O painel exige verificação do usuário (digital, rosto ou PIN) tanto no login quanto na confirmação de mudanças | **Fica** se a pessoa emprestar o dedo. Nenhuma tecnologia resolve isso |
 
@@ -307,7 +307,7 @@ O que **não está coberto**, dito sem rodeio:
 
 ## 5. Custo e limites do plano gratuito, com a conta feita
 
-### 5.1 Os tetos que existem `[C — documentação oficial da Cloudflare]`
+### 5.1 Os tetos que existem `[C: documentação oficial da Cloudflare]`
 
 | Recurso | Plano gratuito |
 |---|---|
@@ -323,8 +323,8 @@ recebe fatura) e ruim (ao estourar, é queda, não custo).
 
 ### 5.2 A conta do painel
 
-Uma sessão realista do dono — entrar, ver o início, revisar as palavras, listar duas páginas de
-Reels, abrir a tela da mensagem, trocar o link com a digital, conferir a atividade e sair — custa
+Uma sessão realista do dono: entrar, ver o início, revisar as palavras, listar duas páginas de
+Reels, abrir a tela da mensagem, trocar o link com a digital, conferir a atividade e sair, custa
 **cerca de 12 requisições ao Worker**. Vinte sessões num dia movimentado: **240 requisições**, ou
 **0,24%** do teto diário.
 
@@ -338,10 +338,10 @@ Reels, abrir a tela da mensagem, trocar o link com a digital, conferir a ativida
 Em escrita no banco: salvar uma tela custa 2 escritas; a parada de emergência custa 2; um login
 custa 3. O dia a dia do dono são dezenas de escritas, contra 100.000. **O painel não é o problema.**
 
-> **Correção de 2026-09-08 — o cron passou de 15 para 5 minutos.** O bloco acima dizia 96
+> **Correção de 2026-09-08: o cron passou de 15 para 5 minutos.** O bloco acima dizia 96
 > invocações. O intervalo de 15 minutos engolia inteiros os dois primeiros degraus da espera de
 > `computeNextRetry` (1 min, 4 min, 16 min): quem pedia 1 minuto esperava até 15. A conta foi de
-> 96 para 288 invocações por dia — 0,29% do teto, contra 0,10% —, e a conclusão do parágrafo não
+> 96 para 288 invocações por dia: 0,29% do teto, contra 0,10%, e a conclusão do parágrafo não
 > muda. Um tique com a fila vazia sai antes de qualquer escrita.
 
 Do lado da automação, por comentário atendido: 5 consultas ao banco e cerca de 7 linhas escritas
@@ -353,13 +353,13 @@ O gargalo é o teto de **100.000 requisições por dia**, e ele é atingível po
 O que este desenho faz a respeito, em ordem de eficácia:
 
 1. **Nenhuma rota sem login consulta o banco antes de uma assinatura fechar.** Uma varredura custa
-   invocação, mas não custa banco e não custa escrita — então ela não derruba a automação por
+   invocação, mas não custa banco e não custa escrita, então ela não derruba a automação por
    consumo de cota de escrita.
 2. Superfície sem login pequena e **escrita dentro de um teste**: três páginas, cinco rotas de
    cerimônia e a parada.
 3. Limitadores de tentativa opcionais. O painel funciona sem eles, e nada do desenho pode depender
    deles para estar correto.
-4. Três arquivos estáticos fora da cota, inclusive o formulário da parada de emergência — que é a
+4. Três arquivos estáticos fora da cota, inclusive o formulário da parada de emergência, que é a
    última coisa que precisa responder quando tudo o mais está errado.
 
 E o que este desenho **não** faz: não promete imunidade. Isso precisa estar escrito no README, na
@@ -374,7 +374,7 @@ banco chega à tela sem ser neutralizado, o que no desenho antigo era impossíve
 
 ### 5.4 A cota do Instagram
 
-O painel disputa **a mesma** cota de 24 horas que a automação usa para responder — a fórmula
+O painel disputa **a mesma** cota de 24 horas que a automação usa para responder, a fórmula
 oficial é `4800 × impressões` `[C]`. Por isso: listagem de Reels com cache curto e botão "Atualizar"
 explícito, nunca busca automática; e a tela "O que aconteceu" tem teto de 20 consultas por abertura.
 Vinte aberturas num dia são 400 chamadas subtraídas do orçamento de envio. O caminho do webhook
@@ -388,13 +388,13 @@ O painel não substitui o assistente local. Cinco coisas continuam sendo feitas 
 todas por um motivo estrutural, não por preguiça de portar:
 
 1. **Gerar e cadastrar os segredos** (`wrangler secret put`). Nenhuma rota HTTP pode gravar um
-   segredo da Cloudflare — não existe essa API para o próprio Worker. E se existisse, seria a porta
+   segredo da Cloudflare: não existe essa API para o próprio Worker. E se existisse, seria a porta
    que o painel inteiro existe para não abrir.
 2. **A chave que cifra o token do Instagram.** Rotacioná-la inutiliza o token guardado no banco. É
    uma operação que precisa de um humano ciente na frente do terminal.
 3. **Publicar o projeto, aplicar as migrações e definir a allowlist de domínios.** A allowlist é,
    por definição, a trava que o painel não pode alterar. Ela vive no repositório e é sobrescrita a
-   cada publicação — o que normalmente é uma pegadinha e aqui é exatamente **a propriedade que faz a
+   cada publicação: o que normalmente é uma pegadinha e aqui é exatamente **a propriedade que faz a
    trava funcionar**.
 4. **A primeira conexão com o Instagram (OAuth).** Ela acontece antes de existir qualquer passkey;
    não há sessão para autorizar. E o painel **nunca** inicia esse fluxo, nem depois: se ele pudesse,
@@ -409,7 +409,7 @@ estado o painel está e diz em português o que fazer.
 
 ---
 
-# PARTE 2 — REFERÊNCIA DE IMPLEMENTAÇÃO
+# PARTE 2: REFERÊNCIA DE IMPLEMENTAÇÃO
 
 Regra que atravessa toda a Parte 2: **um nome por conceito**. Sinônimo é erro, não estilo.
 
@@ -419,31 +419,31 @@ Regra que atravessa toda a Parte 2: **um nome por conceito**. Sinônimo é erro,
 
 | Caminho | Método | Sessão | CSRF | Step-up | Onde vive |
 |---|---|---|---|---|---|
-| `/painel` | GET | sim | — | — | Worker (Início) |
+| `/painel` | GET | sim |: |, | Worker (Início) |
 | `/painel/chave` | POST | sim | sim | **não** | Worker (`acao=ligar\|desligar`) |
-| `/painel/entrar` | GET | não | — | — | Worker (**0 consulta ao D1**) |
-| `/painel/entrar/codigo` | GET, POST | não | — | — | Worker (entrada por código de recuperação) |
-| `/painel/convite` | GET | não | — | — | Worker (lê o token do fragmento; 0 consulta) |
+| `/painel/entrar` | GET | não |: |, | Worker (**0 consulta ao D1**) |
+| `/painel/entrar/codigo` | GET, POST | não |, |, | Worker (entrada por código de recuperação) |
+| `/painel/convite` | GET | não |: |, | Worker (lê o token do fragmento; 0 consulta) |
 | `/painel/reels` | GET, POST | sim | sim | ao alargar | Worker |
 | `/painel/reel` | GET (`?midia=`), POST | sim | sim | se tocar mensagem/link | Worker |
 | `/painel/palavras` | GET, POST | sim | sim | ao alargar | Worker |
 | `/painel/palavras/testar` | POST | sim | sim | não | Worker (função pura, 0 escrita) |
 | `/painel/mensagem` | GET, POST | sim | sim | **sempre** no POST | Worker |
 | `/painel/mensagem/previa` | POST | sim | sim | não | Worker (`renderTemplate`, 0 escrita) |
-| `/painel/atividade` | GET | sim | — | — | Worker |
+| `/painel/atividade` | GET | sim |: |, | Worker |
 | `/painel/aparelhos` | GET, POST | sim | sim | sim em `remover_passkey` e `gerar_codigos`; **não** em `sair_de_tudo` | Worker |
 | `/painel/ajustes` | GET, POST | sim | sim | ao alargar | Worker |
 | `/painel/sair` | POST | sim | sim | não | Worker |
-| `/painel/api/entrar/opcoes` | POST | não | — | — | Worker, JSON, **0 consulta ao D1** |
-| `/painel/api/entrar/verificar` | POST | não | — | — | Worker, JSON |
-| `/painel/api/registrar/opcoes` | POST | convite \| recuperação \| sessão+step-up | **sim no modo sessão** | — | Worker, JSON |
-| `/painel/api/registrar/verificar` | POST | bilhete de registro | — | — | Worker, JSON |
-| `/painel/api/stepup/opcoes` | POST | sim | sim | — | Worker, JSON |
-| `/painel/parar` | GET | não | — | — | **asset** `public/painel/parar/index.html` |
+| `/painel/api/entrar/opcoes` | POST | não |: |, | Worker, JSON, **0 consulta ao D1** |
+| `/painel/api/entrar/verificar` | POST | não |, |, | Worker, JSON |
+| `/painel/api/registrar/opcoes` | POST | convite \| recuperação \| sessão+step-up | **sim no modo sessão** |, | Worker, JSON |
+| `/painel/api/registrar/verificar` | POST | bilhete de registro |, |, | Worker, JSON |
+| `/painel/api/stepup/opcoes` | POST | sim | sim |, | Worker, JSON |
+| `/painel/parar` | GET | não |: |, | **asset** `public/painel/parar/index.html` |
 | `/painel/parada` | POST | não | não | não | Worker (ação da parada de emergência) |
-| `/painel/painel.css`, `/painel/painel.js` | GET | não | — | — | **assets** |
-| `/setup/painel/codigos` | POST | Bearer admin | — | — | Worker (gera e devolve os códigos uma vez) |
-| `/setup/painel/zerar` | POST | Bearer admin | — | — | Worker (apaga credenciais e sessões) |
+| `/painel/painel.css`, `/painel/painel.js` | GET | não |, |, | **assets** |
+| `/setup/painel/codigos` | POST | Bearer admin |, |, | Worker (gera e devolve os códigos uma vez) |
+| `/setup/painel/zerar` | POST | Bearer admin |, |, | Worker (apaga credenciais e sessões) |
 
 Inalteradas e intocáveis: `/health`, `/privacy-policy`, `/data-deletion`, `/webhooks/instagram`,
 `/setup/authorize`, `/setup/subscribe`, `/oauth/callback` `[C]`.
@@ -452,7 +452,7 @@ Inalteradas e intocáveis: `/health`, `/privacy-policy`, `/data-deletion`, `/web
 para `GET /painel/<tela>?ok=<codigo>`. Um caminho por tela.
 
 **A exceção, escrita porque o metateste a lê:** existe uma segunda forma de POST, o **POST que só
-renderiza** — zero escrita, zero `303`, devolve `200` com a página inteira remontada no servidor. São
+renderiza**: zero escrita, zero `303`, devolve `200` com a página inteira remontada no servidor. São
 exatamente três: a paginação dos Reels em `POST /painel/reels` (§12.5), `POST /painel/palavras/testar`
 e `POST /painel/mensagem/previa`. Elas existem porque o desenho tem de funcionar sem JavaScript, e
 `303` perderia o estado já digitado no formulário. A tabela de rotas de §11.1 carrega o campo
@@ -462,14 +462,14 @@ responde `303`**, e **toda rota com `escreve: false` executa zero escritas no D1
 
 **Regra de identificador.** Nenhum segmento variável de caminho, em nenhuma rota, para sempre.
 Identificador que precisa de URL própria vai na **query string**, com nome em português (`?midia=`);
-identificador de uma **escrita** vai no corpo do POST. `media_id` **não é segredo** — ele aparece no
-`permalink` público do Reel —, então a regra "segredo nunca na query string" (`oauth.ts:26-30`
+identificador de uma **escrita** vai no corpo do POST. `media_id` **não é segredo**, ele aparece no
+`permalink` público do Reel, então a regra "segredo nunca na query string" (`oauth.ts:26-30`
 `[C]`) **não é violada**. Continua proibido na URL, sem exceção: código de parada, código de
 recuperação, token de convite, desafio, assertion, qualquer material de sessão.
 
 **As duas exceções de caminho.** `/painel/parar` (asset, só o formulário) e `/painel/parada`
 (Worker, a ação) são deliberadamente diferentes, para que um POST nunca seja endereçado a um caminho
-de asset. `GET /painel/parada` responde **`303` para `/painel/parar`** — decisão deste documento,
+de asset. `GET /painel/parada` responde **`303` para `/painel/parar`**, decisão deste documento,
 explicada em §11.6.
 
 **Nomes deletados, que não existem em lugar nenhum:** `/painel/api/estado`, `/painel/api/config*`,
@@ -512,7 +512,7 @@ em **toda** rota `/painel/api/*` que corra com sessão (hoje `stepup/opcoes` sem
 
 Índices, e só estes: `idx_painel_credenciais_rp (rp_id)`, `idx_painel_sessoes_cred (credential_id)`,
 `idx_painel_codigos_tipo (tipo, usado_em)`. Nenhum índice em `painel_config`, `painel_midias` nem
-`painel_auditoria` — justificado em §8.4. **Nenhum índice novo em `processed_comments`**, nunca:
+`painel_auditoria`: justificado em §8.4. **Nenhum índice novo em `processed_comments`**, nunca:
 índice encarece **cada** escrita do caminho quente `[C]`.
 
 Prefixo `painel_` obrigatório em toda tabela nova. Nome deletado: `midias_selecionadas`.
@@ -530,7 +530,7 @@ Prefixo `painel_` obrigatório em toda tabela nova. Nome deletado: `midias_selec
 
 **`PANEL_ORIGIN` não existe.** A origem esperada é sempre `'https://' + env.PANEL_RP_ID`, calculada
 num único helper `origemDoPainel(env)`. Motivo: uma variável a menos para o leigo errar, e torna
-**impossível** origem e `rpId` divergirem — a classe de erro que produz credencial irrecuperável,
+**impossível** origem e `rpId` divergirem: a classe de erro que produz credencial irrecuperável,
 porque o `rpId` gravado dentro da credencial não pode ser corrigido depois `[C]`.
 
 **Chave de cada balde**, especificada porque há teste que a afirma: `PANEL_LIMITER_LOGIN` usa
@@ -538,18 +538,18 @@ porque o `rpId` gravado dentro da credencial não pode ser corrigido depois `[C]
 `PANEL_LIMITER_STOP` usa `"parada:" + cf-connecting-ip`. O **prefixo distinto** é o que impede que o
 balde do login e o da parada se misturem mesmo quando dois deles caem no mesmo binding de reserva.
 Requisição **sem** `CF-Connecting-IP` cai num balde global daquele prefixo (`"painel:global"`,
-`"codigo:global"`, `"parada:global"`) e continua limitada — nunca passa livre.
+`"codigo:global"`, `"parada:global"`) e continua limitada, nunca passa livre.
 
 **A troca embutida em `PANEL_LIMITER_CODIGO`, dita como troca:** ela **triplica** a taxa de tentativa
 permitida contra o código de recuperação, de 10/60 s para 30/60 s, e o código de recuperação é o
 caminho para **cadastrar uma passkey nova**. Aceitamos porque o limitador nunca foi a defesa desse
-segredo — a defesa são os 100 bits de §10.11, e o contador da Cloudflare é por data center e
+segredo: a defesa são os 100 bits de §10.11, e o contador da Cloudflare é por data center e
 eventualmente consistente `[C]`, então um atacante distribuído já multiplicava os 10 por trezentos. O
 que o binding próprio compra é real e é outra coisa: um bot martelando o login não consome mais a
 cota de que o dono precisa para digitar o código numa emergência.
 
 São **três** limitadores e não um porque `limit` é fixo por binding e `period` só aceita 10 ou 60
-`[C]` — a chave não consegue expressar limites diferentes. **Ausentes os bindings, o painel funciona
+`[C]`: a chave não consegue expressar limites diferentes. **Ausentes os bindings, o painel funciona
 sem a camada**; nada do desenho pode depender deles para estar correto. Nomes deletados:
 `PANEL_LIMITER`, `LOGIN_LIMITER`, `LIMITE_LOGIN`, `LIMITE_PAINEL`.
 
@@ -574,11 +574,11 @@ exceção declarada: **não** entram nos bindings de teste, de propósito.
 | Ids novos revalidados por gravação | **20** |
 | Itens por página da Meta (`limit`) | **25** |
 | Páginas da Meta por toque em "Carregar mais" | **4**, parando antes com 10 Reels ou sem `paging.next` |
-| Sessão — prazo absoluto | **12 h**, nunca estendido |
-| Sessão — prazo ocioso | **2 h** deslizante |
-| Sessão — gravação de `vista_em` | no máximo 1 a cada **15 min** |
-| Desafio WebAuthn — `entrar` e `stepup` | **120 s** |
-| Desafio WebAuthn — `registrar` | **300 s** (ver §15.3, objeção acolhida) |
+| Sessão: prazo absoluto | **12 h**, nunca estendido |
+| Sessão: prazo ocioso | **2 h** deslizante |
+| Sessão: gravação de `vista_em` | no máximo 1 a cada **15 min** |
+| Desafio WebAuthn: `entrar` e `stepup` | **120 s** |
+| Desafio WebAuthn: `registrar` | **300 s** (ver §15.3, objeção acolhida) |
 | Step-up | **120 s e uma operação** |
 | Convite | **20 min**, uso único |
 | Códigos de recuperação | **6**, 20 caracteres Crockford base32 (**100 bits**) |
@@ -639,7 +639,7 @@ migrations/
   0002_painel_config.sql · 0003_painel_codigos.sql · 0004_painel_acesso.sql · CHECKSUMS.txt
 ```
 
-`link-allowlist.ts` fica em **`src/services/`**, não em `src/security/` — decisão registrada em
+`link-allowlist.ts` fica em **`src/services/`**, não em `src/security/`, decisão registrada em
 §15.3. `escapeHtml` continua exportado de `src/routes/legal.ts:50` `[C]` e é **importado** por
 `html.ts`; não existe segunda cópia, e `legal.ts` não é movido nem editado nesta fase.
 
@@ -681,7 +681,7 @@ ela é a única tabela de auditoria do painel e criar tabela vazia não custa na
 
 ### 8.2 As quatro regras contra o `CREATE TABLE IF NOT EXISTS` silencioso
 
-`CREATE TABLE IF NOT EXISTS` continua sendo usado — é a convenção do projeto (`0001_initial.sql`
+`CREATE TABLE IF NOT EXISTS` continua sendo usado, é a convenção do projeto (`0001_initial.sql`
 `[C]`) e é o que torna a reaplicação segura. O que muda é que ele deixa de ser a única linha de
 defesa, porque sozinho ele transforma "a tabela já existe com outra forma" num no-op silencioso que
 só quebra em produção, com `no such column`.
@@ -701,7 +701,7 @@ só quebra em produção, com `no such column`.
 ### 8.3 Princípio das restrições: `CHECK` = teto absurdo, validador = regra de produto
 
 A rota de parada de emergência precisa gravar `enabled = 0` **mesmo quando a linha de configuração
-ainda não existe** — ela faz um `INSERT ... ON CONFLICT DO UPDATE` que, no ramo `INSERT`,
+ainda não existe**: ela faz um `INSERT ... ON CONFLICT DO UPDATE` que, no ramo `INSERT`,
 materializa a linha a partir do padrão de fábrica. Se um `CHECK` de produto
 (`destination_url LIKE 'https://%'`) estivesse no schema, um fork cujo `src/config.ts` ainda tem
 `'[COLE_SEU_LINK]'` veria a **parada de emergência falhar com erro de constraint**. A última rota
@@ -825,7 +825,7 @@ CREATE TABLE IF NOT EXISTS painel_midias (
   atualizado_em          INTEGER NOT NULL
 );
 -- Sem indice secundario DE PROPOSITO. A unica consulta do caminho quente e
--- "todas as linhas ativas", que varre a tabela inteira — e a tabela tem teto de
+-- "todas as linhas ativas", que varre a tabela inteira, e a tabela tem teto de
 -- 200 linhas. Um indice em `ativo` teria cardinalidade 2 (inutil) e faria cada
 -- gravacao custar o dobro: um write na tabela e um no indice.
 
@@ -861,7 +861,7 @@ CREATE TABLE IF NOT EXISTS painel_auditoria (
 disponíveis no D1. Se não estiverem, remover **só** esses três predicados: o `length(...) <= 2000`
 continua sendo o teto e o validador em TypeScript continua sendo a barreira de verdade.
 
-`WITHOUT ROWID` **não é usado** em nenhuma tabela — fica decidido, e não é pendência.
+`WITHOUT ROWID` **não é usado** em nenhuma tabela, fica decidido, e não é pendência.
 
 ### 8.5 `migrations/0003_painel_codigos.sql`
 
@@ -959,7 +959,7 @@ CREATE TABLE IF NOT EXISTS painel_convites_usados (
 **Não existe tabela `painel_tentativas`**, e isso é a decisão, não um esquecimento. Dois motivos,
 cada um suficiente sozinho: (1) uma linha por tentativa de login daria ao atacante um botão para
 esgotar a cota de escrita e desligar o webhook `[C]`; (2) bloqueio por tentativa em rota não
-autenticada é uma arma apontada para o dono, e não há espaço de senha a exaurir — o segredo do login
+autenticada é uma arma apontada para o dono, e não há espaço de senha a exaurir, o segredo do login
 é uma chave privada dentro de um autenticador. O único contador persistido do painel é
 `painel_sessoes.falhas_stepup`, alcançável só por quem já tem sessão válida.
 
@@ -1014,7 +1014,7 @@ DELETE FROM painel_auditoria WHERE id <= ?;
 ```
 
 Lê no máximo 501 linhas pelo rowid e só escreve quando há o que apagar. Entra em
-`runScheduledTasks`, que já roda a cada 5 minutos `[C]` — assim a poda **nunca** entra no caminho de
+`runScheduledTasks`, que já roda a cada 5 minutos `[C]`, assim a poda **nunca** entra no caminho de
 gravação do painel. É a única poda de `painel_auditoria` no projeto.
 
 No mesmo cron, guardada por uma leitura de `painel_estado.atualizado_em` para rodar no máximo a cada
@@ -1030,7 +1030,7 @@ Sessões expiradas já são rejeitadas na leitura; o delete é higiene de armaze
 ### 8.10 Isolamento nos testes
 
 `limparBanco()` sai de `tests/repositories.test.ts:9` `[C]` e passa a viver em
-`tests/fixtures/banco.ts` — é a **única** edição mecânica autorizada nos seis arquivos de teste
+`tests/fixtures/banco.ts`: é a **única** edição mecânica autorizada nos seis arquivos de teste
 atuais. As **oito** tabelas novas entram nessa função, junto com `processed_comments` e
 `account_tokens`. E `invalidarCacheDeConfig()` é chamada no `beforeEach`: sem isso, um teste que usa
 `AGORA = 1_700_000_000_000` deixa um cache "válido até o futuro" que contamina o teste seguinte.
@@ -1076,7 +1076,7 @@ interface SnapshotConfig {
 | **Linha presente e válida** | config do banco, `origem: 'banco'` | caminho normal |
 | **Linha global com QUALQUER campo inválido** | `{...automationConfig, enabled: false}`, `origem: 'parado_por_erro'`, aviso na tela **nomeando o campo** | um único campo inválido significa que a tela e o webhook podem discordar; entregar um link diferente do que a tela mostra é pior que não entregar nada |
 | **Erro de D1 na leitura** | idem, e o snapshot de falha **é cacheado** com o TTL longo | seguro, e não martela um banco que já está caindo |
-| **Linha de override inválida** | aquela mídia recebe patch `{ enabled: false }`; as outras seguem | descartar a linha **alargaria** — ela podia ser justamente o que estreitava |
+| **Linha de override inválida** | aquela mídia recebe patch `{ enabled: false }`; as outras seguem | descartar a linha **alargaria**, ela podia ser justamente o que estreitava |
 | **Linhas de mídia órfãs** (sem linha de config) | ignoradas, com aviso na tela | misturar global-do-arquivo com override-do-banco alarga |
 
 A propriedade que fica escrita e verificável: **erro nunca alarga, e erro nunca inventa um valor que
@@ -1085,11 +1085,11 @@ o dono não viu na tela.**
 ### 9.3 O parser: `NULL` vira chave ausente
 
 ```ts
-// ERRADO — produz { destinationUrl: undefined } e zera o campo global no spread,
+// ERRADO: produz { destinationUrl: undefined } e zera o campo global no spread,
 // levando isDestinationUrlConfigured a lancar TypeError dentro de processComment.
 const patch = { destinationUrl: row.destination_url ?? undefined }
 
-// CERTO — insercao condicional de chave. A chave so existe se a coluna nao e NULL.
+// CERTO: insercao condicional de chave. A chave so existe se a coluna nao e NULL.
 function patchDaLinha(row: PainelMidiaRecord): Partial<AutomationConfig> {
   const patch: Partial<AutomationConfig> = {}
   if (row.enabled !== null) patch.enabled = row.enabled === 1
@@ -1103,7 +1103,7 @@ function patchDaLinha(row: PainelMidiaRecord): Partial<AutomationConfig> {
 
 Três reforços: ligar `"exactOptionalPropertyTypes": true` no `tsconfig.json` `[V]` (transforma
 `patch.x = undefined` em erro de compilação); teste explícito
-`expect('destinationUrl' in patch).toBe(false)` — não basta `toBeUndefined()`, que passa nos dois
+`expect('destinationUrl' in patch).toBe(false)`, não basta `toBeUndefined()`, que passa nos dois
 casos e é exatamente o teste que deixaria o bug passar; e guarda em desenvolvimento
 `Object.values(patch).every((v) => v !== undefined)`.
 
@@ -1124,7 +1124,7 @@ const overrides: MediaAutomation[] = midiasAtivas.map((m) => ({
 
 Consequência: o invariante `existe override(X) ⟹ isMediaAllowed(X)` passa a valer **sempre**, sem
 nenhuma checagem. Na tela, na documentação, no validador e no log, o alargamento se chama
-`mediaScope: 'todas'` — nunca "`allowedMediaIds` para `*`".
+`mediaScope: 'todas'`, nunca "`allowedMediaIds` para `*`".
 
 ### 9.5 Uma carga por lote, não por comentário
 
@@ -1181,7 +1181,7 @@ export function invalidarCacheDeConfig(): void { cache = null }
   de não conseguir parar.
 - **Desligado, 60 s.** Servir "parado" desatualizado nunca causa dano, e economiza exatamente quando
   o sistema mais precisa. O preço é que religar demora até 1 minuto para valer em todos os isolates
-  — e a tela diz isso.
+  e a tela diz isso.
 - **Congelamento em profundidade obrigatório.** `{...global}` de `resolveConfigForMedia` é cópia
   rasa: os arrays continuam sendo a mesma referência do cache. Sem `Object.freeze` nos arrays, um
   consumidor que fizesse `config.triggerKeywords.push(...)` envenenaria o isolate inteiro. Hoje
@@ -1195,15 +1195,15 @@ export function invalidarCacheDeConfig(): void { cache = null }
   toda gravação é POST → `303` → GET, o caminho é: gravou no lote → `invalidarCacheDeConfig()` →
   redireciona → o GET relê do banco. A pessoa vê o que ficou gravado, não o que ela digitou.
 
-Alternativas recusadas: Cache API (é por colo e não tem invalidação — criaria uma segunda fonte de
+Alternativas recusadas: Cache API (é por colo e não tem invalidação, criaria uma segunda fonte de
 verdade); Workers KV (1.000 escritas/dia no free `[C]` e consistência eventual); Durable Object
 (cota própria e binding a mais, atrito para leigo); ler a `versao` a cada invocação (continua sendo
-uma consulta e um subrequest — não economiza nada).
+uma consulta e um subrequest: não economiza nada).
 
 ### 9.7 Validação: um só validador, dois chamadores
 
 O mesmo módulo puro `src/services/config-validation.ts` roda na **escrita** (rejeita com mensagem
-específica) e na **leitura** (não pode rejeitar — degrada para falha segura). É o que garante que
+específica) e na **leitura** (não pode rejeitar, degrada para falha segura). É o que garante que
 uma linha que entrou por fora do painel (`wrangler d1 execute`, bug de migration futura) seja
 julgada pela mesma régua.
 
@@ -1224,8 +1224,8 @@ Toda gravação de configuração é formulário `application/x-www-form-urlenco
 de dados. A ordem espelha a já usada no webhook (tamanho → assinatura → parse, sobre o corpo cru,
 `webhook.ts:49-69` `[C]`):
 
-0. `painelHabilitado(env)` — sem `PANEL_RP_ID` o painel inteiro responde `503`, antes de tudo.
-1. Teto do corpo — **32 KB** em formulário.
+0. `painelHabilitado(env)`: sem `PANEL_RP_ID` o painel inteiro responde `503`, antes de tudo.
+1. Teto do corpo: **32 KB** em formulário.
 2. `Origin` / `Sec-Fetch-Site` (§7.8).
 3. Sessão válida.
 4. Ficha anti-CSRF do campo escondido `csrf`, comparada em tempo constante.
@@ -1236,7 +1236,7 @@ de dados. A ordem espelha a já usada no webhook (tamanho → assinatura → par
 7. Validação campo a campo.
 8. **Step-up**, quando o diff toca campo que exige. O servidor **recalcula** o `op_hash` a partir do
    corpo recebido e compara com `timingSafeEqual`. Vem depois da validação porque o hash é sobre a
-   mudança canônica, que só existe depois do parse — e isso não é concessão: até aqui nada foi
+   mudança canônica, que só existe depois do parse, e isso não é concessão: até aqui nada foi
    gravado.
 9. Trava otimista por `versao` e gravação em lote com o registro de auditoria.
 10. `303` para `GET /painel/<tela>?ok=<codigo>`.
@@ -1247,31 +1247,31 @@ de dados. A ordem espelha a já usada no webhook (tamanho → assinatura → par
 
 | Campo | Regra na escrita | O que quebra sem ela |
 |---|---|---|
-| `enabled` | booleano estrito | — |
+| `enabled` | booleano estrito |: |
 | `triggerKeywords` | array de string, 1..20 itens, cada um ≤ 40 caracteres. **Comprimento medido no texto NORMALIZADO** com as opções vigentes, não no cru | `"eu!"` normaliza para `"eu"`: medir no cru deixa passar gatilho de 2 letras |
-| — gatilho curto | mínimo **2** normalizados em `exact`; **4** em `contains` | `contains` com gatilho de 2 letras casa quase todo comentário |
-| — gatilho vazio | rejeitar item que normalize para vazio | Hoje ele é **pulado em silêncio** (`normalize.ts:77` `[C]`): a pessoa acha que configurou e nada acontece |
-| — duplicata | rejeitar dois itens que normalizem para o mesmo texto | confusão pura na tela |
-| — lista vazia | permitida só com `enabled = 0` | automação ligada que nunca dispara parece viva |
+| gatilho curto | mínimo **2** normalizados em `exact`; **4** em `contains` | `contains` com gatilho de 2 letras casa quase todo comentário |
+| gatilho vazio | rejeitar item que normalize para vazio | Hoje ele é **pulado em silêncio** (`normalize.ts:77` `[C]`): a pessoa acha que configurou e nada acontece |
+| duplicata | rejeitar dois itens que normalizem para o mesmo texto | confusão pura na tela |
+| lista vazia | permitida só com `enabled = 0` | automação ligada que nunca dispara parece viva |
 | `matchMode` | `'exact' \| 'contains'`; ir para `contains` é **alargar → step-up** | campo que compõe o pior combo |
-| `caseSensitive`, `normalizeAccents`, `ignorePunctuation` | booleano estrito | — |
+| `caseSensitive`, `normalizeAccents`, `ignorePunctuation` | booleano estrito |, |
 | `processOnlyReels` | booleano; `false` é **alargar → step-up** | amplia o raio para qualquer publicação |
 | `mediaScope` | `'todas' \| 'selecionadas'`; ir para `'todas'` é **alargar → step-up** | idem |
 | `publicReplyEnabled` / `privateReplyEnabled` | booleano; **desligar nunca exige step-up** | a direção segura não pode ter atrito |
 | `publicReplyText` | 1..500 caracteres após NFKC + remoção de `\p{Cc}\p{Cf}`; **nenhum placeholder**; **step-up sempre** | o texto público não passa por `renderTemplate`: um `{link}` ali sairia escrito assim mesmo, publicamente |
 | `privateReplyText` | 1..500, mesma limpeza; **só** `{username}` e `{link}`; se `privateReplyEnabled`, exigir `{link}`; pior caso renderizado (link 2048 + username 64) ≤ 1000 `[I, teto defensivo]`; **step-up sempre** | Direct sem link é um Direct quebrado enviado a cada acionamento |
-| — placeholder inválido | rejeitar qualquer `{...}` fora do par conhecido | `renderTemplate` deixa desconhecido intacto de propósito `[C]` — bom em runtime, péssimo como estado salvo |
-| — URL no texto | **toda** sequência com cara de domínio passa pela allowlist (§9.8) | allowlist só no campo do link é contornada escrevendo a URL no texto |
-| `destinationUrl` | `new URL()` obrigatório; **só `https:`**; sem `user:senha@`; sem porta diferente de 443; host minúsculo e em punycode; ≤ 2048; host na allowlist; **step-up sempre** | a regra de escrita é mais estrita que `isDestinationUrlConfigured`, que ainda aceita `http://` `[C]` — a função de leitura fica como está, por compatibilidade, e a escrita é que aperta |
+| placeholder inválido | rejeitar qualquer `{...}` fora do par conhecido | `renderTemplate` deixa desconhecido intacto de propósito `[C]`, bom em runtime, péssimo como estado salvo |
+| URL no texto | **toda** sequência com cara de domínio passa pela allowlist (§9.8) | allowlist só no campo do link é contornada escrevendo a URL no texto |
+| `destinationUrl` | `new URL()` obrigatório; **só `https:`**; sem `user:senha@`; sem porta diferente de 443; host minúsculo e em punycode; ≤ 2048; host na allowlist; **step-up sempre** | a regra de escrita é mais estrita que `isDestinationUrlConfigured`, que ainda aceita `http://` `[C]`, a função de leitura fica como está, por compatibilidade, e a escrita é que aperta |
 | `userCooldownHours` | `Number.isInteger`, 0..8760. Baixar abaixo do valor atual é **alargar → step-up** e confirmação escrita | **cooldown negativo é o caso mais traiçoeiro:** `now - horas*3600000` `[C]` vai para o futuro, a comparação é sempre falsa e o freio **desaparece sem erro nenhum**. `NaN`/`Infinity` viram `.bind(NaN)` e derrubam a consulta dentro de `processComment`, documentada como função que nunca lança |
 | `mediaIds` | `^[0-9]{5,25}$`, nunca `Number()`; **máximo 200 no total**; no máximo **20 ids novos por requisição**; ids novos revalidados contra a conta com `getMediaInfo` | 200 é o bound de carga fria, memória e CPU; 20 é o bound de subrequests |
 
-Os três campos com step-up **sempre** — `destinationUrl`, `privateReplyText` e `publicReplyText` —
+Os três campos com step-up **sempre**: `destinationUrl`, `privateReplyText` e `publicReplyText`,
 vivem na mesma tela, `/painel/mensagem`. Não há caminho de gravação desses três fora dela.
 
 Duas recusas que não são sobre campo isolado: não deixar salvar `mediaScope: 'selecionadas'` com
 lista vazia e `enabled = 1`; e, se a listagem da Meta falhar na montagem da tela, o painel mostra o
-erro e **não deixa salvar a seleção** — salvar a partir de uma lista que não carregou apagaria a
+erro e **não deixa salvar a seleção**: salvar a partir de uma lista que não carregou apagaria a
 seleção existente.
 
 ### 9.8 A allowlist de domínios
@@ -1280,7 +1280,7 @@ Módulo `src/services/link-allowlist.ts`, uma implementação só, usada na escr
 
 Variável **pública** `ALLOWED_LINK_DOMAINS` no bloco `vars` do `wrangler.jsonc`. Não é segredo: não
 tem confidencialidade nenhuma e precisa ser revisável num diff. O bloco `vars` é sobrescrito a cada
-deploy e editá-lo pelo dashboard não adianta `[C]` — o que aqui é **a propriedade que faz a trava
+deploy e editá-lo pelo dashboard não adianta `[C]`, o que aqui é **a propriedade que faz a trava
 funcionar**: o teto do painel está ancorado no repositório mais a credencial de deploy, exatamente
 as duas coisas que um painel invadido não tem.
 
@@ -1302,7 +1302,7 @@ Regra de casamento, deliberadamente burra:
 qualquer alteração de link e de texto** e mostra a tarja *"a lista de domínios permitidos não foi
 configurada no deploy; nenhum link pode ser alterado por aqui"*, e a **entrega continua funcionando**
 com o link que já está valendo. Bloquear a entrega quebraria, na atualização, todo mundo que hoje
-tem um `destinationUrl` no arquivo e nenhuma variável nova — punir o usuário legítimo por uma
+tem um `destinationUrl` no arquivo e nenhuma variável nova, punir o usuário legítimo por uma
 configuração que ele ainda não teve chance de fazer não é falha segura, é falha barulhenta.
 
 Aplicação na escrita, sobre `destinationUrl` **e** `publicReplyText` **e** `privateReplyText`:
@@ -1323,7 +1323,7 @@ cobre: uma escrita feita **fora** do painel; um **encolhimento posterior** da al
 futura do validador com um furo fechado só na escrita. Violação na global → `enabled: false`,
 `origem: 'parado_por_erro'`, aviso nomeando campo e host. Violação numa linha de mídia → patch
 `{ enabled: false }` para aquela mídia. Nunca substituir pelo link de fábrica. O escaneamento roda
-uma vez por preenchimento de cache, não por comentário — irrelevante nos 10 ms de CPU.
+uma vez por preenchimento de cache, não por comentário, irrelevante nos 10 ms de CPU.
 
 ### 9.9 Auditoria: dois destinos, duas regras opostas
 
@@ -1333,8 +1333,8 @@ uma vez por preenchimento de cache, não por comentário — irrelevante nos 10 
 | **`console` / Workers Logs** | método, caminho **sem query string**, status, código de erro em snake_case. **Nenhum valor, nunca** | sai da base do dono, retenção definida pela Cloudflare, fora do controle deste código |
 
 A promessa escrita em `src/index.ts:8-16` `[C]` é sobre **dado de terceiro**: o IGSID só como
-SHA-256, e o texto do comentário e o username não armazenados. A configuração do painel — link,
-texto do Direct, palavras-gatilho — **não é dado de terceiro**: é conteúdo do próprio dono, e já
+SHA-256, e o texto do comentário e o username não armazenados. A configuração do painel, link,
+texto do Direct, palavras-gatilho: **não é dado de terceiro**: é conteúdo do próprio dono, e já
 está armazenado em `painel_config`, na mesma base, em texto claro. Guardar o valor anterior numa
 linha de auditoria **não acrescenta nenhuma classe nova de dado**; acrescenta histórico. A promessa
 pública fica intacta, sem ressalva.
@@ -1342,10 +1342,10 @@ pública fica intacta, sem ressalva.
 **O que entra em `antes`/`depois`:** o estado completo da entidade, restrito aos **campos de
 comportamento**. Para a global, de `enabled` a `user_cooldown_hours`, sem `versao`,
 `parado_por_codigo_em`, `criado_em` e `atualizado_em`. Para uma linha de mídia, `media_id`, `ativo` e
-as colunas de sobreposição — **fica de fora todo o metadado de exibição** (`legenda_curta`,
+as colunas de sobreposição: **fica de fora todo o metadado de exibição** (`legenda_curta`,
 `permalink`, `media_product_type`, `postado_em`, `visto_em`, `indisponivel_desde`). Motivo decisivo:
 `legenda_curta` é um recorte da `caption` do Reel, e `caption` de Reel está na lista de proibidos
-abaixo — **a proibição vence a regra do "estado completo"**. (Isto era uma contradição aparente no
+abaixo: **a proibição vence a regra do "estado completo"**. (Isto era uma contradição aparente no
 material de origem e fica resolvida aqui.)
 
 **Proibido nos dois destinos, sem exceção:** segredo de qualquer espécie (cookie, HMAC, desafio,
@@ -1365,11 +1365,11 @@ Demais regras:
 - Valores de `acao`: `config_alterada`, `midia_alterada`, `mudanca_recusada`, `login`,
   `sessao_encerrada`, `passkey_registrada`, `passkey_removida`, `stepup_recusado`, `codigos_gerados`,
   `recuperacao_usada`, `parada_acionada`, `acesso_zerado`.
-- Fracasso de requisição **não autenticada** não gera linha nenhuma no D1 — vai só para
+- Fracasso de requisição **não autenticada** não gera linha nenhuma no D1, vai só para
   `console.warn`. Gravar tentativa de estranho seria escrita provocada por estranho.
 - **Restaurar passa pelo mesmo funil**: reenviar o `antes` pela rota normal de gravação, com o mesmo
   validador, o mesmo step-up e a **allowlist de hoje**. Se a allowlist encolheu, a restauração é
-  recusada — e isso está certo.
+  recusada: e isso está certo.
 
 ### 9.10 Contabilidade de escrita
 
@@ -1444,7 +1444,7 @@ sobrevive ao rollback.
 | Armadilha | Tratamento | Onde |
 |---|---|---|
 | `MediaAutomation` omite `allowedMediaIds`; override para Reel fora da lista global nunca dispara | `allowedMediaIds` deixa de ser gravável; a lista é **derivada** das mesmas linhas que geram override | schema + loader |
-| `.find()` — dois cartões citando o mesmo Reel, o primeiro vence em silêncio | `media_id` é PRIMARY KEY; duas entradas para o mesmo Reel deixam de ser representáveis | schema |
+| `.find()`: dois cartões citando o mesmo Reel, o primeiro vence em silêncio | `media_id` é PRIMARY KEY; duas entradas para o mesmo Reel deixam de ser representáveis | schema |
 | `{...global, ...patch}` com `undefined` explícito zera o campo global | `NULL` → **chave ausente**, via `if (row.x !== null)`; reforçado por `exactOptionalPropertyTypes` e por teste com `'campo' in patch` | parser + tsconfig + teste |
 | **Nova:** `enabled: true` num override **derrota a parada de emergência** | `CHECK (enabled IS NULL OR enabled = 0)` | schema |
 | Assinatura síncrona vs D1 assíncrono, com chamada dentro do `for` | funções continuam puras e síncronas; snapshot carregado uma vez por lote | `config-store.ts` + `index.ts` |
@@ -1488,7 +1488,7 @@ proposito ∈ { "entrar", "registrar", "stepup" }
 O convite deriva do `SETUP_ADMIN_TOKEN` porque ele é emitido **offline**, na máquina do dono, pelo
 assistente, que já lê esse token do `.dev.vars` `[C]`. A separação por rótulo garante que um convite
 vazado **não** vira cookie de sessão nem desafio válido, e que rotacionar o `SETUP_ADMIN_TOKEN`
-invalida convites **sem** derrubar as sessões — que era o problema de hoje, em que o
+invalida convites **sem** derrubar as sessões, que era o problema de hoje, em que o
 `SETUP_ADMIN_TOKEN` é simultaneamente token de acesso e chave HMAC do `state` do OAuth `[C]`.
 
 **Consequência a documentar em letra grande:** rotacionar `PANEL_SESSION_KEY` derruba todas as
@@ -1496,7 +1496,7 @@ sessões **e invalida os códigos de recuperação e de parada** (a pimenta muda
 coluna `versao_hash`, e por isso o assistente, ao rotacionar essa chave, tem de oferecer a
 regeneração dos códigos no mesmo passo, em letras grandes. As passkeys **não** são afetadas.
 
-### 10.2 Portão de sanidade — o furo mais fácil de deixar aberto
+### 10.2 Portão de sanidade: o furo mais fácil de deixar aberto
 
 Se o segredo **não foi cadastrado**, em Workers ele chega como `undefined`, e um HMAC com chave
 vazia é perfeitamente computável **por qualquer pessoa que leu o código**.
@@ -1541,7 +1541,7 @@ assinatura em tempo constante → prazo. Nunca o contrário. A mensagem ao clien
 `src/security/base64url.ts` passa a exportar encode **e** decode; `decodeBase64Url` devolve
 `Uint8Array | null` e **nunca lança**.
 
-### 10.4 Registro de passkey: as três — e apenas três — autorizações
+### 10.4 Registro de passkey: as três: e apenas três, autorizações
 
 ```ts
 type AutorizacaoRegistro =
@@ -1551,7 +1551,7 @@ type AutorizacaoRegistro =
 ```
 
 Não existe uma quarta. Em particular, **não existe** o ramo `if (credenciais.length === 0) permitir`
-— o "trust on first use" que é exatamente o takeover de primeiro acesso.
+o "trust on first use" que é exatamente o takeover de primeiro acesso.
 
 **O convite**, emitido pelo assistente sem rede e sem rota:
 
@@ -1563,18 +1563,18 @@ pre     = "0"  -> so vale enquanto NAO existir nenhuma credencial (primeira inst
 ```
 
 O assistente imprime `https://<host>/painel/convite#c=<convite>`. **Fragmento**, não query string: o
-fragmento não é enviado ao servidor, não entra em log de proxy nem em `Referer` — a mesma regra que
+fragmento não é enviado ao servidor, não entra em log de proxy nem em `Referer`, a mesma regra que
 `oauth.ts:26-30` já aplica `[C]`. TTL de 20 minutos: tempo de sair do terminal e pegar o celular,
 curto o bastante para que um convite esquecido num print esteja morto. `pre=0` é defesa em
 profundidade barata: o convite comum, que pode acabar num print de tutorial, deixa de funcionar no
 instante em que a primeira passkey existe.
 
-Uso único: o `nonce` vai para `painel_convites_usados` com `ON CONFLICT DO NOTHING` — o mesmo padrão
-de claim atômico do `claimComment` `[C]` — e o resultado é lido por `meta.changes` `[C]`. Duas
+Uso único: o `nonce` vai para `painel_convites_usados` com `ON CONFLICT DO NOTHING`, o mesmo padrão
+de claim atômico do `claimComment` `[C]`: e o resultado é lido por `meta.changes` `[C]`. Duas
 requisições concorrentes com o mesmo convite não podem ambas ver `changes === 1`, porque o D1 é
-SQLite com escritor único `[I, forte — vale um teste de concorrência]`.
+SQLite com escritor único `[I, forte: vale um teste de concorrência]`.
 
-**`POST /painel/api/registrar/opcoes`** — corpo `{ tipo, ... }`:
+**`POST /painel/api/registrar/opcoes`**: corpo `{ tipo... }`:
 
 1. Escada de verificação (§11.3). No modo `sessao`, exige sessão + **ficha CSRF** + assertion de
    step-up cuja mudança canônica é `{ acao: "adicionar_passkey" }`.
@@ -1583,7 +1583,7 @@ SQLite com escritor único `[I, forte — vale um teste de concorrência]`.
    lista de `excludeCredentials`, isto é, os `credential_id` já registrados: devolver isso a um
    estranho é enumeração gratuita `[C]`.
 4. Nesse ponto **nada foi consumido**: o convite não foi marcado, o código não foi queimado. Se a
-   pessoa cancelar a biometria — o fracasso mais comum — ela tenta de novo com o mesmo convite.
+   pessoa cancelar a biometria: o fracasso mais comum, ela tenta de novo com o mesmo convite.
 5. Lê ou cria `painel_estado.usuario_handle` (32 bytes aleatórios, base64url). Estável para sempre:
    se mudasse, cada registro criaria uma conta separada no gerenciador de senhas do celular.
 6. Sorteia `desafio = base64url(random(32))` e monta o **bilhete de registro**, no mesmo cookie
@@ -1610,10 +1610,10 @@ elimina ~90% do trabalho de verificação e a cadeia X.509 que ameaçaria os 10 
 `residentKey: "required"` porque, com dono único, não há campo de usuário para enumerar `[C]`.
 Ed25519 (-8) fica de fora por decisão: cobertura mínima e incompatibilidades conhecidas `[C]`.
 
-### 10.5 `POST /painel/api/registrar/verificar` — verificação da attestation
+### 10.5 `POST /painel/api/registrar/verificar`: verificação da attestation
 
 Verificações obrigatórias, em ordem, cada uma com falha genérica ao cliente (`credencial_invalida`)
-e detalhe só em `console.warn` — o padrão de `oauth.ts` `[C]`:
+e detalhe só em `console.warn`: o padrão de `oauth.ts` `[C]`:
 
 1. Escada de §11.3 (corpo ≤ 8 KB, `content-type: application/json`, origem).
 2. Cookie `__Host-painel_desafio` presente, envelope válido, propósito **`registrar`**, no prazo.
@@ -1625,7 +1625,7 @@ e detalhe só em `console.warn` — o padrão de `oauth.ts` `[C]`:
    `crossOrigin !== true`.
 5. `attestationObject` em CBOR: `fmt === "none"` e `attStmt` mapa vazio. Qualquer outra coisa é
    anomalia e é **recusada**, não "aceita e ignorada".
-6. `authData` (binário cru): bytes 0–31 `rpIdHash === SHA-256(PANEL_RP_ID)`, comparado byte a byte —
+6. `authData` (binário cru): bytes 0–31 `rpIdHash === SHA-256(PANEL_RP_ID)`, comparado byte a byte,
    é o passo mais pulado de todos `[C]`; byte 32 flags, com `UP` (bit 0), `UV` (bit 2) e `AT` (bit 6)
    **obrigatórios**, e `BE` (bit 3) e `BS` (bit 4) lidos para a tela; bytes 33–36 `signCount`
    big-endian; depois `aaguid` (16 B), `credentialIdLength` (2 B, teto de 1023), `credentialId` e a
@@ -1639,15 +1639,15 @@ e detalhe só em `console.warn` — o padrão de `oauth.ts` `[C]`:
 10. `apelido` saneado, 1–40 caracteres, sem caracteres de controle. Ele **não** é escapado na
     gravação; é escapado na renderização, automaticamente.
 
-**Parser CBOR — requisitos de segurança** (`src/services/webauthn/cbor.ts`): subconjunto mínimo
+**Parser CBOR: requisitos de segurança** (`src/services/webauthn/cbor.ts`): subconjunto mínimo
 (inteiros, byte strings, text strings, arrays, mapas); **recusar** comprimento indefinido;
 profundidade máxima 4; byte string máxima 2 KB; e exigir que o parser **consuma exatamente** os
 bytes esperados, sem sobra. Nunca lança: devolve união discriminada, no formato que `webhook.ts` já
-usa `[C]`. **O parser CBOR só roda no registro**, nunca no login — o que mantém o caminho quente
+usa `[C]`. **O parser CBOR só roda no registro**, nunca no login, o que mantém o caminho quente
 longe dos 10 ms de CPU.
 
 **Ordem de gravação, e o preço dela.** Consumir a autorização **antes** de inserir a credencial. Se
-a inserção falhar, o convite ou o código foi queimado por nada, e a pessoa precisa de outro —
+a inserção falhar, o convite ou o código foi queimado por nada, e a pessoa precisa de outro,
 aceito de propósito. A ordem inversa abre uma corrida em que duas requisições com o mesmo convite
 inserem duas credenciais, e uma delas pode ser do atacante. Perder um convite é aborrecimento;
 ganhar uma credencial indevida é o fim do jogo.
@@ -1671,7 +1671,7 @@ Agora entre com ele."* Três razões: (a) a sessão nasce **sempre** de uma asse
 (`webauthn.get`) com UV conferido, num ponto único do código, o que torna a garantia testável;
 (b) a rotação obrigatória de identificador no login fecha fixação de sessão; (c) é o que faz o
 código de recuperação nunca virar sessão, nem direta nem indiretamente (§15.3, divergência 1). O
-custo é um gesto de biometria a mais, logo depois de outro — aceito, e a tela explica.
+custo é um gesto de biometria a mais, logo depois de outro, aceito, e a tela explica.
 
 ### 10.6 Prova de que não existe janela em que um estranho se registre
 
@@ -1679,24 +1679,24 @@ custo é um gesto de biometria a mais, logo depois de outro — aceito, e a tela
 se o requisitante possuir: (S1) o `SETUP_ADMIN_TOKEN`; ou (S2) a chave privada de uma passkey já
 registrada; ou (S3) um código de recuperação não usado.
 
-- *Lema 1 — caminho único.* `INSERT INTO painel_credenciais` aparece em exatamente um lugar do
+- *Lema 1: caminho único.* `INSERT INTO painel_credenciais` aparece em exatamente um lugar do
   código, chamado de exatamente um lugar. **Verificado por teste** que faz grep em `src/` e falha se
   a string aparecer em mais de um arquivo. Sem esse teste, o lema envelhece mal.
-- *Lema 2 — nenhum registro sem bilhete.* `401` antes de qualquer parse se o cookie faltar, tiver
+- *Lema 2: nenhum registro sem bilhete.* `401` antes de qualquer parse se o cookie faltar, tiver
   MAC inválido, propósito diferente de `registrar` ou prazo vencido.
-- *Lema 3 — o bilhete não é forjável.* MAC sob `k_env("registrar")`, derivada de
+- *Lema 3: o bilhete não é forjável.* MAC sob `k_env("registrar")`, derivada de
   `PANEL_SESSION_KEY`, que é secret da Cloudflare e cuja ausência desliga o painel inteiro (§10.2).
-- *Lema 4 — o bilhete só é emitido com uma das três autorizações*, e a função tem exatamente três
+- *Lema 4: o bilhete só é emitido com uma das três autorizações*, e a função tem exatamente três
   ramos.
-- *Lema 5 — cada ramo exige um segredo:* convite (MAC de 256 bits sob chave derivada do admin
+- *Lema 5: cada ramo exige um segredo:* convite (MAC de 256 bits sob chave derivada do admin
   token), recuperação (100 bits), sessão (chave privada em hardware **mais** biometria).
-- *Lema 6 — não existe ramo TOFU.*
+- *Lema 6: não existe ramo TOFU.*
 
 **Teorema.** Um requisitante sem S1, S2 e S3 não consegue inserir credencial em nenhum instante. Em
 particular, no intervalo entre o deploy e a primeira passkey, as três autorizações já dependem de
 segredos que **existem antes do deploy**. O conjunto de instantes em que o registro está aberto é
 **vazio**, não apenas curto. **Corolário:** se o dono nunca rodar o assistente, o painel fica
-inerte, não aberto — a direção certa.
+inerte, não aberto: a direção certa.
 
 O teorema **não** cobre: vazamento do `SETUP_ADMIN_TOKEN` (rotacionável; a varredura de segredos já
 procura por isso `[C]`); interceptação do convite antes do primeiro uso (TTL de 20 min, uso único,
@@ -1708,7 +1708,7 @@ sessão viva (limitado pelo escape automático e pelo step-up preso ao conteúdo
 **`POST /painel/api/entrar/opcoes`** é a rota não autenticada mais exposta do painel, e custa **zero
 consulta ao D1**: sorteia 32 bytes e assina um envelope de propósito `entrar`, `Max-Age=120`.
 Resposta: `{ challenge, rpId, allowCredentials: [], userVerification: "required", timeout: 120000 }`.
-`allowCredentials` vazio porque as credenciais são descobríveis — e porque devolver a lista de
+`allowCredentials` vazio porque as credenciais são descobríveis, e porque devolver a lista de
 `credential_id` a quem ainda não provou nada é enumeração `[C]`.
 
 **`POST /painel/api/entrar/verificar`**, na ordem:
@@ -1717,15 +1717,15 @@ Resposta: `{ challenge, rpId, allowCredentials: [], userVerification: "required"
 2. Cookie de desafio: MAC válido em tempo constante, propósito `entrar`, dentro dos 120 s.
    **Só depois disto o D1 é tocado.**
 3. `type === "public-key"`; `id` é base64url plausível.
-4. `SELECT` da credencial por `credential_id` — 1 leitura. Não encontrada **ou**
+4. `SELECT` da credencial por `credential_id`: 1 leitura. Não encontrada **ou**
    `rp_id !== PANEL_RP_ID`: falha genérica. Credencial de endereço antigo é **ignorada**, não é erro
-   especial — é o que faz a troca de domínio não virar mensagem incompreensível `[C]`.
+   especial: é o que faz a troca de domínio não virar mensagem incompreensível `[C]`.
 5. `userHandle` presente e igual a `painel_estado.usuario_handle`.
 6. `clientDataJSON`: `type === "webauthn.get"` literal; `challenge` igual ao do cookie com
    `timingSafeEqual`; `origin === origemDoPainel(env)` exato; `crossOrigin !== true`.
 7. `authenticatorData`: `rpIdHash` confere; `UP = 1` e **`UV = 1` obrigatório**; lê `signCount`,
    `BE`, `BS`.
-8. **O que é assinado**: `authenticatorData || SHA-256(clientDataJSON)` — os bytes crus
+8. **O que é assinado**: `authenticatorData || SHA-256(clientDataJSON)`, os bytes crus
    concatenados, **não** o JSON `[C]`. Errar isso é o bug que faz tudo retornar `false`.
 9. **ES256: converter a assinatura de DER para bruto.** É a armadilha número um do projeto `[C]`: o
    autenticador devolve `SEQUENCE { INTEGER r, INTEGER s }` e o WebCrypto exige `r||s` em 64 bytes.
@@ -1748,13 +1748,13 @@ derParaBruto(der: Uint8Array): Uint8Array | null
 10. `importKey('jwk', ...)` + `verify` (`ECDSA/SHA-256` ou `RSASSA-PKCS1-v1_5`). Ambos suportados no
     runtime da Cloudflare `[C]`.
 11. `signCount`: se `novo > 0 && antigo > 0 && novo <= antigo`, apenas `console.warn` **sem o
-    `credential_id` inteiro**. **Nunca recusar** — passkeys sincronizadas por iCloud Keychain e
+    `credential_id` inteiro**. **Nunca recusar**: passkeys sincronizadas por iCloud Keychain e
     Google Password Manager devolvem 0 sempre `[C]`, e recusar trancaria o dono legítimo para fora,
     invertendo a falha segura.
-12. Cria a sessão e atualiza a credencial (`sign_count`, `backup_state`, `usado_em`) — 2 escritas,
-    ambas depois de uma assinatura válida. Auditoria `acao = 'login'` — 1 escrita.
+12. Cria a sessão e atualiza a credencial (`sign_count`, `backup_state`, `usado_em`), 2 escritas,
+    ambas depois de uma assinatura válida. Auditoria `acao = 'login'`, 1 escrita.
 13. Resposta `{ ok: true, para: "/painel" }`; o `painel.js` navega. É a única navegação que o
-    JavaScript faz — não há roteador.
+    JavaScript faz: não há roteador.
 
 **Custo do fracasso: 1 verificação de MAC, 1 leitura e ZERO escritas.** É o número que sustenta a
 regra de não gravar por tentativa: o teto passa a ser a cota de requisições do Worker, e a automação
@@ -1776,13 +1776,13 @@ hmac  = HMAC-SHA256( k_sessao, "s1|" + sid_b64 + "|" + expira_em )
 linha sozinha faria cada cookie de lixo custar uma consulta. Juntos: o **HMAC é o filtro grátis**
 (bot mandando cookies aleatórios é rejeitado com zero consultas) e a **linha é a autoridade**
 (logout de verdade, "desconectar este aparelho", morte em cascata quando a passkey é removida).
-Guardamos `sha256(sid)`, não o `sid`: um dump do D1 não entrega cookie utilizável — o mesmo
+Guardamos `sha256(sid)`, não o `sid`: um dump do D1 não entrega cookie utilizável, o mesmo
 raciocínio que já levou o projeto a guardar `commenter_scoped_id_hash` em vez do IGSID `[C]`.
 
 O prefixo `__Host-` importa de verdade aqui: `workers.dev` está na lista de sufixos públicos `[C]`,
 então `<conta>.workers.dev` é domínio registrável e **qualquer outro Worker seu na mesma conta**
 poderia, sem o prefixo, gravar um cookie de domínio pai e sombrear a sessão do painel. O preço é
-`Path=/`, que faz o cookie acompanhar também `/webhooks/instagram` — inofensivo e verificável: o
+`Path=/`, que faz o cookie acompanhar também `/webhooks/instagram`, inofensivo e verificável: o
 handler do webhook não lê cookie e não pode passar a ler, e a assinatura do webhook é calculada
 sobre o corpo cru, jamais sobre o cabeçalho `Cookie` `[C]`.
 
@@ -1792,7 +1792,7 @@ sobre o corpo cru, jamais sobre o cabeçalho `Cookie` `[C]`.
 | ocioso (`ociosa_ate`) | **2 h** deslizante | celular esquecido na mesa expira sozinho |
 | gravação de `vista_em` | no máximo 1 a cada **15 min** | uso intenso não vira uma escrita por requisição |
 
-**Rotação** em exatamente dois momentos: login bem-sucedido (sempre linha nova — fecha fixação de
+**Rotação** em exatamente dois momentos: login bem-sucedido (sempre linha nova, fecha fixação de
 sessão) e step-up bem-sucedido (a sessão muda de "conseguiu ler" para "acabou de autorizar"). **Não**
 rotaciona a cada requisição: custaria uma escrita por requisição e criaria a corrida clássica de
 rede móvel (resposta perdida, cookie novo nunca chega, dono deslogado). Como a rotação do step-up
@@ -1800,7 +1800,7 @@ acontece na mesma requisição que grava e devolve `303`, o cookie novo chega ju
 
 **Consequência honesta do `SameSite=Strict`:** ao abrir o painel por um link vindo de fora
 (WhatsApp, um atalho de outro app), a **primeira** navegação é cross-site e o navegador **não** manda
-o cookie — o dono cai em `GET /painel/entrar` mesmo tendo sessão viva. Por isso essa página traz,
+o cookie: o dono cai em `GET /painel/entrar` mesmo tendo sessão viva. Por isso essa página traz,
 além do botão de passkey, um link **"Continuar"** apontando para `/painel`: clicá-lo é navegação
 same-site, o cookie vai junto e a sessão aparece. Custa **0 consulta**. Navegação por favorito ou
 atalho na tela inicial não tem origem iniciadora e **carrega o cookie normalmente** `[I]`, então o
@@ -1867,7 +1867,7 @@ Regras que acompanham:
   caminhos. Chaves ordenadas lexicograficamente por code point, sem espaço entre tokens, números como
   inteiros, strings já em NFKC e sem `\p{Cc}\p{Cf}`. O objeto `mudanca` sempre carrega
   `{ acao: "<operacao>", ... }`, com `acao` ∈ `config` | `adicionar_passkey` | `remover_passkey` |
-  `gerar_codigos` — assim duas operações diferentes com payload idêntico não compartilham
+  `gerar_codigos`: assim duas operações diferentes com payload idêntico não compartilham
   assinatura, e o campo `operacao` do corpo da cerimônia é só roteamento e **precisa ser igual** a
   `mudanca.acao`. Sem essa especificação, o hash recalculado diverge e a trava vira bug
   intermitente.
@@ -1885,14 +1885,14 @@ Regras que acompanham:
 alargamento do envelope de alcance (`matchMode` → `contains`, cooldown abaixo do atual,
 `mediaScope` → `'todas'`, `processOnlyReels` → `false`); adicionar ou remover passkey; gerar códigos
 novos. **O que não exige:** desligar qualquer coisa, estreitar alcance, remover um Reel da lista,
-apagar palavra, **"sair de todos os aparelhos"**, e **ligar a automação de novo** — é a direção
+apagar palavra, **"sair de todos os aparelhos"**, e **ligar a automação de novo**, é a direção
 segura, e a parada de emergência depende de desligar ser barato.
 
 **Por que ligar de novo não exige step-up**, apesar de parecer alargamento: religar não muda nenhum
 valor, apenas devolve a chave ao estado anterior, que já era do dono e que ele já autorizou quando
 gravou aqueles campos. Exigir biometria aqui puniria justamente quem acabou de usar o freio de
 emergência. Religar exige **sessão + ficha CSRF + confirmação explícita na tela**, com a data vinda
-de `parado_por_codigo_em` (§10.12) — e nada além disso.
+de `parado_por_codigo_em` (§10.12): e nada além disso.
 
 ### 10.11 Códigos de recuperação
 
@@ -1908,18 +1908,18 @@ de `parado_por_codigo_em` (§10.12) — e nada além disso.
 | Poder | **só registra uma passkey nova**; nunca cria sessão sozinho | um código não pode virar senha |
 
 Normalização da entrada: maiúsculas, remover espaços e hífens, mapear `I`/`L` → `1` e `O` → `0`;
-depois exigir exatamente 20 caracteres do alfabeto — qualquer outra coisa é recusa **antes** de
+depois exigir exatamente 20 caracteres do alfabeto, qualquer outra coisa é recusa **antes** de
 qualquer consulta.
 
 **A conta de entropia.** O pior caso agregado do limitador, por ele ser por data center, é da ordem
 de 1.500 requisições/minuto distribuídas `[C/I]`. Com 100 bits, o tempo esperado para adivinhar é
-`2^99 / 1500` minutos — número sem significado físico. E o teto real é mais duro: o atacante não
+`2^99 / 1500` minutos: número sem significado físico. E o teto real é mais duro: o atacante não
 consegue emitir 100.000 requisições/dia sem estourar a cota do Worker, que é o mesmo recurso que ele
-estaria tentando derrubar. **A entropia, não o bloqueio, é o que protege esses códigos** — e é por
+estaria tentando derrubar. **A entropia, não o bloqueio, é o que protege esses códigos**, e é por
 isso que a ausência de tabela de tentativas não é uma concessão.
 
 **Por que o Worker gera, e não o assistente.** Para calcular a pimenta, o assistente precisaria da
-`PANEL_SESSION_KEY` na máquina — um segundo lugar onde a chave de sessão existe, o oposto exato da
+`PANEL_SESSION_KEY` na máquina: um segundo lugar onde a chave de sessão existe, o oposto exato da
 separação de segredos. Sem a pimenta, um dump do D1 vira ataque offline. E há um modo de falha
 silencioso a evitar: o dono rodar o assistente numa máquina que nunca teve a chave e gravar um hash
 que o Worker não consegue verificar. A objeção "o código em claro trafega pela rede" não introduz
@@ -1946,7 +1946,7 @@ um código foi usado por quem não devia, os outros estão na mesma lista vazada
 
 ### 10.12 Código de parada de emergência
 
-**Por que é seguro expô-lo sem login** — argumento de assimetria de consequência, não de
+**Por que é seguro expô-lo sem login**: argumento de assimetria de consequência, não de
 obscuridade:
 
 1. Ele só sabe uma coisa: `enabled = 0`. Não lê configuração, não lista Reels, não mostra o link,
@@ -1955,7 +1955,7 @@ obscuridade:
 3. A alternativa é pior: sem esta rota, o dono trancado para fora não tem freio nenhum enquanto o
    Worker continua mandando Direct em nome dele.
 4. Ela não é fraca por estar exposta: são 80 bits, e o que a torna aceitável não é o segredo ser
-   grande — é o segredo comprar tão pouco.
+   grande: é o segredo comprar tão pouco.
 
 **Forma e execução:**
 
@@ -1978,7 +1978,7 @@ O formulário vive no **asset** `public/painel/parar/index.html`, sem script e s
 ação é um caminho **diferente**, para que um POST nunca seja endereçado a um caminho de asset.
 **POST com o código no corpo, nunca GET com o código na URL** `[C]`: query string vaza em log de
 proxy, histórico e `Referer`. Corpo capado em **1 KB**. Sem exigência de `Origin`/`Sec-Fetch-Site` e
-sem ficha CSRF — "CSRF" aqui significaria enganar o dono para que ele desligue a própria automação,
+sem ficha CSRF: "CSRF" aqui significaria enganar o dono para que ele desligue a própria automação,
 e mesmo isso exige o código; exigir origem quebraria a chamada por `curl` do assistente, que é um
 caminho legítimo de emergência. É a **única** exceção de origem em todo o painel.
 
@@ -1993,7 +1993,7 @@ caminho legítimo de emergência. É a **única** exceção de origem em todo o 
 Por que distinguir, contrariando a convenção de erro genérico do projeto: (a) o que a distinção
 compra o atacante é um oráculo sobre um espaço de 80 bits que ele não consegue varrer, porque o teto
 de 100.000 requisições/dia `[C]` é o mesmo recurso que ele estaria tentando derrubar; (b) a
-indistinção não esconde o resultado — a automação para de responder, e isso se vê de fora —, esconde
+indistinção não esconde o resultado: a automação para de responder, e isso se vê de fora, esconde
 só do dono; (c) uma pessoa que acredita ter parado a automação e não parou é exatamente a falha que
 a regra de falha segura existe para impedir; (d) a convenção genérica é sobre **autenticação**, onde
 há credencial a enumerar, e aqui não há nada a enumerar. Por isso `credencial_invalida` **não** se
@@ -2014,7 +2014,7 @@ Adicionar: sessão + ficha + step-up com `{ acao: "adicionar_passkey" }`, depois
 explica: "confirme que é você" e depois "crie a nova chave".
 
 Remover: `POST /painel/aparelhos` com `acao=remover_passkey`, step-up cuja mudança canônica é
-`{ acao: "remover_passkey", credential_id: "<id>" }` — o `op_hash` amarra a assinatura **àquela**
+`{ acao: "remover_passkey", credential_id: "<id>" }`, o `op_hash` amarra a assinatura **àquela**
 credencial, então um XSS não troca o alvo depois da aprovação. A regra "não pode remover a última"
 tem de ser **atômica**:
 
@@ -2026,24 +2026,24 @@ DELETE FROM painel_credenciais
 ```
 
 A subconsulta é avaliada dentro da mesma instrução e o D1 é SQLite com escritor único
-`[I, forte — vale um teste de concorrência]`. `meta.changes === 0` `[C]` vira "não é possível remover
+`[I, forte: vale um teste de concorrência]`. `meta.changes === 0` `[C]` vira "não é possível remover
 a última passkey; cadastre outra antes". A contagem considera **só** credenciais com o `rp_id`
 atual: credenciais de endereço antigo são inúteis e podem ser removidas livremente, inclusive todas.
 
 **Aviso obrigatório antes do gesto:** remover uma passkey **apaga as sessões dela**. Se for a
-credencial da sessão atual, o dono é deslogado na hora — comportamento correto, e **a tela avisa
+credencial da sessão atual, o dono é deslogado na hora, comportamento correto, e **a tela avisa
 antes**: *"Este é o aparelho que você está usando agora. Ao removê-lo você vai sair do painel e vai
 precisar entrar de novo com outro aparelho ou com um código de recuperação."*
 
 **Nunca exibir o `credential_id` inteiro.** Na tela de Aparelhos, cada linha é identificada por
 apelido, data de cadastro e último uso; quando um desempate visual é necessário, aparece **só o
-prefixo de 8 caracteres do `sha256(credential_id)`** — o mesmo recorte que §9.9 usa no campo `ator`
+prefixo de 8 caracteres do `sha256(credential_id)`**, o mesmo recorte que §9.9 usa no campo `ator`
 (`passkey:<8 hex>`) e §11.7 no `console`. Um identificador inteiro na tela não diferencia melhor e
 convida a copiar credencial para lugar nenhum. São **três** destinos e **uma** regra: tela, `console`
 e `painel_auditoria` veem o mesmo prefixo, nunca o valor cru.
 
 **"Sair de todos os aparelhos"** é `POST /painel/aparelhos` com `acao=sair_de_tudo`: sessão + ficha
-CSRF, **sem step-up** (é a direção segura de §10.10), `DELETE FROM painel_sessoes` — 1 escrita —, e o
+CSRF, **sem step-up** (é a direção segura de §10.10), `DELETE FROM painel_sessoes`, 1 escrita, e o
 próprio dono sai junto, com a tela dizendo isso antes. A mesma página traz "sair deste aparelho"
 (`POST /painel/sair`), "gerar novos códigos" e "cadastrar outro aparelho", cada um como formulário
 POST com o campo `csrf` escondido.
@@ -2052,7 +2052,7 @@ POST com o campo `csrf` escondido.
 
 `workers.dev` está na seção de domínios privados da Public Suffix List `[C]`. Consequências:
 
-1. `rpId = "workers.dev"` é **rejeitado pelo navegador** — é um eTLD.
+1. `rpId = "workers.dev"` é **rejeitado pelo navegador**, é um eTLD.
 2. `rpId` = **host completo**, nunca `<conta>.workers.dev`: usar a conta faria qualquer outro Worker
    seu compartilhar as passkeys do painel `[C]`.
 3. `PANEL_RP_ID` é var explícita, **sem fallback para `url.hostname`**: o `Host` é controlado pelo
@@ -2073,7 +2073,7 @@ POST com o campo `csrf` escondido.
 
 ### 11.1 Onde o painel entra no roteamento
 
-O painel entra pelo **`default:` do switch** de `src/index.ts:61` `[C]` — nunca por um `startsWith`
+O painel entra pelo **`default:` do switch** de `src/index.ts:61` `[C]`, nunca por um `startsWith`
 avaliado antes dele:
 
 ```ts
@@ -2103,7 +2103,7 @@ export async function routePainel(request, env, url, now): Promise<Response | nu
 
 **Por quê:** com o painel no `default:`, **nenhum caminho do painel pode ser avaliado antes de
 `case WEBHOOK_PATH`**. Um erro de digitação futuro numa rota do painel deixa de ser uma falha de
-segurança capaz de engolir o webhook — cuja assinatura é calculada sobre o corpo cru e não sobrevive
+segurança capaz de engolir o webhook: cuja assinatura é calculada sobre o corpo cru e não sobrevive
 a qualquer código que leia o corpo antes `[C]`. Ordem léxica vira garantia estrutural. O 404 atual
 `[C]` é preservado por construção. `/painelzinho` não casa; `/painel` sem barra casa. `src/index.ts`
 cresce seis linhas e não ganha nenhum import do painel além do roteador.
@@ -2117,7 +2117,7 @@ CSRF, step-up. `HEAD` é tratado como `GET`; `OPTIONS` cai em `405` de propósit
 **Por que a parada é desviada antes do portão, e não depois.** O portão de §10.2 exige `PANEL_RP_ID`,
 que é um dado do **subsistema WebAuthn**. Se ele estiver faltando ou quebrado, um roteador que
 aplicasse o portão a tudo derrubaria com `503` justamente o freio que §10.12 chama de "a última que
-precisa funcionar" — e a linha `env.PANEL_RP_ID.length`, escrita sem `typeof`, ainda lançaria
+precisa funcionar": e a linha `env.PANEL_RP_ID.length`, escrita sem `typeof`, ainda lançaria
 `TypeError` dentro do `default:` do switch de `src/index.ts`, porque um binding não cadastrado chega
 como `undefined` em Workers. As duas coisas se resolvem com o mesmo desvio: `/painel/parada` e
 `/painel/parar` saem antes, e todo o resto passa por `painelHabilitado(env)`, que já é `typeof`-safe.
@@ -2128,7 +2128,7 @@ há como comparar código nenhum, e aí sim ela devolve o `503`. **Teste obrigat
 
 ### 11.2 Assets: três arquivos, e nada mais
 
-`"assets": { "directory": "./public", "not_found_handling": "none" }` — **sem `binding`** e **sem
+`"assets": { "directory": "./public", "not_found_handling": "none" }`, **sem `binding`** e **sem
 `run_worker_first`**: com `run_worker_first` as rotas casadas sempre invocam o Worker e passam a
 devolver 429 quando a cota estoura `[C]`, que é exatamente o que não queremos para o arquivo da
 parada de emergência.
@@ -2143,7 +2143,7 @@ parada de emergência.
 elimina a classe de bug "JS velho no cache depois do deploy".
 
 Duas armadilhas que viram regra de projeto: **`not_found_handling` NUNCA pode ser
-`single-page-application`** (nesse modo qualquer caminho não encontrado devolve `index.html` —
+`single-page-application`** (nesse modo qualquer caminho não encontrado devolve `index.html`,
 inclusive `/webhooks/instagram`); e **nenhum arquivo de `public/` pode ter o caminho de uma rota do
 Worker** (o sequestro seria silencioso). O `verificar-antes-de-publicar` lista `public/` e falha se
 aparecer um quarto arquivo ou se algum caminho colidir com `rotas.ts`.
@@ -2152,7 +2152,7 @@ aparecer um quarto arquivo ou se algum caminho colidir com `rotas.ts`.
 
 | # | Verificação | Custo | Falha |
 |---|---|---|---|
-| 0 | `painelHabilitado(env)` — **exceto** `/painel/parada` e `/painel/parar`, desviadas antes (§11.1) | 0 | `503 painel_desativado` |
+| 0 | `painelHabilitado(env)`: **exceto** `/painel/parada` e `/painel/parar`, desviadas antes (§11.1) | 0 | `503 painel_desativado` |
 | 1 | método exato; `OPTIONS` → `405` com `Allow` | 0 | `405 metodo_nao_permitido` |
 | 2 | `Origin` / `Sec-Fetch-Site` | 0 | `403 origem_invalida` |
 | 3 | `content-type` por família | 0 | `415 tipo_nao_suportado` |
@@ -2161,14 +2161,14 @@ aparecer um quarto arquivo ou se algum caminho colidir com `rotas.ts`.
 | 6 | cookie presente **e** HMAC do envelope válido | 1 HMAC | `401` em JSON, `303` para `/painel/entrar` em página |
 | 7 | ficha CSRF (todo POST autenticado) | 1 HMAC | `403 csrf_invalido` |
 | 8 | step-up, quando a rota ou o conteúdo exige | 0 | `403 step_up_necessario` |
-| 9 | **só agora: D1** | — | — |
+| 9 | **só agora: D1** |, |, |
 
 **Até o passo 8, inclusive, nenhuma consulta ao D1 acontece.** Lixo em cookie, cookie forjado, corpo
-enorme, origem errada — tudo recusado sem tocar no banco.
+enorme, origem errada: tudo recusado sem tocar no banco.
 
 **A regra escrita pelo seu conteúdo real** (correção de uma frase errada no material de origem, que
 dizia haver uma única exceção): *nenhuma rota não autenticada consulta o D1 antes de um HMAC
-fechar.* **Três** rotas recebem código digitado e têm a mesma forma — `POST /painel/parada`,
+fechar.* **Três** rotas recebem código digitado e têm a mesma forma, `POST /painel/parada`,
 `POST /painel/entrar/codigo` e `POST /painel/api/registrar/opcoes` no modo `recuperacao`. Nelas o
 HMAC que fecha é o **do próprio código**, calculado com a pimenta `k_codigos` que o atacante não
 tem; o formato exato é validado **antes** (0 consulta), e só então vem **1 leitura e 0 escrita**. Não
@@ -2231,7 +2231,7 @@ de exceção. Todo `try/catch` segue o padrão de `oauth.ts:136-140` `[C]`:
 
 **A linha que mais importa é a do `credencial_invalida`.** O painel não pode distinguir "passkey
 desconhecida" de "assinatura inválida" `[C]`: com o código público, separar os dois casos daria um
-oráculo de enumeração. Um código só, uma frase só, e — na medida do possível — o **mesmo caminho de
+oráculo de enumeração. Um código só, uma frase só, e, na medida do possível, o **mesmo caminho de
 trabalho**: verificar a assinatura mesmo quando a credencial não existe, usando uma chave
 descartável, para não criar diferença grosseira de tempo `[I: mitigação parcial]`.
 
@@ -2239,7 +2239,7 @@ descartável, para não criar diferença grosseira de tempo `[I: mitigação par
 
 Dois perfis em código (`html.ts` expõe `cabecalhos(perfil)`): `'pagina'` para HTML do Worker e
 `'api'` para as cinco respostas JSON. O terceiro perfil, dos três assets, vai em `public/_headers`
-`[V]` — e se `_headers` não funcionar, **nada quebra**: ele cobre um CSS, um JS e uma página sem
+`[V]`: e se `_headers` não funcionar, **nada quebra**: ele cobre um CSS, um JS e uma página sem
 script e sem interpolação. O plano B com `run_worker_first` está deletado do projeto.
 
 CSP única das páginas, sem nonce, porque o CSS é arquivo externo:
@@ -2260,11 +2260,11 @@ CSP das respostas JSON: `default-src 'none'; frame-ancestors 'none'; base-uri 'n
 | `X-Content-Type-Options` | `nosniff` | `nosniff` | `nosniff` |
 | `X-Frame-Options` | `DENY` | `DENY` | `DENY` |
 | `Referrer-Policy` | `no-referrer` | `no-referrer` | `no-referrer` |
-| `Cross-Origin-Opener-Policy` | `same-origin` | `same-origin` | — |
+| `Cross-Origin-Opener-Policy` | `same-origin` | `same-origin` |, |
 | `Cross-Origin-Resource-Policy` | `same-origin` | `same-origin` | `same-origin` |
-| `Permissions-Policy` | ver abaixo | ver abaixo | — |
+| `Permissions-Policy` | ver abaixo | ver abaixo |, |
 | `Cache-Control` | `no-cache` | `private, no-store` | `private, no-store` |
-| `Vary` | — | `Cookie` | `Cookie` |
+| `Vary` |: | `Cookie` | `Cookie` |
 
 ```
 Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(),
@@ -2273,21 +2273,21 @@ Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), m
 
 Notas de projeto: `require-trusted-types-for 'script'` torna `innerHTML` um **erro de runtime**, não
 de revisão; **nunca** `Cross-Origin-Embedder-Policy: require-corp`, que quebraria as miniaturas do
-`fbcdn.net`; `Vary: Cookie` em **toda** resposta do Worker, sem exceção por rota — uma regra sem
+`fbcdn.net`; `Vary: Cookie` em **toda** resposta do Worker, sem exceção por rota, uma regra sem
 exceção vale mais que uma otimização de um cabeçalho; **sem `preload`** no HSTS porque
 `workers.dev` não é nosso, e pedir preload de um host dentro de um sufixo público de terceiro não é
 decisão que este projeto possa tomar `[C]`. `/oauth/callback` ganha `Cache-Control: private,
 no-store` e `Referrer-Policy: no-referrer`, porque a resposta atual traz o `username` da conta no
-corpo `[C]`. `GET /painel/reels` merece destaque: a `thumbnail_url` é uma **URL-capacidade** — quem
-tem o link vê a imagem sem login `[C]` — e essa resposta não pode entrar em Cache API nem em KV, com
+corpo `[C]`. `GET /painel/reels` merece destaque: a `thumbnail_url` é uma **URL-capacidade**, quem
+tem o link vê a imagem sem login `[C]`: e essa resposta não pode entrar em Cache API nem em KV, com
 chave nenhuma.
 
 ### 11.6 As duas rotas da parada, e a decisão sobre o `GET`
 
 `/painel/parar` (asset, o formulário) e `/painel/parada` (Worker, a ação) diferem por uma letra, e a
 primeira é a URL que a pessoa leiga vai digitar de um papel, no celular, no pior dia do projeto.
-**Decisão:** manter as duas grafias — o custo de renomear tudo é real e `/painel/parada` nunca é
-digitada por um humano, já que é só o `action` do formulário — e **eliminar o beco sem saída**:
+**Decisão:** manter as duas grafias, o custo de renomear tudo é real e `/painel/parada` nunca é
+digitada por um humano, já que é só o `action` do formulário, e **eliminar o beco sem saída**:
 `GET /painel/parada` responde **`303` para `/painel/parar`**, em vez de `405`. Não custa estado, não
 revela nada, e transforma um erro de digitação plausível numa chegada ao lugar certo. Um POST
 endereçado ao caminho do asset continua sendo impossível de acontecer no projeto, porque nenhum
@@ -2309,7 +2309,7 @@ access token da Meta (nem prefixo); `TOKEN_ENCRYPTION_KEY`; endereço IP; `User-
 truncado. Os quatro campos de configuração são a única assimetria da lista: proibidos no `console`,
 permitidos em `painel_auditoria`, e ela é deliberada.
 
-Volume e formato: **log de leitura, nenhum** — só falha e mudança de estado geram linha, o mesmo
+Volume e formato: **log de leitura, nenhum**, só falha e mudança de estado geram linha, o mesmo
 critério de hoje `[C]`. Formato `console.warn('painel:', metodo, caminho, status, codigo)`, sem
 template string com dado variável dentro, para não existir o caminho em que alguém interpola um
 valor por engano. `wrangler.jsonc` tem `observability.enabled: true` `[C]`, então esse `console` vai
@@ -2322,7 +2322,7 @@ seu próprio banco**, o histórico das mudanças que **você** fez na sua config
 tela "O que aconteceu", o painel **pergunta ao Instagram** o @ de quem comentou naqueles comentários
 e **não guarda** essa informação.
 
-### 11.8 Separação entre painel, webhook e OAuth — sete regras verificáveis
+### 11.8 Separação entre painel, webhook e OAuth: sete regras verificáveis
 
 1. **Ordem no switch.** `case WEBHOOK_PATH` antes de tudo; o painel só existe no `default:`.
 2. **Proibido middleware global.** Não pode existir `withSecurityHeaders(handler)` embrulhando o
@@ -2340,9 +2340,9 @@ e **não guarda** essa informação.
    importa é a do caminho de **escrita**. A leitura pelo painel é permitida **somente** na forma
    descrita em §12.6, e **nenhuma** consulta do painel pode retornar `commenter_scoped_id_hash`.
 7. **O painel não inicia OAuth.** Não existe rota de reconexão no painel. Se ele pudesse disparar o
-   fluxo, um painel comprometido conectaria a conta do **atacante**, e o `state` assinado — a única
+   fluxo, um painel comprometido conectaria a conta do **atacante**, e o `state` assinado, a única
    proteção do `/oauth/callback`, que não pode exigir cabeçalho porque quem chega é o navegador
-   `[C]` — passaria a ser emitido a pedido de uma sessão. O painel **mostra** o estado da conexão e
+   `[C]`: passaria a ser emitido a pedido de uma sessão. O painel **mostra** o estado da conexão e
    instrui a usar o assistente.
 
 `/setup/authorize`, `/setup/subscribe` e `/oauth/callback` **ficam**, sem depreciação e sem mudança
@@ -2354,7 +2354,7 @@ passa apenas a recusar outros métodos com `405 + Allow: GET` (hoje o switch nã
 
 **Não existe `GET /painel/diagnostico`**: uma rota de diagnóstico é mais uma superfície não
 autenticada, e o valor dela cabe num enum. `GET /health` mantém o corpo de hoje `[C]` e ganha
-**exatamente um** campo novo, `painel`, **na raiz do objeto** — irmão de `status` e `webhook`, nunca
+**exatamente um** campo novo, `painel`, **na raiz do objeto**, irmão de `status` e `webhook`, nunca
 dentro de `configurado` (`health.ts:13-21` `[C]`). É esse caminho, `corpo.painel`, que o teste
 "nenhum outro campo apareceu" percorre.
 
@@ -2364,7 +2364,7 @@ barato. Por isso o campo tem **duas resoluções da mesma pergunta**, e a difere
 
 | Quem pergunta | Valores possíveis |
 |---|---|
-| **qualquer um** (sem `Authorization`) | `desativado` \| `sem_acesso` \| `pronto` — os três do contrato §4.5 |
+| **qualquer um** (sem `Authorization`) | `desativado` \| `sem_acesso` \| `pronto`, os três do contrato §4.5 |
 | **`Authorization: Bearer <SETUP_ADMIN_TOKEN>`** | os seis, com precedência declarada abaixo |
 
 | `painel` (detalhado) | Significa | O que o assistente diz | Some no público em |
@@ -2373,16 +2373,16 @@ barato. Por isso o campo tem **duas resoluções da mesma pergunta**, e a difere
 | `sem_passkey` | ligado, mas nenhuma credencial utilizável para o `rp_id` atual | "O painel está ligado mas ninguém consegue entrar. Gere um convite agora." | `sem_acesso` |
 | `sem_codigo_parada` | há passkey, mas nenhum código de parada gravado | "Você ainda não tem botão de pânico. Gere os códigos." | `sem_acesso` |
 | `pronto_arquivo` | tudo cadastrado, e a configuração vem do `src/config.ts` | "Tudo certo. A configuração ainda vem do arquivo." | `pronto` |
-| `pronto_banco` | tudo cadastrado, e a configuração vem do painel | "Tudo certo. **A configuração vive no painel** — editar o arquivo aqui não muda nada." | `pronto` |
+| `pronto_banco` | tudo cadastrado, e a configuração vem do painel | "Tudo certo. **A configuração vive no painel**, editar o arquivo aqui não muda nada." | `pronto` |
 | `pronto_parado` | tudo cadastrado, e a configuração está em `parado_por_erro` | "A automação está parada por um campo inválido. Abra o painel para ver qual." | `pronto` |
 
 **Por que `sem_passkey` não pode ser público.** Segundo §10.4, o convite comum (`pre=0`) funciona
-**exatamente enquanto não existe nenhuma credencial** — e some no instante em que a primeira passkey
+**exatamente enquanto não existe nenhuma credencial**, e some no instante em que a primeira passkey
 nasce. Publicar `sem_passkey` numa rota anônima entrega, por polling de graça, o instante preciso em
 que um convite interceptado ou fotografado num tutorial ainda vale. O valor mesclado `sem_acesso` do
 contrato não separava os dois estados, e essa fusão **era** a proteção. `sem_codigo_parada` acompanha
 pelo mesmo motivo: junto com `sem_passkey` ele descreve o grau de desamparo do painel para quem não
-tem nada. Os três `pronto_*` também só saem sob Bearer — não por ameaça, mas porque um enum que muda
+tem nada. Os três `pronto_*` também só saem sob Bearer, não por ameaça, mas porque um enum que muda
 de tamanho conforme quem pergunta é mais fácil de testar do que um que muda de conteúdo.
 
 O assistente local **já tem** o `SETUP_ADMIN_TOKEN` (é ele quem o cadastra no deploy), então manda o
@@ -2406,14 +2406,14 @@ estados especiais da tela de Reels, a tela de atividade e as exigências de celu
 ### 12.1 As seis regras que governam toda a tela
 
 1. **Vocabulário de dona de negócio.** A tela nunca escreve *override*, *config*, *endpoint*,
-   *media ID*, *placeholder*, *token*, *hash*, *step-up*, *rate limit*, *fallback* — nem *payload*.
+   *media ID*, *placeholder*, *token*, *hash*, *step-up*, *rate limit*, *fallback*, nem *payload*.
    Glossário obrigatório em §12.7.
 2. **Apertar o freio é grátis; soltar o freio custa a biometria.**
 3. **Nada some em silêncio.** Se a automação está ligada mas nada vai ser enviado, a tela diz isso
    em letras grandes na primeira dobra.
 4. **O que a tela mostra é o que o Worker vai fazer.** A prévia usa `renderTemplate` `[C]` e a caixa
    de teste usa `matchKeyword` `[C]`, ambas de produção. Não existe segunda implementação em
-   JavaScript — e não existe API JSON de dados que pudesse abrigar uma.
+   JavaScript: e não existe API JSON de dados que pudesse abrigar uma.
 5. **Custa cota, então não faz sozinho.** Sem auto-refresh, sem polling, sem buscar lista a cada
    render. Atualizar é sempre um botão explícito.
 6. **Erro nunca alarga, e erro nunca inventa um valor que o dono não viu na tela.**
@@ -2421,7 +2421,7 @@ estados especiais da tela de Reels, a tela de atividade e as exigências de celu
 Navegação no celular: barra fixa embaixo com cinco itens, ícone **e** palavra (nunca só ícone):
 Início · Reels · Palavras · Mensagem · Mais. "Mais" abre O que aconteceu · Aparelhos · Ajustes finos
 · Sair. A **barra do topo é a mesma em todas as telas** e carrega o estado global mais o botão de
-desligar — é o único elemento repetido do painel, e a repetição é proposital: a pessoa nunca precisa
+desligar: é o único elemento repetido do painel, e a repetição é proposital: a pessoa nunca precisa
 procurar como parar.
 
 ### 12.2 Fluxos
@@ -2445,7 +2445,7 @@ das três respostas de §10.12.
 verde nasce do `?ok=`. Quando a mudança é protegida, entra a tela intermediária **"Confira o que vai
 mudar"**, que mostra o antes e o depois lado a lado, em português, e é onde a digital é pedida. Ela
 existe por dois motivos: para a pessoa, é a última chance de ler o que vai assinar; para a
-arquitetura, é onde o rascunho vive **sem ser gravado** — em campos escondidos, em texto comum, sem
+arquitetura, é onde o rascunho vive **sem ser gravado**, em campos escondidos, em texto comum, sem
 assinatura própria, porque o `op_hash` dentro do cookie já cobre o conteúdo inteiro e o servidor o
 recalcula do corpo recebido. Mexer num campo escondido muda o hash e a gravação é recusada.
 **Cancelar não grava nada**, e o rascunho continua na tela.
@@ -2458,7 +2458,7 @@ desculpa: *"Cada mudança protegida é confirmada uma vez. É por isso que é se
 Três sinais **sempre juntos**, nunca só cor: cadeado + a palavra "protegido" ao lado do rótulo;
 borda âmbar no grupo de campos; e a frase escrita antes do botão. E o botão diz o que vai acontecer:
 **"Salvar (vai pedir a sua digital)"**. Nas telas em que só *parte* dos campos é protegida, o rótulo
-é "Salvar" e quem garante o aviso é o cadeado no campo mais a tela de conferência — nunca uma
+é "Salvar" e quem garante o aviso é o cadeado no campo mais a tela de conferência, nunca uma
 surpresa biométrica.
 
 Regra escrita no rodapé dos Ajustes: *"Diminuir o alcance da automação nunca pede a sua digital.
@@ -2466,24 +2466,24 @@ Aumentar, sim."*
 
 ### 12.4 Limites e avisos das palavras-gatilho
 
-Como não existe conserto de campo inválido, o que está fora do limite é **recusa** — nunca
+Como não existe conserto de campo inválido, o que está fora do limite é **recusa**, nunca
 "continuar assim mesmo", nunca substituição por valor de fábrica.
 
 | Situação | Nível | Texto |
 |---|---|---|
-| Menos de 4 caracteres normalizados no modo "basta aparecer" | **Recusa** | **"quer" é curto demais para esse modo.** Qualquer comentário com essas letras aciona — inclusive "não quer" e "quer não". Escreva pelo menos duas palavras. [ Usar "eu quero o link" ] [ Trocar para "o comentário tem que ser só isso" ] |
+| Menos de 4 caracteres normalizados no modo "basta aparecer" | **Recusa** | **"quer" é curto demais para esse modo.** Qualquer comentário com essas letras aciona, inclusive "não quer" e "quer não". Escreva pelo menos duas palavras. [ Usar "eu quero o link" ] [ Trocar para "o comentário tem que ser só isso" ] |
 | Menos de 2 caracteres normalizados | **Recusa** | **Esta palavra é curta demais.** Escreva pelo menos duas letras. |
 | 2 a 3 caracteres no modo "só isso" | Aviso | **"eu" é bem curto.** Neste modo funciona. Só tome cuidado se um dia trocar de modo. |
 | Mais de 40 caracteres | **Recusa** | **Esta frase é longa demais.** Use no máximo 40 letras. |
 | Mais de 20 palavras | **Recusa** | **Você chegou a 20 palavras, o máximo.** Apague uma para adicionar outra. |
 | Palavra que é pedaço de outra | Aviso | **"quero" está dentro de "eu quero".** No modo "basta aparecer no meio", a segunda nunca vai ser usada. |
 | Só emoji ou pontuação | **Recusa** | **Isto não vai funcionar nunca.** A automação ignora emojis e pontuação ao comparar, então esta palavra fica vazia e é pulada em silêncio `[C]`. |
-| Lista vazia com automação ligada | **Recusa** | **Sem nenhuma palavra a automação nunca responde.** Ou escreva pelo menos uma, ou desligue — as duas são seguras, mas só uma fica clara no seu painel. [ Desligar a automação ] |
+| Lista vazia com automação ligada | **Recusa** | **Sem nenhuma palavra a automação nunca responde.** Ou escreva pelo menos uma, ou desligue, as duas são seguras, mas só uma fica clara no seu painel. [ Desligar a automação ] |
 
 Avisos da tela da mensagem: falta `{link}` ("do jeito que está, a pessoa vai receber só o texto");
 apelido desconhecido como `{nome}` ("o painel só conhece {username} e {link}; esse trecho vai chegar
 escrito assim mesmo" `[C]`); link ainda de fábrica entre colchetes ("enquanto estiver assim, a
-automação não envia nada — de propósito" `[C]`); mensagem longa ("480 de 500 caracteres; Direct
+automação não envia nada: de propósito" `[C]`); mensagem longa ("480 de 500 caracteres; Direct
 longo costuma ser ignorado"). Contador ao vivo a partir de 400 caracteres.
 
 ### 12.5 Os quatro estados especiais da tela de Reels
@@ -2497,14 +2497,14 @@ longo costuma ser ignorado"). Contador ao vivo a partir de 400 caracteres.
 | Cursor vencido | "A lista ficou velha enquanto esta página estava aberta. Toque em Atualizar. O que você já marcou está guardado nesta tela." |
 
 Mecânica da paginação: uma página = **uma** chamada a `me/media` = 1 subrequest `[C]`, com
-`limit=25` e o filtro de Reels feito **no Worker** `[C]` — não há filtro server-side por REELS
+`limit=25` e o filtro de Reels feito **no Worker** `[C]`, não há filtro server-side por REELS
 `[I]`. Um toque em "Carregar mais" busca **no máximo 4 páginas**, parando antes se já tiver juntado
 10 Reels ou se `paging.next` sumir. **Some quando `paging.next` some** `[C]`: receber menos itens que
 o `limit` não significa fim. É um `<form method="post">` normal que reenvia o cursor `after` num
 campo escondido e re-renderiza a página inteira no servidor, com os ids já marcados preservados em
-campos escondidos — funciona sem JavaScript. **O cursor nunca vai para o D1** `[C]`: cursores são
+campos escondidos: funciona sem JavaScript. **O cursor nunca vai para o D1** `[C]`: cursores são
 temporários, e guardá-los é bug futuro. Quando as 4 páginas rendem menos de 3 Reels, a tela explica
-em vez de parecer quebrada: *"Estas últimas publicações não são Reels — toque de novo para continuar
+em vez de parecer quebrada: *"Estas últimas publicações não são Reels, toque de novo para continuar
 procurando."*
 
 Cache da listagem: **10 minutos** `[I]`, com a tela dizendo de quando ela é ("Lista de 14:32.
@@ -2519,9 +2519,9 @@ sobreposição preenchida. Se a pessoa abre "responder diferente" num Reel **nã
 Ao salvar: teto de **200** Reels no total (com aviso a partir de 197) e **20 ids novos por
 gravação**, cada id novo revalidado contra a conta com `getMediaInfo` `[C]`. Acima disso é recusa,
 com o formulário voltando preenchido e o texto *"Marque até 20 Reels novos por vez. Salve estes e
-continue — o que já estava escolhido continua valendo."*
+continue: o que já estava escolhido continua valendo."*
 
-### 12.6 "O que aconteceu": o @ ao vivo — decisão do dono, especificada
+### 12.6 "O que aconteceu": o @ ao vivo: decisão do dono, especificada
 
 A tela mostra os três estados grandes, as pendências com botão, e a lista dos últimos comentários
 processados com o **@ buscado ao vivo na Graph API**, sem armazenar nada de novo.
@@ -2537,14 +2537,14 @@ SELECT comment_id, media_id, status, created_at, next_retry_at, last_error_code
 ```
 
 Ela **nunca** retorna `commenter_scoped_id_hash`. Sem índice por `created_at`, a consulta varre a
-tabela — para uma conta pequena são centenas de linhas por abertura, irrelevante contra 5.000.000 de
+tabela: para uma conta pequena são centenas de linhas por abertura, irrelevante contra 5.000.000 de
 linhas lidas por dia `[C]`. **Não criar índice**: um índice novo em `processed_comments` encareceria
 **cada INSERT do caminho quente**, levando o claim de ~3 para ~4 escritas `[C]`. Se um dia doer, a
 saída correta é uma tabela de contadores diários escrita pelo cron, não um índice.
 
 **A busca do @:** para cada linha exibida,
 `GET https://graph.instagram.com/{META_API_VERSION}/{comment_id}?fields=username,timestamp` com o
-Bearer da conta. Host obrigatoriamente `graph.instagram.com` — `assertGraphHost` quebra qualquer
+Bearer da conta. Host obrigatoriamente `graph.instagram.com`, `assertGraphHost` quebra qualquer
 tentativa de usar `graph.facebook.com` `[C]`.
 
 **Orçamento de subrequests, e o comportamento diante do teto de 50.** Cada consulta ao D1 **também**
@@ -2565,16 +2565,16 @@ subtraídas do orçamento de envio. Por isso: **sem auto-refresh, sem polling**,
 explícito, e o teto por tela.
 
 **Comentário apagado.** O nó responde erro (tipicamente 404 / objeto inexistente). A linha
-**continua aparecendo**, com *"@ indisponível — o comentário foi apagado"* no lugar do arroba, e o
+**continua aparecendo**, com *"@ indisponível: o comentário foi apagado"* no lugar do arroba, e o
 resultado traduzido intacto. Nunca sumir com a linha. O mesmo texto cobre perfil apagado e conta que
 bloqueou. Consequência honesta, escrita na própria tela: **quanto mais antiga a linha, maior a
-chance de aparecer "indisponível"** — a lista envelhece para "sem nome" sozinha.
+chance de aparecer "indisponível"**: a lista envelhece para "sem nome" sozinha.
 
 **Falha geral da Graph API** não pode quebrar a tela: ela degrada para a mesma lista **sem os @**,
 com a faixa *"não conseguimos falar com o Instagram agora"* e o resultado de cada linha intacto.
 
 **Armazenamento novo: nenhum.** O username **não** é gravado no D1, **não** entra em Cache API,
-**não** entra em cache de isolate e **não** vai para o `console` nem para `painel_auditoria` — ele
+**não** entra em cache de isolate e **não** vai para o `console` nem para `painel_auditoria`, ele
 vive apenas durante a renderização daquela resposta. É isso que torna a promessa literal e testável.
 O cabeçalho de `src/index.ts` continua verdadeiro sem ressalva; a política de privacidade ganha a
 frase de §11.7. A resposta vai com `Cache-Control: private, no-store` e `Vary: Cookie`. O username
@@ -2584,13 +2584,13 @@ atravessa o HTML e é escapado **automaticamente** pela tag `` html`` ``.
 com `instagram_business_basic` lê um **nó de comentário por id** e devolve `username`. O escopo
 cobre leitura de comentários `[C]`, mas não esse acesso específico. **Testar em conta real antes de
 prometer na documentação.** Se falhar, não há escopo de Instagram Login que resolva: a tela degrada
-permanentemente para a versão sem @ — os três estados, as pendências e a lista com horário e
-resultado, sem o arroba — e o documento registra a queda.
+permanentemente para a versão sem @: os três estados, as pendências e a lista com horário e
+resultado, sem o arroba: e o documento registra a queda.
 
 **O enum que governa é `CommentStatus`, e ele não é o mesmo dos motivos de ignorar.** A tela lê
 `processed_comments.status`; esse valor vem de `CommentStatus`, declarado em
 `src/repositories/comments-repository.ts:11-20` `[C]`. `SkipReason` e `ProcessOutcome`
-(`automation.ts:28,40` `[C]`) são resultados **em memória** do processamento — dois enums de arquivos
+(`automation.ts:28,40` `[C]`) são resultados **em memória** do processamento, dois enums de arquivos
 diferentes, que o material de origem misturava numa citação só. É o de `comments-repository.ts` que o
 dicionário obrigatório percorre, e é ele que o teste "valor novo sem tradução quebra" enumera.
 
@@ -2614,26 +2614,26 @@ banco.** Conferido no código: o **único** `INSERT` em `processed_comments` é
 `return { kind: 'skipped', ... }` acontecem **antes** do `claimComment`, então **um comentário
 ignorado não deixa linha nenhuma**. `'received'` e `'ignored'` estão declarados no tipo e **não são
 escritos em lugar nenhum de `src/`** `[C]`. Logo, a lista mostra `completed`, `private_sent`,
-`retry_pending`, `failed` e `uncertain` — e nada mais.
+`retry_pending`, `failed` e `uncertain`: e nada mais.
 
 **A decisão, tomada aqui: não passamos a gravar linha para comentário ignorado.** O caminho quente já
 está em ~3 escritas por comentário atendido e o teto de 100.000 escritas/dia é o recurso que §5.2 e
 §16.1 protegem; gravar uma linha por comentário **ignorado** faria o custo de banco crescer com o
-volume de comentários que a automação **não** responde — exatamente o volume que não temos como
+volume de comentários que a automação **não** responde, exatamente o volume que não temos como
 prever. Um Reel que viraliza com 5.000 comentários fora da regra passaria a custar 5.000 escritas por
 nada. Se um dia esse histórico for desejado, ele é decisão nova, com conta própria, e a saída correta
 provavelmente é a tabela de contadores diários escrita pelo cron que já aparece nesta seção.
 
 **A consequência vai escrita na própria tela**, acima da lista, e §3 diz o mesmo na linguagem do
-dono: *"Aqui aparecem os comentários que a automação **atendeu**. Comentários que ela ignorou — por
+dono: *"Aqui aparecem os comentários que a automação **atendeu**. Comentários que ela ignorou, por
 não serem de um Reel da sua lista, por não terem nenhuma das suas palavras, ou porque a pessoa já
-tinha recebido — não deixam registro, e por isso não aparecem aqui."*
+tinha recebido: não deixam registro, e por isso não aparecem aqui."*
 
 **As oito frases continuam obrigatórias mesmo assim.** As três hoje inalcançáveis (`processing`,
 `received`, `ignored`) existem porque `processing` **é** o valor que o claim grava e pode ser lido
 numa corrida real, e porque um valor de enum sem frase é o bug que a tela mostraria como texto cru. O
 teste percorre o tipo `CommentStatus` inteiro e exige frase para cada membro; um valor novo no enum
-quebra. O que o teste **não** afirma — e não pode afirmar, sob pena de virar promessa falsa — é que
+quebra. O que o teste **não** afirma: e não pode afirmar, sob pena de virar promessa falsa, é que
 todo valor traduzido aparece em produção.
 
 **Os motivos de ignorar (`SkipReason`) não entram no dicionário da tela**, porque nenhum deles chega
@@ -2642,7 +2642,7 @@ decisão acima mudar é o dia em que eles ganham linhas aqui.
 
 Os três estados grandes têm duas variações de cinza que precisam de texto próprio: **parada por erro
 na configuração** (*"A automação está parada por segurança: o campo **intervalo por pessoa** está com
-um valor que não dá para entender. Corrija esse campo e ela volta."* — a tela **nomeia o campo** e
+um valor que não dá para entender. Corrija esse campo e ela volta."*, a tela **nomeia o campo** e
 não inventa substituto) e **parada pelo código de emergência** (*"A automação foi desligada pelo
 código de parada em 03/09 às 14:42."*, vindo de `parado_por_codigo_em`). E o estado "ainda com os
 ajustes de fábrica" (*"Seus ajustes ainda são os que vieram no programa. Salve uma vez para o painel
@@ -2660,14 +2660,14 @@ tela `[C]`.
 |---|---|---|
 | Login falhou | `credencial_invalida` | **Não deu para entrar com este aparelho.** Tente de novo. Se continuar assim, entre com um código de recuperação e cadastre este aparelho outra vez. [ Usar um código ] |
 | Demorou e a confirmação venceu | `credencial_invalida` | **Demorou um pouquinho e a confirmação venceu.** É só tentar de novo. |
-| Cancelou a digital | — (só no navegador) | **Você cancelou a leitura da digital.** Nada foi salvo: o link continua exatamente como estava. |
+| Cancelou a digital |: (só no navegador) | **Você cancelou a leitura da digital.** Nada foi salvo: o link continua exatamente como estava. |
 | Muitas tentativas | `muitas_tentativas` | **Muitas tentativas seguidas.** Espere um minuto. Sua automação **não** foi afetada. |
 | Origem estranha no formulário | `origem_invalida` | **Este formulário não veio do painel.** Abra o painel de novo e refaça a mudança. |
 | Formulário grande demais | `corpo_grande_demais` | **Isto ficou grande demais para enviar de uma vez.** Encurte o texto ou salve os Reels em duas vezes. |
-| Campo inválido ao salvar | `dados_invalidos` | **Não dá para salvar assim:** o campo **intervalo por pessoa** precisa ser um número de 0 a 8760. Nada foi alterado — corrija e salve de novo. |
-| A configuração mudou em outro lugar | `versao_desatualizada` | **Alguém (ou você, em outra aba) mudou os ajustes.** Recarregue a tela — o que você escreveu continua aqui. |
+| Campo inválido ao salvar | `dados_invalidos` | **Não dá para salvar assim:** o campo **intervalo por pessoa** precisa ser um número de 0 a 8760. Nada foi alterado, corrija e salve de novo. |
+| A configuração mudou em outro lugar | `versao_desatualizada` | **Alguém (ou você, em outra aba) mudou os ajustes.** Recarregue a tela, o que você escreveu continua aqui. |
 | Instagram não respondeu | `falha_meta` | **Não conseguimos falar com o Instagram agora.** Sua automação continua funcionando com o que já está salvo. [ Tentar de novo ] |
-| Miniaturas venceram | — | **As miniaturas venceram** — é normal, elas duram pouco. Sua escolha de Reels continua salva. |
+| Miniaturas venceram |: | **As miniaturas venceram**, é normal, elas duram pouco. Sua escolha de Reels continua salva. |
 | Link fora da lista | `dominio_nao_permitido` | **Este endereço não está liberado.** Só é possível usar links de `noxelora.com.br`. Essa trava é proposital: ela impede que um invasor aponte o seu link para um site de golpe. |
 | URL dentro do texto do Direct | `dominio_nao_permitido` | **Tem um endereço escrito dentro da mensagem:** `bit.ly/xyz`. Endereços só entram pelo campo do link. [ Trocar por {link} ] |
 | Faltou a digital numa mudança protegida | `step_up_necessario` | **Esta mudança precisa da sua digital.** Confira o que vai mudar e confirme. |
@@ -2680,7 +2680,7 @@ tela `[C]`.
 | Código de parada errado | `codigo_incorreto` | **Esse código não confere. Confira e digite de novo.** |
 | Qualquer erro inesperado | `falha_interna` | **Alguma coisa deu errado do nosso lado.** Sua automação e sua configuração não foram alteradas. [ Tentar de novo ] [ Desligar tudo ] |
 
-**Em toda tela de erro com sessão, o botão de desligar continua visível** — erro é exatamente o
+**Em toda tela de erro com sessão, o botão de desligar continua visível**, erro é exatamente o
 momento em que a pessoa mais precisa dele. A única exceção é a página de resultado da parada de
 emergência, que por contrato não mostra nada além da frase.
 
@@ -2721,7 +2721,7 @@ Sem framework, sem roteador, sem modelo de estado, sem `innerHTML`, sem cache pr
 `<noscript>` na tela de entrar, honesto nos dois sentidos:
 
 > **Este navegador está com o JavaScript desligado.** Funcionam assim mesmo: entrar com um código de
-> recuperação, a página de parada de emergência, e todo salvamento que **não** pede a digital —
+> recuperação, a página de parada de emergência, e todo salvamento que **não** pede a digital,
 > marcar Reels, apagar palavras, testar um comentário, ver a prévia e desligar a automação. O que
 > exige JavaScript é a leitura da sua digital: cadastrar aparelho, entrar por digital e confirmar
 > mudanças protegidas.
@@ -2736,12 +2736,12 @@ Sem framework, sem roteador, sem modelo de estado, sem `innerHTML`, sem cache pr
 | Teclado certo | `inputmode="url"` no link; `autocapitalize="none"` e `autocomplete="off"` nas palavras e no código de parada; `enterkeyhint="done"` |
 | Ação sempre alcançável | Barra fixa embaixo, respeitando `env(safe-area-inset-bottom)` |
 | Sem depender de passar o mouse | Nada de tooltip; explicação é texto visível ou `<details>` |
-| Tema | `color-scheme: light dark` no `painel.css`, cores por `prefers-color-scheme` — mesma prática de `legal.ts` `[C]` |
+| Tema | `color-scheme: light dark` no `painel.css`, cores por `prefers-color-scheme`, mesma prática de `legal.ts` `[C]` |
 | Conexão ruim | Sem fonte externa, sem imagem além das miniaturas; CSS ~6 KB, HTML ~15 KB por tela |
-| Datas | `Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' })` no servidor; rodapé diz "Horários no fuso de Brasília" `[I]` — decisão consciente de fixar o fuso em vez de pedir configuração |
+| Datas | `Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' })` no servidor; rodapé diz "Horários no fuso de Brasília" `[I]`, decisão consciente de fixar o fuso em vez de pedir configuração |
 
 Acessibilidade: `<label for>` em todo campo; `<fieldset>` + `<legend>` em cada grupo de opções;
-**resumo de erros no topo do formulário** com links âncora para os campos com problema — o formato
+**resumo de erros no topo do formulário** com links âncora para os campos com problema, o formato
 natural do `dados_invalidos`, que devolve a lista de campos; `aria-live="polite"` nas faixas de
 aviso; estado **nunca** só por cor; contraste mínimo 4.5:1 nos dois temas; foco visível de 2px;
 `lang="pt-BR"` no `<html>` `[C]`.
@@ -2771,7 +2771,7 @@ aviso; estado **nunca** só por cor; contraste mínimo 4.5:1 nos dois temas; foc
 
 **A segunda coluna tem DOIS números porque a escrituração de sessão de §10.8 mora na guarda
 comum.** Ela soma +1 consulta e +1 escrita a toda tela autenticada, e no máximo uma vez a cada 15
-minutos por sessão — é a cadência de `vista_em`/`ociosa_ate`. "Entrar" e a parada de emergência
+minutos por sessão: é a cadência de `vista_em`/`ociosa_ate`. "Entrar" e a parada de emergência
 ficam fora da regra porque nenhuma das duas tem sessão. A nota é uma só, e não um número por
 linha, de propósito: repetir o +1 em nove lugares garante que um deles fique para trás no dia em
 que a cadência mudar.
@@ -2783,18 +2783,18 @@ As três divergências entre a redação original e o medido:
    `→ após 15 min` inteira.
 2. **Palavras, Mensagem e Ajustes pagavam 2 na redação e pagam 3 e 4.** O terceiro subrequest é a
    pergunta sobre a conta, que a barra do topo exige desde que §12.1 passou a querer a barra IGUAL
-   em toda tela — sem ela a barra diria "Ligada e respondendo" numa instalação que não consegue
+   em toda tela: sem ela a barra diria "Ligada e respondendo" numa instalação que não consegue
    enviar nada. O quarto, só em Ajustes, é o bloco de histórico da Etapa 10. Este número já
    estava velho antes desta rodada, e o laço antigo o media sem dizer que divergia.
 3. **"O que aconteceu" virou duas linhas.** A abertura simples paga 4; o 5 da redação original vale
    para o toque em "Atualizar", que é outra invocação. O `→ 6` daquela linha é derivado da nota
-   acima e não é medido por `TELA-20`, que abre as telas sem `?acao=atualizar` — marcado `[C]`
+   acima e não é medido por `TELA-20`, que abre as telas sem `?acao=atualizar`, marcado `[C]`
    por isso.
 
 O pior caso do painel é o toque em "Atualizar" com a tela cheia: 5 consultas + até 20 chamadas à
 Meta + 1 da escrituração de sessão = **26 dos 50 subrequests**. O gargalo do projeto continua
 sendo outro e é **anterior ao painel**: o `processEvents` do webhook pode estourar as 50
-consultas num lote com 10 ou mais comentários `[C]` — ver §16.
+consultas num lote com 10 ou mais comentários `[C]`, ver §16.
 
 ---
 
@@ -2802,14 +2802,14 @@ consultas num lote com 10 ou mais comentários `[C]` — ver §16.
 
 Duas decisões de método governam tudo:
 
-**T1 — Registro de garantias com ID estável, mais metatestes.** Cada garantia recebe um
+**T1: Registro de garantias com ID estável, mais metatestes.** Cada garantia recebe um
 identificador; o nome do teste em vitest **cita o ID**, o código que implementa a trava cita o ID num
 comentário, e nenhuma etapa é entregue enquanto o teste do seu ID não estiver verde. Os metatestes
 falham quando alguém cria uma rota nova sem protegê-la, uma tabela nova sem limpar entre testes, uma
 coluna que o `CREATE TABLE IF NOT EXISTS` não criou, ou um binding novo sem propagar. Sem isso, o
-risco real não é a trava quebrar — é a trava nunca ter sido aplicada a uma superfície criada depois.
+risco real não é a trava quebrar: é a trava nunca ter sido aplicada a uma superfície criada depois.
 
-**T2 — WebAuthn testado por duas fontes independentes:** um autenticador de software escrito no
+**T2: WebAuthn testado por duas fontes independentes:** um autenticador de software escrito no
 próprio repositório e **vetores congelados** capturados de hardware real. Só o software daria testes
 simétricos (o mesmo autor comete o mesmo erro dos dois lados e tudo passa); só os vetores dariam
 cobertura pobre. Juntos, o software gera variação e os vetores provam que a variação corresponde ao
@@ -2844,7 +2844,7 @@ helpers não viram suítes vazias.
 
 ### 13.2 As garantias, agrupadas
 
-**SES — Sessão (13).** Sessão expirada recusada; assinada com outro segredo recusada; `expira_em`
+**SES: Sessão (13).** Sessão expirada recusada; assinada com outro segredo recusada; `expira_em`
 adulterado recusado por assinatura; envelope de propósito errado recusado; **assinatura conferida
 antes do prazo** (preserva o comportamento de `oauth-state.ts` `[C]`); cookie sai com os quatro
 atributos; cookie não aparece no corpo nem em outro cabeçalho; **apagar a linha invalida a sessão na
@@ -2858,7 +2858,7 @@ sem cookie recusada; `Origin` de outro domínio recusado mesmo com ficha correta
 na query string não é aceita; sem `Origin`, só passa com `Sec-Fetch-Site: same-origin`; sem os dois,
 `origem_invalida`.
 
-**CONV — Convite e registro (12).** Convite válido gera options; **usado duas vezes falha na
+**CONV: Convite e registro (12).** Convite válido gera options; **usado duas vezes falha na
 segunda**; expirado recusado; assinado com outro segredo recusado; prazo adulterado recusado;
 **registro sem convite e sem código é recusado ANTES de gerar as options**; com passkey já
 cadastrada, o convite `pre=0` não abre registro; registro recusado não deixa linha; código de
@@ -2868,7 +2868,7 @@ uma vence** (padrão `ON CONFLICT DO NOTHING` com `Promise.all`, como já se tes
 `repositories.test.ts` `[C]`). Mais o teste do Lema 1: `INSERT INTO painel_credenciais` aparece em
 exatamente um arquivo de `src/`. E: **registro bem-sucedido NÃO emite cookie de sessão**.
 
-**WA — WebAuthn (29).** ES256 e RS256 válidos aceitos; desafio expirado recusado; desafio de outro
+**WA: WebAuthn (29).** ES256 e RS256 válidos aceitos; desafio expirado recusado; desafio de outro
 propósito recusado; desafio vindo do corpo ignorado; `webauthn.create` recusado no login; origem
 `...workers.dev.evil.com` recusada; origem com barra final ou porta recusada; `rpIdHash` de outro RP
 recusado; `UP=0` recusado; **`UV=0` recusado tanto no login quanto no step-up**; assinatura de outra
@@ -2879,11 +2879,11 @@ responde igual a assinatura inválida; `signCount` que regride avisa mas **não*
 sempre 0 aceito; flags BE/BS extraídas e expostas; `fmt` diferente de `none` recusado; COSE com
 `alg` fora de -7/-257 recusado; corpo de `/painel/api/*` acima de **8 KB** recusado antes do parse;
 credencial de outro dono não aceita; **limitação conhecida documentada como teste:** o mesmo desafio
-reapresentado dentro dos 120 s ainda é aceito — se um dia alguém implementar uso único de verdade,
+reapresentado dentro dos 120 s ainda é aceito, se um dia alguém implementar uso único de verdade,
 esse teste falha e obriga a decisão consciente; corpo de formulário acima de **32 KB** recusado;
 corpo de `/painel/parada` acima de **1 KB** recusado antes de tocar o D1.
 
-**LNK — Allowlist (16).** Link fora da lista recusado e nada gravado; host exato aceito; subdomínio
+**LNK: Allowlist (16).** Link fora da lista recusado e nada gravado; host exato aceito; subdomínio
 só com a regra explícita; `https://evil-exemplo.com` recusado; `https://exemplo.com.evil.com`
 recusado; `https://exemplo.com@evil.com` recusado; `http://` recusado mesmo com host permitido;
 `javascript:`, `data:` e `//` recusados; punycode ou homógrafo recusado; **URL dentro do texto do
@@ -2892,7 +2892,7 @@ Direct passa pela allowlist**; idem no texto público; **allowlist vazia recusa 
 allowlist para a automação já rodando; automação por mídia com link próprio fora da lista barrada;
 **restaurar uma versão da auditoria com link hoje proibido é recusado pelo mesmo validador**.
 
-**STEP — Step-up (17).** Ausente bloqueia texto do Direct e link; **fora dos 120 s bloqueia**; `UV=0`
+**STEP: Step-up (17).** Ausente bloqueia texto do Direct e link; **fora dos 120 s bloqueia**; `UV=0`
 recusado; step-up do link não autoriza gravar o texto; **o mesmo step-up não serve para duas
 gravações**; **`op_hash` recalculado no servidor** (step-up de um conteúdo não autoriza outro);
 `contains` exige step-up; baixar o cooldown exige; **`mediaScope` para `'todas'` exige**; **desligar
@@ -2901,7 +2901,7 @@ privilegiada: duas gravações seguidas exigem dois step-ups**; `publicReplyText
 step-up é amarrado ao `sid`; 10 falhas apagam a sessão. Mais o teste de `json_canonico` com vetores
 congelados: **o mesmo hash a partir do JSON da cerimônia e do formulário urlencoded**.
 
-**STOP — Parada (14).** Código correto desliga sem sessão; **`GET /painel/parada` redireciona para
+**STOP: Parada (14).** Código correto desliga sem sessão; **`GET /painel/parada` redireciona para
 `/painel/parar`**, que serve o asset; código na query string nunca é lido; **código errado responde
 `codigo_incorreto` e não provoca escrita**; a resposta não contém link, texto nem campo de config;
 código errado custa **1 leitura e 0 escrita**; depois da parada, `evaluateComment` devolve
@@ -2910,10 +2910,10 @@ editar; a comparação passa por `timingSafeEqual` (provado injetando um compara
 das três respostas contém configuração, link, contagem ou estado da conta**; a página não informa se
 existe código cadastrado; falha de D1 devolve a terceira resposta; e, o mais importante,
 **`PANEL_RP_ID` ausente (o binding chega como `undefined`, não como string vazia) derruba `GET
-/painel` em `503` e a parada continua desligando a automação** — a rota é desviada antes do portão de
+/painel` em `503` e a parada continua desligando a automação**, a rota é desviada antes do portão de
 sanidade (§11.1), e nenhuma linha do roteador lança `TypeError` nesse cenário.
 
-**CFG — Config e falha segura (18).** Linha ausente usa o padrão de fábrica com `origem: 'arquivo'`;
+**CFG: Config e falha segura (18).** Linha ausente usa o padrão de fábrica com `origem: 'arquivo'`;
 linha corrompida **deixa a automação parada**; tipo errado idem; campo desconhecido do banco
 descartado; **o parser nunca produz chave com valor `undefined`**; patch com campo ausente **não**
 zera o global; `processComment` continua sem lançar com config corrompida; **`matchMode` inválido
@@ -2924,7 +2924,7 @@ comentários executa menos de 50 queries**; gravar config inválida é recusado 
 usa a fábrica e sinaliza; linha de mídia inválida recebe `{ enabled: false }` e as outras seguem;
 linhas órfãs ignoradas com aviso; erro de D1 vira `parado_por_erro` cacheado com o TTL longo.
 
-**MID — Reels (13).** `media_id` de 18 dígitos sobrevive ao round-trip sem virar `Number`; id que não
+**MID: Reels (13).** `media_id` de 18 dígitos sobrevive ao round-trip sem virar `Number`; id que não
 veio da listagem é recusado; `'selecionadas'` com lista vazia e automação ligada não pode ser salvo;
 falha da Meta não permite salvar seleção; mídia apagada continua marcada como indisponível;
 `entry[].id` diferente do `ig_user_id` é ignorado; a tela responde `private, no-store` + `Vary`;
@@ -2932,7 +2932,7 @@ falha da Meta não permite salvar seleção; mídia apagada continua marcada com
 itens; a tela exige sessão; acima de 200 mídias recusado; acima de 20 ids novos recusado;
 **`?midia=` casa por query string e nenhum caminho tem segmento variável**.
 
-**ATV — "O que aconteceu" (11).** **O painel nunca executa escrita em `processed_comments`**;
+**ATV: "O que aconteceu" (11).** **O painel nunca executa escrita em `processed_comments`**;
 **nenhuma consulta do painel retorna `commenter_scoped_id_hash`**; a consulta usa colunas nomeadas e
 `LIMIT 20`; a tela **nunca emite mais de 20 chamadas à Meta por invocação**; as chamadas saem em
 blocos de no máximo 6 simultâneas; o orçamento é conferido antes de disparar (com N linhas, o total
@@ -2941,13 +2941,13 @@ Graph API degrada para a lista sem @, com faixa, e a tela continua abrindo; **o 
 o `console` nem para `painel_auditoria`, e não sobrevive ao fim da requisição**; um username contendo
 `<script>` sai escapado; sem toque em "Atualizar" nenhuma chamada à Meta é feita. Mais o dicionário
 de tradução como função pura, percorrendo o tipo **`CommentStatus` de
-`src/repositories/comments-repository.ts`** — e não `SkipReason`: todo valor do enum tem frase, e um
+`src/repositories/comments-repository.ts`**: e não `SkipReason`: todo valor do enum tem frase, e um
 valor novo sem tradução quebra. E o par que sustenta a frase honesta da tela: **a automação não grava
 linha para comentário ignorado** (com um evento que casa cada `SkipReason`, o contador de escritas de
 §13.4 fica em zero) e **a tela renderiza o aviso de "só os atendidos aparecem" sempre**, inclusive
 com a lista vazia.
 
-**HDR — Cabeçalhos, HTML e vazamento (10).** CSP canônica em toda página, sem `unsafe-inline` nem
+**HDR: Cabeçalhos, HTML e vazamento (10).** CSP canônica em toda página, sem `unsafe-inline` nem
 `unsafe-eval` e com `require-trusted-types-for`; `img-src` só com `'self'`, `data:` e os CDNs da
 Meta; `private, no-store` + `Vary: Cookie` em toda resposta; `nosniff` e `no-referrer`; **nenhum
 corpo de erro contém stack trace, nome de exceção, nome de coluna nem a palavra "payload"** (laço
@@ -2955,25 +2955,25 @@ sobre todas as rotas com entrada inválida, afirmando que o corpo não casa
 `/Error|at \w+ \(|SQLITE|D1_|undefined|payload/`); **valor vindo do banco interpolado no HTML passa
 por `escapeHtml`**; `/health` devolve o corpo de hoje mais **exatamente um** campo novo, em
 `corpo.painel`, com um dos **três** valores públicos quando não há `Authorization` e um dos **seis**
-sob Bearer válido — e **`sem_passkey` nunca aparece numa resposta sem Bearer** (§11.9); **toda
+sob Bearer válido: e **`sem_passkey` nunca aparece numa resposta sem Bearer** (§11.9); **toda
 página é montada pela tag `` html`` ``** (laço que renderiza cada tela com um valor de banco contendo
 `<script>` e afirma que a saída não contém `<script>`); nenhuma resposta traz `Access-Control-*` e
 `OPTIONS` devolve 405.
 
-**RL — Rate limit (10).** A décima primeira tentativa dentro de 60 s é recusada com 429; passada a
+**RL: Rate limit (10).** A décima primeira tentativa dentro de 60 s é recusada com 429; passada a
 janela libera; IPs diferentes não compartilham contador; requisição sem `CF-Connecting-IP` cai num
 balde global e continua limitada; **tentativa de login recusada executa zero escritas**; **com o
 binding ausente, o limitador de reserva assume e o login continua limitado**; o limitador do painel
 não se aplica ao webhook; login bem-sucedido zera o contador daquele IP; **a parada tem limite
 próprio, mais generoso**; **os três bindings são distintos e cada família de rota fala com o seu**.
 
-**AUD — Auditoria (5).** Toda gravação registra evento com data, credencial usada e campos
+**AUD: Auditoria (5).** Toda gravação registra evento com data, credencial usada e campos
 alterados; o registro **não** guarda código, cookie, `credential_id` inteiro, IP nem `User-Agent`;
 tentativa recusada também registra, com `antes = depois = NULL`; teto de 500 linhas com a mais antiga
 saindo; **nenhum valor de configuração vai para o `console`**.
 
-**META — Metatestes (9).** Toda rota registrada exige sessão, salvo a allowlist **escrita no teste**
-— `['/painel/entrar', '/painel/entrar/codigo', '/painel/convite', '/painel/parada',
+**META: Metatestes (9).** Toda rota registrada exige sessão, salvo a allowlist **escrita no teste**
+`['/painel/entrar', '/painel/entrar/codigo', '/painel/convite', '/painel/parada',
 '/painel/api/entrar/opcoes', '/painel/api/entrar/verificar', '/painel/api/registrar/opcoes',
 '/painel/api/registrar/verificar']`; todo POST autenticado exige ficha CSRF, salvo as exceções
 escritas no teste; toda tabela do schema aparece em `limparBanco()`; todo binding **obrigatório**
@@ -2984,7 +2984,7 @@ gravável está classificado como exige/não exige step-up (`allowedMediaIds` **
 **`PRAGMA table_info` de cada tabela confere o conjunto exato de colunas**; todo caminho da tabela de
 rotas é string exata, começa por `/painel` e não tem segmento variável.
 
-**REG — Regressão (30).** Congelam o comportamento de hoje **antes** de qualquer linha do painel
+**REG: Regressão (30).** Congelam o comportamento de hoje **antes** de qualquer linha do painel
 existir. Webhook: POST assinado **sem cookie e sem ficha CSRF** continua 200 `EVENT_RECEIVED`;
 assinatura inválida continua 401; corpo acima de 512 KB continua 413 mesmo com assinatura válida;
 `content-length` mentiroso continua 413 antes de ler o corpo; PUT continua 405; a assinatura continua
@@ -3007,7 +3007,7 @@ painel que entrou nele; **`routePainel` devolve `null` para `/webhooks/instagram
 
 **A regra dura:** os seis arquivos de teste atuais **não são editados** durante as etapas 0 a 15. Se
 uma mudança do painel obrigar a alterar `tests/webhook.test.ts`, `tests/automation.test.ts` ou
-`tests/security.test.ts`, isso **é** a regressão — e o sinal para parar, não para ajustar o teste. A
+`tests/security.test.ts`, isso **é** a regressão, e o sinal para parar, não para ajustar o teste. A
 única exceção é a migração mecânica de `limparBanco()`.
 
 ### 13.3 Como testar WebAuthn sem hardware
@@ -3016,14 +3016,14 @@ uma mudança do painel obrigar a alterar `tests/webhook.test.ts`, `tests/automat
 **produz os mesmos bytes que um autenticador real produziria** usando `crypto.subtle`:
 
 1. Par de chaves: ES256 `ECDSA/P-256`; RS256 `RSASSA-PKCS1-v1_5` 2048 bits, expoente `[1,0,1]`.
-2. Chave pública COSE: exporta JWK e monta o mapa CBOR de inteiros — `{1:2, 3:-7, -1:1, -2:x, -3:y}`
+2. Chave pública COSE: exporta JWK e monta o mapa CBOR de inteiros, `{1:2, 3:-7, -1:1, -2:x, -3:y}`
    para EC2, `{1:3, 3:-257, -1:n, -2:e}` para RSA. Exige um **codificador** CBOR mínimo (~40 linhas).
    O decodificador de produção e o codificador de teste são escritos separados, por definição
    independentes.
 3. `authData`: `SHA-256(rpId)` (32) `|| flags` (1) `|| signCount` big-endian (4) e, só no registro,
    `aaguid` de 16 zeros `|| credIdLen` (2) `|| credentialId || cosePublicKey`.
 4. `clientDataJSON` serializado como texto e convertido para bytes.
-5. Assinatura sobre `authData || SHA-256(clientDataJSON)` — nunca sobre o JSON.
+5. Assinatura sobre `authData || SHA-256(clientDataJSON)`, nunca sobre o JSON.
 6. **DER:** o WebCrypto assina ECDSA em raw `r||s`; um autenticador real devolve ASN.1 DER. O dublê
    **converte raw → DER**, o inverso do que a produção faz. Sem esse passo o teste jamais exercita o
    caminho DER e a armadilha maior do projeto passa despercebida.
@@ -3031,22 +3031,22 @@ uma mudança do painel obrigar a alterar `tests/webhook.test.ts`, `tests/automat
 
 `autenticarComRAlto` assina em laço até obter um `r` com o bit mais alto ligado (~50%, converge em
 poucas voltas). `autenticarComRCurto` precisaria de ~1500 tentativas (~1/256) e por isso **vem dos
-vetores congelados**, não do laço — honesto e barato. Mutação para os casos negativos: helpers puros
+vetores congelados**, não do laço: honesto e barato. Mutação para os casos negativos: helpers puros
 `trocarByte`, `comOrigin`, `comTipo`, `comRpId`, `semUv`, cada um alterando exatamente uma coisa.
 
 **Vetores congelados** (`tests/fixtures/vetores-webauthn.ts`), capturados **uma vez** de aparelhos
 reais e commitados como base64url. Não contêm segredo: são chave pública, assinatura, desafio e
-metadados — exatamente o que o servidor já recebe pela rede. Conjunto mínimo: `registroEs256Android`
+metadados: exatamente o que o servidor já recebe pela rede. Conjunto mínimo: `registroEs256Android`
 (Chrome/Android), `registroRs256WindowsHello` (TPM, o único caminho RS256), `loginEs256Icloud`
 (signCount 0, BE=1 BS=1), `loginEs256DerRAlto`, `loginEs256DerRCurto` e **`loginSemUv`**, que é um
 vetor **negativo**: prova que UV=0 é recusado nos dois fluxos. Cada vetor vem com o `rpId`, o
-`origin` e o desafio que valiam na captura. Um teste dedicado — "os vetores capturados de hardware
-real são aceitos pelo verificador" — é o único que prova que o `AutenticadorFalso` não está apenas
+`origin` e o desafio que valiam na captura. Um teste dedicado, "os vetores capturados de hardware
+real são aceitos pelo verificador": é o único que prova que o `AutenticadorFalso` não está apenas
 concordando consigo mesmo.
 
 **O que não dá para provar, e não vamos fingir:** que o **navegador** recusa um `rpId` errado (quem
 impõe isso é o navegador); que `UV=1` significa biometria conferida (ligamos o bit no teste); que
-`residentKey`/`excludeCredentials` fazem efeito (são instruções para o autenticador — testável só
+`residentKey`/`excludeCredentials` fazem efeito (são instruções para o autenticador, testável só
 como "as options contêm esses campos"); anti-replay real do desafio; fluxo cross-device por QR; a
 exigência de gesto do usuário no Safari; compatibilidade real de cada gerenciador de senhas. O
 Virtual Authenticator do Chrome DevTools daria um E2E de navegador, e foi **descartado do portão
@@ -3055,7 +3055,7 @@ fica como ferramenta opcional de depuração, documentada, fora do `npm run chec
 
 ### 13.4 Rate limit e o contador de consultas
 
-O limitador vira uma **porta** com três implementações — `LimitadorDeBinding` (usa o binding da
+O limitador vira uma **porta** com três implementações, `LimitadorDeBinding` (usa o binding da
 família da rota), `LimitadorDeReserva` (janela em memória por isolate mais Cache API, para quando o
 binding não existe) e `LimitadorFalso` (dublê injetado). Três camadas de teste, nenhuma tocando a
 rede: o **algoritmo puro** com `agora` injetado (inclusive relógio que anda para trás, que não pode
@@ -3077,7 +3077,7 @@ class D1Contador {
 }
 ```
 
-É o único jeito honesto de transformar "não gasta cota" — que é uma afirmação sobre faturamento — em
+É o único jeito honesto de transformar "não gasta cota", que é uma afirmação sobre faturamento, em
 uma afirmação sobre **código**. **O que o teste de rate limit não prova:** que o limite segura um
 atacante real. O contador do binding é por data center e eventualmente consistente `[C]`; a proteção
 da cota diária vem de outro lugar, e esse residual precisa estar **escrito na documentação**, não
@@ -3093,7 +3093,7 @@ escondido atrás de um teste verde.
 | 8 | Todo binding de `src/types/env.ts` aparece em `wrangler.jsonc`, `.dev.vars.example` e nos bindings do `vitest.config.ts` (exceção declarada: os três `ratelimits`) | falha |
 | 9 | `ALLOWED_LINK_DOMAINS` não está vazio nem com o domínio de exemplo | falha |
 | 10 | `PANEL_RP_ID` não está vazio, não é `workers.dev` puro e não tem esquema nem barra | falha |
-| ~~11~~ | **APAGADA.** `PANEL_ORIGIN` não existe | — |
+| ~~11~~ | **APAGADA.** `PANEL_ORIGIN` não existe |, |
 | 12 | No `.dev.vars`, `PANEL_SESSION_KEY` difere de `TOKEN_ENCRYPTION_KEY` e de `SETUP_ADMIN_TOKEN` | falha |
 | 13 | Os **três** arquivos de `public/` não têm `<script>` inline, `onclick=` nem `javascript:` | falha |
 | 14 | A varredura de segredos cobre `public/` e o handler de `/setup/painel/codigos` | falha |
@@ -3105,31 +3105,31 @@ escondido atrás de um teste verde.
 
 O número 11 fica **vago de propósito**: renumerar faria "checagem 13", "15" e "18" significarem
 coisas diferentes em partes diferentes do projeto. A checagem 13 cobre **só** `public/`: a proibição
-de `onclick=` e `javascript:` no HTML **gerado** é teste (HDR), não grep — e essa é uma das
+de `onclick=` e `javascript:` no HTML **gerado** é teste (HDR), não grep, e essa é uma das
 consequências práticas de o HTML nascer no Worker. A checagem 19 é a casa **única** da garantia sobre
 `cru(` (ver §15.3): a alternativa era um teste dependente de `import.meta.glob(..., { query: '?raw' })`
-sob `vitest-pool-workers`, comportamento não verificado — uma garantia que pode nascer quebrada por
+sob `vitest-pool-workers`, comportamento não verificado, uma garantia que pode nascer quebrada por
 detalhe de bundler ensina a equipe a ignorá-la.
 
 **Opção nova no assistente local**, item **"6. Conferir o painel"**, usando `GET /health` e o campo
 único novo (§11.9). E, **localmente**, sem campo novo nenhum: conferir se o `PANEL_RP_ID` do
-`wrangler.jsonc` é igual ao host que o assistente está usando para falar com o Worker — a situação
+`wrangler.jsonc` é igual ao host que o assistente está usando para falar com o Worker, a situação
 que **invalida todas as passkeys** e não tem migração, e que merece aviso em letras grandes.
 
 **Checklist manual, feito uma vez por aparelho e registrado com data:** passkey em hardware real
-(iPhone/Safari, Android/Chrome, Windows Hello — o único caminho RS256 —, Mac/Touch ID, login
+(iPhone/Safari, Android/Chrome, Windows Hello, o único caminho RS256, Mac/Touch ID, login
 cross-device por QR, e uma chave de segurança sem PIN **só para capturar o vetor negativo**); captura
 dos vetores congelados durante esse ensaio; **ensaio de perda e recuperação** (apagar todas as
-passkeys e recuperar com código, depois gerar convite novo pelo terminal) — feito **antes** de o dono
+passkeys e recuperar com código, depois gerar convite novo pelo terminal), feito **antes** de o dono
 depender do painel, não no dia em que perder o telefone; **parada de emergência de verdade**, com a
 automação ligada, acionada de um aparelho deslogado, confirmando que o Direct parou e que a segunda
 tentativa não grava nada; e o **passo a passo do step-up com olhos de leigo**, confirmando que a tela
-mostra o valor literal antes da biometria — a única parte da trava que nenhum teste alcança.
+mostra o valor literal antes da biometria, a única parte da trava que nenhum teste alcança.
 
 **Propriedades não testáveis por natureza:** que uma comparação é realmente de tempo constante (o
 teste só prova que a função certa foi chamada); que uma mensagem não vaza informação por **tempo de
-resposta**; que a entropia de `crypto.getRandomValues` é boa. E os limites de plataforma — 100.000
-requisições/dia, 50 subrequests e 10 ms de CPU — **não são impostos pelo Miniflare**: o teste de
+resposta**; que a entropia de `crypto.getRandomValues` é boa. E os limites de plataforma, 100.000
+requisições/dia, 50 subrequests e 10 ms de CPU, **não são impostos pelo Miniflare**: o teste de
 consultas por lote é a melhor aproximação disponível; os outros dois só aparecem em produção.
 
 ---
@@ -3140,10 +3140,10 @@ Cada etapa é entregável e verificável sozinha: começa por um teste que **fal
 termina com `npm run check` verde, e tem uma forma de o dono conferir com os próprios olhos. Nenhuma
 etapa avança com a anterior vermelha.
 
-### Etapa 0 — Rede de segurança (nenhuma linha de painel)
+### Etapa 0: Rede de segurança (nenhuma linha de painel)
 
 Congelar o presente antes de mexer nele. **Primeiro teste que falha:** *"POST assinado sem cookie e
-sem ficha CSRF continua 200"* — falha porque `regressao-webhook.test.ts` ainda não existe.
+sem ficha CSRF continua 200"*: falha porque `regressao-webhook.test.ts` ainda não existe.
 
 Escreve as três suítes de regressão, `tests/fixtures/banco.ts` (com `limparBanco()` único),
 `tests/fixtures/dubles.ts` (`D1Contador`), o metateste de tabelas e `migrations/CHECKSUMS.txt` com o
@@ -3152,34 +3152,34 @@ painel (§16): o fatiamento do lote para caber nas 50 consultas por invocação;
 `.replace('{link}', ...)` cru de `index.ts:214` por `renderTemplate`; e a remoção de `configForEvent`,
 código morto. **Verificação do dono:** `npm run check` verde com ~40 testes novos, produção intocada.
 
-### Etapa 1 — Sessão assinada com claims (sem HTTP)
+### Etapa 1: Sessão assinada com claims (sem HTTP)
 
 `src/security/signed-envelope.ts` generaliza `oauth-state.ts` para carregar propósito, claims e TTL
 parametrizável, **sem alterar** `createState`/`validateState` (as regressões de OAuth protegem isso).
 `base64url.ts` ganha o `decode`. Binding novo `PANEL_SESSION_KEY`, raiz das quatro subchaves,
 propagado pelos cinco lugares. Entrega o grosso de SES e os metatestes de binding.
 
-### Etapa 2 — Config no D1, só leitura
+### Etapa 2: Config no D1, só leitura
 
 `migrations/0002_painel_config.sql`, `painel-config-repository.ts`, `config-store.ts` (snapshot,
 cache por isolate, `invalidarCacheDeConfig()`) e `config-validation.ts` (o validador único).
 `src/config.ts` **intocado**. Entrega CFG e a primeira versão do `PRAGMA table_info`. **Verificação:**
 o dono insere uma linha por `wrangler d1 execute` e vê a automação mudar de comportamento **sem
-redeploy**; corrompe a linha à mão e vê a automação **parar** — não "consertar".
+redeploy**; corrompe a linha à mão e vê a automação **parar**, não "consertar".
 
-### Etapa 3 — Allowlist de domínios (função pura)
+### Etapa 3: Allowlist de domínios (função pura)
 
 `src/services/link-allowlist.ts`, aplicado já na **leitura** da config, em link e em texto.
 **Verificação:** com a allowlist estreita e um link fora dela no banco, a automação para.
 
-### Etapa 4 — Parada de emergência, códigos, e o nascimento da auditoria
+### Etapa 4: Parada de emergência, códigos, e o nascimento da auditoria
 
 Entregue **antes** do painel, de propósito: o dono ganha o botão de pânico enquanto o resto ainda
 está sendo construído. `migrations/0003_painel_codigos.sql`, `panel-codes.ts`, `POST /painel/parada`,
 o asset `public/painel/parar/index.html`, e `POST /setup/painel/codigos` (o **Worker** gera os 6+1
 códigos e devolve o texto uma única vez).
 
-**É aqui que `painel_auditoria` começa a receber escrita** — não na etapa 10. Motivo: os dois
+**É aqui que `painel_auditoria` começa a receber escrita**, não na etapa 10. Motivo: os dois
 primeiros eventos auditáveis do projeto nascem nesta etapa (`codigos_gerados` e `parada_acionada`), e
 a parada é justamente o evento que mais precisa de registro. A contabilidade das duas pontas fica
 assim, e é ela que os testes afirmam:
@@ -3194,28 +3194,28 @@ assim, e é ela que os testes afirmam:
 
 A etapa 10 não "cria" a auditoria: ela acrescenta as linhas de **mudança de configuração**, que são
 as únicas que preenchem `antes` e `depois`, mais o bloco de histórico na tela. **Verificação:** do
-celular, deslogado, o dono desliga a automação com o código impresso no papel — e lê uma frase que
+celular, deslogado, o dono desliga a automação com o código impresso no papel, e lê uma frase que
 diz claramente se deu certo.
 
-### Etapa 5 — Rate limit
+### Etapa 5: Rate limit
 
 A porta `Limitador` com as três implementações. Os **três** bindings opcionais entram no
 `wrangler.jsonc`; o ambiente de teste segue **sem** eles, de propósito. Aplica já na rota de parada.
 
-### Etapa 6 — Verificação WebAuthn (pura, sem rota)
+### Etapa 6: Verificação WebAuthn (pura, sem rota)
 
 `AutenticadorFalso`, CBOR mínimo, COSE→JWK, DER→raw e a verificação completa. Os vetores congelados
-entram aqui — o que exige o checklist manual de hardware **nesta etapa**, não no fim. É a maior massa
+entram aqui: o que exige o checklist manual de hardware **nesta etapa**, não no fim. É a maior massa
 de testes do projeto.
 
-### Etapa 7 — Convite de uso único e registro da primeira passkey
+### Etapa 7: Convite de uso único e registro da primeira passkey
 
 `migrations/0004_painel_acesso.sql`, `GET /painel/convite`, `/painel/api/registrar/opcoes` e
 `/verificar`, recusa quando já existe passkey, e o teste do caminho único de `INSERT`.
 **Verificação:** o dono gera o convite no terminal e registra a passkey do próprio celular; tenta de
 novo com o mesmo link e é recusado.
 
-### Etapa 8 — Login, cookie e o portão de rotas
+### Etapa 8: Login, cookie e o portão de rotas
 
 `rotas.ts`, `router.ts` entrando pelo `default:`, `guardas.ts`, `html.ts` (a tag `` html`` ``,
 `cru()`, `pagina()`, `cabecalhos(perfil)`) e `resposta.ts` com a tabela de erros.
@@ -3223,7 +3223,7 @@ novo com o mesmo link e é recusado.
 de rota. **Verificação:** o dono entra no painel com a digital e vê uma página que ainda não edita
 nada.
 
-### Etapa 9 — Leitura da configuração na tela
+### Etapa 9: Leitura da configuração na tela
 
 **Primeiro teste que falha:** *"valor vindo do banco interpolado no HTML passa por `escapeHtml`"*.
 As telas de Início, Palavras, Mensagem e Ajustes sobem em modo leitura, e `/painel/atividade` sobe na
@@ -3231,7 +3231,7 @@ As telas de Início, Palavras, Mensagem e Ajustes sobem em modo leitura, e `/pai
 `painel_midias` e `account_tokens`. Entrega o dicionário de tradução e as garantias de escape.
 **Verificação:** o dono vê, do celular, a configuração que hoje só existe em TypeScript.
 
-### Etapa 10 — Escrita dos campos de risco baixo
+### Etapa 10: Escrita dos campos de risco baixo
 
 Formulário POST → `303` → `GET ...?ok=`. Gatilhos, flags de normalização, `enabled`, cooldown **para
 cima**. A auditoria de configuração nasce aqui, com `antes`/`depois` completos no D1 e **nenhum
@@ -3240,7 +3240,7 @@ botão "Voltar a esta versão" (que reenvia o `antes` pela rota normal de grava�
 hoje). **Verificação:** o dono muda uma palavra-gatilho pelo celular e vê valer sem redeploy; abre o
 histórico e vê o valor anterior.
 
-### Etapa 11 — Step-up e os campos de risco alto
+### Etapa 11: Step-up e os campos de risco alto
 
 Classificação de risco por campo, `POST /painel/api/stepup/opcoes`, o cookie `__Host-painel_stepup`,
 `json_canonico` especificado e testado, `op_hash` recalculado no servidor, e a tela intermediária
@@ -3248,29 +3248,29 @@ Classificação de risco por campo, `POST /painel/api/stepup/opcoes`, o cookie `
 barrado; com digital funciona; link fora da allowlist é barrado **mesmo com digital**; e duas
 mudanças seguidas pedem duas digitais.
 
-### Etapa 12 — Reels e automações por mídia (a prioridade do dono)
+### Etapa 12: Reels e automações por mídia (a prioridade do dono)
 
 Listagem paginada, seleção por clique, `mediaScope`, sobreposições por mídia, unicidade de
 `media_id`, `/painel/reel?midia=`. **Verificação:** o dono escolhe os Reels clicando. É o que ele
 pediu em primeiro lugar.
 
-### Etapa 13 — Recuperação, múltiplos aparelhos e revogação
+### Etapa 13: Recuperação, múltiplos aparelhos e revogação
 
 Entrada por código de recuperação, várias passkeys (teto de 10), tela de Aparelhos com apelido e
 flags BE/BS, remoção com step-up, geração de códigos pela tela e `POST /setup/painel/zerar`.
 **Verificação:** ensaio completo de perda de aparelho, feito de verdade.
 
-### Etapa 14 — "O que aconteceu" com o @ ao vivo
+### Etapa 14: "O que aconteceu" com o @ ao vivo
 
 A consulta paginada a `processed_comments` com colunas nomeadas, a busca do @ em blocos de 6, o
 orçamento de subrequests conferido antes de disparar, o texto de comentário apagado, a degradação
 quando a Graph API falha, e o "Ver mais". Mais o dicionário de `CommentStatus` e o aviso obrigatório
-de que **só os comentários atendidos aparecem** (§12.6) — a etapa não sobe sem essa frase na tela, sob
+de que **só os comentários atendidos aparecem** (§12.6), a etapa não sobe sem essa frase na tela, sob
 pena de entregar menos do que §3 promete. **Pré-requisito:** o teste `[V]` de §12.6 precisa ter sido
-feito em conta real antes desta etapa. **Verificação:** o dono abre a tela e vê quem recebeu — e lê,
+feito em conta real antes desta etapa. **Verificação:** o dono abre a tela e vê quem recebeu, e lê,
 sem procurar, por que quem não recebeu não está ali.
 
-### Etapa 15 — Portões de publicação e documentação
+### Etapa 15: Portões de publicação e documentação
 
 As checagens 8 a 10 e 12 a 19 do `verificar-antes-de-publicar.mjs`; a opção "6. Conferir o painel" no
 assistente; a reescrita do manifesto de `configurar.mjs:12-19` para "por que o painel é seguro"; as
@@ -3319,7 +3319,7 @@ do primeiro cadastro elas ficam caras.
    (lista com horário e resultado) ou sem a lista (só os estados e as pendências)? A recomendação
    deste documento é a primeira.
 4. **Cloudflare Access** entra como camada opcional documentada? Ela provavelmente barra antes de
-   invocar o Worker, o que economizaria cota `[V — a documentação da Cloudflare se contradiz sobre
+   invocar o Worker, o que economizaria cota `[V, a documentação da Cloudflare se contradiz sobre
    `.workers.dev`]`. Testar custa uma tarde; virar requisito está proibido.
 5. **Retenção de 500 linhas de auditoria** é suficiente, ou o dono quer mais histórico? Mais linhas
    não custam quase nada em leitura, mas ocupam espaço e não têm tela de busca.
@@ -3328,7 +3328,7 @@ do primeiro cadastro elas ficam caras.
 7. **Como o painel é anunciado no README:** recurso principal, ou recurso avançado com o aviso de
    cota de §5.3 na mesma página? O aviso é obrigatório nas duas opções; muda só o destaque.
 
-### 15.2 Pendências `[V]` — todas bloqueiam uma frase na documentação, nenhuma bloqueia código
+### 15.2 Pendências `[V]`: todas bloqueiam uma frase na documentação, nenhuma bloqueia código
 
 | # | Pendência | Quem depende | Se falhar |
 |---|---|---|---|
@@ -3342,7 +3342,7 @@ do primeiro cadastro elas ficam caras.
 | 8 | Leitura de nó de comentário por id devolve `username` | só o @ da tela de atividade | ver a pergunta 3 de §15.1 |
 | 9 | Cloudflare Access em `.workers.dev` | camada opcional | documentar o resultado com data; nunca virar requisito |
 | 10 | Retenção dos Workers Logs no plano gratuito | política de privacidade | escrever "retenção definida pela Cloudflare" |
-| 11 | `__Host-` em navegadores antigos de celular | o cookie | medir; **não há plano B aceitável** — o prefixo fica |
+| 11 | `__Host-` em navegadores antigos de celular | o cookie | medir; **não há plano B aceitável**, o prefixo fica |
 | 12 | CPU da carga fria com 200 mídias dentro dos 10 ms | o teto de 200 | baixar para 100, e o teste de teto muda de número junto |
 | 13 | Invocação de cron conta contra as 100.000 | a aritmética de §5.2 | ajustar a conta, que já sobra por duas ordens de grandeza |
 | 14 | Reconhecer "tabela inexistente" pela mensagem de erro do D1 | o estado de migration não aplicada | o remédio primário continua sendo a ordem documentada do deploy: migration antes do código |
@@ -3353,7 +3353,7 @@ Um autor único não pode se contradizer. Estas oito divergências existiam entr
 origem e foram **decididas** aqui:
 
 1. **`POST /painel/entrar/codigo` emite sessão?** **Não.** O código de recuperação só permite
-   **cadastrar uma passkey nova**, e nunca cria sessão sozinho — um código não pode virar senha. O
+   **cadastrar uma passkey nova**, e nunca cria sessão sozinho, um código não pode virar senha. O
    POST faz 1 leitura, **não consome** o código, e renderiza a tela "crie a passkey nova". O consumo
    acontece em `/painel/api/registrar/verificar`.
 2. **Tabela de códigos de erro.** Vale a canônica de §11.4. As nove grafias divergentes
@@ -3377,7 +3377,7 @@ origem e foram **decididas** aqui:
    `processed_comments.status` guarda; `SkipReason` e `ProcessOutcome` (`automation.ts:28,40`) são
    resultados em memória e **não chegam ao banco**. Mais grave que a citação: o corpus prometia, na
    Saída A do contrato e aqui, dez frases de `SkipReason` que **nenhum caminho do código atual pode
-   produzir** — todos os `skipped` acontecem antes do único `INSERT` da tabela. Decidido em §12.6:
+   produzir**: todos os `skipped` acontecem antes do único `INSERT` da tabela. Decidido em §12.6:
    **não** passamos a gravar linha para comentário ignorado (a conta de escrita de §5.2 e §16.1
    proíbe), e a tela **diz** que só mostra o que a automação atendeu.
 8. **O portão de sanidade contra a parada de emergência.** §10.2 e §10.12 do corpus dizem que
@@ -3395,22 +3395,22 @@ origem e foram **decididas** aqui:
   segunda constante para alguém esquecer.
 - **"As três rotas `/painel/api/*` que exigem sessão" não existia em número três.** A regra passa a
   ser escrita sem número, e **`/painel/api/registrar/opcoes` passa a exigir ficha CSRF no modo
-  sessão** — do contrário ela seria o único POST autorizado por cookie de sessão sem ficha, e
+  sessão**: do contrário ela seria o único POST autorizado por cookie de sessão sem ficha, e
   cadastrar uma passkey nova é precisamente a operação que um atacante mais gostaria de executar em
   nome do dono.
 - **Um terceiro limitador, `PANEL_LIMITER_CODIGO`.** Um bot martelando o login não pode consumir a
-  cota que o dono precisaria para digitar o **código de recuperação**, que é caminho de emergência —
+  cota que o dono precisaria para digitar o **código de recuperação**, que é caminho de emergência,
   o mesmo raciocínio que já dera binding próprio à parada. **Isto é uma troca, não um ganho puro, e
   §7.4 a escreve como troca:** o contrato punha `/painel/entrar/codigo` sob 10/60 s, e o binding novo
   **triplica** para 30/60 s a taxa de tentativa permitida contra um segredo que abre o cadastro de
   passkey. Aceita porque a defesa desse segredo sempre foram os 100 bits de §10.11, e porque o
-  contador da Cloudflare é por data center `[C]` — um atacante distribuído já ignorava os 10.
-- **`/health` ganha um campo, com seis valores — mas só sob Bearer.** O campo único aprovado perdia
+  contador da Cloudflare é por data center `[C]`, um atacante distribuído já ignorava os 10.
+- **`/health` ganha um campo, com seis valores: mas só sob Bearer.** O campo único aprovado perdia
   dois diagnósticos reais: "de onde vem a configuração" (a pergunta que resolve a classe inteira de
   "editei o arquivo, fiz deploy e nada mudou") e a possibilidade de o assistente **bloquear** a
   edição do arquivo. **O que a primeira versão desta decisão não pesou:** `/health` é uma rota
   **pública** (`health.ts:10` `[C]`, sem `isAdmin`), e ali `sem_passkey` entrega a qualquer anônimo,
-  por polling barato, exatamente o instante em que um convite `pre=0` interceptado ainda funciona —
+  por polling barato, exatamente o instante em que um convite `pre=0` interceptado ainda funciona,
   a fusão em `sem_acesso` **era** a proteção, não uma imprecisão. A decisão final divide: **sem
   `Authorization`, os três valores do contrato** (`desativado | sem_acesso | pronto`); **com
   `Authorization: Bearer <SETUP_ADMIN_TOKEN>`, os seis**, que é tudo o que o assistente local
@@ -3443,17 +3443,17 @@ origem e foram **decididas** aqui:
   correto. §7.1 e §10.10 foram corrigidos, e §10.10 passou a explicar por quê.
 - **"Sair de todos os aparelhos" tem endereço e não exige step-up.** A rota existia no corpus
   (`POST /painel/aparelhos`, `acao=sair_de_tudo`) e sumiu na compressão, ao mesmo tempo em que §7.1
-  marcava a tela inteira como step-up "sim" — o que faria sair de todos os aparelhos pedir biometria,
+  marcava a tela inteira como step-up "sim": o que faria sair de todos os aparelhos pedir biometria,
   contra a regra de §10.10 de que **desligar é barato**. Restaurada em §10.13, com o step-up preso às
   operações que alargam (`remover_passkey`, `gerar_codigos`).
 - **A proibição de atraso artificial na resposta** e a **regra de nunca exibir o `credential_id`
-  inteiro na tela** existiam no corpus, evaporaram na compressão e voltaram — a primeira em §11.3
+  inteiro na tela** existiam no corpus, evaporaram na compressão e voltaram, a primeira em §11.3
   (`sleep` no Worker é DoS a favor do atacante, contra o maior risco residual do projeto), a segunda
   em §10.13, fechando o terceiro dos três destinos que §9.9 e §11.7 já cobriam.
 - **As chaves dos baldes de rate limit** (`"painel:"`, `"codigo:"`, `"parada:"` + `cf-connecting-ip`)
   voltaram a §7.4. Sem elas, o teste RL que afirma "a chave enviada é a esperada" não tinha
-  especificação para verificar, e a separação por prefixo — que é o que impede o balde da parada e o
-  do login se misturarem — não existia em lugar nenhum.
+  especificação para verificar, e a separação por prefixo, que é o que impede o balde da parada e o
+  do login se misturarem: não existia em lugar nenhum.
 - **A "regra de forma" das rotas ganhou a exceção escrita** (§7.1): três POSTs só renderizam, e a
   tabela de rotas carrega `escreve: true | false` para que o metateste afirme a regra sem nascer
   contra o desenho.
@@ -3464,7 +3464,7 @@ origem e foram **decididas** aqui:
   humano; o beco sem saída foi resolvido de forma mais barata, com o `303` de §11.6.
 - **Separar `publicReplyText` numa tela própria** para que a regra do lote não arraste tudo. A
   premissa está errada: o texto público vive em `/painel/mensagem`, onde **todos** os campos já
-  exigem step-up sempre — não há lote a arrastar. O que se acolhe é a metade certa da objeção: a tela
+  exigem step-up sempre: não há lote a arrastar. O que se acolhe é a metade certa da objeção: a tela
   precisa dizer, antes do gesto, que aquele toque cobre a tela inteira.
 - **Trocar `SameSite=Strict` por `Lax`.** O custo é real e está registrado, mas com `Strict` nem a
   página autenticada chega a renderizar numa navegação hostil, favorito e atalho continuam
@@ -3477,7 +3477,7 @@ origem e foram **decididas** aqui:
 Nenhum destes itens é causado pelo painel. Três deles são corrigidos na **etapa 0** porque o painel
 os agrava; os demais ficam registrados.
 
-### 16.1 O teto de 50 subrequests quebra lotes de 10 ou mais comentários — **bug já existente**
+### 16.1 O teto de 50 subrequests quebra lotes de 10 ou mais comentários: **bug já existente**
 
 Hoje, por comentário processado, o Worker gasta `findByCommentId` + `isUserInCooldown` +
 `claimComment` + `markPrivateSent` + `markCompleted` = **5 consultas ao D1**, mais **2 por lote**
@@ -3489,8 +3489,8 @@ Hoje, por comentário processado, o Worker gasta `findByCommentId` + `isUserInCo
 ```
 
 Um Reel viral produz webhooks com lotes grandes, e é exatamente aí que o dano é maior. **Isto é
-independente do painel e existe hoje**, sem nenhuma linha nova. A correção é fatiar o lote — por
-exemplo 5 comentários por invocação, com o resto reagendado pelo cron que já existe — e ela entra na
+independente do painel e existe hoje**, sem nenhuma linha nova. A correção é fatiar o lote, por
+exemplo 5 comentários por invocação, com o resto reagendado pelo cron que já existe, e ela entra na
 etapa 0, com um teste que afirma que um lote de 10 comentários executa menos de 50 consultas. O
 painel só piora isso se a configuração for lida por comentário, e é por isso que §9.5 exige uma carga
 por lote.
@@ -3506,13 +3506,13 @@ lendo configuração direto do módulo, justamente quando a origem da configura�
 A retentativa do cron monta o Direct com `.replace('{link}', ...)` **fora** de `renderTemplate`
 `[C]`. Isso significa, ali: sem remoção de caracteres de controle, sem teto de tamanho, e trocando
 apenas a **primeira** ocorrência. `renderTemplate` usa `replaceAll` e sanitiza `[C]`. Com o texto
-vindo do banco, isso vira um segundo ponto de renderização não sanitizado — por isso a troca por
+vindo do banco, isso vira um segundo ponto de renderização não sanitizado, por isso a troca por
 `renderTemplate` entra na etapa 0, antes de o painel existir.
 
 ### 16.4 `/privacy-policy` e `/data-deletion` servem `<style>` inline sem CSP
 
 `src/routes/legal.ts:139` `[C]`. Como o painel passou a usar CSS externo e uma CSP sem nonce, o
-mecanismo de nonce por resposta não entra no escopo deste projeto — mas duas páginas **públicas** de
+mecanismo de nonce por resposta não entra no escopo deste projeto, mas duas páginas **públicas** de
 um projeto que declara segurança como valor central continuam sem CSP nenhuma. **Recomendação:**
 tratar como item de escopo próprio, com prazo, e não como nota. `legal.ts` não é movido nem editado
 durante as etapas 0 a 15.
@@ -3527,7 +3527,7 @@ um achado independente do painel.
 
 A tabela tem dois índices, então cada `INSERT` custa cerca de **3 escritas** `[C]`. Isso é uma
 decisão correta hoje (os dois índices servem consultas reais), mas fixa uma regra para o futuro:
-**nenhum índice novo em `processed_comments`**, nunca — inclusive para a tela de atividade, que
+**nenhum índice novo em `processed_comments`**, nunca, inclusive para a tela de atividade, que
 prefere varrer a tabela a encarecer cada comentário processado (§12.6).
 
 ### 16.7 Documentação que fica desatualizada com o painel
@@ -3543,7 +3543,7 @@ ganha as três frases de §11.7.
 
 Com o painel, esse token deixa de proteger só o OAuth: ele passa a ser também a chave que **assina
 convites de registro** e a credencial que **gera os códigos**. Quem tem esse token cadastra uma
-passkey. Ele não vira menos importante — vira mais. É por isso que a chave de sessão é separada
+passkey. Ele não vira menos importante: vira mais. É por isso que a chave de sessão é separada
 (rotacionar o admin token não pode derrubar sessões, e vazar um convite não pode entregar a chave das
 sessões), e é por isso que a documentação precisa dizer isso na mesma página em que ensina a gerar o
 convite.

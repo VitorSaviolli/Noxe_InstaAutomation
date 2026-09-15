@@ -24,7 +24,7 @@ import { cookieDeStepUpExpirado } from './stepup'
  * (§9.9, §15.4). A frase antiga dizia "nem hoje nem quando as linhas de midia
  * chegarem", e elas chegaram neste mesmo commit: `POST /painel/reel` grava uma
  * sobreposicao e `POST /painel/reels` grava a selecao, e as duas passam por
- * aqui. A regra continua a mesma — `legenda_curta` e recorte da `caption` do
+ * aqui. A regra continua a mesma, `legenda_curta` e recorte da `caption` do
  * Reel, e `caption` esta na lista de proibidos dos DOIS destinos, entao a
  * proibicao vence a regra do "estado completo". A protecao e estrutural: a
  * funcao copia de `CAMPOS_DE_COMPORTAMENTO`, e nao do objeto que recebeu, entao
@@ -56,7 +56,7 @@ export interface AplicacaoDeMudanca {
 /**
  * Passo 9 e passo 10: UM `db.batch()` e o `303`.
  *
- * O lote tem duas ou tres linhas — configuracao, auditoria e, so quando houve
+ * O lote tem duas ou tres linhas, configuracao, auditoria e, so quando houve
  * step-up, a rotacao do `sid` (§10.8). Se qualquer parte falhar, todas falham:
  * sem log, sem mudanca, e nada de "grava e depois tenta logar".
  */
@@ -67,7 +67,7 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
   /** A entidade que esta gravacao altera: um `media_id`, ou a linha global. */
   const alvo = pedido.midias?.alvo ?? null
 
-  // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo —
+  // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo,
   // a sessao muda de "conseguiu ler" para "acabou de autorizar". O prazo
   // absoluto e o que JA estava valendo: SES-01 diz que ele nunca e estendido.
   // Como a rotacao acontece na mesma requisicao que grava e devolve o `303`, o
@@ -80,7 +80,7 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
   // global logo abaixo roda. Avaliadas antes dele, elas veem a mesma versao que
   // o `WHERE` do global vai ver: as duas travas casam juntas ou falham juntas.
   //
-  // **Postas DEPOIS, elas nunca commitariam** — e a razao escrita aqui ate esta
+  // **Postas DEPOIS, elas nunca commitariam**, e a razao escrita aqui ate esta
   // rodada dizia o contrario. Como o `bind` e `versaoEnviada` e a bump ja teria
   // acontecido, o `EXISTS` seria sempre falso: a linha global e a de auditoria
   // gravariam e a selecao de Reels do dono ficaria para tras em silencio, com a
@@ -109,8 +109,8 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
         origem: 'painel',
         ator: aplicacao.ator,
         // §9.9: a coluna diz se AQUELA gravacao passou por step-up. Um `false`
-        // fixo faria a auditoria nao distinguir a troca do link — que so
-        // acontece com a digital — de uma troca de palavra-gatilho.
+        // fixo faria a auditoria nao distinguir a troca do link, que so
+        // acontece com a digital, de uma troca de palavra-gatilho.
         stepUp: comStepUp,
         // **A acao segue o ALVO, e nao a rota** (§9.9). `midia_alterada` ja
         // existia em `AcaoDeAuditoria` e na lista de §9.9, e ate esta linha
@@ -119,7 +119,7 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
         //
         // Isso ligava duas telas que ninguem tinha ligado. `ultimasMudancas`
         // filtra `WHERE acao = 'config_alterada' AND antes IS NOT NULL` e nao
-        // le o `alvo` — entao a linha de um Reel entrava no historico de
+        // le o `alvo`, entao a linha de um Reel entrava no historico de
         // Ajustes indistinguivel da global, com o botao "Voltar a esta versao"
         // ao lado. E o `antes` de uma linha de Reel e a config EFETIVA daquele
         // Reel: apertar o botao gravava o link e o intervalo PRIVADOS de um
@@ -133,13 +133,13 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
         //
         // A pergunta e sobre o ALVO, e nao sobre a presenca de `midias`:
         // `POST /painel/reels` tambem escreve em `painel_midias`, e ele muda a
-        // linha GLOBAL — `mediaScope` — com um `alvo` nulo, porque marcar e
+        // linha GLOBAL, `mediaScope`, com um `alvo` nulo, porque marcar e
         // desmarcar nao tem um alvo, tem um conjunto novo. Aquela linha e
         // restauravel e continua sendo `config_alterada`.
         acao: alvo === null ? 'config_alterada' : 'midia_alterada',
         // §9.9 quer saber QUAL entidade mudou. Um `media_id` cabe nos 32
         // caracteres da coluna, e e por isso que ela existe desde a migration
-        // `0002` — a Task 13 e a primeira a preenche-la.
+        // `0002`, a Task 13 e a primeira a preenche-la.
         alvo,
         campos: JSON.stringify([...mudados, ...(aplicacao.pedido.midias?.campos ?? [])]),
         antes: comoJson(antes),
@@ -170,7 +170,7 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
   //
   // O indice deixou de ser `0` porque as escritas de midia vao na frente. Ele e
   // calculado, e nao escrito: uma constante aqui erraria em silencio na
-  // primeira rota que gravasse midia — e o silencio seria "gravou e disse que
+  // primeira rota que gravasse midia, e o silencio seria "gravou e disse que
   // nao", que e a direcao que destroi a confianca.
   if ((resultado[indiceDaConfig]?.meta.changes ?? 0) === 0) {
     return erro('versao_desatualizada', contexto)
@@ -178,7 +178,7 @@ export async function aplicarMudanca(aplicacao: AplicacaoDeMudanca): Promise<Res
 
   // Sem isto o isolate que acabou de gravar continuaria servindo o snapshot
   // antigo ate o TTL vencer, e a tela mostraria o valor de ANTES logo depois de
-  // o dono salvar — o jeito mais rapido de destruir a confianca dele.
+  // o dono salvar, o jeito mais rapido de destruir a confianca dele.
   invalidarCacheDeConfig()
 
   // §10.10, fim do passo 4: aplica, **expira o cookie**, rotaciona o `sid`,

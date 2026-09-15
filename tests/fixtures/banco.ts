@@ -3,7 +3,7 @@
  *
  * `limparBanco()` e a UNICA funcao de limpeza do projeto: nenhuma suite
  * escreve o proprio `DELETE FROM`. Toda tabela que entrar no schema entra
- * tambem em `TABELAS_DO_SCHEMA` — o metateste META-03, em
+ * tambem em `TABELAS_DO_SCHEMA`, o metateste META-03, em
  * `tests/painel-metatestes.test.ts`, compara esta lista com o que o D1
  * realmente tem e falha se alguem esquecer.
  *
@@ -24,7 +24,7 @@ export const TABELAS_DO_SCHEMA = [
   'processed_comments',
   'account_tokens',
   // `painel_midias` antes de `painel_config`: nao ha chave estrangeira entre
-  // elas, mas a relacao conceitual e essa — midia sem linha global e orfa.
+  // elas, mas a relacao conceitual e essa, midia sem linha global e orfa.
   'painel_midias',
   'painel_auditoria',
   'painel_codigos',
@@ -51,7 +51,7 @@ export async function limparBanco(db: D1Database): Promise<void> {
 /**
  * Liga uma conta do Instagram no banco de teste.
  *
- * Sem isto `processEvents` e `runScheduledTasks` param na primeira linha —
+ * Sem isto `processEvents` e `runScheduledTasks` param na primeira linha,
  * toda suite que exercita o caminho de entrega precisa do mesmo cenario.
  */
 export async function ligarConta(
@@ -144,8 +144,8 @@ export async function gravarConfig(
  *
  * Existe por causa de MID-11 e do teste do teto de HTML, que precisam de 200
  * linhas ANTES de comecar a medir o que realmente lhes interessa. Com um
- * `INSERT` por vez esse preparo levava ~5s — em cima do teto padrao de 5000ms
- * do vitest —, e o resultado era o pior tipo de teste: verde quando rodava
+ * `INSERT` por vez esse preparo levava ~5s, em cima do teto padrao de 5000ms
+ * do vitest, e o resultado era o pior tipo de teste: verde quando rodava
  * sozinho, vermelho quando rodava junto com os outros. Um teste que responde a
  * carga da maquina mente nos dois sentidos.
  *

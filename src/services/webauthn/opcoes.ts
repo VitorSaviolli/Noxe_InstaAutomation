@@ -4,11 +4,11 @@
  * Sao funcoes PURAS que montam o objeto que o `navigator.credentials` recebe.
  * O sorteio do desafio e a emissao do envelope ficam com a rota (§10.4 passo 6,
  * §10.7): este arquivo nao le o relogio, nao sorteia nada sozinho e nao conhece
- * cookie — o desafio entra por parametro, ja assinado por quem chamou.
+ * cookie, o desafio entra por parametro, ja assinado por quem chamou.
  *
  * **`userVerification: "required"` nas tres.** E metade de §7.8: a outra metade
  * e a flag `UV` conferida no `authData`, que mora em `verificar.ts`. As options
- * sozinhas nao provam nada — sao instrucao para o autenticador, e um
+ * sozinhas nao provam nada, sao instrucao para o autenticador, e um
  * autenticador hostil ignora instrucao. Estao aqui porque o autenticador
  * HONESTO precisa delas para pedir a biometria; a trava e a outra metade.
  */
@@ -74,7 +74,7 @@ export function sortearDesafio(): string {
 /**
  * Options de `POST /painel/api/registrar/opcoes` (§10.4, passo 7).
  *
- * O `timeout` acompanha o prazo do envelope de `registrar` — 300 s — porque os
+ * O `timeout` acompanha o prazo do envelope de `registrar`, 300 s, porque os
  * dois medem a mesma coisa: quanto tempo o dono tem para encarar o primeiro
  * dialogo do sistema operacional que ja viu. Derivar do envelope em vez de
  * escrever o numero de novo e o que impede os dois de divergirem.
@@ -123,7 +123,7 @@ export function opcoesDeLogin(entrada: {
  * Options de `POST /painel/api/stepup/opcoes` (§10.10).
  *
  * Iguais as do login de proposito: a cerimonia e a mesma, e o que separa uma da
- * outra e o proposito do envelope — `stepup` em vez de `entrar` —, mais o
+ * outra e o proposito do envelope, `stepup` em vez de `entrar`, mais o
  * `op_hash` que a rota de escrita recalcula. Duas formas diferentes de montar
  * as mesmas options seriam duas chances de esquecer o `userVerification`.
  */

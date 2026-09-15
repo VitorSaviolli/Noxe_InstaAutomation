@@ -14,15 +14,15 @@ import { gravarConfig, gravarMidia, limparBanco } from './fixtures/banco'
 import { AGORA, configDeTeste } from './fixtures/dubles'
 
 /**
- * LNK — a allowlist de dominios (16 garantias).
+ * LNK, a allowlist de dominios (16 garantias).
  *
  * A afirmacao que esta suite existe para provar: **o painel nao consegue
- * apontar o link do Direct para fora da lista escrita no repositorio** — nem
+ * apontar o link do Direct para fora da lista escrita no repositorio**, nem
  * pelo campo do link, nem escrevendo o endereco dentro do texto, nem por uma
  * escrita feita fora do painel, direto no banco.
  *
  * Nenhum dominio de nenhuma instalacao aparece aqui: este repositorio e um
- * template publico e a lista nasce VAZIA nele — inclusive nos bindings de
+ * template publico e a lista nasce VAZIA nele, inclusive nos bindings de
  * teste. Cada teste declara a propria allowlist, do mesmo jeito que `now` e
  * sempre injetado.
  *
@@ -45,7 +45,7 @@ function envComAllowlist(dominios: string): Env {
 /**
  * Os achados de uma config, como `campo/codigo`.
  *
- * Quase sempre e o codigo e o campo que o teste afirma — o codigo e o
+ * Quase sempre e o codigo e o campo que o teste afirma, o codigo e o
  * contrato de §11.4 e a frase muda com a redacao. A excecao e onde a FRASE e
  * a garantia: §9.8 exige que o aviso nomeie o host, e ha teste que confere o
  * host dentro dela.
@@ -75,7 +75,7 @@ beforeEach(async () => {
 
 // ---------------------------------------------------------------------------
 
-describe('LNK — a lista e a regra de casamento', () => {
+describe('LNK: a lista e a regra de casamento', () => {
   test('LNK-02: host exato aceito', () => {
     expect(hostPermitido(PERMITIDO, SO_O_HOST)).toBe(true)
     expect(comLink('https://exemplo.com/promo')).toEqual([])
@@ -115,14 +115,14 @@ describe('LNK — a lista e a regra de casamento', () => {
   test('LNK-06: https://exemplo.com@evil.com e recusado pela propria allowlist', () => {
     // O host de verdade e `evil.com`: tudo antes do `@` e usuario e senha.
     // O validador tambem recusa (`link_com_credencial`), e a allowlist recusa
-    // sozinha — sao duas travas independentes, e este teste prova a daqui.
+    // sozinha, sao duas travas independentes, e este teste prova a daqui.
     expect(comLink('https://exemplo.com@evil.com/promo')).toContain(RECUSA_DO_DOMINIO)
   })
 
   test('LNK-07: http:// e recusado mesmo com o host na lista', () => {
     // O host esta liberado, e ainda assim a config inteira e recusada: a
     // allowlist responde por hosts, e o `https` obrigatorio e regra do
-    // validador — as duas rodam sempre juntas, e e por isso que estar na
+    // validador, as duas rodam sempre juntas, e e por isso que estar na
     // lista nao compra o esquema.
     expect(hostPermitido(PERMITIDO, SO_O_HOST)).toBe(true)
     expect(comLink('http://exemplo.com/promo')).toEqual(['destinationUrl/link_sem_https'])
@@ -130,7 +130,7 @@ describe('LNK — a lista e a regra de casamento', () => {
 
   test('LNK-08: javascript:, data: e // sao recusados', () => {
     // Esses esquemas nao tem host: nao ha o que comparar com a lista, e quem
-    // os recusa e o `https` obrigatorio do validador — que roda sempre junto.
+    // os recusa e o `https` obrigatorio do validador, que roda sempre junto.
     const semHost = ['destinationUrl/link_sem_https', 'destinationUrl/link_nao_normalizado']
     expect(comLink('javascript:alert(1)')).toEqual(semHost)
     expect(comLink('data:text/html,<h1>oi</h1>')).toEqual(semHost)
@@ -142,8 +142,8 @@ describe('LNK — a lista e a regra de casamento', () => {
     // `exemplo.com` escrito com o "e" cirilico. `new URL` converte para
     // punycode, e o punycode nao e o que esta na lista.
     expect(comLink('https://еxemplo.com/promo')).toContain(RECUSA_DO_DOMINIO)
-    // O mesmo endereco ja escrito em punycode — a forma exata para a qual
-    // `new URL` converte o de cima —, para o caso de alguem gravar a forma
+    // O mesmo endereco ja escrito em punycode, a forma exata para a qual
+    // `new URL` converte o de cima, para o caso de alguem gravar a forma
     // convertida direto no banco.
     expect(comLink('https://xn--xemplo-2of.com/promo')).toEqual([RECUSA_DO_DOMINIO])
   })
@@ -152,7 +152,7 @@ describe('LNK — a lista e a regra de casamento', () => {
     // Porta diferente da padrao: `url.host` a carrega, e host com porta nao
     // casa entrada nenhuma.
     expect(comLink('https://exemplo.com:8443/promo')).toContain(RECUSA_DO_DOMINIO)
-    // Maiuscula: `new URL` normaliza o host, entao a allowlist aceita — e o
+    // Maiuscula: `new URL` normaliza o host, entao a allowlist aceita, e o
     // validador recusa, porque o texto guardado deixa de ser o endereco que o
     // navegador visita.
     expect(comLink('https://EXEMPLO.com/promo')).toEqual(['destinationUrl/link_nao_normalizado'])
@@ -173,7 +173,7 @@ describe('LNK — a lista e a regra de casamento', () => {
 
   test('LNK-09: ponto percent-encoded na query nao atravessa a varredura', () => {
     // `%2E` no lugar do ponto some do detector, e um redirecionador de verdade
-    // decodifica o parametro antes de redirecionar — o contorno funciona de
+    // decodifica o parametro antes de redirecionar, o contorno funciona de
     // ponta a ponta. Por isso a query e varrida tambem decodificada.
     expect(comLink('https://exemplo.com/ir?u=https%3A%2F%2Fatacante%2Ecom')).toEqual([
       RECUSA_DO_DOMINIO,
@@ -200,7 +200,7 @@ describe('LNK — a lista e a regra de casamento', () => {
   })
 })
 
-describe('LNK — o texto', () => {
+describe('LNK: o texto', () => {
   test('LNK-10: URL dentro do texto do Direct passa pela allowlist', () => {
     // Sem isto a trava seria contornada em dez segundos: bastaria deixar o
     // campo do link em paz e escrever o endereco do golpe na mensagem.
@@ -238,7 +238,7 @@ describe('LNK — o texto', () => {
 
     // O host DENTRO da frase e o que separa a limpeza de um acaso: sem NFKC e
     // sem tirar o zero-width, o detector veria "nte.com" e nao "atacante.com"
-    // — recusaria do mesmo jeito, mas por engano, e o aviso mentiria.
+    // recusaria do mesmo jeito, mas por engano, e o aviso mentiria.
     expect(achadosDe(comZeroWidth, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
       'O endereco atacante.com nao esta na lista liberada no deploy.',
     ])
@@ -250,13 +250,13 @@ describe('LNK — o texto', () => {
   test('LNK-09: homografo dentro do TEXTO e recusado', () => {
     // O contorno que fecha o circulo do golpe: o campo do link fica em paz e o
     // domínio de golpe vai na mensagem, escrito com um "e" cirilico. NFKC nao
-    // toca alfabeto cirilico — quem resolve e a canonizacao do candidato pelo
+    // toca alfabeto cirilico, quem resolve e a canonizacao do candidato pelo
     // mesmo `new URL` que o campo do link ja usa.
     const valores = configDeTeste({
       privateReplyText: 'Ola, {username}! Corre em atacantе.com antes de {link}',
     })
 
-    // A frase nomeia o PUNYCODE, que e o endereco que o navegador visitaria —
+    // A frase nomeia o PUNYCODE, que e o endereco que o navegador visitaria,
     // sem isso o aviso mostraria dois textos identicos ao olho do dono.
     expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
       'O endereco xn--atacant-ehg.com nao esta na lista liberada no deploy.',
@@ -295,7 +295,7 @@ describe('LNK — o texto', () => {
   test('LNK-10: porta citada no texto nao esconde o host', () => {
     // No texto a pergunta e sobre o DOMINIO: `atacante.com:8080` e recusado
     // pelo host, sem a porta atrapalhar. (No campo do link a porta entra na
-    // comparacao, porque la `url.host` a carrega — e recusar e o lado seguro.)
+    // comparacao, porque la `url.host` a carrega, e recusar e o lado seguro.)
     const valores = configDeTeste({ publicReplyText: 'Ver em atacante.com:8080' })
 
     expect(achadosDe(valores, SO_O_HOST).map((achado) => achado.mensagem)).toEqual([
@@ -323,7 +323,7 @@ describe('LNK — o texto', () => {
   })
 })
 
-describe('LNK — a lista vazia e as entradas invalidas', () => {
+describe('LNK: a lista vazia e as entradas invalidas', () => {
   test('LNK-12: allowlist vazia nao permite host nenhum, e nao "passa tudo"', () => {
     const vazia = lerAllowlist('')
 
@@ -376,7 +376,7 @@ describe('LNK — a lista vazia e as entradas invalidas', () => {
   })
 })
 
-describe('LNK — na leitura', () => {
+describe('LNK: na leitura', () => {
   test('LNK-13: config com link proibido no banco para a automacao', async () => {
     // A verificacao do dono desta etapa, encenada: a allowlist estreita, um
     // link de fora gravado direto no banco, e a automacao parada.
@@ -456,7 +456,7 @@ describe('LNK — na leitura', () => {
   })
 })
 
-describe('LNK — carry-forward da revisao da Task 3', () => {
+describe('LNK: carry-forward da revisao da Task 3', () => {
   test('o host permitido escondido na query nao normaliza o link', () => {
     // `config-validation.ts` comparava com `bruto.includes(url.host)`, e
     // `https://EXEMPLO.com/?r=exemplo.com` passava: o host normalizado

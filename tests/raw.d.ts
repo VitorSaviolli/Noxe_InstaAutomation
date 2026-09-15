@@ -8,7 +8,7 @@
  * Existe para UM teste: o asset `public/painel/parar/index.html` e a copia que
  * o Worker serve em `GET /painel/parar` precisam ser o MESMO byte a byte, e
  * duas copias sem prova de igualdade divergem na primeira etapa que mexer numa
- * delas. Producao nao usa isto — o Worker carrega a pagina de uma constante.
+ * delas. Producao nao usa isto, o Worker carrega a pagina de uma constante.
  */
 declare module '*.html?raw' {
   const conteudo: string
@@ -21,7 +21,7 @@ declare module '*.html?raw' {
  * Declarado a mao, e nao herdado de `vite/client`: aquele pacote de tipos traz
  * junto o `document`, o `window` e o resto do DOM, e o codigo deste projeto
  * roda no workerd, onde nada disso existe. Um tipo largo aqui abriria a porta
- * para um teste — ou pior, para um arquivo de `src/` — referenciar API de
+ * para um teste, ou pior, para um arquivo de `src/`, referenciar API de
  * navegador e passar no typecheck.
  *
  * Existe para UM teste: o Lema 1 de §10.6, que varre `src/` inteiro e falha se
@@ -43,7 +43,7 @@ interface ImportMeta {
  * acima e afirma que nenhum teste oferece a cerimonia de step-up para uma
  * gravacao que a allowlist daquele ambiente jamais aceitaria. O `glob` do Vite
  * OMITE o modulo que o chama, entao o unico arquivo fora da guarda seria
- * justamente aquele onde ela mora — e uma guarda cega para si mesma e o buraco
+ * justamente aquele onde ela mora, e uma guarda cega para si mesma e o buraco
  * mais facil de nao notar. Esta declaracao e o que deixa aquele arquivo se
  * importar como texto e entrar na propria varredura.
  */

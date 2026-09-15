@@ -5,6 +5,8 @@
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+# Seus dados pessoais, usados pelo npm run verificar para achar vazamento
+.identidade-local.txt
 # Certificados e chaves privadas
 *.pem
 *.key

@@ -51,15 +51,15 @@ import {
 } from './fixtures/dubles'
 
 /**
- * MID — Reels e automacoes por midia (§12.5, §13.2).
+ * MID, Reels e automacoes por midia (§12.5, §13.2).
  *
  * As treze garantias MID de §13.2 sao MID-01 a MID-13; a partir de MID-14 estao
- * as travas que elas nao nomeiam mas das quais dependem — a extensao do funil
+ * as travas que elas nao nomeiam mas das quais dependem, a extensao do funil
  * do Ruling 91, o `enabled = 0` do Ruling 92 e a auditoria por Reel.
  *
  * **MID-06 nao existe neste arquivo, e a ausencia esta declarada.** A garantia
  * "`entry[].id` diferente do `ig_user_id` e ignorado" e sobre o WEBHOOK, e
- * entrega-la exige mudar `parseCommentEvents` para carregar o `entry.id` — o
+ * entrega-la exige mudar `parseCommentEvents` para carregar o `entry.id`, o
  * que quebra `tests/webhook.test.ts:93`, que compara o evento inteiro com
  * `toEqual` e esta na lista de arquivos que esta tarefa nao edita. Ela tambem
  * nao pode se apoiar em `env.META_IG_USER_ID`, que nasce VAZIO no repositorio:
@@ -82,7 +82,7 @@ const CREDENCIAL = 'credencial-de-teste'
  *
  * Dezoito digitos e o tamanho de verdade, e ele importa: `1.78e17` esta **acima
  * de 2^53** (~9.0e15), entao `Number(id)` perde precisao e casa o Reel errado
- * sem erro nenhum — o dano que a migration `0002` descreve e que o Ruling 90
+ * sem erro nenhum, o dano que a migration `0002` descreve e que o Ruling 90
  * estende ao JSON.
  */
 const REEL_A = '178414000000000001'
@@ -203,7 +203,7 @@ beforeEach(async () => {
   invalidarCacheDeConfig()
   // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
   // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
-  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // listagem que o anterior guardou, e de afirmar sobre uma Meta que nunca foi
   // chamada.
   esquecerAListagem()
   await ligarConta(env, AGORA)
@@ -213,12 +213,12 @@ beforeEach(async () => {
 // As treze garantias MID de §13.2
 // ---------------------------------------------------------------------------
 
-describe('MID — Reels e automacoes por midia', () => {
+describe('MID: Reels e automacoes por midia', () => {
   test('MID-01: `media_id` de 18 digitos sobrevive ao round-trip sem virar `Number`', async () => {
     // O perigo escrito como medicao, e nao como frase: os dois ids abaixo sao
     // DIFERENTES como texto e IGUAIS depois de `Number()`. Se qualquer ponto do
     // caminho os converter, o painel passa a responder no Reel errado e nada
-    // falha — o dano exato que a migration `0002` descreve.
+    // falha, o dano exato que a migration `0002` descreve.
     expect(REEL_A).not.toBe(REEL_VIZINHO)
     expect(Number(REEL_A)).toBe(Number(REEL_VIZINHO))
 
@@ -250,7 +250,7 @@ describe('MID — Reels e automacoes por midia', () => {
 
   test('MID-02: id que nao veio da listagem e recusado', async () => {
     // Os campos escondidos vem do cliente, entao a unica coisa que o servidor
-    // pode conferir e se aquele Reel e mesmo da conta — e §12.5 manda conferir,
+    // pode conferir e se aquele Reel e mesmo da conta, e §12.5 manda conferir,
     // com `getMediaInfo`, cada id NOVO. Um id que a conta nao conhece e
     // RECUSADO, e nao ignorado: ignorar deixaria a tela dizer "salvo" e voltar
     // sem aquele Reel, sem nunca dizer por que.
@@ -282,7 +282,7 @@ describe('MID — Reels e automacoes por midia', () => {
     expect(resposta.status).toBe(400)
     expect(await linhaDeEscopo()).toBe('todas')
 
-    // Contrapositivo: com a automacao DESLIGADA, a mesma gravacao passa — as
+    // Contrapositivo: com a automacao DESLIGADA, a mesma gravacao passa, as
     // duas sao seguras, e §12.4 so recusa a que fica confusa no painel.
     await env.DB.prepare('UPDATE painel_config SET enabled = 0 WHERE id = 1').run()
     invalidarCacheDeConfig()
@@ -292,7 +292,7 @@ describe('MID — Reels e automacoes por midia', () => {
 
   test('MID-04: falha da Meta nao permite salvar selecao', async () => {
     // §9.7: "se a listagem da Meta falhar na montagem da tela, o painel mostra
-    // o erro e NAO deixa salvar a selecao" — salvar a partir de uma lista que
+    // o erro e NAO deixa salvar a selecao", salvar a partir de uma lista que
     // nao carregou apagaria a selecao existente.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     await gravarMidia(env.DB, REEL_A)
@@ -401,7 +401,7 @@ describe('MID — Reels e automacoes por midia', () => {
   test('MID-09: a paginacao para quando `paging.next` some, nao quando vem menos itens', async () => {
     // §12.5, e e a garantia mais facil de escrever errado: receber menos itens
     // que o `limit` NAO significa fim de lista. A primeira pagina traz UM item
-    // — muito menos que os 25 do `limit` — e ainda tem `paging.next`; a
+    // muito menos que os 25 do `limit`, e ainda tem `paging.next`; a
     // segunda traz tres e NAO tem. Quem parasse por contagem pararia na
     // primeira e deixaria tres Reels de fora, em silencio.
     await gravarConfig(env.DB)
@@ -430,7 +430,7 @@ describe('MID — Reels e automacoes por midia', () => {
       expect({ [rota.caminho]: rota.sessao }).toEqual({ [rota.caminho]: true })
     }
 
-    // Sem cookie nenhum, a rota de pagina desvia para `/painel/entrar` — e nao
+    // Sem cookie nenhum, a rota de pagina desvia para `/painel/entrar`, e nao
     // renderiza a escolha de Reels de ninguem.
     const resposta = await despachar(
       new Request(`${RAIZ}${ROTA_REELS.caminho}`),
@@ -472,7 +472,7 @@ describe('MID — Reels e automacoes por midia', () => {
   })
 
   test('MID-12: acima de 20 ids NOVOS por gravacao e recusado', async () => {
-    // §12.5: 20 e o bound de SUBREQUESTS — cada id novo custa um `getMediaInfo`.
+    // §12.5: 20 e o bound de SUBREQUESTS, cada id novo custa um `getMediaInfo`.
     // E um bound diferente do de 200: um formulario com 200 ids ja salvos e
     // legitimo, e um com 21 ids novos nao.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
@@ -517,7 +517,7 @@ describe('MID — Reels e automacoes por midia', () => {
     // Com o Reel na query string, a tela abre.
     expect((await telaDeUmReel(sessao, `?${CAMPO_DO_REEL}=${REEL_A}`)).status).toBe(200)
 
-    // Sem ele, e RECUSA — nao uma tela vazia.
+    // Sem ele, e RECUSA, nao uma tela vazia.
     expect((await telaDeUmReel(sessao, '')).status).toBe(400)
 
     // Um id que nao casa com linha ativa nem inativa e RECUSADO, e nao ignorado.
@@ -532,12 +532,12 @@ describe('MID — Reels e automacoes por midia', () => {
 // As travas de que as treze dependem
 // ---------------------------------------------------------------------------
 
-describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () => {
+describe('MID: a extensao do funil, o `enabled` por Reel e a auditoria', () => {
   test('MID-14: a escrita de midia entra no MESMO lote e cai junto com a trava otimista', async () => {
     // Ruling 91, e e a garantia que decidiu o desenho: as escritas de
     // `painel_midias` carregam a MESMA trava otimista do `UPDATE` global, na
     // propria clausula `WHERE`. Com a versao errada no formulario, a gravacao
-    // inteira e recusada — a linha global, a de auditoria E a selecao.
+    // inteira e recusada, a linha global, a de auditoria E a selecao.
     //
     // A mutacao que este teste mata: tirar `TRAVA_DE_VERSAO` dos statements de
     // `painel-midias-repository.ts`. Sem ela a selecao commitava debaixo de um
@@ -545,7 +545,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     await gravarConfig(env.DB, { media_scope: 'selecionadas', versao: 7 })
     // **Um Reel JA ATIVO, e ele e a metade que faz o teste morder.** Sem ele, o
     // `UPDATE ... SET ativo = 0` do comeco do lote nao teria linha nenhuma para
-    // alterar, e tirar a trava daquele statement sobreviveria a suite inteira —
+    // alterar, e tirar a trava daquele statement sobreviveria a suite inteira,
     // medi essa mutacao, e foi assim que ela sobreviveu na primeira grafia deste
     // teste. Com o `REEL_B` ativo, a mutacao o DESMARCA debaixo de um `409`: o
     // dono le "recarregue a tela" e a escolha dele ja mudou.
@@ -588,7 +588,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
   test('MID-14b: a trava de versao vive no STATEMENT, e nao so no portao do funil', async () => {
     // **O portao antecipado do funil ESCONDE a trava de SQL, e por isso ela
     // precisa do proprio teste.** `gravarConfiguracao` compara a versao lida com
-    // a enviada e responde `409` antes de montar o lote — entao MID-14, que
+    // a enviada e responde `409` antes de montar o lote, entao MID-14, que
     // manda a versao errada no formulario, nunca chega ao `db.batch()`. Eu medi
     // isso: tirar `TRAVA_DE_VERSAO` de `statementDeDesmarcarTodas` deixava a
     // suite INTEIRA verde.
@@ -596,7 +596,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // O que a trava de SQL guarda e a janela que o portao nao alcanca: entre
     // `carregarConfigEfetiva` e o `db.batch()`, outra aba pode ter gravado. Ali
     // o `UPDATE` global falha por `WHERE versao = ?`, e sem a mesma clausula nas
-    // escritas de midia a selecao commitaria sozinha — o dono lendo "recarregue
+    // escritas de midia a selecao commitaria sozinha, o dono lendo "recarregue
     // a tela" com a escolha dele ja trocada.
     //
     // Medir isso pelo HTTP exigiria uma corrida de verdade dentro de uma
@@ -643,14 +643,14 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // `WHERE acao = 'config_alterada' AND antes IS NOT NULL` e NAO le o
     // `alvo`. Com a etiqueta errada, a linha deste Reel entrava no historico da
     // tela de Ajustes indistinguivel de uma mudanca global, com o botao "Voltar
-    // a esta versao" ao lado — e o `antes` de uma linha de Reel e a config
+    // a esta versao" ao lado, e o `antes` de uma linha de Reel e a config
     // EFETIVA daquele Reel. O botao gravava o link e o intervalo privados de um
     // Reel por cima da configuracao de todos. A metade silenciosa e a que
     // decide: quando o campo divergente nao e protegido, nao ha step-up nenhum
     // e nada aparece na tela antes de gravar.
     //
     // AUDIT-24, na suite da auditoria, afirma a outra ponta: com esta acao a
-    // linha nao chega ao historico. Aqui fica a fonte — quem escolhe a acao.
+    // linha nao chega ao historico. Aqui fica a fonte, quem escolhe a acao.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     await gravarMidia(env.DB, REEL_A)
     const sessao = await abrirSessao()
@@ -681,7 +681,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // metades. §9.9 registra GRAVACAO, e um formulario reenviado igual nao e
     // uma: a linha de auditoria nascia com `campos: []`, sem nomear campo
     // nenhum. A `versao` subia, e ela e a trava otimista de TODA aba aberta do
-    // painel — reabrir Palavras ou Mensagem passava a dar `409` por causa de um
+    // painel, reabrir Palavras ou Mensagem passava a dar `409` por causa de um
     // botao que nao mudou nada. E a faixa verde dizia "Pronto, salvo" para uma
     // gravacao que nao gravou, contra §12.1 regra 4.
     //
@@ -713,13 +713,13 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-24: o botao que VAI pedir a digital diz isso ANTES (§12.3)', async () => {
     // §12.3 e literal: "quem garante o aviso e o cadeado no campo mais a tela de
-    // conferencia — **nunca uma surpresa biometrica**". Ate esta rodada
+    // conferencia, **nunca uma surpresa biometrica**". Ate esta rodada
     // `blocoDosBotoes` nao emitia sinal nenhum, e "Voltar tudo a seguir a regra
     // geral" cai na cerimonia sempre que desfazer ALARGA (MID-21). O dono
     // descobria pelo leitor de digital.
     //
-    // A tela tem tudo para decidir na renderizacao — `antes`, `depois` e
-    // `camposProtegidos`, a tabela da propria spec —, e os dois Reels abaixo sao
+    // A tela tem tudo para decidir na renderizacao, `antes`, `depois` e
+    // `camposProtegidos`, a tabela da propria spec, e os dois Reels abaixo sao
     // o mesmo botao com a sobreposicao virada para os dois lados.
     await gravarConfig(env.DB, { enabled: 1, user_cooldown_hours: 24 })
     // O A ESTREITAVA (48 > 24): desfazer alarga. O B ALARGAVA (12 < 24):
@@ -751,11 +751,11 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-25: a listagem tem cache de 10 minutos, e o botao Atualizar e quem o joga fora', async () => {
     // **Ruling 98: as duas metades sao a MESMA peca.** §12.1 regra 5 e
-    // `[C]`-dura — "sem auto-refresh, sem polling, sem buscar lista a cada
-    // render; Atualizar e sempre um botao explicito" — e §12.5 e `[I]`-explicita
+    // `[C]`-dura, "sem auto-refresh, sem polling, sem buscar lista a cada
+    // render; Atualizar e sempre um botao explicito", e §12.5 e `[I]`-explicita
     // sobre os 10 minutos. Ate esta rodada nao havia cache NENHUM (todo `GET`
     // gastava ate quatro chamadas a Meta) e nao havia botao Atualizar em tela
-    // nenhuma — enquanto DUAS frases renderizadas mandavam toca-lo:
+    // nenhuma, enquanto DUAS frases renderizadas mandavam toca-lo:
     // `TELA_DOS_REELS.semReels` e `MOTIVO_DA_RECUSA.reel_desconhecido`. Frase
     // que manda fazer o impossivel e a familia dos Rulings 75 e 82.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
@@ -779,7 +779,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       escapeHtml(`${TELA_DOS_REELS.listaBuscadaHa} 9 ${TELA_DOS_REELS.listaBuscadaHaFim}`),
     )
 
-    // E o singular, que ate esta rodada saia "há 1 minutos" — portugues que
+    // E o singular, que ate esta rodada saia "há 1 minutos", portugues que
     // nenhuma pessoa escreve, na tela que existe para explicar.
     const umMinuto = await (await telaDeReels(sessao, falsa, AGORA + 60_000)).text()
     expect(umMinuto).toContain(
@@ -794,7 +794,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     expect(falsa.cursores.length).toBe(2)
 
     // E o botao ignora o cache: dentro da janela, o toque busca. Zero escrita,
-    // `200`, a pagina remontada — a mesma forma da paginacao (§7.1).
+    // `200`, a pagina remontada, a mesma forma da paginacao (§7.1).
     const atualizado = await postarReels(sessao, `${CAMPO_DA_ACAO}=${ATUALIZAR}`, falsa)
 
     expect(atualizado.status).toBe(200)
@@ -839,21 +839,21 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // **A AUTORIDADE dos numeros mudou nesta rodada, e a mudanca e uma divida
     // INVENTADA sendo apagada.** A versao anterior afirmava "§12.5 (200 Reels) e
     // §12.9 (15 KB) nao fecham juntas". Nao ha tal conflito: §12.9 nao impoe
-    // teto — a linha diz *"Conexao ruim | ... CSS ~6 KB, HTML ~15 KB por tela"*,
-    // com til, como diretriz —, e a pergunta que ela protege e "abre em conexao
+    // teto, a linha diz *"Conexao ruim | ... CSS ~6 KB, HTML ~15 KB por tela"*,
+    // com til, como diretriz, e a pergunta que ela protege e "abre em conexao
     // ruim?". Os tetos crus abaixo sao **trava-crescimento desta branch**, e nao
     // cumprimento de §12.9: eles reprovam quem piorar.
     //
     // **Quem responde a pergunta de §12.9 e a medida COMPRIMIDA**, que entrou
     // agora: a Cloudflare comprime a saida, e 39.473 bytes crus viram 2.499 no
     // fio (a re-revisao mediu 2.507 antes desta rodada). Os 39 KB sao custo de
-    // memoria e de parse. Um teto gzipado reprova bloat ESTRUTURAL — um bloco
-    // novo por Reel — e nunca reprova repeticao barata, que e a distincao que
+    // memoria e de parse. Um teto gzipado reprova bloat ESTRUTURAL, um bloco
+    // novo por Reel, e nunca reprova repeticao barata, que e a distincao que
     // falta ao numero cru.
     //
     // **Dois consertos valem 65 KB dos 104 medidos no comeco da rodada 1:** (1)
     // o Reel salvo que nao apareceu so e tratado como apagado quando a listagem
-    // ACABOU — antes, cada Reel nunca perguntado virava um `<li>` inteiro
+    // ACABOU, antes, cada Reel nunca perguntado virava um `<li>` inteiro
     // dizendo "Este Reel nao existe mais", o que alem de pesar era falso; (2) o
     // botao Atualizar carrega so o que o banco ainda nao sabe.
     //
@@ -895,7 +895,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // lado. §12.1 regra 6: erro nunca inventa, e a tela nao afirma o que nao
     // sabe.
     //
-    // A guarda que ja existia — "so vale quando a listagem VEIO" — e a mesma
+    // A guarda que ja existia, "so vale quando a listagem VEIO", e a mesma
     // ideia pela metade: com a Meta muda, ausencia nao prova nada; com a lista
     // pela metade, tambem nao.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
@@ -922,8 +922,8 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     expect(parcial).not.toContain(TELA_DOS_REELS.reelApagado)
 
     // Contrapositivo: com `paging.next` AUSENTE, a lista acabou e a ausencia do
-    // B passa a ser prova. Sem esta metade, um `sumidos` fixo em `[]` — que faz
-    // o Reel apagado sumir em silencio, o que §3 proibe — passaria verde.
+    // B passa a ser prova. Sem esta metade, um `sumidos` fixo em `[]`, que faz
+    // o Reel apagado sumir em silencio, o que §3 proibe, passaria verde.
     esquecerAListagem()
     const completa = await (
       await telaDeReels(sessao, new MetaDeListagem([pagina([item(REEL_A)], null)]))
@@ -937,14 +937,14 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // **CRITICAL introduzido pela rodada 1, e ele apagava a selecao do dono com
     // faixa VERDE.** `montarTela` fazia `desenho.marcadosNaTela ?? ativos`. No
     // `GET` o campo e `null` e cai em `ativos`, certo; no `POST` do botao
-    // Atualizar ele e o array de marcados do corpo — e o formulario do Atualizar
+    // Atualizar ele e o array de marcados do corpo, e o formulario do Atualizar
     // so carrega o que o banco AINDA NAO SABE, que numa tela recem-aberta e
     // vazio. `[] ?? ativos` e `[]`: o `??` nao dispara em array vazio. A tela
     // voltava com tudo desmarcado E sem os campos escondidos que preservavam os
     // Reels de fora da pagina, e o Salvar seguinte gravava `ativo = 0` neles,
     // com `303 ?ok=salvo` e a faixa "Pronto, salvo. Ja esta valendo."
     //
-    // §12.1 regra 4 — "o que a tela mostra e o que o Worker vai fazer" — e regra
+    // §12.1 regra 4, "o que a tela mostra e o que o Worker vai fazer", e regra
     // 6, na tela que §3 chama de prioridade numero um.
     //
     // **As DUAS pontas sao afirmadas aqui, e a segunda e a que importa:** as
@@ -996,7 +996,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
       new MetaDeListagem(paginaParcial()),
     )
 
-    // **`sem_mudanca`, e nao `salvo`** — e a diferenca e a medida do defeito.
+    // **`sem_mudanca`, e nao `salvo`**, e a diferenca e a medida do defeito.
     // Com a selecao intacta nao ha o que gravar (MID-23), entao o funil nem
     // escreve; com o defeito, o mesmo toque devolvia `?ok=salvo` e a faixa
     // "Pronto, salvo. Ja esta valendo." por cima de dois Reels desativados.
@@ -1009,8 +1009,8 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-30: sem linha em `account_tokens`, a tela de Reels mostra a pendencia de §3', async () => {
     // **A peca central do conserto de subrequests da rodada 1 foi entregue sem
-    // trava nenhuma.** `contaConectada` — uma segunda leitura de
-    // `account_tokens` na mesma renderizacao — virou `contaDaListagem`, que
+    // trava nenhuma.** `contaConectada`, uma segunda leitura de
+    // `account_tokens` na mesma renderizacao, virou `contaDaListagem`, que
     // deduz a resposta do motivo da listagem. A re-revisao mutou a chamada para
     // `true` e depois para `false` e a suite INTEIRA passou nos dois casos: a
     // tela podia afirmar para sempre que a conta nao esta conectada, ou esconder
@@ -1033,7 +1033,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
   })
 
   test('MID-31: a Meta muda NAO vira "conta desconectada" na barra do topo', async () => {
-    // `falha_meta` acontece **com** a conta ligada — o token existe e foi a Meta
+    // `falha_meta` acontece **com** a conta ligada, o token existe e foi a Meta
     // que nao respondeu. Dizer "nao conectada" ali mandaria o dono reconectar
     // uma conta que nunca desconectou, que e a afirmacao falsa de §12.1 regra 3;
     // e e o contrapositivo sem o qual MID-30 passaria com a pergunta fixada em
@@ -1054,7 +1054,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-32: um Reel DESMARCADO com regras proprias mantem o selo na lista', async () => {
     // §12.5 e literal: o selo "⚙ Regras proprias" aparece "quando aquela linha
-    // de `painel_midias` tem alguma coluna de sobreposicao preenchida" — e ela
+    // de `painel_midias` tem alguma coluna de sobreposicao preenchida", e ela
     // pode estar INATIVA, porque desmarcar um Reel na tela nao apaga as regras
     // dele. E a razao de esta tela precisar das linhas que o lote da
     // configuracao filtrava com `ativo = 1`.
@@ -1062,7 +1062,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // **A trava vale para o conserto de §12.10 desta rodada.** As linhas agora
     // vem do `db.batch()` da configuracao, com a variante `comAsInativas`. Se um
     // dia o `WHERE ativo = 1` voltar para aquele statement, a economia continua
-    // de pe e o selo some em silencio de todo Reel desmarcado — que e a metade
+    // de pe e o selo some em silencio de todo Reel desmarcado, que e a metade
     // do defeito que ninguem olha, porque a tela continua carregando.
     await gravarConfig(env.DB, { media_scope: 'selecionadas', user_cooldown_hours: 24 })
     await gravarMidia(env.DB, REEL_A, { user_cooldown_hours: 48 }, 0)
@@ -1088,7 +1088,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     expect(validarSobreposicao({ ...semSobreposicao(), enabled: 1 })).toBe('reel_nao_pode_ligar')
 
     // A segunda linha: o `CHECK` da migration recusa a mesma coisa para quem
-    // escrever por fora do painel — `wrangler d1 execute`, ou um bug futuro.
+    // escrever por fora do painel, `wrangler d1 execute`, ou um bug futuro.
     await gravarConfig(env.DB)
     await expect(
       env.DB.prepare(
@@ -1101,10 +1101,10 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-17: "voltar tudo a seguir a regra geral" zera as treze colunas', async () => {
     // §3: o botao existe e desfazer e a direcao segura. As treze colunas voltam
-    // a `NULL` num statement so — escrever "so o que mudou" deixaria a coluna
+    // a `NULL` num statement so, escrever "so o que mudou" deixaria a coluna
     // esquecida com o valor velho enquanto a tela dissesse que ela voltou.
-    // A sobreposicao escolhida ALARGA — intervalo por pessoa menor que o geral
-    // —, entao desfaze-la ESTREITA, e estreitar nunca pede a digital. E a
+    // A sobreposicao escolhida ALARGA, intervalo por pessoa menor que o geral
+    //, entao desfaze-la ESTREITA, e estreitar nunca pede a digital. E a
     // metade de §3 que vale sem ressalva; a outra metade e o MID-21 abaixo.
     await gravarConfig(env.DB, { enabled: 1, user_cooldown_hours: 24 })
     await gravarMidia(env.DB, REEL_A, { enabled: 0, user_cooldown_hours: 12 })
@@ -1124,14 +1124,14 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     }
   })
 
-  test('MID-18: a paginacao e um POST que so RENDERIZA — zero escrita, `200`', async () => {
+  test('MID-18: a paginacao e um POST que so RENDERIZA: zero escrita, `200`', async () => {
     // §7.1 nomeia as tres excecoes a regra de forma, e esta e uma delas: um
     // `303` perderia o que a pessoa ja marcou, e o desenho tem de funcionar sem
     // JavaScript.
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     const sessao = await abrirSessao()
     // A pagina que volta traz SO o `REEL_B`: o `REEL_A`, marcado na pagina
-    // anterior, esta fora da tela — e e exatamente ele que precisa sobreviver.
+    // anterior, esta fora da tela, e e exatamente ele que precisa sobreviver.
     const falsa = new MetaDeListagem([pagina([item(REEL_B)], null)])
 
     const resposta = await postarReels(
@@ -1148,7 +1148,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // O cursor foi usado, e ele NUNCA foi ao D1.
     expect(falsa.cursores).toEqual(['cursor-da-segunda'])
 
-    // E o que ja estava marcado volta na pagina nova, num campo escondido — sem
+    // E o que ja estava marcado volta na pagina nova, num campo escondido, sem
     // isso, salvar depois de "Carregar mais" apagaria as escolhas das paginas
     // anteriores.
     const corpo = await resposta.text()
@@ -1158,7 +1158,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
   test('MID-22: nenhuma palavra proibida do glossario aparece nas duas telas novas', async () => {
     // §12.1 regra 1 e §12.7: a lista de palavras que a tela NUNCA escreve. Ela
     // vale para as telas novas exatamente como para as cinco anteriores, e
-    // `TELA-24` nao as alcanca — o laco de la percorre a lista `TELAS` daquele
+    // `TELA-24` nao as alcanca, o laco de la percorre a lista `TELAS` daquele
     // arquivo, e §13.1 nao deixa uma suite emprestar o corpo de outra. Sem esta
     // afirmacao, "media id", "override" e "config" entrariam na tela de Reels
     // sem nada reclamar, e a tela de Reels e justamente a que mais convida a
@@ -1191,13 +1191,13 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
     // A grafia anterior percorria `Object.values(TELA_DOS_REELS)` logo depois do
     // laco das telas renderizadas, e o efeito de leitura era "as frases desta
     // tela estao cobertas". Nao estavam: o laco passava em frase MORTA. Duas das
-    // constantes que ele varria — `cursorVencido` e `miniaturaVencida` — tem
+    // constantes que ele varria, `cursorVencido` e `miniaturaVencida`, tem
     // ZERO usos em `src/`, e um teste que da impressao de cobrir a renderizacao
     // sem cobri-la e o que §13.1 chama de pior que ausencia, porque desliga a
     // atencao.
     //
     // Quem varre as constantes do dicionario agora e o DIC-02, e ele varre o
-    // modulo INTEIRO — `TELA_DOS_REELS` e `MOTIVO_DA_RECUSA` inclusive —, entao
+    // modulo INTEIRO, `TELA_DOS_REELS` e `MOTIVO_DA_RECUSA` inclusive, entao
     // nada se perdeu. O que este teste afirma e so o que o nome dele diz: as
     // duas telas RENDERIZADAS nao escrevem palavra proibida. Os dois estados de
     // §12.5 que ainda nao tem tela vao para a Task 13b, e ate la eles estao
@@ -1207,8 +1207,8 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
   test('MID-21: desfazer a sobreposicao PEDE a digital quando desfazer alarga', async () => {
     // **A tensao entre §3 e §10.10, afirmada.** §3 diz que "Voltar tudo a seguir
     // a regra geral" nao pede digital, "porque desfazer e sempre a direcao
-    // segura". Nao e sempre: quando a sobreposicao daquele Reel ESTREITAVA — um
-    // intervalo por pessoa MAIOR que o geral —, desfaze-la alarga, e §10.10
+    // segura". Nao e sempre: quando a sobreposicao daquele Reel ESTREITAVA, um
+    // intervalo por pessoa MAIOR que o geral, desfaze-la alarga, e §10.10
     // lista o alargamento entre o que pede a digital.
     //
     // Quem decide e `camposProtegidos`, a tabela da propria spec, e nao um `if`
@@ -1230,7 +1230,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 
   test('MID-19: `acao` que nao casa e recusa, e nao uma gravacao com outro escopo', async () => {
     // Ruling 85. Ate ele, um `acao=carregarr` caia no `!==` e virava uma
-    // gravacao COMUM — a operacao pedida sumia e o que sobrava era um formulario
+    // gravacao COMUM, a operacao pedida sumia e o que sobrava era um formulario
     // com outro escopo, gravado sem que ninguem tivesse pedido isso.
     await gravarConfig(env.DB)
     const sessao = await abrirSessao()
@@ -1264,7 +1264,7 @@ describe('MID — a extensao do funil, o `enabled` por Reel e a auditoria', () =
 /**
  * O `<form>` daquela operacao, recortado da tela.
  *
- * Os tres formularios da tela de um Reel sao irmaos e so o `acao` os separa —
+ * Os tres formularios da tela de um Reel sao irmaos e so o `acao` os separa,
  * afirmar sobre a pagina inteira nao distinguiria "o botao certo avisa" de
  * "algum lugar da pagina avisa".
  */
@@ -1317,7 +1317,7 @@ function entradasDo(formulario: string): EntradaDoFormulario[] {
 /**
  * Os Reels que aquele formulario manda de volta: marcados MAIS escondidos.
  *
- * O navegador nao distingue os dois — os dois viram `midia=` no corpo —, e a
+ * O navegador nao distingue os dois, os dois viram `midia=` no corpo, e a
  * afirmacao do dono e sobre o conjunto: "o que eu tinha escolhido continua
  * escolhido depois deste toque".
  */
@@ -1363,7 +1363,7 @@ function paginaComReel() {
   return pagina([item(REEL_A)], null)
 }
 
-/** A `versao` da linha global — a trava otimista de toda aba aberta (§8.8). */
+/** A `versao` da linha global, a trava otimista de toda aba aberta (§8.8). */
 async function versaoDaConfig(): Promise<number | undefined> {
   const linha = await env.DB.prepare('SELECT versao FROM painel_config WHERE id = 1').first<{
     versao: number

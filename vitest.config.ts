@@ -7,7 +7,7 @@ import { unstable_readConfig } from 'wrangler'
  * de verdade em memoria. Isso evita mock de banco: as queries testadas sao as
  * mesmas que rodam em producao.
  *
- * Os valores de binding aqui sao FICTICIOS e existem so para o teste — nenhum
+ * Os valores de binding aqui sao FICTICIOS e existem so para o teste, nenhum
  * segredo real entra neste arquivo, que e versionado.
  */
 const migrations = await readD1Migrations('./migrations')
@@ -17,7 +17,7 @@ const migrations = await readD1Migrations('./migrations')
  * o que o ambiente de teste precisa: entrada, data de compatibilidade, banco e
  * as `vars` publicas.
  *
- * O que ele NAO herda sao os tres bindings `ratelimits` — a excecao declarada
+ * O que ele NAO herda sao os tres bindings `ratelimits`, a excecao declarada
  * de §7.4. Passar `wrangler: { configPath }` faria o pool derivar TODOS os
  * bindings do arquivo, os tres limitadores inclusive, e nao existe forma de
  * remover um binding depois que o pool o leu (a fusao de opcoes do Miniflare
@@ -34,13 +34,13 @@ const producao = unstable_readConfig({ config: './wrangler.jsonc' })
  *
  * A leitura acima e explicita campo a campo, e o preco disso e que um binding
  * NOVO (KV, R2, Durable Object, fila, servico, um D1 a mais) chega ao Worker
- * publicado e NAO chega ao ambiente de teste — a suite continuaria verde
+ * publicado e NAO chega ao ambiente de teste, a suite continuaria verde
  * provando menos do que promete. Herdar `producao.vars` cobre so as `vars`; o
  * resto some em silencio. Esta lista fecha esse buraco: o conjunto vem do
  * arquivo, e o metateste compara com o `env` de teste.
  *
  * Vai como binding porque o teste roda dentro do workerd, onde nao existe
- * sistema de arquivos nem `unstable_readConfig` — o mesmo caminho que
+ * sistema de arquivos nem `unstable_readConfig`, o mesmo caminho que
  * `TEST_MIGRATIONS` ja usa.
  */
 /** Containers cujos itens nomeiam o binding em `name`, e nao em `binding`. */
@@ -142,11 +142,11 @@ export default defineConfig({
           // Allowlist de dominios VAZIA, igual ao wrangler.jsonc: e o estado
           // em que a entrega continua funcionando e o painel nao altera link
           // nem texto (§9.8). Cada teste que exercita a trava declara a
-          // propria lista, do mesmo jeito que `now` e sempre injetado — uma
+          // propria lista, do mesmo jeito que `now` e sempre injetado, uma
           // lista fixa aqui esconderia qual regra cada teste esta provando.
           ALLOWED_LINK_DOMAINS: '',
           // Raiz das quatro subchaves do painel. Ficticia, e DIFERENTE do
-          // SETUP_ADMIN_TOKEN e do TOKEN_ENCRYPTION_KEY de proposito — o
+          // SETUP_ADMIN_TOKEN e do TOKEN_ENCRYPTION_KEY de proposito, o
           // metateste META-05 falha se alguem repetir um valor aqui.
           PANEL_SESSION_KEY: 'chave-de-sessao-do-painel-de-teste',
           // Consumido por tests/setup.ts para criar o schema antes dos testes.

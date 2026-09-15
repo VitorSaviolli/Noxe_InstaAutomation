@@ -2,7 +2,7 @@
  * Dubles injetados por parametro e o cenario minimo compartilhado.
  *
  * Nada de mock de modulo: os dubles sao classes locais que o teste passa por
- * parametro. Um nome por conceito — quem precisa de um duble da Meta, de um
+ * parametro. Um nome por conceito, quem precisa de um duble da Meta, de um
  * relogio fixo ou de uma config de teste importa daqui, e nao escreve o seu.
  *
  * Este arquivo mora em `tests/fixtures/`, que nao casa com o `include` do
@@ -22,8 +22,8 @@ const ESCRITA = /^\s*(insert|update|delete|replace)/i
  * Envolve um D1Database real e conta o que passa por ele.
  *
  * E o unico jeito honesto de transformar "nao estoura o teto de 50
- * subrequests por invocacao" — que e uma afirmacao sobre a plataforma, e que
- * o Miniflare NAO impoe — numa afirmacao sobre o codigo.
+ * subrequests por invocacao", que e uma afirmacao sobre a plataforma, e que
+ * o Miniflare NAO impoe, numa afirmacao sobre o codigo.
  *
  * `prepares` conta cada statement preparado, inclusive os que depois entram
  * num `db.batch()`. Como um `db.batch()` inteiro vale UM subrequest, o numero
@@ -92,25 +92,25 @@ export function comoD1(contador: D1Contador): D1Database {
 export const AGORA = 1_700_000_000_000
 
 /**
- * Os tetos de HTML por tela, em bytes — e a AUTORIDADE de cada um.
+ * Os tetos de HTML por tela, em bytes, e a AUTORIDADE de cada um.
  *
  * **§12.9 nao e teto.** A linha da tabela diz *"Conexao ruim | ... CSS ~6 KB,
- * HTML ~15 KB por tela"* — com til, como diretriz de projeto. Quem transformou
+ * HTML ~15 KB por tela"*, com til, como diretriz de projeto. Quem transformou
  * a aproximacao em assercao dura foi o TELA-29, e a pergunta que §12.9 protege
  * nao e "cabe no numero" e sim **"abre em conexao ruim?"**.
  *
  * A resposta a essa pergunta foi MEDIDA, e ela e sim com folga: a tela de Reels
  * no teto de 200 Reels sao 39.473 bytes crus e **2.499 comprimidos**
  * (`CompressionStream('gzip')`, que e o que a Cloudflare aplica na saida). Os
- * 39 KB sao custo de memoria e de parse, nao de rede — e por isso o MID-27
+ * 39 KB sao custo de memoria e de parse, nao de rede, e por isso o MID-27
  * mede as duas coisas: o teto cru trava crescimento, e o comprimido e o unico
  * numero preso ao que §12.9 protege.
  *
  * Os tres numeros abaixo sao **trava-crescimento desta branch**, e nao
  * cumprimento de §12.9: eles reprovam quem piorar. A distancia entre
- * `TETO_DE_HTML` e os dois de Reels e divida DECLARADA de desenho de tela —
+ * `TETO_DE_HTML` e os dois de Reels e divida DECLARADA de desenho de tela,
  * encolher o teto de 200, mandar a selecao preservada num campo so em vez de N,
- * ou paginar o formulario —, e ela vai com o resto de §3 para a Task 13b.
+ * ou paginar o formulario, e ela vai com o resto de §3 para a Task 13b.
  *
  * Moram AQUI porque duas suites os afirmam: `painel-telas` percorre as sete
  * telas e `painel-midias` mede os dois cenarios de Reels que aquele laco nunca
@@ -129,7 +129,7 @@ export const TETO_NO_LIMITE_DE_200_REELS = 40 * 1024
  *
  * Medido em 2.499 bytes no pior cenario (200 escolhidos, 25 na pagina). O teto
  * folgado nao afrouxa nada: um teto gzipado reprova bloat ESTRUTURAL de
- * verdade — um bloco novo por Reel, uma tabela inteira a mais — e nunca reprova
+ * verdade, um bloco novo por Reel, uma tabela inteira a mais, e nunca reprova
  * repeticao barata, que e exatamente a distincao que falta ao numero cru.
  */
 export const TETO_COMPRIMIDO_DE_REELS = 6 * 1024
@@ -157,7 +157,7 @@ export const TETO_DE_SUBREQUESTS = 50
  * palavra-gatilho, o texto e o link. Um teste que dependesse desses valores
  * ficaria vermelho na maquina de todo mundo que usa o produto como ele foi
  * feito para ser usado. O que a regressao congela e o COMPORTAMENTO dado uma
- * config conhecida — a forma do contrato de `src/config.ts` e conferida a
+ * config conhecida, a forma do contrato de `src/config.ts` e conferida a
  * parte, campo a campo.
  */
 export const CONFIG_DE_TESTE: AutomationConfig = {
@@ -185,8 +185,8 @@ export function configDeTeste(patch: Partial<AutomationConfig> = {}): Automation
 /**
  * Duble da Graph API da Meta.
  *
- * Guarda a ORDEM das chamadas — e o que prova que nenhuma consulta extra
- * entrou no caminho — e o texto exato de cada Direct.
+ * Guarda a ORDEM das chamadas, e o que prova que nenhuma consulta extra
+ * entrou no caminho, e o texto exato de cada Direct.
  */
 export class MetaFalsa {
   readonly chamadas: string[] = []
@@ -208,7 +208,7 @@ export class MetaFalsa {
     return { ok: true as const, data: { id: mediaId, media_product_type: 'REELS' } }
   }
 
-  /** Quantas chamadas a Meta — que contam no mesmo teto das consultas ao D1. */
+  /** Quantas chamadas a Meta, que contam no mesmo teto das consultas ao D1. */
   get total(): number {
     return this.chamadas.length
   }
@@ -255,7 +255,7 @@ export class MetaQueFalha {
  * Duble da Meta cuja CONTA parou: token revogado, 401 ou 403.
  *
  * `TOKEN_INVALIDO` nao esta em `isRetryable`, e era exatamente por isso que a
- * varredura marcava `failed` — terminal — um comentario que nao tinha nada de
+ * varredura marcava `failed`, terminal, um comentario que nao tinha nada de
  * errado. Conta o numero de tentativas para o teste provar que a fila e
  * abandonada na primeira, em vez de martelar uma conta ja sinalizada.
  */
@@ -312,7 +312,7 @@ export class D1BatchQuebrado {
  * D1 que deixa o PRIMEIRO `batch()` passar e estoura no segundo.
  *
  * Existe para provar que uma rota grava em UM lote so. "Grava a config,
- * depois tenta logar" — a variante que §8.8 proibe em letras grandes — passa
+ * depois tenta logar", a variante que §8.8 proibe em letras grandes, passa
  * verde por qualquer contagem que olhe so o resultado final, porque os dois
  * lotes gravam a mesma coisa. Aqui o segundo lote nao existe, e se alguem o
  * criar a rota devolve erro em vez de sucesso.
@@ -350,7 +350,7 @@ export class D1SegundoBatchQuebrado {
 /**
  * Duble do binding `ratelimits` da Cloudflare.
  *
- * Guarda a ORDEM e o TEXTO de cada chave recebida — e o que prova que a chave
+ * Guarda a ORDEM e o TEXTO de cada chave recebida, e o que prova que a chave
  * enviada e exatamente a de §7.4, e que cada familia de rota fala com o binding
  * dela e com mais nenhum.
  */
@@ -468,10 +468,10 @@ export function pedir(caminho: string, cabecalhos: Record<string, string> = {}):
  * **Ela morava em TRES arquivos, com o corpo identico e um nome diferente no
  * terceiro** (`contemPalavraNoCorpo`). Tres copias de uma comparacao que
  * decide se a tela escreveu uma palavra proibida sao tres chances de uma delas
- * ficar para tras — e a que ficasse para tras seria a que continuaria dizendo
+ * ficar para tras, e a que ficasse para tras seria a que continuaria dizendo
  * "verde" depois de a regra ter mudado. §13.1 nomeia `tests/fixtures/*` como o
  * lugar de um helper compartilhado, e este arquivo e o que ja hospeda o que
- * nao e duble (`AGORA`, `RAIZ`, `pedir`, `capturarConsole`) — abrir um quinto
+ * nao e duble (`AGORA`, `RAIZ`, `pedir`, `capturarConsole`), abrir um quinto
  * arquivo de fixture criaria um nome que §13.1 nao lista.
  */
 export function contemPalavra(texto: string, palavra: string): boolean {
@@ -510,7 +510,7 @@ export function paginaDeMidias(itens: readonly unknown[], proximo: string | null
 /**
  * Duble da listagem da Meta.
  *
- * Guarda a ORDEM e o CURSOR de cada chamada — e o que prova que a paginacao
+ * Guarda a ORDEM e o CURSOR de cada chamada, e o que prova que a paginacao
  * para onde §12.5 manda e nao onde a contagem sugere.
  *
  * Mora aqui, e nao dentro de uma suite, porque DUAS suites precisam dele:

@@ -11,7 +11,7 @@
  * pela mesma razao que o repositorio de configuracao: "sem log, sem mudanca"
  * (§8.8) so e verdade se a escrita da midia, a bump de `versao` e a linha de
  * auditoria estiverem no mesmo lote atomico. Um `.run()` aqui seria a segunda
- * grafia do lote — exatamente o que o Ruling 91 proibe.
+ * grafia do lote, exatamente o que o Ruling 91 proibe.
  *
  * **`media_id` e TEXT em todo o caminho, sem excecao** (Ruling 90). A migration
  * `0002` ja avisa que converter para numero perde precisao acima de 2^53 e
@@ -20,7 +20,7 @@
  *
  * **A leitura do CAMINHO QUENTE nao mora aqui**: ela e `PainelConfigRepository.ler()`,
  * que traz global e midias ativas num `batch` unico. Este repositorio serve a
- * TELA, que precisa tambem das linhas inativas — um Reel desmarcado continua
+ * TELA, que precisa tambem das linhas inativas, um Reel desmarcado continua
  * existindo, com a sobreposicao dele guardada, e some da tela se a consulta
  * filtrar por `ativo = 1`.
  */
@@ -30,9 +30,9 @@ import { ID_DA_CONFIG, type PainelMidiaRecord } from './painel-config-repository
  * A trava otimista de §8.8, escrita como CLAUSULA de cada escrita de midia.
  *
  * **Esta e a peca que faz a extensao do funil ser uma extensao e nao um
- * segundo funil** (Ruling 91). A trava do painel e uma so — `painel_config.versao`,
+ * segundo funil** (Ruling 91). A trava do painel e uma so, `painel_config.versao`,
  * que a migration `0002` define como "contador monotonico de TODA a
- * configuracao (global + midias)" —, e uma escrita de midia que nao a
+ * configuracao (global + midias)", e uma escrita de midia que nao a
  * carregasse commitaria sozinha no dia em que outra aba tivesse salvo antes.
  *
  * **Ela nao pode ser `changes() > 0`**, que e como a linha de auditoria se
@@ -40,11 +40,11 @@ import { ID_DA_CONFIG, type PainelMidiaRecord } from './painel-config-repository
  * anterior, e uma FILA de escritas de midia quebraria a corrente na primeira
  * que alterasse zero linhas. E nao pode ser `versao = <resultante>` depois do
  * `UPDATE` global, porque um escritor concorrente que empurrasse a versao para
- * o mesmo numero satisfaria a condicao — o caso exato que GRAV-19 constroi.
+ * o mesmo numero satisfaria a condicao, o caso exato que GRAV-19 constroi.
  *
  * Ela e o MESMO predicado do `UPDATE` global, avaliado ANTES dele: por isso as
  * escritas de midia vao no comeco do lote, e nao no fim. Dentro do
- * `db.batch()`, que roda em transacao, `versao` ainda e a de antes da bump —
+ * `db.batch()`, que roda em transacao, `versao` ainda e a de antes da bump,
  * entao as duas travas ou casam as duas, ou falham as duas.
  */
 const TRAVA_DE_VERSAO = `EXISTS (SELECT 1 FROM painel_config WHERE id = ${ID_DA_CONFIG} AND versao = ?)`
@@ -72,7 +72,7 @@ export const IDS_NOVOS_POR_GRAVACAO = 20
 /**
  * As colunas de sobreposicao de `painel_midias`, na ordem do schema.
  *
- * `NULL` significa CHAVE AUSENTE no patch — "este Reel segue a regra geral"
+ * `NULL` significa CHAVE AUSENTE no patch, "este Reel segue a regra geral"
  * (§9.3). Nao existe um quarto estado, e por isso a lista e fechada aqui: um
  * `UPDATE` escrito a mao numa tela esqueceria uma coluna, e a coluna esquecida
  * ficaria com o valor velho enquanto a tela dissesse que ela voltou ao geral.
@@ -136,7 +136,7 @@ export class PainelMidiasRepository {
    * As inativas vem junto de proposito: desmarcar um Reel na tela nao apaga a
    * sobreposicao dele, e uma consulta que filtrasse por `ativo = 1` faria a
    * pessoa remarcar o Reel e descobrir que "as regras proprias" voltaram
-   * sozinhas — ou que sumiram, conforme o dia.
+   * sozinhas, ou que sumiram, conforme o dia.
    */
   async lerTodas(): Promise<PainelMidiaRecord[]> {
     const resultado = await this.db
@@ -171,7 +171,7 @@ export class PainelMidiasRepository {
    * a sobreposicao junto, e um `UPDATE` so das que entraram deixaria ativa
    * qualquer Reel que a pessoa desmarcou.
    *
-   * `atualizado_em` anda so nas linhas que estavam ativas — o `WHERE` evita
+   * `atualizado_em` anda so nas linhas que estavam ativas, o `WHERE` evita
    * carimbar 200 linhas a cada gravacao.
    */
   statementDeDesmarcarTodas(now: number, versaoEsperada: number): D1PreparedStatement {
@@ -238,8 +238,8 @@ export class PainelMidiasRepository {
   /**
    * Devolve um Reel que JA TEM linha a lista de escolhidos.
    *
-   * Nao toca em metadado nenhum, e a omissao e a decisao: `getMediaInfo` — a
-   * unica chamada que a gravacao faz — nao devolve legenda nem permalink, e
+   * Nao toca em metadado nenhum, e a omissao e a decisao: `getMediaInfo`, a
+   * unica chamada que a gravacao faz, nao devolve legenda nem permalink, e
    * sobrescreve-los com vazio apagaria exatamente o que a tela mostra no estado
    * "o Instagram nao respondeu".
    *
@@ -282,7 +282,7 @@ export class PainelMidiasRepository {
   }
 
   /**
-   * Escreve a sobreposicao INTEIRA de um Reel — as treze colunas de uma vez.
+   * Escreve a sobreposicao INTEIRA de um Reel, as treze colunas de uma vez.
    *
    * Escrever a lista fechada, e nao "so o que mudou", e o que faz "Voltar tudo
    * a seguir a regra geral" ser uma operacao e nao treze: o botao manda a

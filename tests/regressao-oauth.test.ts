@@ -18,7 +18,7 @@ import {
 } from './fixtures/dubles'
 
 /**
- * REG — regressao do fluxo OAuth de instalacao.
+ * REG, regressao do fluxo OAuth de instalacao.
  *
  * O `/setup/*` e o `/oauth/callback` sao anteriores ao painel e continuam
  * anteriores a ele: quem entra ali e o dono com o SETUP_ADMIN_TOKEN, ou o
@@ -37,7 +37,7 @@ function responderComEnv(request: Request): Promise<Response> {
   return responder(request, env)
 }
 
-describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => {
+describe('REG: /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -53,7 +53,7 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     // A UNICA mudanca que §11.8 pede nas rotas de instalacao, e ela e uma
     // subtracao: ate a etapa do roteador do painel, o `switch` nao conferia
     // metodo nenhum aqui, e um `PUT` com Bearer valido gerava um `state`
-    // assinado — um `state` de verdade, emitido por um metodo que o assistente
+    // assinado, um `state` de verdade, emitido por um metodo que o assistente
     // nunca usa. `Allow: GET` porque e assim que ele sempre chamou.
     for (const metodo of ['POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
       const resposta = await responderComEnv(
@@ -118,7 +118,7 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
     )
     expect(comTokenErrado.status).toBe(401)
 
-    // Com o token certo e sem conta ligada, para em 409 — sem tocar a rede.
+    // Com o token certo e sem conta ligada, para em 409, sem tocar a rede.
     const comTokenCerto = await responderComEnv(
       new Request(`${RAIZ}/setup/subscribe`, {
         method: 'POST',
@@ -202,7 +202,7 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
       expect(await contarCodigos()).toBe(0)
     }
 
-    // Com o Bearer certo, os codigos saem — uma unica vez, no corpo.
+    // Com o Bearer certo, os codigos saem, uma unica vez, no corpo.
     const registrado = capturarConsole()
     let corpo: { recuperacao: string[]; parada: string }
     try {
@@ -235,7 +235,7 @@ describe('REG — /setup/* continua protegido so pelo SETUP_ADMIN_TOKEN', () => 
   test.todo('REG-22: /setup/painel/zerar exige Bearer e nao toca account_tokens (etapa 7)')
 })
 
-describe('REG — o `state` do OAuth continua exatamente como e hoje', () => {
+describe('REG: o `state` do OAuth continua exatamente como e hoje', () => {
   /**
    * Vetor de ouro. `n0.1700000600000` foi escolhido porque o HMAC-SHA256 dele
    * com o SETUP_ADMIN_TOKEN de teste produz, em base64 PADRAO, os tres
@@ -351,14 +351,14 @@ async function contarCodigos(): Promise<number> {
 }
 
 /**
- * REG-ADMIN — o comparador unico das rotas administrativas.
+ * REG-ADMIN, o comparador unico das rotas administrativas.
  *
  * `isAdmin` e a UNICA porta de `/setup/authorize`, `/setup/subscribe`,
  * `/setup/painel/codigos` e `/setup/painel/zerar`. As duas ultimas nasceram
- * depois deste arquivo, e a segunda delas apaga o acesso ao painel inteiro —
+ * depois deste arquivo, e a segunda delas apaga o acesso ao painel inteiro,
  * entao o que esta funcao aceita virou uma pergunta mais cara do que era.
  */
-describe('REG-ADMIN — isAdmin nao aceita segredo vazio', () => {
+describe('REG-ADMIN: isAdmin nao aceita segredo vazio', () => {
   /** Um `Env` de teste com o admin token trocado. Nada real aqui. */
   function envCom(token: string | undefined): Env {
     return { ...env, SETUP_ADMIN_TOKEN: token } as unknown as Env
@@ -382,7 +382,7 @@ describe('REG-ADMIN — isAdmin nao aceita segredo vazio', () => {
   test('REG-ADMIN-03: segredo VAZIO nao autentica ninguem, nem com Bearer vazio', () => {
     // O caso e um `wrangler secret put` que recebeu Enter sem nada. Sem esta
     // guarda, `timingSafeEqual('', '')` compara zero bytes com zero bytes e
-    // devolve true — e um `Authorization: Bearer ` sem nada depois abriria as
+    // devolve true, e um `Authorization: Bearer ` sem nada depois abriria as
     // quatro rotas, entre elas a que apaga o acesso ao painel.
     expect(isAdmin(comBearer(''), envCom(''))).toBe(false)
     expect(isAdmin(comBearer('qualquer-coisa'), envCom(''))).toBe(false)

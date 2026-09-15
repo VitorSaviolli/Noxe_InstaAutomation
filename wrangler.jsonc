@@ -13,7 +13,7 @@
   //
   // SEM `binding` e SEM `run_worker_first`, e as duas ausencias sao decisao.
   // Com `run_worker_first` as rotas casadas passariam a invocar o Worker e
-  // devolveriam 429 quando a cota estourasse — exatamente o que nao pode
+  // devolveriam 429 quando a cota estourasse, exatamente o que nao pode
   // acontecer com o arquivo da parada de emergencia.
   //
   // `not_found_handling` NUNCA pode virar "single-page-application": nesse
@@ -48,14 +48,14 @@
   //
   // A CADA 5 MINUTOS, e o numero e derivado do backoff, nao escolhido a gosto.
   // `computeNextRetry` agenda 1min, 4min e 16min (`src/services/automation.ts`);
-  // com o cron a cada 15, os dois primeiros degraus eram engolidos inteiros — um
+  // com o cron a cada 15, os dois primeiros degraus eram engolidos inteiros, um
   // comentario que pedia 1 minuto esperava ate 15, e o de 4 tambem. Retentar
   // rapido importa aqui: a private reply so e aceita por 7 dias, e uma falha de
   // rede no primeiro minuto e exatamente o caso que a espera curta existe para
   // resolver.
   //
   // Custo: 288 invocacoes por dia em vez de 96. O teto do plano gratuito e de
-  // 100.000 requisicoes/dia — 0,29% dele. E o cron sai cedo sem escrever nada
+  // 100.000 requisicoes/dia, 0,29% dele. E o cron sai cedo sem escrever nada
   // quando a fila esta vazia (`findRetryPending` devolve zero e `retryPending`
   // retorna antes de qualquer gravacao), entao tique ocioso nao custa escrita.
   "triggers": {
@@ -63,7 +63,7 @@
   },
 
   // Apenas configuracao NAO secreta. Segredos vao por `wrangler secret put`.
-  // ATENCAO: este bloco e SOBRESCRITO a cada deploy — editar pelo dashboard
+  // ATENCAO: este bloco e SOBRESCRITO a cada deploy, editar pelo dashboard
   // nao adianta, o proximo deploy apaga. Este arquivo e a fonte da verdade.
   "vars": {
     // PREENCHER: ID publico do SEU app no Meta for Developers.
@@ -108,7 +108,7 @@
 
   // ---------------------------------------------------------------------
   // Limitadores de tentativa do painel. Camada de defesa OPCIONAL: apagar
-  // este bloco inteiro nao quebra nada — o painel continua correto e o
+  // este bloco inteiro nao quebra nada, o painel continua correto e o
   // limitador de reserva (uma janela por isolate, dentro do proprio Worker)
   // assume no lugar. O que estes bindings compram e cota; a seguranca dos
   // codigos vem da entropia deles, nunca daqui.
@@ -125,8 +125,8 @@
   // LEIA ISTO ANTES DE APAGAR O BLOCO. Sem estes tres bindings cadastrados, o
   // que resta e o limitador de reserva, e ele conta dentro de UM servidor so
   // (um "isolate") e por endereco de IP. Contra uma pessoa tentando de um
-  // endereco so, ele segura. Contra trafego distribuido — muitos enderecos ao
-  // mesmo tempo, que e o que um ataque de verdade faz — a protecao de cota e
+  // endereco so, ele segura. Contra trafego distribuido, muitos enderecos ao
+  // mesmo tempo, que e o que um ataque de verdade faz, a protecao de cota e
   // praticamente NULA: o teto de 10 por minuto vira 10 vezes o numero de
   // enderecos vezes o numero de servidores. Nao existe teto global sem estes
   // bindings, e isso nao e um defeito escondido: e o preco de a camada ser
@@ -135,7 +135,7 @@
   // O que cadastrar os tres compra e exatamente isso, e nao seguranca: o
   // contador passa a ser da Cloudflare, aplicado antes de a sua cota ser
   // gasta. A cota do plano gratuito e de 100.000 requisicoes por dia, e ela e
-  // o maior risco residual deste projeto — o dia em que ela acaba e o dia em
+  // o maior risco residual deste projeto, o dia em que ela acaba e o dia em
   // que a automacao para de responder. A seguranca dos codigos continua vindo
   // do tamanho deles, nunca daqui.
   // ---------------------------------------------------------------------

@@ -1,4 +1,4 @@
-# SETUP_META.md — Guia do zero no Meta for Developers
+# SETUP_META.md: Guia do zero no Meta for Developers
 
 Guia passo a passo para quem **nunca** abriu o painel do Meta for Developers.
 Leia na ordem. Não pule etapas: várias delas dependem da anterior.
@@ -13,9 +13,9 @@ comentários do Instagram rodando em Cloudflare Workers + TypeScript + D1).
 Este é o **segundo** dos dois guias de instalação, e ele começa onde o outro
 termina:
 
-1. **`SETUP_CLOUDFLARE.md` primeiro** — banco criado, segredos cadastrados e
+1. **`SETUP_CLOUDFLARE.md` primeiro**: banco criado, segredos cadastrados e
    Worker publicado.
-2. **`SETUP_META.md` — este aqui, depois.**
+2. **`SETUP_META.md`: este aqui, depois.**
 
 **Por que nessa ordem:** a URL pública do seu Worker (o endereço terminado em
 `.workers.dev`) **só passa a existir depois do primeiro deploy**, feito no outro
@@ -28,7 +28,7 @@ dela. Sem o deploy feito, você trava na etapa 4 daqui.
       você não tem essa URL, pare e faça o `SETUP_CLOUDFLARE.md` até o passo 8.
 - [ ] **O `SETUP_ADMIN_TOKEN`** que você gerou e cadastrou no outro guia
       (passo 6.4 de lá). É a senha das rotas administrativas.
-- [ ] **Uma conta no Facebook.** É ela que vira a sua conta de desenvolvedor —
+- [ ] **Uma conta no Facebook.** É ela que vira a sua conta de desenvolvedor,
       não tem como fugir disso, mesmo o projeto sendo do Instagram.
 - [ ] **Uma conta profissional no Instagram** (Comercial ou Criador de
       conteúdo), que é a conta que será automatizada. Conta pessoal **não
@@ -38,13 +38,13 @@ dela. Sem o deploy feito, você trava na etapa 4 daqui.
 
 A API que este projeto usa (responder comentários e mandar Direct) **só existe
 para contas profissionais**. Se a sua conta ainda é pessoal, converta antes de
-qualquer outra coisa — leva menos de dois minutos, é gratuito e reversível:
+qualquer outra coisa: leva menos de dois minutos, é gratuito e reversível:
 
 1. Abra o **app do Instagram** no celular, com a conta que será automatizada.
 2. Toque no seu perfil e vá em **Menu (☰) → Configurações e privacidade**.
 3. Entre em **Tipo de conta e ferramentas → Mudar para conta profissional**.
 4. Escolha uma categoria e, quando perguntarem, selecione **Criador de
-   conteúdo** ou **Comercial** — os dois servem para este projeto.
+   conteúdo** ou **Comercial**: os dois servem para este projeto.
 5. Se o app oferecer **vincular a uma Página do Facebook**, aceite e vincule à
    sua conta do Facebook. Isso facilita o resto do caminho no painel da Meta.
 
@@ -63,8 +63,8 @@ ferramentas**: deve aparecer que a conta é profissional.
 | Item | Valor |
 |---|---|
 | Nome do Worker | `noxe-insta-automation` |
-| URL pública | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev` — **exemplo**; use a que saiu do seu `npm run deploy` |
-| Banco D1 | `noxe-insta-automation` — criado por você no passo 4 do `SETUP_CLOUDFLARE.md` |
+| URL pública | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev`, **exemplo**; use a que saiu do seu `npm run deploy` |
+| Banco D1 | `noxe-insta-automation`: criado por você no passo 4 do `SETUP_CLOUDFLARE.md` |
 | Arquivo de configuração | `wrangler.jsonc` (**não** existe `wrangler.toml` neste projeto) |
 | Versão da Graph API | `v25.0` (variável `META_API_VERSION` no `wrangler.jsonc`) |
 
@@ -85,19 +85,19 @@ ferramentas**: deve aparecer que a conta é profissional.
 | GET | `/oauth/callback` | Recebe o `code`, troca por token, salva cifrado e já assina a conta | `state` assinado |
 | POST | `/setup/subscribe` | Refaz a inscrição da conta (nível conta) manualmente | `Authorization: Bearer SETUP_ADMIN_TOKEN` |
 
-### Hosts da Meta (leia com atenção — cada etapa usa um host diferente)
+### Hosts da Meta (leia com atenção: cada etapa usa um host diferente)
 
 Esta é uma das maiores fontes de confusão. São **três** hosts distintos:
 
 | Etapa | Host |
 |---|---|
 | Tela de consentimento (onde a pessoa clica "Permitir") | `https://www.instagram.com/oauth/authorize` |
-| Troca do `code` por token curto | `POST https://api.instagram.com/oauth/access_token` — **único** uso desse host |
+| Troca do `code` por token curto | `POST https://api.instagram.com/oauth/access_token`, **único** uso desse host |
 | Todo o resto (token longo, refresh, comentários, Direct, inscrição) | `https://graph.instagram.com` |
 
 > **`graph.facebook.com` NÃO é usado neste projeto.** Esse host pertence ao
 > outro fluxo (o de Facebook Login para Instagram). Se você seguir um tutorial
-> da internet que manda usar `graph.facebook.com`, é outro fluxo — ignore.
+> da internet que manda usar `graph.facebook.com`, é outro fluxo, ignore.
 
 ---
 
@@ -106,7 +106,7 @@ Esta é uma das maiores fontes de confusão. São **três** hosts distintos:
 1. Abra <https://developers.facebook.com>.
 2. Clique em **Começar** (canto superior direito).
 3. Faça login com uma conta do **Facebook**. Sim, precisa de uma conta do
-   Facebook mesmo o projeto sendo do Instagram — é a conta do Facebook que vira
+   Facebook mesmo o projeto sendo do Instagram, é a conta do Facebook que vira
    sua conta de desenvolvedor.
 4. A Meta vai pedir para:
    - **confirmar seu e-mail**;
@@ -117,7 +117,7 @@ Esta é uma das maiores fontes de confusão. São **três** hosts distintos:
 
 Pré-requisito paralelo, do lado do Instagram: a conta que vai ser automatizada
 precisa ser **profissional** (Comercial ou Criador de conteúdo). Se você pulou o
-bloco "Onde você está" lá em cima, volte nele agora — a conversão está explicada
+bloco "Onde você está" lá em cima, volte nele agora, a conversão está explicada
 lá e é obrigatória. Conta pessoal não consegue autorizar este app.
 
 ---
@@ -125,7 +125,7 @@ lá e é obrigatória. Conta pessoal não consegue autorizar este app.
 ## 2. Criar o app correto (qual tipo escolher)
 
 1. No painel, clique em **Meus apps → Criar app**.
-2. A Meta hoje pergunta primeiro **"O que você quer que seu app faça?"** —
+2. A Meta hoje pergunta primeiro **"O que você quer que seu app faça?"**,
    é uma lista de **casos de uso**. Escolha a opção relacionada ao
    **Instagram** (normalmente aparece como *Outro* → depois tipo **Empresa**,
    ou diretamente um caso de uso de Instagram, dependendo da versão do painel
@@ -138,7 +138,7 @@ lá e é obrigatória. Conta pessoal não consegue autorizar este app.
    ele pode ser vinculado aqui. Não é obrigatório neste momento para usar a
    sua própria conta.
 
-> **Não escolha** os tipos *Consumidor*, *Jogos* ou *Workplace* — eles não
+> **Não escolha** os tipos *Consumidor*, *Jogos* ou *Workplace*, eles não
 > oferecem o caso de uso do Instagram que precisamos.
 
 > Se a tela que a Meta te mostrar for diferente do descrito (o painel muda com
@@ -159,7 +159,7 @@ lá e é obrigatória. Conta pessoal não consegue autorizar este app.
    - **Configurações** (Instagram Login, URIs de redirecionamento, credenciais)
    - **Webhooks**
 
-Guarde o caminho **Casos de uso → Personalizar** — vamos voltar nele nas etapas
+Guarde o caminho **Casos de uso → Personalizar**, vamos voltar nele nas etapas
 6, 7, 9, 10 e 11.
 
 ---
@@ -199,7 +199,7 @@ Dentro de **Casos de uso → Instagram → Personalizar → Configurações**:
 > **Pendência do projeto:** as rotas `/privacy-policy` e `/data-deletion` estão
 > implementadas em `src/routes/legal.ts`, mas ainda contêm os placeholders
 > `CONTATO_EMAIL` e `NOME_RESPONSAVEL`. Preencha antes de colar essas URLs no
-> painel — a Meta (e qualquer revisor) abre essas páginas.
+> painel: a Meta (e qualquer revisor) abre essas páginas.
 
 ---
 
@@ -220,7 +220,7 @@ teste do Instagram*, *Funções → Testadores do Instagram*):
 3. Envie o convite.
 4. **Aceite o convite no app do Instagram**, com a conta convidada:
    **Configurações → Site (ou "Aplicativos e sites") → Convites de testador →
-   Aceitar**. O convite fica pendente até esse aceite — e sem o aceite o
+   Aceitar**. O convite fica pendente até esse aceite, e sem o aceite o
    consentimento do passo 8 falha.
 
 Se a conta que você vai automatizar é a mesma do administrador do app, ainda
@@ -229,7 +229,7 @@ funcionar".
 
 ---
 
-## 6. Onde achar App ID e App Secret — ⚠️ ALERTA DOS DOIS PARES
+## 6. Onde achar App ID e App Secret: ⚠️ ALERTA DOS DOIS PARES
 
 Este é **o ponto onde mais gente trava**. Existem **dois pares de credenciais
 diferentes** dentro do mesmo app, com nomes parecidos, em telas diferentes:
@@ -237,7 +237,7 @@ diferentes** dentro do mesmo app, com nomes parecidos, em telas diferentes:
 | Onde | Como aparece | Serve para |
 |---|---|---|
 | **Configurações → Básico** | *Identificação do app* e *Chave secreta do app* | Credenciais do **app do Facebook**. Usadas no fluxo com Facebook Login (`graph.facebook.com`). |
-| **Casos de uso → Instagram → Personalizar** (área de configuração do Instagram Login) | *ID do app do Instagram* e *Chave secreta do app do Instagram* | Credenciais do **Instagram Login** — o fluxo deste projeto. |
+| **Casos de uso → Instagram → Personalizar** (área de configuração do Instagram Login) | *ID do app do Instagram* e *Chave secreta do app do Instagram* | Credenciais do **Instagram Login**, o fluxo deste projeto. |
 
 ### Qual vale para nós
 
@@ -248,14 +248,14 @@ secreta do app do Instagram**.
 Se você usar por engano o par de **Configurações → Básico**, o sintoma típico
 é o consentimento até abrir, mas a troca do `code` em
 `POST https://api.instagram.com/oauth/access_token` falhar com erro de
-client inválido — ou a validação da assinatura do webhook nunca bater.
+client inválido: ou a validação da assinatura do webhook nunca bater.
 
 ### Onde esses valores entram no projeto
 
 | Valor | Onde vive |
 |---|---|
-| App ID do Instagram | `META_APP_ID` — variável **não secreta**, no `wrangler.jsonc` |
-| App Secret do Instagram | `META_APP_SECRET` — **secret**, via `wrangler secret put` |
+| App ID do Instagram | `META_APP_ID`: variável **não secreta**, no `wrangler.jsonc` |
+| App Secret do Instagram | `META_APP_SECRET`: **secret**, via `wrangler secret put` |
 
 ### O que fazer agora, na prática
 
@@ -285,7 +285,7 @@ npx wrangler secret put SETUP_ADMIN_TOKEN
 ```
 
 Se você seguiu o `SETUP_CLOUDFLARE.md`, os três últimos **já estão cadastrados**
-— foram gerados lá com `npm run gerar:segredos`. Só o `META_APP_SECRET` é novo
+foram gerados lá com `npm run gerar:segredos`. Só o `META_APP_SECRET` é novo
 aqui. Confira com `npx wrangler secret list`, que mostra os nomes cadastrados
 (nunca os valores).
 
@@ -327,7 +327,7 @@ Regras importantes:
   mídia; pedir permissão a mais só atrapalha (e vira pergunta chata em App
   Review no futuro).
 - Enquanto você opera **a sua própria conta**, essas três permissões funcionam
-  em **Standard Access** — sem App Review. Veja a etapa 15.
+  em **Standard Access**: sem App Review. Veja a etapa 15.
 
 ---
 
@@ -349,7 +349,7 @@ npm run deploy
 O `npm run check` roda lint, checagem de tipos e os **822 testes** antes de
 publicar.
 
-> **Vai aparecer aviso sobre segredo faltando durante os testes — é esperado.**
+> **Vai aparecer aviso sobre segredo faltando durante os testes, é esperado.**
 > Os testes não usam os seus segredos de verdade: o `vitest.config.ts` injeta
 > valores fictícios. O que vale é a linha final dizendo que os testes passaram.
 > Aviso não é erro.
@@ -412,7 +412,7 @@ curl -i \
 > **Por que dois comandos diferentes?** No PowerShell do Windows, `curl` é apenas
 > um apelido para o `Invoke-WebRequest`, que **não aceita** as opções `-H` e `-i`.
 > Colar ali o comando de Mac/Linux devolve um erro confuso sobre parâmetro
-> desconhecido — não é problema do seu token nem do Worker. Use sempre o bloco do
+> desconhecido: não é problema do seu token nem do Worker. Use sempre o bloco do
 > seu sistema.
 
 > ⚠️ **Cuidado com o histórico do terminal.** Colar o `SETUP_ADMIN_TOKEN` direto
@@ -435,7 +435,7 @@ assinado (HMAC, validade de 10 minutos) e com os três scopes.
    Instagram, você autoriza a conta errada e depois não entende por que nada
    chega.
 3. Revise a tela de permissões e clique em **Permitir**. Lembre do cronômetro de
-   10 minutos: se aparecer "State inválido ou expirado", não tem mistério —
+   10 minutos: se aparecer "State inválido ou expirado", não tem mistério,
    repita a etapa 8.2 e seja mais rápido.
 4. O Instagram redireciona para `/oauth/callback` no seu Worker. A partir daí,
    sem você fazer mais nada, o Worker:
@@ -454,7 +454,7 @@ Detalhes do `code` que explicam erros comuns:
 | Característica do `code` | Consequência prática |
 |---|---|
 | Vale **1 hora** | Se você demorar, refaça o `/setup/authorize` |
-| **Uso único** | Recarregar a página do callback dá erro — é esperado |
+| **Uso único** | Recarregar a página do callback dá erro, é esperado |
 | Vem com `#_` no final | O Worker já remove; se você testar na mão, remova |
 
 Para conferir qual conta ficou autorizada (isso exige um token do Instagram em
@@ -521,13 +521,13 @@ O Verify Token é uma **string inventada por você**. Não é fornecida pela Met
 A única regra é: o valor no painel e o valor em `META_WEBHOOK_VERIFY_TOKEN`
 precisam ser **idênticos**.
 
-**Se você seguiu o `SETUP_CLOUDFLARE.md`, esse valor já existe** — foi gerado no
+**Se você seguiu o `SETUP_CLOUDFLARE.md`, esse valor já existe**, foi gerado no
 passo 6 de lá e guardado no seu gerenciador de senhas. Use aquele mesmo. Não
 gere um novo agora: o Worker já está com o antigo cadastrado, e dois valores
 diferentes fazem a verificação falhar.
 
 Se precisar gerar um valor novo (ou se perdeu o anterior), use o gerador do
-próprio projeto — ele funciona igual no Windows, no Mac e no Linux:
+próprio projeto: ele funciona igual no Windows, no Mac e no Linux:
 
 ```bash
 npm run gerar:segredos
@@ -543,7 +543,7 @@ cadastrados.
 openssl rand -base64 32
 ```
 
-No PowerShell do Windows o `openssl` normalmente não existe — mais um motivo
+No PowerShell do Windows o `openssl` normalmente não existe, mais um motivo
 para usar o `npm run gerar:segredos`.
 
 Grave no Worker:
@@ -559,7 +559,7 @@ secret e faça o deploy **antes** de clicar em "Verificar e salvar".
 
 ---
 
-## 11. Assinar o evento "comments" — os DOIS níveis
+## 11. Assinar o evento "comments": os DOIS níveis
 
 Aqui mora o erro mais frustrante do projeto: assinar **um** nível só e ficar
 esperando eventos que nunca chegam. **São dois, e os dois são obrigatórios.**
@@ -569,13 +569,13 @@ esperando eventos que nunca chegam. **São dois, e os dois são obrigatórios.**
 | **(a) APP** | Painel da Meta: Casos de uso → Personalizar → Webhooks | **Manual.** Não existe API. | "Este app quer receber o campo `comments`." |
 | **(b) CONTA** | `POST /me/subscribed_apps` | Automático no `/oauth/callback`; manual via `/setup/subscribe` | "Esta conta específica autoriza este app a receber os eventos dela." |
 
-### (a) Nível APP — manual
+### (a) Nível APP: manual
 
 Na aba **Webhooks** do caso de uso do Instagram, na lista de campos
 disponíveis, encontre **`comments`** e clique em **Assinar**. Confirme que ele
 fica marcado como assinado. Sem isso, a Meta nem tenta entregar nada.
 
-### (b) Nível CONTA — via API
+### (b) Nível CONTA: via API
 
 Normalmente já foi feito sozinho no passo 8. Se você precisar refazer (por
 exemplo, depois de reautorizar), use a rota administrativa:
@@ -641,14 +641,14 @@ allowedMediaIds: ['17912345678901234'],
 
 Depois do teste, volte para `['*']` (ou deixe travado, se você só quer automatizar
 posts escolhidos a dedo). **Toda mudança em `src/config.ts` só vale depois de
-`npm run deploy`** — o arquivo é lido pelo Worker publicado, não pela sua máquina.
+`npm run deploy`**: o arquivo é lido pelo Worker publicado, não pela sua máquina.
 
 #### Como descobrir o ID do Reel
 
 O ID da mídia **não** é o código que aparece na URL do post
 (`instagram.com/reel/ABC123...`). É um número longo, e há três formas de obtê-lo:
 
-**1. Pelo painel da Meta (não precisa de token — mais fácil)**
+**1. Pelo painel da Meta (não precisa de token, mais fácil)**
 
 Comente a palavra-gatilho no Reel e vá em **Casos de uso → Instagram →
 Personalizar → Webhooks → Entregas recentes**. Abra a última entrega e procure no
@@ -679,7 +679,7 @@ curl -s "https://graph.instagram.com/v25.0/me/media?fields=id,media_type,permali
 #### Mensagem diferente por post
 
 Se você quer **vários** posts ativos, cada um entregando um link diferente, não
-use `allowedMediaIds` — use `mediaAutomations`, no mesmo `src/config.ts`. Cada
+use `allowedMediaIds`: use `mediaAutomations`, no mesmo `src/config.ts`. Cada
 entrada sobrepõe a configuração global só para os IDs listados:
 
 ```ts
@@ -741,7 +741,7 @@ O que você não citar na entrada continua vindo da configuração global.
 
 | Limite | Valor |
 |---|---|
-| Private reply por comentário | **Apenas 1** — repetir no mesmo comentário não funciona |
+| Private reply por comentário | **Apenas 1**: repetir no mesmo comentário não funciona |
 | Janela do private reply | **7 dias** a partir da criação do comentário |
 | Rate limit de private replies | **750 chamadas/hora** por conta profissional |
 
@@ -750,7 +750,7 @@ comentário sempre vai falhar por design.
 
 ### Endpoints envolvidos (para conferir manualmente, se quiser)
 
-Você **não precisa** destes comandos para o fluxo normal — o Worker faz tudo
+Você **não precisa** destes comandos para o fluxo normal, o Worker faz tudo
 sozinho. Eles servem para depurar na mão, e exigem um token do Instagram válido.
 
 **Resposta pública em um comentário**
@@ -798,7 +798,7 @@ curl -X POST "https://graph.instagram.com/v25.0/{ig-user-id}/messages" \
 > **Confira antes do teste:** o campo `destinationUrl` em `src/config.ts` precisa
 > ser o **seu** link. Se ele ainda estiver com um marcador entre colchetes, a
 > automação recusa o acionamento com o motivo `link_nao_configurado` e ninguém
-> recebe nada. E se o repositório veio com o link de outra pessoa, troque —
+> recebe nada. E se o repositório veio com o link de outra pessoa, troque,
 > senão o Direct entrega o link errado.
 
 ---
@@ -835,7 +835,7 @@ Regras do refresh que você precisa saber:
 
 ### E se passar dos 60 dias sem renovar?
 
-Não existe recuperação por API. O único caminho é **refazer o OAuth do zero** —
+Não existe recuperação por API. O único caminho é **refazer o OAuth do zero**,
 e vale de novo o limite de 10 minutos entre pedir a URL e clicar em "Permitir".
 O caminho mais fácil continua sendo `npm run configurar`, que abre o navegador
 direto. Na mão:
@@ -857,7 +857,7 @@ curl -i \
   "https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/setup/authorize"
 ```
 
-Autorize de novo (etapa 8) e pronto — o `/oauth/callback` grava o token novo e
+Autorize de novo (etapa 8) e pronto: o `/oauth/callback` grava o token novo e
 refaz a inscrição de nível conta. Depois disso, confirme a inscrição com
 `POST /setup/subscribe` (etapa 11b) se quiser ter certeza.
 
@@ -875,7 +875,7 @@ Quando "não chega nada", o painel da Meta responde metade das perguntas.
 | **Casos de uso → Instagram → Personalizar → Webhooks → Entregas recentes** | Cada tentativa de entrega, o corpo enviado e o código HTTP que o seu Worker devolveu. É aqui que você descobre se a Meta tentou e você respondeu errado, ou se ela nem tentou. |
 | **Painel do app → Alertas** | Avisos do app: permissão descontinuada, versão da API sendo aposentada, problemas de conformidade. |
 | **Configurações → Básico** | Estado do app (desenvolvimento/produção), URLs obrigatórias faltando. |
-| **Ferramentas → Explorador da API de Gráficos** | Útil para testar chamadas manualmente — lembrando que este projeto usa `graph.instagram.com`, então nem tudo do explorador se aplica. |
+| **Ferramentas → Explorador da API de Gráficos** | Útil para testar chamadas manualmente, lembrando que este projeto usa `graph.instagram.com`, então nem tudo do explorador se aplica. |
 
 E do lado do Cloudflare:
 
@@ -894,7 +894,7 @@ Interpretação rápida das entregas recentes:
 
 > Lembre: o Worker **não** registra texto de comentário nem username, e guarda o
 > IGSID do autor apenas como SHA-256. Então não espere achar o conteúdo do
-> comentário nos seus próprios logs — por design, ele não está lá. Para ver o
+> comentário nos seus próprios logs: por design, ele não está lá. Para ver o
 > conteúdo entregue, use as **entregas recentes** no painel da Meta.
 
 ---
@@ -905,7 +905,7 @@ Interpretação rápida das entregas recentes:
 
 | Cenário | O que basta |
 |---|---|
-| Automatizar **a sua própria** conta profissional | **Standard Access** — **não exige App Review** |
+| Automatizar **a sua própria** conta profissional | **Standard Access**, **não exige App Review** |
 | Atender contas de **terceiros / clientes** | **Advanced Access**, que exige **App Review** + **Verificação Comercial** (Business Verification) |
 
 Enquanto o projeto só mexe na **sua** conta (com ela adicionada como testadora,
@@ -916,7 +916,7 @@ que outra empresa ou pessoa for conectar a conta dela ao seu app.
 > painel da Meta mostra "Complete app review" como um dos passos numerados da
 > lista. Ele é uma **sugestão do assistente**, não um bloqueio: com Standard
 > Access e a sua conta como testadora, a automação funciona sem revisão nenhuma.
-> Você pode submeter mesmo assim — só saiba que é opcional no seu caso, e que a
+> Você pode submeter mesmo assim: só saiba que é opcional no seu caso, e que a
 > análise leva semanas.
 
 Se você **vai** submeter (ou vai atender clientes), o resto desta etapa é o
@@ -932,7 +932,7 @@ app), exceto onde indicado:
 
 | Campo | O que é | Valor para este projeto |
 |---|---|---|
-| **Ícone do app** | Imagem quadrada de **1024 × 1024** px | Sua logo. Veja a 15.3 — é o item que mais gente esquece. |
+| **Ícone do app** | Imagem quadrada de **1024 × 1024** px | Sua logo. Veja a 15.3, é o item que mais gente esquece. |
 | **URL da Política de Privacidade** | Página pública que explica o tratamento dos dados | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/privacy-policy` |
 | **Categoria do app** | A categoria que melhor descreve o que o app faz | *Empresa e páginas* / *Utilitários* costumam servir. Escolha a mais honesta. |
 | **E-mail comercial** | Fica em **Configurações do desenvolvedor**, não em Básico | É para onde a Meta manda o **resultado da revisão** e os alertas. Use um e-mail que você lê de verdade. |
@@ -947,11 +947,11 @@ Preencha também, se a tela pedir:
 > **Não confunda com a etapa 4.** O campo de **URI de redirecionamento** (aquele
 > único campo de "redirect URL" do *Set up Instagram business login*) recebe
 > **só** `.../oauth/callback`. As URLs de privacidade e de exclusão de dados são
-> outra tela — esta aqui, **Configurações → Básico**.
+> outra tela: esta aqui, **Configurações → Básico**.
 
 ---
 
-### 15.3 O ícone do app (a "foto") — obrigatório
+### 15.3 O ícone do app (a "foto"): obrigatório
 
 Este é um requisito real e fácil de esquecer, porque ele não aparece na lista de
 passos do assistente do Instagram: ele mora em **Configurações → Básico**.
@@ -960,7 +960,7 @@ passos do assistente do Instagram: ele mora em **Configurações → Básico**.
 
 | Item | Regra |
 |---|---|
-| Dimensões | **1024 × 1024 px** — quadrado exato |
+| Dimensões | **1024 × 1024 px**: quadrado exato |
 | Formato | PNG (JPG também é aceito) |
 | Fundo | Use fundo **sólido**. Transparência costuma virar preto ou branco dependendo de onde a imagem é exibida. |
 | Cantos | Envie **quadrado**, sem cantos arredondados desenhados. A Meta arredonda sozinha na exibição. |
@@ -983,7 +983,7 @@ o que o revisor da Meta vê. Um ícone genérico ou vazio piora a taxa de aprova
 - ✅ Use a **sua** logo, ou uma marca própria simples: uma letra, um símbolo, uma
   forma. Precisa ficar legível reduzido a ~40 px.
 
-> **Não tem logo?** Serve qualquer imagem quadrada própria e legível — inclusive
+> **Não tem logo?** Serve qualquer imagem quadrada própria e legível, inclusive
 > uma feita num editor gratuito (Canva, Figma, GIMP). O que não pode é ficar
 > vazio nem usar marca alheia.
 
@@ -1024,7 +1024,7 @@ Regras da própria Meta:
 - Use o **inglês** como idioma da interface quando possível. Se a sua interface
   estiver em português, **coloque legendas** explicando o que está acontecendo.
 - **Explique o que cada botão faz** se não for óbvio na tela.
-- Mostre a experiência **completa** — não pedaços soltos.
+- Mostre a experiência **completa**: não pedaços soltos.
 
 **Roteiro sugerido para este projeto** (grave a tela do computador + a tela do
 celular, ou use o celular filmado):
@@ -1058,7 +1058,7 @@ Escreva em inglês. Modelos para copiar e adaptar:
 
 > **NÃO peça `instagram_business_content_publish`.** Este projeto não publica
 > mídia nenhuma. Pedir permissão que você não usa é a pergunta mais chata que a
-> revisão faz — e você não vai ter o que responder.
+> revisão faz: e você não vai ter o que responder.
 
 ---
 
@@ -1084,7 +1084,7 @@ Para automatizar **só a sua conta**, isso não é exigido.
 - [ ] Screencast gravado cobrindo as **3** permissões, com legendas se não estiver em inglês (15.5)
 - [ ] Justificativa escrita para **cada** permissão (15.6)
 - [ ] `instagram_business_content_publish` **não** está na lista de permissões pedidas
-- [ ] A automação está **funcionando de verdade** — o revisor vai tentar reproduzir
+- [ ] A automação está **funcionando de verdade**, o revisor vai tentar reproduzir
 
 > Os requisitos exatos de App Review mudam com frequência. Os quatro campos
 > obrigatórios, a especificação do ícone e as regras do screencast desta seção
@@ -1094,7 +1094,7 @@ Para automatizar **só a sua conta**, isso não é exigido.
 
 ---
 
-## Apêndice A — Checklist final
+## Apêndice A: Checklist final
 
 - [ ] `SETUP_CLOUDFLARE.md` concluído: Worker publicado e URL anotada
 - [ ] Conta de desenvolvedor criada e verificada (etapa 1)
@@ -1114,9 +1114,9 @@ Para automatizar **só a sua conta**, isso não é exigido.
 - [ ] `CONTATO_EMAIL` e `NOME_RESPONSAVEL` em `src/routes/legal.ts` preenchidos
 - [ ] **Ícone 1024 × 1024 do app** carregado em Configurações → Básico (etapa 15.3)
 - [ ] URLs de `/privacy-policy` e `/data-deletion` coladas em Configurações → Básico (etapa 15.2)
-- [ ] Só faça App Review se for atender **terceiros** — para a sua própria conta não é exigido (etapa 15.1)
+- [ ] Só faça App Review se for atender **terceiros**, para a sua própria conta não é exigido (etapa 15.1)
 
-## Apêndice B — Comandos do projeto
+## Apêndice B: Comandos do projeto
 
 | Comando | O que faz |
 |---|---|
@@ -1139,7 +1139,7 @@ Para automatizar **só a sua conta**, isso não é exigido.
 > valores fictícios injetados pelo `vitest.config.ts`, não os seus segredos
 > reais. Olhe a linha final: se disser que passou, passou.
 
-## Apêndice C — Mapa do código (para saber onde mexer)
+## Apêndice C: Mapa do código (para saber onde mexer)
 
 | Caminho | Responsabilidade |
 |---|---|
@@ -1168,6 +1168,6 @@ Para automatizar **só a sua conta**, isso não é exigido.
 
 **Regra de ouro deste guia:** tudo que está aqui foi verificado contra o
 projeto e a documentação oficial. Se você esbarrar em algo que não está
-descrito — um campo novo na tela, um erro com código desconhecido, um limite
-diferente — **confirme na documentação oficial da Meta** em vez de chutar. Um
+descrito: um campo novo na tela, um erro com código desconhecido, um limite
+diferente: **confirme na documentação oficial da Meta** em vez de chutar. Um
 palpite errado no OAuth ou no webhook custa horas de depuração.

@@ -21,7 +21,7 @@ import {
 } from './fixtures/dubles'
 
 /**
- * REG — regressao do roteador.
+ * REG, regressao do roteador.
  *
  * O painel vai entrar pelo `default:` do `switch` de `src/index.ts`. Este
  * arquivo congela, antes disso, quem NAO passa por ali: as sete rotas de hoje
@@ -49,7 +49,7 @@ const SETE_ROTAS: ReadonlyArray<{ caminho: string; status: number }> = [
   { caminho: '/setup/subscribe', status: 401 },
 ]
 
-describe('REG — o roteador antes do painel', () => {
+describe('REG: o roteador antes do painel', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -83,7 +83,7 @@ describe('REG — o roteador antes do painel', () => {
   test('REG-26: /painel e /painel/ entram os dois no painel, e nenhum vira o 404 cru', async () => {
     // Esta garantia MUDOU de forma na etapa do roteador, e a mudanca esta
     // escrita aqui porque ela e deliberada. Antes do painel existir, os dois
-    // caminhos respondiam o mesmo 404 e o teste comparava corpo com corpo — era
+    // caminhos respondiam o mesmo 404 e o teste comparava corpo com corpo, era
     // a forma que um roteador com `case '/painel'` e sem `/painel/` deixava
     // vermelha. Agora `/painel` E uma rota (sem sessao, `303` para
     // `/painel/entrar`) e `/painel/` NAO e (`404 rota_desconhecida`, da tabela
@@ -167,7 +167,7 @@ describe('REG — o roteador antes do painel', () => {
 
   test('REG-27f: a fusao de SEIS para TRES de §11.9 esta inteira, valor por valor', () => {
     // **REG-27d nao prendia isto, e a diferenca importa.** Ele afirmava que o
-    // valor publico esta na lista dos tres e que nao e `sem_passkey` — o que
+    // valor publico esta na lista dos tres e que nao e `sem_passkey`, o que
     // `pronto` tambem satisfaz. Ou seja: trocar a fusao de `sem_codigo_parada`
     // de `sem_acesso` para `pronto` passava verde, e essa e justamente a fusao
     // que §11.9 explica ser a PROTECAO ("junto com `sem_passkey` ele descreve o
@@ -175,7 +175,7 @@ describe('REG — o roteador antes do painel', () => {
     //
     // Um mapa exaustivo num `toEqual` unico afirma as duas metades de uma vez: o
     // destino de cada um dos seis, e que sao exatamente seis. Um valor novo no
-    // enum sem linha aqui quebra — que e o mesmo criterio do dicionario de
+    // enum sem linha aqui quebra, que e o mesmo criterio do dicionario de
     // `CommentStatus`.
     const fusao: Record<EstadoDoPainel, EstadoPublicoDoPainel> = {
       desativado: comoPublico('desativado'),
@@ -205,15 +205,15 @@ describe('REG — o roteador antes do painel', () => {
     // **O defeito que este teste prende foi meu, e ele mentia exatamente onde
     // doi.** A primeira versao do campo `painel` reescreveu o predicado de
     // habilitacao a mao e conferia comprimento ZERO de dois bindings.
-    // `painelHabilitado` (§10.2) — quem de fato decide o `503` de toda rota do
-    // painel — exige TRES pisos. Entre os dois havia uma faixa inteira de
+    // `painelHabilitado` (§10.2), quem de fato decide o `503` de toda rota do
+    // painel, exige TRES pisos. Entre os dois havia uma faixa inteira de
     // configuracao (uma chave de 31 caracteres, um caractere perdido no
     // copiar-e-colar) em que toda tela respondia `503 painel_desativado` e esta
     // rota respondia `pronto`; o assistente, que le daqui, mandava o dono ficar
     // tranquilo. §11.9 abre dizendo que NAO existe `/painel/diagnostico`: este
     // campo e o unico diagnostico do subsistema.
     //
-    // A afirmacao nao e sobre o predicado — e sobre a CONCORDANCIA entre as duas
+    // A afirmacao nao e sobre o predicado, e sobre a CONCORDANCIA entre as duas
     // respostas. Reescrever o degrau por fora de `painelHabilitado` volta a
     // ficar vermelho aqui, seja qual for a grafia nova.
     const abaixoDoPiso: ReadonlyArray<{ nome: string; patch: Record<string, unknown> }> = [
@@ -237,7 +237,7 @@ describe('REG — o roteador antes do painel', () => {
     }
 
     // Contrapositivo, e ele e obrigatorio: com o ambiente INTEIRO o campo NAO e
-    // `desativado` — senao um degrau que devolvesse sempre `desativado` passaria
+    // `desativado`, senao um degrau que devolvesse sempre `desativado` passaria
     // neste laco sem provar nada.
     const inteiro = (await (await responderComEnv(pedir('/health'))).json()) as Record<
       string,
@@ -251,7 +251,7 @@ describe('REG — o roteador antes do painel', () => {
     const corpo = (await resposta.json()) as Record<string, unknown>
 
     // O conjunto EXATO de campos. A etapa do painel acrescentou EXATAMENTE um,
-    // `painel`, e ele mora na RAIZ — irmao de `status` e `webhook`, nunca
+    // `painel`, e ele mora na RAIZ, irmao de `status` e `webhook`, nunca
     // dentro de `configurado`. E aqui que um campo a mais fica visivel.
     expect(Object.keys(corpo).sort()).toEqual(['configurado', 'painel', 'status', 'webhook'])
     expect(corpo.status).toBe('ok')
@@ -294,7 +294,7 @@ describe('REG — o roteador antes do painel', () => {
   })
 })
 
-describe('REG-29 — o cron', () => {
+describe('REG-29: o cron', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -319,7 +319,7 @@ describe('REG-29 — o cron', () => {
     })
 
     // E o gasto e o de hoje: a leitura do token, a varredura de pendentes e a
-    // leitura barata da poda de auditoria (§8.9) — a UNICA coisa do painel que
+    // leitura barata da poda de auditoria (§8.9), a UNICA coisa do painel que
     // pode entrar no cron, e ela entrou na etapa da parada de emergencia.
     // Nenhuma escrita: a poda so apaga quando ha o que apagar.
     expect({ prepares: direto.prepares, escritas: direto.escritas }).toEqual({
@@ -355,7 +355,7 @@ async function statusPorComentario(): Promise<Record<string, string>> {
   return Object.fromEntries((resultado.results ?? []).map((l) => [l.comment_id, l.status]))
 }
 
-describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
+describe('§16.1: o cron entrega o excedente que o webhook fatiou', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     await ligarConta(env, AGORA)
@@ -394,7 +394,7 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
 
   test('§16.1: uma varredura cheia cabe no teto de 50, com fila maior que o lote', async () => {
     // Fila de 30 pendentes: mais do que qualquer varredura pode drenar. Assim
-    // a conta abaixo mede o LOTE do cron, e nao o tamanho da fila — se alguem
+    // a conta abaixo mede o LOTE do cron, e nao o tamanho da fila, se alguem
     // dobrar RETRY_BATCH_SIZE, este teste vermelha.
     await env.DB.batch(
       Array.from({ length: 30 }, (_, i) =>
@@ -417,14 +417,14 @@ describe('§16.1 — o cron entrega o excedente que o webhook fatiou', () => {
     // Consultas ao D1 e chamadas a Meta dividem os mesmos 50 subrequests.
     expect(contador.prepares + doCron.total).toBeLessThan(TETO_DE_SUBREQUESTS)
 
-    // E a varredura drenou de verdade — nao passou raspando por estar vazia.
+    // E a varredura drenou de verdade, nao passou raspando por estar vazia.
     const status = await statusPorComentario()
     expect(Object.values(status).filter((s) => s === 'completed').length).toBeGreaterThan(0)
     expect(Object.values(status).filter((s) => s === 'retry_pending').length).toBeGreaterThan(0)
   })
 })
 
-describe('§16.3 — a retentativa do cron passa por renderTemplate', () => {
+describe('§16.3: a retentativa do cron passa por renderTemplate', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     await ligarConta(env, AGORA)
@@ -446,7 +446,7 @@ describe('§16.3 — a retentativa do cron passa por renderTemplate', () => {
       createApi: () => comoApi(api),
       resolveConfig: () =>
         configDeTeste({
-          privateReplyText: 'Oi {username}! Link: {link} — de novo: {link}',
+          privateReplyText: 'Oi {username}! Link: {link}, de novo: {link}',
           // O caractere de controle no meio e o que o `.replace()` cru deixava
           // passar para dentro da mensagem.
           destinationUrl: 'https://exemplo.com/a\u0000b',
@@ -454,12 +454,12 @@ describe('§16.3 — a retentativa do cron passa por renderTemplate', () => {
     })
 
     expect(api.textosEnviados).toEqual([
-      'Oi ! Link: https://exemplo.com/ab — de novo: https://exemplo.com/ab',
+      'Oi ! Link: https://exemplo.com/ab, de novo: https://exemplo.com/ab',
     ])
   })
 })
 
-describe('§16.1 — a retentativa do cron tem a mesma escada do caminho inline', () => {
+describe('§16.1: a retentativa do cron tem a mesma escada do caminho inline', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     await ligarConta(env, AGORA)
@@ -553,7 +553,7 @@ describe('a conta parada nao pode queimar a fila do cron', () => {
 
     // `TOKEN_INVALIDO` nao esta em `isRetryable`, e o ramo `else` marcava
     // `failed`, que e TERMINAL: o comentario de quem digitou a palavra-gatilho
-    // era apagado do mundo por um problema da CONTA. Parar e reversivel — o
+    // era apagado do mundo por um problema da CONTA. Parar e reversivel, o
     // dono reconecta e a varredura seguinte entrega.
     const linha = await registro('comment-token-morto')
     expect(linha?.status).toBe('retry_pending')
@@ -612,15 +612,15 @@ describe('a conta parada nao pode queimar a fila do cron', () => {
 /**
  * O token que venceu.
  *
- * `expires_at` existia desde a 0001 e era lido por UM lugar so — `shouldRefresh`
- * —, que responde `false` tanto para "ainda cedo" quanto para "tarde demais". O
+ * `expires_at` existia desde a 0001 e era lido por UM lugar so, `shouldRefresh`
+ *, que responde `false` tanto para "ainda cedo" quanto para "tarde demais". O
  * resultado e que o prazo vencido nao produzia nem renovacao, nem aviso, nem
  * tela dizendo a verdade: a linha continuava em `account_tokens`, e todo mundo
  * que perguntava "tem conta?" perguntava so isso.
  *
  * Um token longo do Instagram vale 60 dias. Quem troca a senha, cai num
  * checkpoint ou passa dois meses sem o cron rodar tem a linha intacta e nada
- * sendo entregue — e via, nas seis telas do painel, "Conectada. A automacao
+ * sendo entregue, e via, nas seis telas do painel, "Conectada. A automacao
  * consegue falar com o Instagram para enviar".
  */
 describe('o token vencido nao pode passar por conta conectada', () => {
@@ -657,7 +657,7 @@ describe('o token vencido nao pode passar por conta conectada', () => {
   test('/health nao responde `contaAutorizada` para um token morto', async () => {
     // **O UNICO teste desta suite ancorado no relogio real, e a excecao tem
     // motivo.** `/health` entra por `worker.fetch`, que calcula o proprio
-    // `now = Date.now()` — nenhum parametro atravessa a rota. `AGORA` e
+    // `now = Date.now()`, nenhum parametro atravessa a rota. `AGORA` e
     // novembro de 2023, entao um token gravado com ele ja nasce vencido do
     // ponto de vista de `//health`, e a versao anterior deste teste falhava
     // no CONTRAPOSITIVO, nao na garantia. Congelar o relogio com fake timers
@@ -719,8 +719,8 @@ describe('o token vencido nao pode passar por conta conectada', () => {
  * O indice da varredura do cron (migration 0006).
  *
  * O indice parcial some sem barulho: se o `WHERE` de `findRetryPending` deixar
- * de implicar o predicado dele — trocar o literal `'retry_pending'` por um `?`
- * ligado em tempo de execucao basta —, o SQLite volta ao scan de tabela e
+ * de implicar o predicado dele, trocar o literal `'retry_pending'` por um `?`
+ * ligado em tempo de execucao basta, o SQLite volta ao scan de tabela e
  * NENHUM outro teste muda de cor. O plano de consulta e a unica coisa que
  * percebe.
  */
@@ -777,7 +777,7 @@ describe('a varredura do cron continua indo pelo indice', () => {
     ).all<{ name: string }>()
     const nomes = (results ?? []).map((linha) => linha.name)
 
-    // Dois indices ao mesmo tempo nao dariam erro nenhum — so pagariam a
+    // Dois indices ao mesmo tempo nao dariam erro nenhum, so pagariam a
     // escrita que a 0006 existe para nao pagar.
     expect(nomes).not.toContain('idx_comments_retry')
     expect(nomes).toContain('idx_comments_retry_pendentes')

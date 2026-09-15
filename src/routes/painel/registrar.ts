@@ -10,9 +10,9 @@
  * a garantia testavel; a rotacao obrigatoria de identificador no login fecha
  * fixacao de sessao; e e o que faz o codigo de recuperacao nunca virar sessao,
  * nem direta nem indiretamente. O custo e um gesto de biometria a mais, logo
- * depois de outro — aceito, e a tela explica.
+ * depois de outro, aceito, e a tela explica.
  *
- * **As tres — e apenas tres — autorizacoes** (§10.4). Nao existe uma quarta, e
+ * **As tres, e apenas tres, autorizacoes** (§10.4). Nao existe uma quarta, e
  * em particular NAO existe o ramo `if (credenciais.length === 0) permitir`: o
  * "trust on first use" e exatamente o takeover de primeiro acesso que §10.6
  * prova ser impossivel aqui. O conjunto de instantes em que o registro esta
@@ -131,7 +131,7 @@ type AutorizacaoRegistro =
 /** O que a rota busca fora de si mesma. Existe para o teste injetar dubles. */
 export interface DepsDoRegistro {
   /**
-   * Limitador de taxa. O padrao e o da familia da rota — `login` no modo
+   * Limitador de taxa. O padrao e o da familia da rota, `login` no modo
    * convite, `codigo` no modo recuperacao. O modo `sessao` nao tem limitador
    * porque §7.4 nao lhe da binding: quem chega ali ja provou quem e.
    */
@@ -139,9 +139,9 @@ export interface DepsDoRegistro {
   /**
    * O step-up do modo `sessao` (§10.4 passo 1, §10.10, §10.13).
    *
-   * Ate a Etapa 12 o padrao RECUSAVA: o verificador de verdade — `op_hash`
+   * Ate a Etapa 12 o padrao RECUSAVA: o verificador de verdade, `op_hash`
    * recalculado no servidor a partir da mudanca canonica
-   * `{ acao: "adicionar_passkey" }` — nao existia, e escrever aqui uma segunda
+   * `{ acao: "adicionar_passkey" }`, nao existia, e escrever aqui uma segunda
    * versao dele criaria duas especificacoes do mesmo hash. Agora ele existe, e
    * o padrao e ELE: `conferirAdicaoDePasskey`, logo abaixo, chama o MESMO
    * `exigirStepUp` do funil de gravacao, com o `op_hash` calculado pela MESMA
@@ -164,15 +164,15 @@ export interface DepsDoRegistro {
  * O step-up de `{ acao: "adicionar_passkey" }` (§10.13).
  *
  * **A mudanca canonica nao tem campos, e a ausencia e o desenho**: nao ha
- * conteudo a amarrar — a passkey nova ainda nem foi criada, e o que ela vai ser
+ * conteudo a amarrar, a passkey nova ainda nem foi criada, e o que ela vai ser
  * e decidido pelo autenticador depois. O que o `op_hash` prende aqui e a
  * OPERACAO: uma digital colhida para trocar o link do Direct nao serve para
  * cadastrar um aparelho novo, porque `{"acao":"config",...}` e
  * `{"acao":"adicionar_passkey"}` sao textos diferentes e produzem hashes
  * diferentes (§10.10, o `acao` que entra no JSON canonico existe para isto).
  *
- * Sao **dois** gestos de biometria seguidos — um para autorizar, um para criar
- * —, e a tela avisa antes: "confirme que e voce" e depois "crie a chave nova".
+ * Sao **dois** gestos de biometria seguidos, um para autorizar, um para criar
+ *, e a tela avisa antes: "confirme que e voce" e depois "crie a chave nova".
  */
 async function conferirAdicaoDePasskey(entrada: {
   request: Request
@@ -196,7 +196,7 @@ async function conferirAdicaoDePasskey(entrada: {
 
   if (!veredito.ok) {
     // O motivo vai para o log do dono; ao cliente, `step_up_necessario` e mais
-    // nada — separar os casos daria um oraculo para descobrir qual metade da
+    // nada, separar os casos daria um oraculo para descobrir qual metade da
     // trava ainda falta quebrar (§10.10).
     console.warn('painel:', 'registro_recusado', veredito.motivo)
     return false
@@ -209,7 +209,7 @@ async function conferirAdicaoDePasskey(entrada: {
 // As respostas
 // ---------------------------------------------------------------------------
 
-// A tabela canonica de §11.4 mora em `resposta.ts` desde a etapa do roteador —
+// A tabela canonica de §11.4 mora em `resposta.ts` desde a etapa do roteador,
 // esta rota tinha uma copia enquanto aquele arquivo nao existia, e a copia
 // morreu junto com a promessa que ela carregava no comentario. "Esta tabela e a
 // UNICA" nao admite duas grafias do mesmo `status` e da mesma frase.
@@ -220,7 +220,7 @@ async function conferirAdicaoDePasskey(entrada: {
 /**
  * Um erro de §11.4, com o codigo no log e a frase no corpo.
  *
- * Nunca ha campo `detalhe`, `stack`, `cause` ou mensagem de excecao — a
+ * Nunca ha campo `detalhe`, `stack`, `cause` ou mensagem de excecao, a
  * `mensagem` sai da tabela e nao do erro que aconteceu. O `console.warn` segue
  * §11.7: argumentos separados, sem template string com dado variavel dentro.
  */
@@ -256,19 +256,19 @@ function metodoNaoPermitido(request: Request, caminho: string, permitidos: strin
  *
  * Um `catch` que pega TUDO nao sabe qual dos dois aconteceu, e §11.4 ja decidiu
  * o desempate: o `try/catch` generico devolve `falha_interna`. Quem quiser
- * responder `indisponivel` precisa saber que estava falando com o D1 — e ai o
+ * responder `indisponivel` precisa saber que estava falando com o D1, e ai o
  * `catch` fica estreito, em volta so da chamada que toca o banco, nunca em
  * volta do handler inteiro. (`parada.ts:281-341` NAO e esse exemplo, mesmo
  * parecendo um candidato obvio por ser o outro `catch` largo do painel: o dela
- * e um `catch` de HANDLER inteiro — corpo, limitador e a cadeia de
- * `conferirEParar` por baixo —, devolvendo `503` para qualquer excecao de
+ * e um `catch` de HANDLER inteiro, corpo, limitador e a cadeia de
+ * `conferirEParar` por baixo, devolvendo `503` para qualquer excecao de
  * proposito, como divergencia documentada da regra das tres telas canonicas de
  * §10.12. Seguir aquele como modelo de "catch estreito de D1" copiaria a
  * forma errada.)
  *
  * **Por que o `catch` mora aqui, e nao so no roteador.** `router.ts` tem o
  * `catch` canonico, mas ele esta dentro de `despachar()`, e as tres rotas do
- * registro NAO passam por `despachar` — `portaDaApi` ja consome o
+ * registro NAO passam por `despachar`, `portaDaApi` ja consome o
  * `ReadableStream` do corpo, e um `despachar` por cima entregaria corpo vazio
  * ao handler. `routePainel` as chama direto, `src/index.ts` nao tem `try` em
  * volta do `fetch`, e sem este `catch` a excecao escaparia ate o workerd: um
@@ -284,33 +284,33 @@ function falhaInterna(cause: unknown, request: Request, caminho: string): Respon
  * O conflito de chave primaria do passo 8 de §10.5.
  *
  * O `INSERT` da credencial vai sem `ON CONFLICT`, e um `credential_id` repetido
- * derruba o lote inteiro — e essa derrubada E a verificacao do passo 8. Sem
+ * derruba o lote inteiro, e essa derrubada E a verificacao do passo 8. Sem
  * esta leitura da excecao ela virava `503`, com o convite ja queimado (o
  * consumo do nonce vai sozinho e ANTES do lote, de proposito).
  *
  * **A recusa e a generica**, `credencial_invalida`, pelo motivo de sempre
  * (§11.4): distinguir "esta credencial ja existe" de "assinatura invalida"
  * daria um oraculo de enumeracao de `credential_id`. Mesmo status, mesma frase,
- * mesmo lugar no fluxo — e nada do valor vai para o log.
+ * mesmo lugar no fluxo, e nada do valor vai para o log.
  *
  * A unica restricao de unicidade alcancavel neste lote e a PK da credencial: os
  * demais statements sao `UPDATE` e `DELETE`, e o `INSERT` do convite ja saiu
  * antes, com `ON CONFLICT DO NOTHING`. Por isso o regex casa so a CLASSE
- * unicidade/PK — nunca `NOT NULL`, `CHECK` ou `FOREIGN KEY` — sem casar o nome
+ * unicidade/PK, nunca `NOT NULL`, `CHECK` ou `FOREIGN KEY`, sem casar o nome
  * da tabela ou da coluna numa mensagem que e do D1 e nao nossa.
  *
  * **Por que o regex nao e so `/constraint failed/i`.** Confirmado empiricamente
  * neste runtime (`@cloudflare/vitest-pool-workers`): um `credential_id`
  * repetido lanca `D1_ERROR: UNIQUE constraint failed:
  * painel_credenciais.credential_id: SQLITE_CONSTRAINT (extended:
- * SQLITE_CONSTRAINT_PRIMARYKEY)` — mas uma violacao `NOT NULL` lanca
+ * SQLITE_CONSTRAINT_PRIMARYKEY)`, mas uma violacao `NOT NULL` lanca
  * `D1_ERROR: NOT NULL constraint failed: painel_credenciais.<coluna>:
  * SQLITE_CONSTRAINT (extended: SQLITE_CONSTRAINT_NOTNULL)`, e AS DUAS mensagens
- * contem tanto `constraint failed` quanto `SQLITE_CONSTRAINT` — a bare palavra
+ * contem tanto `constraint failed` quanto `SQLITE_CONSTRAINT`, a bare palavra
  * `SQLITE_CONSTRAINT` e o COARSE result code do SQLite, comum a toda classe de
  * violacao. `painel_credenciais` tem DEZ colunas `NOT NULL` (`migrations/
  * 0004_painel_acesso.sql`); hoje nenhum caminho tipado deixa uma chegar nula
- * neste `INSERT` — isto e robustez e observabilidade, nao um bug ao vivo —,
+ * neste `INSERT`, isto e robustez e observabilidade, nao um bug ao vivo,
  * mas o regex antigo teria classificado esse "e se" como `credencial_duplicada`
  * (401, generico) em vez de `falha_interna` (500, com o `cause.message` real no
  * log do dono). So a palavra INICIAL do texto ("UNIQUE" / "PRIMARY KEY") ou o
@@ -323,7 +323,7 @@ function ehConflitoDeChave(cause: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// GET /painel/convite — a pagina, com 0 consulta ao D1
+// GET /painel/convite, a pagina, com 0 consulta ao D1
 // ---------------------------------------------------------------------------
 
 /** Nenhuma interpolacao: o texto e constante, e e o que o torna seguro. */
@@ -345,11 +345,11 @@ export const PAGINA_DO_CONVITE = `<!doctype html>
 </form>
 <h2>Antes de cadastrar, duas coisas importantes</h2>
 <p><strong>O endere&ccedil;o deste painel fica gravado dentro da sua digital.</strong> Se um dia o
-endere&ccedil;o mudar, este aparelho precisa ser cadastrado de novo &mdash; n&atilde;o d&aacute;
+endere&ccedil;o mudar, este aparelho precisa ser cadastrado de novo, n&atilde;o d&aacute;
 para migrar, e n&atilde;o &eacute; defeito: &eacute; assim que a digital protege voc&ecirc; de um
 site falso com outro endere&ccedil;o.</p>
 <p><strong>Chave de seguran&ccedil;a sem PIN n&atilde;o entra.</strong> O painel exige
-confirma&ccedil;&atilde;o de quem voc&ecirc; &eacute; &mdash; digital, rosto ou PIN &mdash; em toda
+confirma&ccedil;&atilde;o de quem voc&ecirc; &eacute;, digital, rosto ou PIN, em toda
 entrada. Uma chavinha USB que apenas "toca" e n&atilde;o pede PIN vai ser recusada.</p>
 <noscript>
 <p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Cadastrar a digital
@@ -394,7 +394,7 @@ const PAGINA_DE_METODO = `<!doctype html>
  * A pagina que o link do convite abre.
  *
  * **O token vem no FRAGMENTO**, nunca na query string: o fragmento nao e
- * enviado ao servidor, nao entra em log de proxy nem em `Referer` — a mesma
+ * enviado ao servidor, nao entra em log de proxy nem em `Referer`, a mesma
  * regra que `oauth.ts` ja aplica. Quem le `location.hash`, limpa a barra de
  * enderecos com `history.replaceState` e manda o token no CORPO do POST e o
  * `painel.js` (§12.8, trabalho 2). Por isso esta funcao nao recebe `url`: ela
@@ -418,7 +418,7 @@ export function handlePaginaDeConvite(request: Request, env: Env): Response {
   // Passo 1. O `Allow` lista os DOIS metodos que a linha acima aceita: um
   // `Allow: GET` num handler que atende `HEAD` e um cabecalho que mente, e
   // `Allow` e exatamente o cabecalho que existe para nao mentir. E o corpo e
-  // HTML, como o `content-type` de `cabecalhos('pagina')` promete — a frase e a
+  // HTML, como o `content-type` de `cabecalhos('pagina')` promete, a frase e a
   // canonica de §11.4 para `metodo_nao_permitido`.
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     console.warn('painel:', request.method, CAMINHO_DO_CONVITE, 405, 'metodo_nao_permitido')
@@ -454,7 +454,7 @@ function lerPedidoDeOpcoes(corpo: unknown): PedidoDeOpcoes | null {
   // A digital do step-up de `{ acao: "adicionar_passkey" }` viaja no CORPO, e
   // nao num cookie: ela e uma assertion, e o cookie desta cerimonia carrega o
   // envelope (o desafio e o `op_hash`), nunca a resposta. Ausente vira `''`, e
-  // `''` recusa no passo do step-up — nao ha ramo em que ela "nao precisa".
+  // `''` recusa no passo do step-up, nao ha ramo em que ela "nao precisa".
   if (lido.tipo === 'sessao') {
     return { tipo: 'sessao', digital: typeof lido.digital === 'string' ? lido.digital : '' }
   }
@@ -474,7 +474,7 @@ function lerPedidoDeOpcoes(corpo: unknown): PedidoDeOpcoes | null {
  * de graca.
  *
  * **Nada e consumido aqui** (passo 4): o convite nao e marcado e o codigo nao e
- * queimado. Se a pessoa cancelar a biometria — o fracasso mais comum — ela
+ * queimado. Se a pessoa cancelar a biometria, o fracasso mais comum, ela
  * tenta de novo com o mesmo convite.
  */
 export async function handleOpcoesDeRegistro(
@@ -489,7 +489,7 @@ export async function handleOpcoesDeRegistro(
   try {
     const pedido = lerPedidoDeOpcoes(porta.corpo)
     // Trava de CONV-06: registro sem convite e sem codigo e recusado ANTES de
-    // gerar as options, e nao depois — e o `null` daqui e o primeiro portao.
+    // gerar as options, e nao depois, e o `null` daqui e o primeiro portao.
     if (pedido === null) return erro('credencial_invalida', request, CAMINHO_DAS_OPCOES)
 
     // Passo 5 da escada: ZERO consulta ao D1 ate esta linha, entao uma
@@ -520,8 +520,8 @@ export async function handleOpcoesDeRegistro(
 /**
  * As options, o desafio e o bilhete (§10.4, passos 5 a 7).
  *
- * Duas leituras: as credenciais — que respondem `excludeCredentials`, a regra
- * do `pre=0` e o teto de 10 de uma vez — e o `usuario_handle`. A segunda so
+ * Duas leituras: as credenciais, que respondem `excludeCredentials`, a regra
+ * do `pre=0` e o teto de 10 de uma vez, e o `usuario_handle`. A segunda so
  * grava na primeirissima vez da vida da instalacao.
  */
 async function montarOpcoes(
@@ -544,7 +544,7 @@ async function montarOpcoes(
   const desafio = sortearDesafio()
 
   // O bilhete: mesmo cookie de todas as cerimonias, distinguido pelo PROPOSITO
-  // — que entra no texto assinado, na derivacao da chave e no nome do cookie
+  // que entra no texto assinado, na derivacao da chave e no nome do cookie
   // (§10.3). `k` carrega a autorizacao ja provada, para que a verificacao nao
   // precise prova-la de novo nem confiar no corpo.
   const bilhete = await emitirEnvelope(
@@ -572,16 +572,16 @@ async function montarOpcoes(
   )
 
   // §10.10, fim do passo 4: **expira o cookie** na requisicao que usa o
-  // envelope. E o mesmo par de `Set-Cookie` de `lote.ts` — a metade que faltava
+  // envelope. E o mesmo par de `Set-Cookie` de `lote.ts`, a metade que faltava
   // aqui.
   //
   // O que a ausencia dela causava: `exigirStepUp` e SEM ESTADO (confere MAC,
-  // prazo, `sid`, `op_hash` e a assinatura — nada marca o envelope como usado),
+  // prazo, `sid`, `op_hash` e a assinatura, nada marca o envelope como usado),
   // entao o `Max-Age=0` E o consumo. Sem ele, o par (cookie + assertion)
   // continuava fechando pelo resto dos 120 s; e como a mudanca canonica de
   // `adicionar_passkey` nao tem alvo nem campos (`{"acao":"adicionar_passkey"}`
   // e sempre o mesmo texto), toda repeticao fechava e cada uma emitia um bilhete
-  // de registro NOVO — uma digital do dono valendo por ate dez cadastros de
+  // de registro NOVO, uma digital do dono valendo por ate dez cadastros de
   // passkey, que e literalmente o "modo privilegiado por 120 s" que §10.10
   // recusa por escrito.
   //
@@ -591,7 +591,7 @@ async function montarOpcoes(
   // Custo para quem cancela a biometria da CRIACAO: um step-up a mais. O
   // `painel.js` ja recomeca a cerimonia inteira a cada clique em "cadastrar
   // este aparelho" (`adicionarAparelho` chama `colherDigital` antes de
-  // `cadastrar`), entao nao ha beco sem saida — so um toque a mais numa
+  // `cadastrar`), entao nao ha beco sem saida, so um toque a mais numa
   // operacao rara, que e exatamente o preco que §10.10 diz aceitar.
   if (autorizacao.tipo === 'sessao') {
     cabecalhosDaResposta.append('set-cookie', cookieDeStepUpExpirado())
@@ -605,7 +605,7 @@ async function montarOpcoes(
  *
  * Constante, e nao o `@` da conta: o `@` so existe depois do OAuth e custaria
  * uma leitura em `account_tokens` numa rota cujo orcamento e de duas. O
- * `displayName` — "Dono da conta" — ja diz o resto, e com dono unico nao ha
+ * `displayName`, "Dono da conta", ja diz o resto, e com dono unico nao ha
  * campo de usuario para escolher.
  */
 const NOME_DE_USUARIO = '@painel'
@@ -633,7 +633,7 @@ type ResultadoDaAutorizacao =
 /**
  * Lema 4 de §10.6: a funcao tem exatamente tres ramos.
  *
- * Lema 5: cada ramo exige um segredo — convite (MAC de 256 bits sob chave
+ * Lema 5: cada ramo exige um segredo, convite (MAC de 256 bits sob chave
  * derivada do admin token), recuperacao (100 bits) e sessao (chave privada em
  * hardware MAIS biometria). Lema 6: nao existe ramo TOFU.
  */
@@ -665,14 +665,14 @@ async function autorizar(
  * deixaria um convite forjado se distinguir de um vencido pelo tempo de
  * resposta e pela mensagem.
  *
- * `pre = "0"` so vale enquanto NAO existir nenhuma credencial — defesa em
+ * `pre = "0"` so vale enquanto NAO existir nenhuma credencial, defesa em
  * profundidade barata: o convite comum, que pode acabar num print de tutorial,
  * deixa de funcionar no instante em que a primeira passkey existe. `pre = "q"`
  * vale em qualquer estado, e o assistente avisa que ele e mais perigoso.
  *
  * **O consumo NAO acontece aqui** (§10.4, passo 4): esta funcao nem pergunta ao
  * banco se o nonce ja foi usado. Quem responde isso e o `INSERT ... ON CONFLICT
- * DO NOTHING` de `/verificar`, que e ATOMICO — perguntar antes seria uma
+ * DO NOTHING` de `/verificar`, que e ATOMICO, perguntar antes seria uma
  * leitura a mais para uma resposta que a corrida pode invalidar no instante
  * seguinte.
  */
@@ -711,7 +711,7 @@ async function autorizarPorConvite(
   // esteja morto.
   if (now > expiraEm) return { recusa: 'credencial_invalida' }
 
-  // Trava de CONV-07, e a PRIMEIRA consulta ao D1 desta rota — depois do HMAC
+  // Trava de CONV-07, e a PRIMEIRA consulta ao D1 desta rota, depois do HMAC
   // fechar, como manda §11.3. `pre=0` deixa de valer no instante em que existe
   // qualquer credencial, inclusive de um endereco antigo: ela prova que a
   // instalacao ja teve dono, mesmo que nao sirva mais para entrar (§10.14).
@@ -732,7 +732,7 @@ async function autorizarPorConvite(
  * que nao e cookie.
  *
  * Trava de CONV-11: codigo errado percorre exatamente o mesmo caminho de codigo
- * inexistente — `conferirCodigo` nao sai no primeiro acerto, e a lista vazia
+ * inexistente, `conferirCodigo` nao sai no primeiro acerto, e a lista vazia
  * passa pelo mesmo laco de uma lista cheia.
  *
  * **Nada e consumido aqui.** O consumo, com `changes === 1`, e de `/verificar`.
@@ -751,7 +751,7 @@ async function autorizarPorCodigo(bruto: string, env: Env): Promise<ResultadoDaA
  * conferencia.** `GET+POST /painel/entrar/codigo` (§15.3, decisao 1) confere o
  * codigo para RENDERIZAR a tela "crie a chave nova neste aparelho", e esta rota
  * o confere para emitir o bilhete de registro. Duas implementacoes da mesma
- * conferencia divergiriam na primeira vez que uma delas ganhasse um passo — e o
+ * conferencia divergiriam na primeira vez que uma delas ganhasse um passo, e o
  * passo mais provavel de divergir e a normalizacao, que e o que faz `O` virar
  * `0` no codigo que a pessoa digita do papel sob estresse.
  *
@@ -764,7 +764,7 @@ async function autorizarPorCodigo(bruto: string, env: Env): Promise<ResultadoDaA
  * vem 1 leitura e 0 escrita: `normalizarCodigo` recusa tudo o que nao for 20
  * caracteres do alfabeto, e e por isso que lixo digitado nao toca o D1 (§11.3).
  * `conferirCodigo` nao sai no primeiro acerto e a lista vazia percorre o mesmo
- * laco de uma lista cheia — codigo errado e codigo inexistente sao o mesmo
+ * laco de uma lista cheia, codigo errado e codigo inexistente sao o mesmo
  * caminho (CONV-11).
  */
 export async function conferirCodigoDeRecuperacao(bruto: string, env: Env): Promise<string | null> {
@@ -782,15 +782,15 @@ export async function conferirCodigoDeRecuperacao(bruto: string, env: Env): Prom
  * A sessao viva com step-up recem feito (§10.4, passo 1).
  *
  * **Este e o unico POST autorizado por cookie de sessao cuja ficha CSRF foi
- * decidida a parte** (§15.4): sem ela, cadastrar uma passkey nova — que e
+ * decidida a parte** (§15.4): sem ela, cadastrar uma passkey nova, que e
  * precisamente a operacao que um atacante mais gostaria de executar em nome do
- * dono — seria a unica rota autenticada sem a camada 3 de §10.9.
+ * dono, seria a unica rota autenticada sem a camada 3 de §10.9.
  *
  * Ordem: sessao (1 HMAC) -> ficha (1 HMAC) -> step-up. Nenhuma consulta ao D1
  * ate o step-up fechar, e por isso um cookie forjado nao custa banco nenhum.
  *
  * A UNICA excecao e a RECUSA de step-up, que paga 1 leitura e 1 escrita em
- * `punirFalhaDeStepUp` — e ela nao contradiz a frase acima: para chegar la o
+ * `punirFalhaDeStepUp`, e ela nao contradiz a frase acima: para chegar la o
  * cookie de sessao ja fechou o HMAC e a ficha ja fechou o dela, entao quem
  * provoca a escrita e alguem que apresentou uma sessao NOSSA. E o mesmo
  * desempate que §9.9 usa para permitir a linha de auditoria de fracasso: "a
@@ -818,7 +818,7 @@ async function autorizarPorSessao(
   const conferir = deps.conferirStepUp ?? conferirAdicaoDePasskey
   if (!(await conferir({ request, env, sidHash: sessao.sidHash, now, digital }))) {
     // A recusa CONTA e deixa rastro (§10.10). Sem estas duas escritas, quem
-    // roubou o cookie de sessao — ou um XSS que alcanca a ficha CSRF — martelava
+    // roubou o cookie de sessao, ou um XSS que alcanca a ficha CSRF, martelava
     // assertions forjadas aqui indefinidamente: o contador nunca subia, a sessao
     // nunca era apagada na decima, e nenhuma linha registrava a sequencia. A
     // MESMA sequencia contra /painel/aparelhos derruba a sessao em 10 tentativas
@@ -848,7 +848,7 @@ async function autorizarPorSessao(
  *   - **`painel_sessoes.falhas_stepup`**, e na DECIMA a sessao e apagada.
  *
  * A separacao entre as duas recusas e a MESMA de `passarPeloStepUp`
- * (`aparelhos.ts`), de proposito — duas grafias da mesma regra divergem na
+ * (`aparelhos.ts`), de proposito, duas grafias da mesma regra divergem na
  * primeira vez que uma delas ganha um passo: a falha INVALIDA incrementa o
  * contador, a AUSENTE nao. Ausente e o primeiro envio, o caminho normal de quem
  * apertou o botao; punir isso derrubaria a sessao de quem so cancelou a
@@ -863,7 +863,7 @@ async function autorizarPorSessao(
  *
  * A auditoria e o UPDATE viajam no mesmo `db.batch()` pela regra de ouro de
  * §8.8: sem log, sem mudanca. E o `campos` carrega `["adicionar_passkey"]`, o
- * nome da operacao recusada — a mesma grafia que `aparelhos.ts` escreve com
+ * nome da operacao recusada, a mesma grafia que `aparelhos.ts` escreve com
  * `JSON.stringify([mudanca.acao])`.
  */
 async function punirFalhaDeStepUp(
@@ -882,7 +882,7 @@ async function punirFalhaDeStepUp(
     // e perguntar a versao custaria uma leitura fora do orcamento desta rota.
     versao: 0,
     origem: 'painel',
-    // Nunca o `credential_id` cru — os tres destinos veem o prefixo (§10.13).
+    // Nunca o `credential_id` cru, os tres destinos veem o prefixo (§10.13).
     ator: `passkey:${await prefixoDeCredencial(linha.credentialId)}`,
     // Recusa nunca e passagem: ou o step-up faltou, ou nao fechou.
     stepUp: false,
@@ -953,7 +953,7 @@ function lerRespostaDeRegistro(corpo: unknown): RespostaDeRegistro | null {
  *
  * **Ordem de gravacao, e o preco dela.** Consumir a autorizacao ANTES de
  * inserir a credencial. Se a insercao falhar, o convite ou o codigo foi
- * queimado por nada, e a pessoa precisa de outro — aceito de proposito. A ordem
+ * queimado por nada, e a pessoa precisa de outro, aceito de proposito. A ordem
  * inversa abre uma corrida em que duas requisicoes com o mesmo convite inserem
  * duas credenciais, e uma delas pode ser do atacante. Perder um convite e
  * aborrecimento; ganhar uma credencial indevida e o fim do jogo.
@@ -968,7 +968,7 @@ export async function handleVerificarRegistro(
 
   try {
     // Lema 2 de §10.6: sem bilhete valido, `401` e nenhuma linha do parser CBOR
-    // chega a rodar — e o parser e o unico trabalho caro desta rota. Lema 3: o
+    // chega a rodar, e o parser e o unico trabalho caro desta rota. Lema 3: o
     // MAC e sob `k_env("registrar")`, derivada da `PANEL_SESSION_KEY`, cuja
     // ausencia ja desligou o painel inteiro la em cima.
     const cookie = lerCookie(request, COOKIE_DO_DESAFIO)
@@ -1015,7 +1015,7 @@ export async function handleVerificarRegistro(
  * invalidacao dos demais + `DELETE` das sessoes + credencial + auditoria).
  *
  * A leitura do teto e a UNICA consulta desta rota, e ela e a terceira do fluxo
- * inteiro — §9.10 orca duas. Ela existe porque o passo 9 de §10.5 manda
+ * inteiro, §9.10 orca duas. Ela existe porque o passo 9 de §10.5 manda
  * conferir o teto na GRAVACAO, e nao so na geracao das options: entre uma
  * requisicao e outra o dono pode ter cadastrado por outro caminho. Uma leitura
  * a mais no caminho que uma instalacao percorre uma vez na vida e o preco de um
@@ -1041,7 +1041,7 @@ async function gravarCredencial(
   const auditoria = new PainelAuditoriaRepository(env.DB)
 
   // Trava de §8.8, a regra de ouro: sem log, sem mudanca. UM `db.batch()` so, e
-  // o `INSERT` da credencial sem `ON CONFLICT` — um `credential_id` repetido
+  // o `INSERT` da credencial sem `ON CONFLICT`, um `credential_id` repetido
   // derruba o lote inteiro e nao deixa nem a linha de auditoria para tras
   // (§10.5, passo 8). Trava de CONV-08: registro recusado nao deixa linha.
   const lote = [
@@ -1072,7 +1072,7 @@ async function gravarCredencial(
       // reautenticacao presa a uma mudanca, e so o ramo `sessao` a teve.
       stepUp: bilhete.tipo === 'sessao',
       // No ramo da recuperacao a linha e `recuperacao_usada`, que e o evento
-      // que §10.11 manda registrar — e o que a investigacao precisa ver, com a
+      // que §10.11 manda registrar, e o que a investigacao precisa ver, com a
       // invalidacao em bloco e o fim das sessoes no mesmo lote.
       acao: bilhete.tipo === 'recuperacao' ? 'recuperacao_usada' : 'passkey_registrada',
       alvo: null,
@@ -1096,7 +1096,7 @@ async function gravarCredencial(
   }
 
   // Trava de §15.3, decisao 5: a resposta sai SEM cookie de sessao. O bilhete e
-  // expirado aqui porque ja cumpriu o papel — um bilhete que sobrevive ao
+  // expirado aqui porque ja cumpriu o papel, um bilhete que sobrevive ao
   // proprio uso e uma autorizacao pendurada esperando uma segunda requisicao.
   return Response.json(
     { ok: true, para: CAMINHO_DE_ENTRAR },
@@ -1114,7 +1114,7 @@ async function consumirAutorizacao(
     case 'convite': {
       // Trava de CONV-02 e de CONV-12: `ON CONFLICT DO NOTHING` mais
       // `meta.changes` e o mesmo claim atomico do `claimComment`. Duas
-      // requisicoes simultaneas com o mesmo convite NAO podem ambas ver 1 — o
+      // requisicoes simultaneas com o mesmo convite NAO podem ambas ver 1, o
       // D1 e SQLite com escritor unico. Vai sozinho e ANTES do lote: se
       // viajasse dentro, uma falha na credencial devolveria o convite ao mundo.
       const gravado = await env.DB.prepare(
@@ -1139,7 +1139,7 @@ async function consumirAutorizacao(
       if ((consumido.meta.changes ?? 0) !== 1) return { ok: false, statements: [] }
 
       // Invalidacao em bloco (§10.11): se um codigo foi usado por quem nao
-      // devia, os outros estao na mesma lista vazada — e qualquer sessao aberta
+      // devia, os outros estao na mesma lista vazada, e qualquer sessao aberta
       // pode ser dele.
       return {
         ok: true,
@@ -1181,7 +1181,7 @@ async function portaDaApi(
   metodo: string,
 ): Promise<PortaDaApi> {
   // Passo 0, e ele vem ANTES do metodo porque e assim que §11.3 numera a
-  // escada — e porque `router.ts` copia essa ordem: la o portao de sanidade
+  // escada, e porque `router.ts` copia essa ordem: la o portao de sanidade
   // roda antes do `switch` de caminhos, entao um `OPTIONS` contra um deploy sem
   // `PANEL_RP_ID` ja responde `503` pelo roteador. Se aqui fosse `405`, a mesma
   // requisicao teria duas respostas conforme quem chamasse o handler, e a
@@ -1229,7 +1229,7 @@ const INVISIVEIS = /[\p{Cc}\p{Cf}]/gu
  *
  * NFKC, fora os invisiveis, sem espaco nas pontas e cortado em 40. Ele **nao**
  * e escapado na gravacao; e escapado na renderizacao, automaticamente, pela tag
- * `html` que nasce com a etapa do roteador — escapar aqui gravaria `&amp;` no
+ * `html` que nasce com a etapa do roteador, escapar aqui gravaria `&amp;` no
  * banco e o dono veria a propria escapatoria na tela.
  *
  * Saneia em vez de recusar: §10.5 diz "saneado", e um apelido longo demais

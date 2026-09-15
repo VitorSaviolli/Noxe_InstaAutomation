@@ -4,7 +4,7 @@
  * **Esta e a armadilha numero um do projeto** (§10.7, passo 9). Um autenticador
  * WebAuthn devolve a assinatura ECDSA como `SEQUENCE { INTEGER r, INTEGER s }`;
  * o `crypto.subtle.verify` do WebCrypto exige `r||s` em 64 bytes crus. Sem esta
- * conversao o `verify` devolve `false` **em silencio** — nao lanca, nao avisa —
+ * conversao o `verify` devolve `false` **em silencio**, nao lanca, nao avisa,
  * e o dono simplesmente nunca entra no proprio painel.
  *
  * O caminho inverso mora no `AutenticadorFalso` do teste, que converte cru ->
@@ -102,7 +102,7 @@ export function derParaBruto(der: Uint8Array): Uint8Array | null {
  * O `0x00` que o DER poe na frente de um inteiro cujo bit mais alto esta ligado
  * some no passo 4; um inteiro curto ganha zeros a esquerda no passo 5. As duas
  * direcoes existem porque as duas acontecem no mundo real, e a segunda so
- * aparece em ~1 de cada 256 assinaturas — o que a torna exatamente o tipo de
+ * aparece em ~1 de cada 256 assinaturas, o que a torna exatamente o tipo de
  * caminho que um teste sintetico esquece.
  */
 function lerInteiro(der: Uint8Array, inicio: number): Leitura | null {

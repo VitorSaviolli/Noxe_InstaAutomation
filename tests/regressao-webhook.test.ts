@@ -23,12 +23,12 @@ import {
 } from './fixtures/dubles'
 
 /**
- * REG — regressao do webhook da Meta.
+ * REG, regressao do webhook da Meta.
  *
  * Congela o comportamento de HOJE, antes de existir qualquer linha do painel.
  * O webhook e a unica porta que a Meta usa: ele nao tem cookie, nao tem ficha
  * CSRF, nao tem limitador e nao pode passar a ter. Quando um teste daqui ficar
- * vermelho durante as etapas do painel, isso E a regressao — o sinal para
+ * vermelho durante as etapas do painel, isso E a regressao, o sinal para
  * parar, nao para ajustar o teste.
  */
 
@@ -74,7 +74,7 @@ function responderComEnv(request: Request): Promise<Response> {
   return responder(request, env)
 }
 
-describe('REG — o webhook da Meta nao tem cookie, ficha CSRF nem limitador', () => {
+describe('REG: o webhook da Meta nao tem cookie, ficha CSRF nem limitador', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -121,6 +121,36 @@ describe('REG — o webhook da Meta nao tem cookie, ficha CSRF nem limitador', (
     expect(pedido.bodyUsed).toBe(false)
   })
 
+  test('REG-04b: corpo em stream SEM content-length e cortado DURANTE a leitura', async () => {
+    // Um POST `chunked` nao tem `content-length`, entao o portao do REG-04 nao
+    // dispara. Antes, `request.text()` lia os 4 MB inteiros e so depois media.
+    const PEDACO = 64 * 1024
+    const TOTAL = 4 * 1024 * 1024
+    let entregues = 0
+    const corpo = new ReadableStream<Uint8Array>({
+      pull(controle) {
+        if (entregues >= TOTAL) {
+          controle.close()
+          return
+        }
+        entregues += PEDACO
+        controle.enqueue(new Uint8Array(PEDACO).fill(0x61))
+      },
+    })
+    const pedido = new Request(CAMINHO, {
+      method: 'POST',
+      body: corpo,
+      headers: { 'x-hub-signature-256': await assinar('qualquer') },
+    })
+    expect(pedido.headers.get('content-length')).toBeNull()
+
+    const parsed = await readWebhookRequest(pedido, env)
+
+    expect(parsed).toEqual({ ok: false, status: 413, reason: 'payload_muito_grande' })
+    // Parou logo depois do teto, e nao no fim dos 4 MB.
+    expect(entregues).toBeLessThan(MAX_BODY_BYTES + 4 * PEDACO)
+  })
+
   test('REG-05: PUT continua 405', async () => {
     const resposta = await responderComEnv(new Request(CAMINHO, { method: 'PUT' }))
     expect(resposta.status).toBe(405)
@@ -158,7 +188,7 @@ describe('REG — o webhook da Meta nao tem cookie, ficha CSRF nem limitador', (
     expect(jsonValidoMalAssinado.status).toBe(401)
   })
 
-  test('REG-08: nenhum limitador e aplicado — 100 POSTs assinados seguidos, todos 200', async () => {
+  test('REG-08: nenhum limitador e aplicado: 100 POSTs assinados seguidos, todos 200', async () => {
     const pedido = await requisicaoAssinada(CORPO_VAZIO)
     const assinatura = pedido.headers.get('x-hub-signature-256') ?? ''
 
@@ -178,7 +208,7 @@ describe('REG — o webhook da Meta nao tem cookie, ficha CSRF nem limitador', (
  * REG-09 congela a TABELA DE DECISAO de `evaluateComment`.
  *
  * Quando a configuracao passar a vir do banco, a tabela vazia precisa produzir
- * exatamente estes vereditos — e este e o unico lugar onde eles estao escritos.
+ * exatamente estes vereditos, e este e o unico lugar onde eles estao escritos.
  *
  * Os vereditos rodam contra `CONFIG_DE_TESTE`, escrita no proprio fixture, e
  * NAO contra `automationConfig`. Este repositorio e um template publico: trocar
@@ -337,7 +367,7 @@ const CASOS: Caso[] = [
   },
 ]
 
-describe('REG-09 — a tabela de decisao de evaluateComment', () => {
+describe('REG-09: a tabela de decisao de evaluateComment', () => {
   test('REG-09: a FORMA do contrato de config nao mudou', () => {
     // Os VALORES sao de quem instalou o projeto e mudam a cada clone. O que nao
     // pode mudar sem que os 20 vereditos abaixo parem de descrever o produto e
@@ -367,7 +397,7 @@ describe('REG-09 — a tabela de decisao de evaluateComment', () => {
   }
 })
 
-describe('REG-10 — o webhook nao depende da listagem de midias', () => {
+describe('REG-10: o webhook nao depende da listagem de midias', () => {
   test('REG-10: com allowedMediaIds ["*"], um media_id nunca visto e aceito', () => {
     const veredito = evaluateComment(
       evento({ mediaId: '17999999999999999' }),
@@ -400,16 +430,16 @@ describe('REG-10 — o webhook nao depende da listagem de midias', () => {
 })
 
 /**
- * §16.1 — o lote do webhook cabe nas 50 consultas por invocacao.
+ * §16.1, o lote do webhook cabe nas 50 consultas por invocacao.
  *
  * Bug PRE-EXISTENTE, independente do painel: cada comentario entregue custa 5
  * consultas ao D1 e o lote custa outras 2, entao `10 x 5 + 2 = 52` estourava o
- * teto de 50 subrequests por invocacao e a invocacao inteira morria — com o
+ * teto de 50 subrequests por invocacao e a invocacao inteira morria, com o
  * lote grande de um Reel viral, que e exatamente quando o dano e maior.
  *
  * A correcao fatia o lote e passa o excedente para a fila que o cron ja varre.
  * O teto NAO e imposto pelo Miniflare (§13.3), entao contar as consultas com o
- * `D1Contador` e a melhor aproximacao disponivel — e ela e conservadora: cada
+ * `D1Contador` e a melhor aproximacao disponivel, e ela e conservadora: cada
  * statement preparado conta, mesmo os que depois viajam juntos num `db.batch()`
  * que vale um subrequest so.
  */
@@ -452,7 +482,7 @@ async function linhasDoBanco(): Promise<LinhaDoBanco[]> {
   return resultado.results ?? []
 }
 
-describe('§16.1 — o lote do webhook cabe nas 50 consultas por invocacao', () => {
+describe('§16.1: o lote do webhook cabe nas 50 consultas por invocacao', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     await ligarConta(env, AGORA)
@@ -466,14 +496,14 @@ describe('§16.1 — o lote do webhook cabe nas 50 consultas por invocacao', () 
     // E a conta fechada, para a folga ficar visivel em vez de implicita:
     // 2 do lote (token da conta e credencial) + 5 entregues x 5 consultas
     // + 5 reagendados. Os 5 reagendados viajam num `db.batch()` unico, que
-    // vale 1 subrequest — o gasto real e 28, o contado e 32.
+    // vale 1 subrequest, o gasto real e 28, o contado e 32.
     expect({ prepares: contador.prepares, batches: contador.batches }).toEqual({
       prepares: 2 + 5 * 5 + 5,
       batches: 1,
     })
   })
 
-  test('§16.1: nenhum comentario do lote se perde — o excedente vira fila do cron', async () => {
+  test('§16.1: nenhum comentario do lote se perde: o excedente vira fila do cron', async () => {
     const api = new MetaFalsa()
 
     await processarContando(loteDe(10), api)
@@ -538,7 +568,7 @@ describe('§16.1 — o lote do webhook cabe nas 50 consultas por invocacao', () 
 
     // `retryPending` entrega sem consultar nada: reagendar sem saber o tipo
     // mandaria o Direct numa publicacao que talvez nem seja Reel. Na duvida
-    // nao processamos — a mesma escolha do caminho inline.
+    // nao processamos, a mesma escolha do caminho inline.
     const ids = (await linhasDoBanco()).map((l) => l.comment_id)
     expect(ids).not.toContain('comment-sem-tipo')
   })
@@ -572,7 +602,7 @@ describe('§16.1 — o lote do webhook cabe nas 50 consultas por invocacao', () 
     )
 
     // Segunda invocacao, ANTES de o cron rodar: o mesmo autor volta. A linha
-    // `retry_pending` da primeira e um Direct prometido — reagendar de novo
+    // `retry_pending` da primeira e um Direct prometido, reagendar de novo
     // renderia dois Directs para a mesma pessoa.
     await processarContando(
       [...loteDe(5, 'b'), evento({ commentId: 'comment-teimoso-2', ...autor })],
@@ -598,6 +628,25 @@ describe('§16.1 — o lote do webhook cabe nas 50 consultas por invocacao', () 
     await expect(promessa).resolves.toBeUndefined()
     // E a fatia que ja tinha sido entregue continua entregue.
     expect(api.chamadas.filter((c) => c === 'private')).toHaveLength(5)
+  })
+
+  test('D1 fora do ar ANTES do laco vira erro registrado, e nao rejeicao silenciosa', async () => {
+    const api = new MetaFalsa()
+    const d1Fora = {
+      prepare() {
+        throw new Error('D1 indisponivel')
+      },
+    } as unknown as D1Database
+
+    // A leitura da conta e a primeira coisa do lote. Antes ela ficava fora de
+    // qualquer `try`, e a rejeicao sumia dentro do `waitUntil`.
+    const promessa = processEvents(loteDe(3), { ...env, DB: d1Fora }, AGORA, {
+      createApi: () => comoApi(api),
+      resolveConfig: () => CONFIG_DO_LOTE,
+    })
+
+    await expect(promessa).resolves.toBeUndefined()
+    expect(api.chamadas).toHaveLength(0)
   })
 
   test('§16.1: dois comentarios do mesmo autor no excedente viram um so', async () => {

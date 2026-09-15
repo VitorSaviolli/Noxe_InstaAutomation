@@ -17,7 +17,7 @@ import { HOST_AUTHORIZE, HOST_GRAPH, HOST_TOKEN_EXCHANGE, REQUIRED_SCOPES } from
  *
  * Regra do refresh: o token precisa ter PELO MENOS 24h de vida e ainda nao
  * ter expirado. Passou de 60 dias sem renovar, o unico caminho e refazer o
- * OAuth do zero — por isso o cron renova bem antes do vencimento.
+ * OAuth do zero, por isso o cron renova bem antes do vencimento.
  */
 
 /** A Meta anexa "#_" ao final do redirect; precisa sair antes de usar. */
@@ -114,7 +114,7 @@ function normalizePermissions(raw: string[] | string | undefined): string[] {
  * Confere se o usuario concedeu TODAS as permissoes pedidas.
  *
  * A tela de consentimento permite desmarcar permissoes individualmente e o
- * fluxo ainda retorna sucesso — sem esta checagem o erro so apareceria no
+ * fluxo ainda retorna sucesso, sem esta checagem o erro so apareceria no
  * primeiro comentario real.
  */
 export function findMissingScopes(granted: readonly string[]): string[] {
@@ -198,7 +198,7 @@ export async function fetchAccountInfo(
  * Inscreve a conta nos campos de webhook.
  *
  * Isto e o NIVEL CONTA. O nivel APP (Callback URL e Verify Token) e feito
- * manualmente no painel da Meta e nao tem API — os dois sao necessarios.
+ * manualmente no painel da Meta e nao tem API, os dois sao necessarios.
  */
 export async function subscribeToWebhooks(
   apiVersion: string,

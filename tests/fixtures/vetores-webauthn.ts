@@ -2,10 +2,10 @@
  * Vetores congelados de hardware real (§13.3).
  *
  * **Estado atual: NENHUM vetor foi capturado. O conjunto abaixo esta VAZIO de
- * propósito, e isso e um `BLOCKED` declarado do Step 5 da Task 7 — nao um
+ * propósito, e isso e um `BLOCKED` declarado do Step 5 da Task 7, nao um
  * esquecimento.**
  *
- * A pagina que captura os vetores **nao mora neste repositorio** — quem procurar
+ * A pagina que captura os vetores **nao mora neste repositorio**, quem procurar
  * por ela aqui nao vai achar. Ela foi publicada a parte, fora da arvore, porque
  * o endereco dela e da instalacao de quem captura e nao tem o que fazer num
  * template publico. O checklist de hardware da Task 7, no diretorio de trabalho
@@ -17,7 +17,7 @@
  * O metodo T2 tem duas fontes e elas so valem por serem **independentes**: o
  * `AutenticadorFalso` gera variacao, e o hardware real prova que a variacao
  * corresponde ao mundo. Preencher este arquivo com saida do `AutenticadorFalso`
- * destruiria exatamente a independencia que T2 existe para garantir — e o teste
+ * destruiria exatamente a independencia que T2 existe para garantir, e o teste
  * "os vetores de hardware sao aceitos" passaria a dizer apenas que o
  * autenticador de software concorda consigo mesmo. Por isso o arquivo nasce
  * vazio e os testes que dependem dele ficam **vermelhos por construcao**
@@ -25,13 +25,13 @@
  *
  * ## O que cada vetor contem, e por que nao contem segredo
  *
- * Chave publica, assinatura, desafio e metadados — exatamente o que o servidor
+ * Chave publica, assinatura, desafio e metadados, exatamente o que o servidor
  * ja recebe pela rede em toda cerimonia. Nao ha chave privada, nao ha cookie,
  * nao ha identificador de conta. Podem ser commitados sem risco.
  *
  * ## Cada vetor traz o proprio `rpId`, `origin` e desafio
  *
- * Eles valiam **na hora da captura** e **nao casam com nenhuma instalacao** —
+ * Eles valiam **na hora da captura** e **nao casam com nenhuma instalacao**,
  * nem com a do dono, nem com a de quem clonar o template. O verificador e
  * testado contra os valores que vem DENTRO do vetor, nunca contra
  * `env.PANEL_RP_ID`. E o que mantem estes testes verdes na maquina de todo
@@ -46,8 +46,8 @@
  *    ja escritas nos testes. Um vetor ES256 de qualquer plataforma cumpre o
  *    papel dele aqui: provar que uma attestation ES256 de hardware e aceita.
  * 2. **O dono nao tem chave USB, e Windows Hello e iCloud sempre confirmam
- *    identidade.** E provavel que `loginSemUv` — o vetor NEGATIVO, com `UV = 0`
- *    — chegue como **BLOCKED permanente**: nao existe autenticador a mao capaz
+ *    identidade.** E provavel que `loginSemUv`, o vetor NEGATIVO, com `UV = 0`
+ *    chegue como **BLOCKED permanente**: nao existe autenticador a mao capaz
  *    de produzi-lo. As duas hipoteses estao prontas: se ele chegar, o teste
  *    dedicado fica verde; se nao chegar, `UV = 0` continua provado em software
  *    pelo helper `semUv()` do `AutenticadorFalso`, e a ausencia do vetor fica
@@ -74,7 +74,7 @@ export const NOMES_DE_VETOR = [
   'loginEs256DerRAlto',
   /** Assertion cujo `r` em DER tem 31 bytes. So o hardware entrega barato. */
   'loginEs256DerRCurto',
-  /** Vetor NEGATIVO: `UV = 0`. Ver aviso 2 acima — provavel BLOCKED. */
+  /** Vetor NEGATIVO: `UV = 0`. Ver aviso 2 acima, provavel BLOCKED. */
   'loginSemUv',
 ] as const
 

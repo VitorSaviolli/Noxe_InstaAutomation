@@ -1,4 +1,4 @@
-# Guia do iniciante — instalação do zero absoluto
+# Guia do iniciante: instalação do zero absoluto
 
 **Este guia é para quem nunca programou.** Ele parte do princípio de que você nunca abriu um terminal, nunca instalou o Node.js e não sabe o que é um repositório. Nada aqui é dado como sabido.
 
@@ -32,28 +32,28 @@ Funciona 24 horas por dia, sem o seu computador ligado. Depois de instalado, seu
 
 ## O mapa do caminho
 
-São 10 etapas. Faça na ordem — cada uma depende da anterior.
+São 10 etapas. Faça na ordem: cada uma depende da anterior.
 
 | # | Etapa | Onde acontece | Tempo |
 |---|---|---|---|
-| 0 | [Vocabulário mínimo](#etapa-0--vocabulário-mínimo) | Aqui mesmo, lendo | 5 min |
-| 1 | [Criar as quatro contas](#etapa-1--criar-as-quatro-contas) | No navegador | 20 min |
-| 2 | [Instalar os dois programas](#etapa-2--instalar-os-dois-programas) | No seu computador | 15 min |
-| 3 | [Aprender o terminal](#etapa-3--o-terminal-sem-medo) | No seu computador | 10 min |
-| 4 | [Baixar o projeto](#etapa-4--baixar-o-projeto) | No terminal | 5 min |
-| 5 | [Aprender a editar os arquivos](#etapa-5--como-editar-os-arquivos-do-projeto) | No seu computador | 5 min |
-| 6 | [Rodar o assistente](#etapa-6--o-assistente-faz-a-parte-chata) | No terminal | 5 min |
-| 7 | [Configurar a Cloudflare](#etapa-7--cloudflare-onde-o-código-vai-morar) | Terminal + navegador | 20 min |
-| 8 | [Configurar a Meta](#etapa-8--meta-onde-fica-a-permissão-do-instagram) | Navegador | 30 min |
-| 9 | [Personalizar e testar](#etapa-9--personalizar-o-que-é-seu) | Terminal + Instagram | 10 min |
+| 0 | [Vocabulário mínimo](#etapa-0-vocabulário-mínimo) | Aqui mesmo, lendo | 5 min |
+| 1 | [Criar as quatro contas](#etapa-1-criar-as-quatro-contas) | No navegador | 20 min |
+| 2 | [Instalar os dois programas](#etapa-2-instalar-os-dois-programas) | No seu computador | 15 min |
+| 3 | [Aprender o terminal](#etapa-3-o-terminal-sem-medo) | No seu computador | 10 min |
+| 4 | [Baixar o projeto](#etapa-4-baixar-o-projeto) | No terminal | 5 min |
+| 5 | [Aprender a editar os arquivos](#etapa-5-como-editar-os-arquivos-do-projeto) | No seu computador | 5 min |
+| 6 | [Rodar o assistente](#etapa-6-o-assistente-faz-a-parte-chata) | No terminal | 5 min |
+| 7 | [Configurar a Cloudflare](#etapa-7-cloudflare-onde-o-código-vai-morar) | Terminal + navegador | 20 min |
+| 8 | [Configurar a Meta](#etapa-8-meta-onde-fica-a-permissão-do-instagram) | Navegador | 30 min |
+| 9 | [Personalizar e testar](#etapa-9-personalizar-o-que-é-seu) | Terminal + Instagram | 10 min |
 
 **Você está sempre em uma dessas 10.** Se se perder, volte a esta tabela e pergunte: "em qual linha eu estou?".
 
 ---
 
-## Etapa 0 — Vocabulário mínimo
+## Etapa 0: Vocabulário mínimo
 
-Você vai ver estas palavras o tempo todo. Não precisa decorar — só saber que elas não são bicho de sete cabeças.
+Você vai ver estas palavras o tempo todo. Não precisa decorar, só saber que elas não são bicho de sete cabeças.
 
 | Palavra | O que é, em português claro |
 |---|---|
@@ -68,22 +68,22 @@ Você vai ver estas palavras o tempo todo. Não precisa decorar — só saber qu
 | **Worker** | O nome que a Cloudflare dá ao seu programinha publicado. Depois de publicado, ele tem um endereço na internet, só seu. |
 | **Deploy / publicar** | Mandar a versão atual do código para a Cloudflare. Toda mudança que você fizer só vale depois de um novo deploy. |
 | **D1** | O banco de dados gratuito da Cloudflare. Guarda quais comentários já foram respondidos, para ninguém receber o Direct duas vezes. |
-| **API** | O jeito oficial de um programa conversar com outro. Este projeto conversa com o Instagram pela API oficial da Meta — nada de truque nem robô fingindo ser você. |
+| **API** | O jeito oficial de um programa conversar com outro. Este projeto conversa com o Instagram pela API oficial da Meta, nada de truque nem robô fingindo ser você. |
 | **Meta** | A empresa dona do Instagram, do Facebook e do WhatsApp. |
 | **Webhook** | Um aviso automático. Quando alguém comenta, a Meta "bate na porta" do seu Worker avisando. |
 | **Token** | Uma senha comprida gerada por um sistema, no lugar de uma senha digitada por você. |
 | **Segredo** | Um valor que **nunca** pode ser mostrado para ninguém nem ir para a internet. Este projeto tem 4. |
-| **OAuth** | Aquela tela de "Fulano quer acessar sua conta — Permitir?". É como você autoriza a automação sem entregar sua senha. |
+| **OAuth** | Aquela tela de "Fulano quer acessar sua conta, Permitir?". É como você autoriza a automação sem entregar sua senha. |
 
 Pronto. Esse era o vocabulário. Nada mais complicado que isso aparece.
 
 ---
 
-## Etapa 1 — Criar as quatro contas
+## Etapa 1: Criar as quatro contas
 
 Faça tudo no navegador, na ordem abaixo. **Nenhuma pede cartão de crédito.**
 
-### 1.1 — Deixar sua conta do Instagram profissional
+### 1.1: Deixar sua conta do Instagram profissional
 
 **Obrigatório.** Conta pessoal não funciona, de jeito nenhum: o Instagram não dá acesso à API para conta pessoal. A conversão é grátis, leva 1 minuto e você pode voltar atrás quando quiser.
 
@@ -94,18 +94,18 @@ No aplicativo do Instagram, no celular:
 3. Toque em **Configurações e privacidade**.
 4. Desça até **Tipo de conta e ferramentas**.
 5. Toque em **Mudar para conta profissional**.
-6. Escolha uma categoria (qualquer uma que combine com você) e selecione **Criador de conteúdo** ou **Comercial** — os dois servem.
+6. Escolha uma categoria (qualquer uma que combine com você) e selecione **Criador de conteúdo** ou **Comercial**, os dois servem.
 7. Se ele oferecer conectar a uma Página do Facebook, pode **pular**. Este projeto não precisa disso.
 
 **Como saber se deu certo:** volte em *Configurações → Tipo de conta e ferramentas*. Se agora aparecer a opção "Mudar para conta pessoal", é porque você já está em uma conta profissional. ✅
 
-### 1.2 — Ter uma conta no Facebook
+### 1.2: Ter uma conta no Facebook
 
-A Meta exige uma conta do Facebook para você entrar no painel de desenvolvedores. **Ela não precisa publicar nada e ninguém vai ver.** Se você já tem uma, use a que você já tem — não crie outra.
+A Meta exige uma conta do Facebook para você entrar no painel de desenvolvedores. **Ela não precisa publicar nada e ninguém vai ver.** Se você já tem uma, use a que você já tem, não crie outra.
 
 Não tem nenhuma? Crie em <https://www.facebook.com>.
 
-### 1.3 — Criar a conta no Meta for Developers
+### 1.3: Criar a conta no Meta for Developers
 
 1. Abra <https://developers.facebook.com>.
 2. Clique em **Começar**, no canto superior direito.
@@ -115,14 +115,14 @@ Não tem nenhuma? Crie em <https://www.facebook.com>.
 
 > Deixe essa aba aberta. Você volta nela na Etapa 8.
 
-### 1.4 — Criar a conta na Cloudflare
+### 1.4: Criar a conta na Cloudflare
 
 1. Abra <https://dash.cloudflare.com/sign-up>.
 2. Cadastre e-mail e senha.
 3. **Confirme o e-mail** antes de continuar (procure na caixa de entrada; às vezes cai no spam).
 4. Escolha o plano **Free**. **Não cadastre cartão de crédito.**
 
-> **Por que não cadastrar cartão?** Sem cartão, o serviço simplesmente para quando o limite gratuito acaba, em vez de gerar cobrança. Para este projeto, o limite gratuito é enorme — você pararia muito antes de chegar perto dele. Detalhes na seção 11 do [README.md](README.md#11-garantia-de-funcionamento-gratuito).
+> **Por que não cadastrar cartão?** Sem cartão, o serviço simplesmente para quando o limite gratuito acaba, em vez de gerar cobrança. Para este projeto, o limite gratuito é enorme, você pararia muito antes de chegar perto dele. Detalhes na seção 11 do [README.md](README.md#11-garantia-de-funcionamento-gratuito).
 
 ### Confira antes de seguir
 
@@ -133,22 +133,22 @@ Não tem nenhuma? Crie em <https://www.facebook.com>.
 
 ---
 
-## Etapa 2 — Instalar os dois programas
+## Etapa 2: Instalar os dois programas
 
 São só dois: **Node.js** e **git**. Os dois são gratuitos, oficiais e seguros.
 
-### 2.1 — Node.js
+### 2.1: Node.js
 
 O Node é o motor que executa o projeto. **Precisa ser a versão 20 ou mais nova.**
 
 **No Windows:**
 
 1. Abra <https://nodejs.org>.
-2. Clique no botão grande que diz **LTS** (é o recomendado; a outra opção, "Current", é a versão de testes — não pegue essa).
+2. Clique no botão grande que diz **LTS** (é o recomendado; a outra opção, "Current", é a versão de testes, não pegue essa).
 3. Vai baixar um arquivo `.msi`. Abra ele.
 4. Clique **Next** em todas as telas, aceite os termos, e **Install**.
 5. Se o Windows perguntar "deseja permitir que este aplicativo faça alterações?", clique **Sim**.
-6. Se aparecer uma tela oferecendo instalar "Tools for Native Modules" (com Chocolatey), pode **desmarcar** — este projeto não precisa.
+6. Se aparecer uma tela oferecendo instalar "Tools for Native Modules" (com Chocolatey), pode **desmarcar**, este projeto não precisa.
 7. **Finish**.
 
 **No Mac:**
@@ -158,7 +158,7 @@ O Node é o motor que executa o projeto. **Precisa ser a versão 20 ou mais nova
 3. **Continuar → Continuar → Concordo → Instalar**. Digite a senha do seu Mac quando pedir.
 4. **Fechar**.
 
-### 2.2 — git
+### 2.2: git
 
 O git é o programa que baixa o projeto.
 
@@ -173,9 +173,9 @@ O git é o programa que baixa o projeto.
 
 **No Mac:**
 
-Na maioria dos Macs o git já vem instalado. Você descobre no próximo passo. Se não vier, o próprio Mac abre uma janelinha oferecendo instalar as "Ferramentas de linha de comando" na primeira vez que você digitar `git` — aceite e espere terminar.
+Na maioria dos Macs o git já vem instalado. Você descobre no próximo passo. Se não vier, o próprio Mac abre uma janelinha oferecendo instalar as "Ferramentas de linha de comando" na primeira vez que você digitar `git`, aceite e espere terminar.
 
-### 2.3 — Conferir se deu certo
+### 2.3: Conferir se deu certo
 
 **Feche todos os terminais que estiverem abertos e abra um novo.** Isso é importante: um terminal aberto *antes* da instalação não enxerga o programa que você acabou de instalar. Se você ainda não sabe abrir um terminal, vá para a Etapa 3 e volte aqui.
 
@@ -206,21 +206,21 @@ Os números não precisam ser exatamente esses. O que importa:
 - O `node` tem que responder **v20** ou maior (v20, v22, v24...). Se responder v18 ou menos, baixe de novo a versão LTS.
 - Os outros dois só precisam responder alguma coisa.
 
-**Respondeu "não é reconhecido como um comando" ou "command not found"?** Vá para a seção [Quando algo der errado](#quando-algo-der-errado), no fim. Não siga adiante sem resolver isso — nada vai funcionar.
+**Respondeu "não é reconhecido como um comando" ou "command not found"?** Vá para a seção [Quando algo der errado](#quando-algo-der-errado), no fim. Não siga adiante sem resolver isso, nada vai funcionar.
 
 ---
 
-## Etapa 3 — O terminal sem medo
+## Etapa 3: O terminal sem medo
 
 O terminal é uma janela onde você digita e aperta Enter. Ele não vai quebrar seu computador. Nenhum comando deste projeto apaga arquivos seus.
 
-### 3.1 — Como abrir
+### 3.1: Como abrir
 
 **Windows:** aperte a tecla `Windows`, digite `powershell` e aperte Enter. Vai abrir uma janela azul ou preta.
 
 **Mac:** aperte `Command + Espaço`, digite `terminal` e aperte Enter.
 
-### 3.2 — Como colar um comando
+### 3.2: Como colar um comando
 
 Você vai copiar comandos deste guia e colar lá. Copiar é o `Ctrl+C` (ou `Cmd+C`) de sempre. Colar muda:
 
@@ -232,7 +232,7 @@ Você vai copiar comandos deste guia e colar lá. Copiar é o `Ctrl+C` (ou `Cmd+
 
 > **Cole uma linha de cada vez** e aperte Enter. Espere terminar antes de colar a próxima. Colar tudo de uma vez costuma dar confusão.
 
-### 3.3 — O que é "rodar um comando"
+### 3.3: O que é "rodar um comando"
 
 Quando este guia mostra um bloco assim:
 
@@ -242,13 +242,13 @@ node --version
 
 significa: **cole `node --version` no terminal e aperte Enter.**
 
-Não copie as crases nem a palavra `bash` — são só a decoração do texto. Copie o comando de dentro.
+Não copie as crases nem a palavra `bash`: são só a decoração do texto. Copie o comando de dentro.
 
-### 3.4 — Saber onde você está
+### 3.4: Saber onde você está
 
 O terminal está sempre "dentro" de alguma pasta. Isso importa muito: os comandos do projeto **só funcionam dentro da pasta do projeto**.
 
-Para ver onde você está — funciona no PowerShell, no Mac e no Git Bash:
+Para ver onde você está: funciona no PowerShell, no Mac e no Git Bash:
 
 ```bash
 pwd
@@ -268,16 +268,16 @@ cd ..
 
 **Atalho que salva:** no Windows, abra a pasta no Explorador de Arquivos, clique com o botão direito num espaço vazio e escolha **"Abrir no Terminal"**. O terminal já abre dentro dela. No Mac, arraste a pasta para cima do ícone do Terminal.
 
-### 3.5 — O que é normal aparecer
+### 3.5: O que é normal aparecer
 
 - **Muito texto rolando na tela:** normal. O terminal narra o que está fazendo.
 - **A palavra `warning` (aviso):** normal, pode ignorar. Aviso não é erro.
 - **A palavra `error` (erro), geralmente em vermelho:** aí sim pare e leia. Vá para [Quando algo der errado](#quando-algo-der-errado).
 - **Nada acontecer por 1 ou 2 minutos:** normal no `npm install`. Está baixando. Espere.
 
-### 3.6 — Fechar e voltar depois
+### 3.6: Fechar e voltar depois
 
-Pode fechar o terminal a qualquer momento — nada se perde. Mas ao voltar, você cai na pasta inicial de novo. **Antes de rodar qualquer comando do projeto, entre na pasta dele:**
+Pode fechar o terminal a qualquer momento, nada se perde. Mas ao voltar, você cai na pasta inicial de novo. **Antes de rodar qualquer comando do projeto, entre na pasta dele:**
 
 ```bash
 cd caminho/para/noxe-insta-automation
@@ -287,9 +287,9 @@ Se um comando reclamar que não achou o `package.json`, é isso: você está na 
 
 ---
 
-## Etapa 4 — Baixar o projeto
+## Etapa 4: Baixar o projeto
 
-### 4.1 — Escolha onde o projeto vai morar
+### 4.1: Escolha onde o projeto vai morar
 
 Qualquer pasta serve. A pasta **Documentos** é uma boa escolha. Abra o terminal e vá até ela.
 
@@ -305,11 +305,11 @@ cd $HOME\Documents
 cd ~/Documents
 ```
 
-### 4.2 — Baixe
+### 4.2: Baixe
 
 Rode os três comandos abaixo, **um de cada vez**, esperando cada um terminar.
 
-O endereço abaixo é o do projeto oficial — pode copiar como está. Só troque se você estiver baixando de um *fork* (uma cópia que outra pessoa fez): nesse caso, o endereço certo aparece no botão verde **Code** da página daquele projeto.
+O endereço abaixo é o do projeto oficial: pode copiar como está. Só troque se você estiver baixando de um *fork* (uma cópia que outra pessoa fez): nesse caso, o endereço certo aparece no botão verde **Code** da página daquele projeto.
 
 ```bash
 git clone https://github.com/VitorSaviolli/Noxe_InstaAutomation.git
@@ -333,17 +333,17 @@ O que cada um fez:
 >
 > O GitHub oferece um botão "Download ZIP". **Não use.** Sem o git você perde a proteção que impede os seus segredos de irem parar na internet no dia em que você publicar a sua própria versão. Use `git clone`, como acima.
 
-### 4.3 — Confira
+### 4.3: Confira
 
 ```bash
 npm test
 ```
 
-Isso roda os testes automáticos do projeto. Espere terminar e procure a palavra **passed** (passou) no fim. Se todos passarem, o seu ambiente está correto — Node, npm e projeto estão conversando.
+Isso roda os testes automáticos do projeto. Espere terminar e procure a palavra **passed** (passou) no fim. Se todos passarem, o seu ambiente está correto, Node, npm e projeto estão conversando.
 
 ---
 
-## Etapa 5 — Como editar os arquivos do projeto
+## Etapa 5: Como editar os arquivos do projeto
 
 Em três momentos você vai precisar abrir um arquivo do projeto e trocar uma palavra. É simples, mas tem uma armadilha.
 
@@ -353,7 +353,7 @@ Em três momentos você vai precisar abrir um arquivo do projeto e trocar uma pa
 |---|---|---|
 | Windows | **Bloco de Notas** (clique direito no arquivo → Abrir com → Bloco de Notas) | Word |
 | Mac | **TextEdit**, mas veja o aviso abaixo | Pages |
-| Qualquer um | **VS Code** — gratuito, em <https://code.visualstudio.com>. É o mais confortável, mas totalmente opcional. | — |
+| Qualquer um | **VS Code**: gratuito, em <https://code.visualstudio.com>. É o mais confortável, mas totalmente opcional. |, |
 
 > **Armadilha do Mac:** o TextEdit abre em "texto formatado", e salvar assim **corrompe o arquivo**. Antes de salvar, vá em **Formatar → Converter para texto simples**. Se você não quiser lidar com isso, instale o VS Code.
 >
@@ -369,7 +369,7 @@ Em três momentos você vai precisar abrir um arquivo do projeto e trocar uma pa
 
 Nesses arquivos, os lugares que você precisa trocar estão marcados com um texto berrante, do tipo `COLE_AQUI_O_ID_DO_SEU_BANCO_D1` ou `[COLOQUE_O_SEU_LINK_AQUI]`. **Substitua o marcador inteiro**, incluindo os colchetes quando houver, e mantenha as aspas que já estavam ali.
 
-Exemplo — antes:
+Exemplo: antes:
 
 ```ts
 destinationUrl: '[COLOQUE_O_SEU_LINK_AQUI]',
@@ -387,7 +387,7 @@ Repare: as aspas simples continuam lá, e a vírgula no fim também. Só o miolo
 
 ---
 
-## Etapa 6 — O assistente faz a parte chata
+## Etapa 6: O assistente faz a parte chata
 
 O projeto vem com um assistente que conduz você pelo terminal, em português, fazendo as perguntas na ordem certa.
 
@@ -399,17 +399,17 @@ Ele abre um menu com cinco etapas:
 
 | Etapa do assistente | O que ela faz por você |
 |---|---|
-| 1 — Segredos | Gera sozinho os valores aleatórios dos segredos e mostra o comando exato para cadastrar cada um |
-| 2 — Conferir o Worker | Verifica se o seu Worker já está no ar e o que ainda falta |
-| 3 — Conectar o Instagram | Monta a URL de autorização e **abre o navegador para você** |
-| 4 — Configurar a automação | Pergunta a palavra-gatilho, o link e os textos, e grava tudo no arquivo certo |
-| 5 — Verificar | Confere se não sobrou nenhum dado pessoal antes de você publicar |
+| 1: Segredos | Gera sozinho os valores aleatórios dos segredos e mostra o comando exato para cadastrar cada um |
+| 2: Conferir o Worker | Verifica se o seu Worker já está no ar e o que ainda falta |
+| 3: Conectar o Instagram | Monta a URL de autorização e **abre o navegador para você** |
+| 4: Configurar a automação | Pergunta a palavra-gatilho, o link e os textos, e grava tudo no arquivo certo |
+| 5: Verificar | Confere se não sobrou nenhum dado pessoal antes de você publicar |
 
-**Ele não substitui os dois guias detalhados** ([SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md) e [SETUP_META.md](SETUP_META.md)) — ele caminha ao lado deles. Use os dois juntos: o guia mostra as telas, o assistente cuida do que é chato de digitar.
+**Ele não substitui os dois guias detalhados** ([SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md) e [SETUP_META.md](SETUP_META.md)), ele caminha ao lado deles. Use os dois juntos: o guia mostra as telas, o assistente cuida do que é chato de digitar.
 
 > **Então eu vou ter que usar o terminal para sempre?** Não. O assistente cuida do que **só** a sua máquina pode fazer: gerar os segredos, cadastrá-los na Cloudflare e fazer o primeiro login do Instagram. Depois disso, o dia a dia é no **painel**, pelo celular: palavra-gatilho, textos, link, quais Reels respondem, e o histórico do que aconteceu.
 >
-> **E um painel na internet não é perigoso?** Seria, se fosse um painel comum. Um painel capaz de mudar o texto do seu Direct viraria, se alguém invadisse, uma máquina de golpe falando em nome da sua conta — com a sua resposta pública dando credibilidade ao golpe. É por isso que este tem quatro travas: **(1)** só entra com passkey — digital, rosto ou chave física —, então não existe senha para vazar ou adivinhar; **(2)** mudar o texto do Direct ou o link exige um **segundo** gesto de biometria, preso àquela mudança específica, de modo que aprovar uma coisa não aprova outra; **(3)** o link só pode apontar para os domínios que você autorizou no arquivo de configuração, e mudar essa lista exige o repositório mais a chave de publicação — as duas coisas que um painel invadido não tem; **(4)** o código de parada desliga tudo de qualquer aparelho, sem senha e sem precisar entrar no painel.
+> **E um painel na internet não é perigoso?** Seria, se fosse um painel comum. Um painel capaz de mudar o texto do seu Direct viraria, se alguém invadisse, uma máquina de golpe falando em nome da sua conta, com a sua resposta pública dando credibilidade ao golpe. É por isso que este tem quatro travas: **(1)** só entra com passkey, digital, rosto ou chave física, então não existe senha para vazar ou adivinhar; **(2)** mudar o texto do Direct ou o link exige um **segundo** gesto de biometria, preso àquela mudança específica, de modo que aprovar uma coisa não aprova outra; **(3)** o link só pode apontar para os domínios que você autorizou no arquivo de configuração, e mudar essa lista exige o repositório mais a chave de publicação, as duas coisas que um painel invadido não tem; **(4)** o código de parada desliga tudo de qualquer aparelho, sem senha e sem precisar entrar no painel.
 >
 > Os segredos continuam vivendo **só no seu computador**: o painel nunca os lê nem os mostra.
 
@@ -421,9 +421,9 @@ npm run configurar 3
 
 ---
 
-## Etapa 7 — Cloudflare: onde o código vai morar
+## Etapa 7: Cloudflare, onde o código vai morar
 
-Nesta etapa você cria o banco de dados, cadastra os segredos e publica o Worker. No fim dela, **o seu endereço na internet passa a existir** — e ele é obrigatório para a Etapa 8.
+Nesta etapa você cria o banco de dados, cadastra os segredos e publica o Worker. No fim dela, **o seu endereço na internet passa a existir**, e ele é obrigatório para a Etapa 8.
 
 **Abra o [SETUP_CLOUDFLARE.md](SETUP_CLOUDFLARE.md) e siga a partir da seção 3.** As seções 1 e 2 você já fez aqui (instalar os programas e baixar o projeto).
 
@@ -432,11 +432,11 @@ Aqui está o resumo do caminho, para você saber onde está pisando:
 | Comando | O que ele faz |
 |---|---|
 | `npx wrangler login` | Abre o navegador para você clicar em **Allow** e autorizar o seu computador na Cloudflare |
-| `npx wrangler d1 create noxe-insta-automation` | Cria o banco de dados. **Ele imprime um `database_id` na tela — copie e cole no `wrangler.jsonc`** |
+| `npx wrangler d1 create noxe-insta-automation` | Cria o banco de dados. **Ele imprime um `database_id` na tela, copie e cole no `wrangler.jsonc`** |
 | `npm run db:migrate:local` | Monta as tabelas no banco de testes da sua máquina |
 | `npm run db:migrate:remote` | Monta as tabelas no banco de verdade, na Cloudflare |
 | `npx wrangler secret put NOME` | Guarda um segredo no cofre da Cloudflare. Você repete isso **5 vezes**, uma por segredo |
-| `npm run deploy` | Publica. **Ele imprime a sua URL — anote!** |
+| `npm run deploy` | Publica. **Ele imprime a sua URL, anote!** |
 
 ### Três coisas que costumam confundir aqui
 
@@ -453,7 +453,7 @@ Mas o arquivo `wrangler.jsonc` usa `:` no lugar do `=`. **Copie só o texto long
 **3. Você só consegue cadastrar 4 dos 5 segredos agora.** O quinto (`META_APP_SECRET`) vem do painel da Meta, que é a próxima etapa. Não fique travado esperando por ele.
 
 > Um dos quatro é o `PANEL_SESSION_KEY`. Se você esquecer dele, tudo publica e
-> funciona — menos o painel, que responde 503 como se não existisse. É o esquecimento
+> funciona: menos o painel, que responde 503 como se não existisse. É o esquecimento
 > mais comum, e o mais confuso de diagnosticar depois.
 
 ### Sua URL
@@ -474,11 +474,11 @@ https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/health
 
 Deve aparecer um texto com `"status": "ok"`. Se aparecer, ✅ o seu Worker está vivo na internet.
 
-Nesse mesmo texto você vai ver `appId: false` e `contaAutorizada: false`. **Isso é o esperado agora** — os dois viram `true` no fim da próxima etapa.
+Nesse mesmo texto você vai ver `appId: false` e `contaAutorizada: false`. **Isso é o esperado agora**, os dois viram `true` no fim da próxima etapa.
 
 ---
 
-## Etapa 8 — Meta: onde fica a permissão do Instagram
+## Etapa 8: Meta, onde fica a permissão do Instagram
 
 Esta é a etapa mais longa e a que mais tem tela para clicar. Reserve 30 minutos sem pressa.
 
@@ -492,22 +492,22 @@ O que vai acontecer, em ordem:
 4. **Pegar o App ID e o App Secret.** O App ID vai para o `wrangler.jsonc`; o App Secret vira o quarto segredo.
 5. **Marcar as 3 permissões** que o projeto pede.
 6. **Cadastrar o webhook** (o endereço que a Meta vai avisar quando alguém comentar) e o Verify Token.
-7. **Assinar o evento de comentários** — em **dois lugares diferentes**, e os dois são obrigatórios.
+7. **Assinar o evento de comentários**: em **dois lugares diferentes**, e os dois são obrigatórios.
 8. **Fazer o login** (aquela tela de "Permitir?") para conectar a sua conta.
 
-### A foto do app — quase todo mundo esquece
+### A foto do app: quase todo mundo esquece
 
 O painel da Meta pede uma **foto do app** (o "ícone"), e ela **não** aparece na lista de passos do assistente: fica escondida em **Configurações → Básico**.
 
 - Tamanho: **1024 × 1024 pixels**, quadrada, PNG.
-- Use a **sua** marca ou uma imagem sua. **Não pode** usar o logo do Instagram, da Meta ou do Facebook — isso reprova o app.
+- Use a **sua** marca ou uma imagem sua. **Não pode** usar o logo do Instagram, da Meta ou do Facebook, isso reprova o app.
 - Não tem logo? Serve qualquer imagem quadrada própria, feita no Canva ou em qualquer editor gratuito.
 
 Isso importa mesmo: essa foto é o que aparece na tela de "Permitir?" que você (e depois qualquer pessoa) vê ao conectar a conta. Um app sem foto passa impressão de coisa quebrada.
 
 ### O alerta que mais derruba gente aqui
 
-**A Meta te mostra DOIS pares de "App ID + App Secret":** um do app do Facebook e outro do Instagram. **Eles são diferentes, e o errado não funciona.** O `SETUP_META.md` tem uma seção inteira só sobre isso, com o alerta em destaque — leia com calma quando chegar lá. Se a automação depois não responder, este é o primeiro lugar para conferir.
+**A Meta te mostra DOIS pares de "App ID + App Secret":** um do app do Facebook e outro do Instagram. **Eles são diferentes, e o errado não funciona.** O `SETUP_META.md` tem uma seção inteira só sobre isso, com o alerta em destaque, leia com calma quando chegar lá. Se a automação depois não responder, este é o primeiro lugar para conferir.
 
 ### Como saber que a Etapa 8 acabou
 
@@ -515,7 +515,7 @@ Abra de novo a sua URL com `/health` no fim. Agora `appId` e `contaAutorizada` p
 
 ---
 
-## Etapa 9 — Personalizar o que é seu
+## Etapa 9: Personalizar o que é seu
 
 Agora você define o que a automação faz. O jeito mais fácil é pelo assistente:
 
@@ -525,10 +525,10 @@ npm run configurar 4
 
 Ele pergunta, uma coisa de cada vez:
 
-- **A palavra-gatilho** — o que a pessoa precisa comentar. Ex.: `eu quero`.
-- **O link** — o que ela vai receber no Direct.
-- **O texto do Direct** — a mensagem privada.
-- **O texto da resposta pública** — o que aparece no comentário.
+- **A palavra-gatilho**: o que a pessoa precisa comentar. Ex.: `eu quero`.
+- **O link**: o que ela vai receber no Direct.
+- **O texto do Direct**: a mensagem privada.
+- **O texto da resposta pública**: o que aparece no comentário.
 
 E grava tudo em `src/config.ts`, guardando uma cópia do arquivo antigo por segurança.
 
@@ -541,7 +541,7 @@ Prefere editar na mão? Abra `src/config.ts` e troque os valores. A explicação
 
 ### Não esqueça da política de privacidade
 
-Abra `src/routes/legal.ts` e troque `[SEU_EMAIL_DE_CONTATO]` e `[NOME_DO_RESPONSAVEL]` pelos seus dados reais. **A Meta exige** que essas páginas existam e funcionem — se ficarem com os marcadores, o seu app fica irregular.
+Abra `src/routes/legal.ts` e troque `[SEU_EMAIL_DE_CONTATO]` e `[NOME_DO_RESPONSAVEL]` pelos seus dados reais. **A Meta exige** que essas páginas existam e funcionem, se ficarem com os marcadores, o seu app fica irregular.
 
 ### Publique a mudança
 
@@ -564,7 +564,7 @@ allowedMediaIds: ['*'],            // todos os Reels
 allowedMediaIds: ['1791234...'],   // só este
 ```
 
-Assim, se alguém comentar a palavra-gatilho num post antigo, não acontece nada. Como descobrir esse número está na etapa 12 do [SETUP_META.md](SETUP_META.md). Terminado o teste, volte para `['*']` — e lembre: **editou → deploy**.
+Assim, se alguém comentar a palavra-gatilho num post antigo, não acontece nada. Como descobrir esse número está na etapa 12 do [SETUP_META.md](SETUP_META.md). Terminado o teste, volte para `['*']`, e lembre: **editou → deploy**.
 
 Para acompanhar ao vivo o que está acontecendo por dentro, deixe isto rodando em outro terminal enquanto comenta:
 
@@ -629,7 +629,7 @@ Não, se você seguiu a Etapa 1.4 e não cadastrou cartão. Sem cartão não exi
 Não. Depois do `npm run deploy`, o código roda nos servidores da Cloudflare. Você pode desligar tudo. Seu computador só é necessário para mudar alguma coisa.
 
 **Isso pode derrubar minha conta do Instagram?**
-Este projeto usa a **API oficial** da Meta — nada de robô fingindo ser você. O que derruba conta é o uso: disparo em massa, mensagem enganosa, prometer conteúdo e não entregar, ou automatizar conta de terceiros sem autorização. Use na sua conta e entregue o que prometeu na legenda. Leia o "Aviso legal e uso responsável" no [README.md](README.md).
+Este projeto usa a **API oficial** da Meta: nada de robô fingindo ser você. O que derruba conta é o uso: disparo em massa, mensagem enganosa, prometer conteúdo e não entregar, ou automatizar conta de terceiros sem autorização. Use na sua conta e entregue o que prometeu na legenda. Leia o "Aviso legal e uso responsável" no [README.md](README.md).
 
 **Preciso de site próprio ou domínio?**
 Não. A Cloudflare te dá um endereço de graça.
@@ -650,7 +650,7 @@ git checkout -- src/config.ts
 (troque pelo arquivo que você quer restaurar). Ele volta ao original. Este é um dos motivos para não baixar como ZIP.
 
 **Não entendi um termo do guia.**
-Está na [Etapa 0](#etapa-0--vocabulário-mínimo). Se não estiver lá, pergunte no repositório — provavelmente falta explicar mesmo, e isso é falha do guia, não sua.
+Está na [Etapa 0](#etapa-0-vocabulário-mínimo). Se não estiver lá, pergunte no repositório, provavelmente falta explicar mesmo, e isso é falha do guia, não sua.
 
 ---
 
@@ -669,7 +669,7 @@ Está na [Etapa 0](#etapa-0--vocabulário-mínimo). Se não estiver lá, pergunt
 | Usar palavras diferentes em Reels diferentes | [README.md, seção 9](README.md#9-automações-por-reel-mediaautomations) |
 | Saber o que é guardado sobre quem comenta | [README.md, seção 13](README.md#13-segurança-e-privacidade) |
 | Conferir que estou dentro do plano gratuito | [README.md, seção 11](README.md#11-garantia-de-funcionamento-gratuito) |
-| Publicar a minha própria versão no GitHub | [README.md, seção 5](README.md#5-segredos-e-git-o-que-nunca-pode-ir-para-o-github) — **leia inteira antes**, é onde mora o risco de vazar segredo |
+| Publicar a minha própria versão no GitHub | [README.md, seção 5](README.md#5-segredos-e-git-o-que-nunca-pode-ir-para-o-github), **leia inteira antes**, é onde mora o risco de vazar segredo |
 
 Chegou até aqui e funcionou? Então você acabou de publicar e operar uma aplicação de verdade na internet, sem escrever uma linha de código. 🎉
 
@@ -677,9 +677,9 @@ Chegou até aqui e funcionou? Então você acabou de publicar e operar uma aplic
 
 ## Créditos e apoio
 
-**Software sem fins lucrativos.** Este projeto não rouba e não coleta informações de ninguém. Tudo o que ele guarda fica no **seu** banco de dados, dentro da **sua** conta da Cloudflare. Nada é enviado ao autor do código nem a terceiros — não existe servidor nosso no meio.
+**Software sem fins lucrativos.** Este projeto não rouba e não coleta informações de ninguém. Tudo o que ele guarda fica no **seu** banco de dados, dentro da **sua** conta da Cloudflare. Nada é enviado ao autor do código nem a terceiros, não existe servidor nosso no meio.
 
-Desenvolvido por **Vitor S. Gonsalez** — **Noxelora**.
+Desenvolvido por **Vitor S. Gonsalez**: **Noxelora**.
 
 ### ⭐ Deu certo para você?
 

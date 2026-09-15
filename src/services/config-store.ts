@@ -8,7 +8,7 @@
  *
  * A propriedade que este modulo existe para garantir, e que vale em todos os
  * caminhos: **erro nunca alarga, e erro nunca inventa um valor que o dono nao
- * viu na tela.** Configuracao corrompida faz a automacao PARAR — nenhum campo
+ * viu na tela.** Configuracao corrompida faz a automacao PARAR, nenhum campo
  * invalido e substituido por valor de fabrica com a automacao rodando (§9.2).
  *
  * Os sete estados possiveis, todos exercitados pelas garantias CFG-01 a
@@ -52,13 +52,13 @@ export interface SnapshotConfig {
   /** Achados do validador na leitura. Vao para a tela, nao para o webhook. */
   readonly avisos: readonly string[]
   /**
-   * As linhas de `painel_midias` INTEIRAS — ativas e inativas —, ou `null`
+   * As linhas de `painel_midias` INTEIRAS, ativas e inativas, ou `null`
    * quando quem leu nao pediu por elas.
    *
    * Existe para as telas de Reels, e ela e a razao de §12.10 voltar a fechar:
    * a pergunta viaja no `db.batch()` que a configuracao ja faz, e um `batch`
-   * vale UM subrequest. `null` significa "esta leitura nao perguntou" — o
-   * caminho quente do webhook nunca pergunta —, e nao "nao ha linhas".
+   * vale UM subrequest. `null` significa "esta leitura nao perguntou", o
+   * caminho quente do webhook nunca pergunta, e nao "nao ha linhas".
    */
   readonly linhasDeMidia: readonly PainelMidiaRecord[] | null
 }
@@ -72,10 +72,10 @@ export const TTL_LIGADO_MS = 10_000
 
 /**
  * Desligado: janela longa, porque servir "parado" desatualizado nunca causa
- * dano — e economiza exatamente quando o sistema mais precisa. O preco e que
+ * dano, e economiza exatamente quando o sistema mais precisa. O preco e que
  * religar demora ate um minuto para valer em todos os isolates, e a tela diz
  * isso. E tambem o TTL do snapshot de falha (CFG-18): `parado_por_erro` tem
- * `enabled: false`, entao ele cai neste ramo sem precisar de caso especial —
+ * `enabled: false`, entao ele cai neste ramo sem precisar de caso especial,
  * um banco que ja esta caindo nao pode ser martelado a cada invocacao.
  */
 export const TTL_DESLIGADO_MS = 60_000
@@ -136,14 +136,14 @@ async function lerEValidar(env: Env, comAsInativas: boolean): Promise<SnapshotCo
   } catch (cause) {
     // A leitura falhou, entao nao ha linha de midia nenhuma para entregar: as
     // telas de Reels caem na mesma tarja de `parado_por_erro` que a config, que
-    // e o modo de falha que elas ja tinham quando a consulta era propria — e
+    // e o modo de falha que elas ja tinham quando a consulta era propria, e
     // uma tarja e melhor que o `500` que a consulta separada produzia.
     return doErroDeLeitura(cause)
   }
 
   if (leitura.config === null) {
     // CFG-01 e CFG-17. Nao e conserto de invalido: e o estado bem definido "o
-    // painel ainda nao existe". Linhas de midia sem linha global sao ORFAS — honra-las
+    // painel ainda nao existe". Linhas de midia sem linha global sao ORFAS, honra-las
     // misturaria global-do-arquivo com sobreposicao-do-banco, e misturar
     // alarga.
     const avisos =
@@ -175,8 +175,8 @@ async function lerEValidar(env: Env, comAsInativas: boolean): Promise<SnapshotCo
  * A fabrica, opcionalmente desligada. Trava de CFG-01, CFG-07 e CFG-14.
  *
  * O snapshot degradado continua sendo uma `AutomationConfig` COMPLETA e bem
- * formada: e isso que mantem `processComment` — documentada como funcao que
- * nunca lanca — sem lancar mesmo com a linha do banco corrompida (CFG-07).
+ * formada: e isso que mantem `processComment`, documentada como funcao que
+ * nunca lanca, sem lancar mesmo com a linha do banco corrompida (CFG-07).
  *
  * Os dois arrays sao COPIADOS: o snapshot e congelado em profundidade, e
  * congelar as listas de `automationConfig` mexeria num modulo que a spec
@@ -202,7 +202,7 @@ function daFabrica(
     // As linhas cruas seguem mesmo nos estados degradados, e a decisao e a que a
     // tela de Reels ja tinha quando lia por conta propria: com a linha global
     // ilegivel, "salvo por voce" continua sendo a unica coisa verdadeira que
-    // aquela tela pode mostrar. Elas nao alargam nada — quem resolve
+    // aquela tela pode mostrar. Elas nao alargam nada, quem resolve
     // comportamento le `overrides`, e ele esta vazio aqui.
     linhasDeMidia: linhas,
   }
@@ -213,7 +213,7 @@ function daFabrica(
  *
  * **Ruling do controlador na rodada 1 de revisao: §9.11 vence a letra de
  * §9.2.** A tabela de §9.2 manda `overrides: []` para "linha ausente", mas a
- * frase que abre §9.11 e mais forte — *"atualizar o codigo e fazer deploy nao
+ * frase que abre §9.11 e mais forte, *"atualizar o codigo e fazer deploy nao
  * pode mudar comportamento nenhum"*. Antes desta etapa, o padrao de
  * `resolveConfigForMedia` era `mediaAutomations` de `src/config.ts`: devolver
  * `[]` aqui apagaria, sem aviso e sem log, as automacoes por Reel de todo
@@ -230,7 +230,7 @@ function daFabrica(
  * cache, e congelar as listas de `src/config.ts` mexeria num modulo que a spec
  * manda deixar intacto.
  *
- * `doArquivo` e parametro — com o default de producao — pelo mesmo motivo de
+ * `doArquivo` e parametro, com o default de producao, pelo mesmo motivo de
  * `resolveConfigForMedia`: num template publico o array nasce vazio, e sem
  * poder injetar cartoes nenhum teste conseguiria distinguir este ramo de um
  * `[]` escrito a mao.
@@ -262,7 +262,7 @@ const TABELA_INEXISTENTE = /no such table/i
  * Duas causas com tratamentos diferentes. Migration nao aplicada e um estado
  * ESPERADO durante um deploy fora de ordem: a automacao segue com a fabrica,
  * exatamente como antes de o painel existir. Qualquer outro erro de D1 e
- * banco caindo, e ai a automacao PARA — nao da para afirmar que a config
+ * banco caindo, e ai a automacao PARA, nao da para afirmar que a config
  * servida e a que o dono viu na tela.
  *
  * Reconhecer o primeiro caso pela mensagem e frágil e nao e a defesa
@@ -321,7 +321,7 @@ function comoAviso(achado: Achado): string {
 /**
  * `0` e `1` viram booleano; QUALQUER outra coisa vira `null`. Trava de CFG-03.
  *
- * Um `row.x === 1` solto transformaria um `2` em `false` — um conserto
+ * Um `row.x === 1` solto transformaria um `2` em `false`, um conserto
  * silencioso, e justamente na direcao que ninguem pediu.
  */
 function lerBooleano(valor: unknown): boolean | null {
@@ -381,7 +381,7 @@ type BooleanosDaConfig = Pick<
 
 /**
  * Monta a config global a partir da linha, e a submete ao validador unico com
- * a allowlist por cima — nunca a `validarConfig` sozinha (§9.8, LNK-13).
+ * a allowlist por cima, nunca a `validarConfig` sozinha (§9.8, LNK-13).
  *
  * `allowedMediaIds` e DERIVADO aqui (§9.4): `'todas'` vira `['*']`,
  * `'selecionadas'` vira a uniao dos `media_id` ativos. Nao existe campo
@@ -447,12 +447,12 @@ function recusa(campo: string, codigo: string, mensagem: string): Validacao<Auto
  * Uma linha de midia vira UMA entrada com UM `mediaId`. Trava de CFG-16.
  *
  * `resolveConfigForMedia` nao muda de assinatura e o `.find()` dela passa a
- * ser deterministico por construcao — `media_id` e PRIMARY KEY, entao duas
+ * ser deterministico por construcao, `media_id` e PRIMARY KEY, entao duas
  * entradas citando o mesmo Reel deixam de ser representaveis (CFG-10).
  *
  * Linha invalida NAO e descartada: descartar ALARGARIA, porque a linha podia
  * ser justamente o que estreitava. Ela vira `{ enabled: false }`, que pausa
- * aquela midia e deixa as outras seguirem — e e tambem o que acontece com uma
+ * aquela midia e deixa as outras seguirem, e e tambem o que acontece com uma
  * midia que traz link ou texto fora da allowlist (LNK-15).
  */
 function sobreposicaoDaLinha(
@@ -481,7 +481,7 @@ function sobreposicaoDaLinha(
  * `{ destinationUrl: undefined }` num spread ZERA o campo global e leva
  * `isDestinationUrlConfigured` a lancar `TypeError` dentro de
  * `processComment`, documentada como funcao que nunca lanca. Por isso e um
- * `if` por coluna, sem excecao — e nunca um `?? undefined`.
+ * `if` por coluna, sem excecao, e nunca um `?? undefined`.
  *
  * Devolve `null` quando alguma coluna tem valor que este codigo nao sabe
  * converter sem inventar. `enabled` so pode chegar como `0`: o `CHECK` da
@@ -518,7 +518,7 @@ function patchDaLinha(linha: PainelMidiaRecord): Partial<AutomationConfig> | nul
 /**
  * Uma coluna booleana de sobreposicao.
  *
- * `null` na coluna nao escreve chave nenhuma — e o `if` por coluna de §9.3,
+ * `null` na coluna nao escreve chave nenhuma, e o `if` por coluna de §9.3,
  * so que num lugar so. Devolve `false` quando o valor nao e `0` nem `1`, para
  * o chamador recusar a linha inteira em vez de inventar um booleano.
  */
@@ -546,7 +546,7 @@ function aplicarBooleano(
  * `{ ...global }` de `resolveConfigForMedia` e copia RASA: os arrays continuam
  * sendo a mesma referencia do cache. Sem `Object.freeze` nos arrays, um
  * consumidor que fizesse `config.triggerKeywords.push(...)` envenenaria o
- * isolate inteiro. Hoje ninguem muta — o congelamento e o que garante que
+ * isolate inteiro. Hoje ninguem muta, o congelamento e o que garante que
  * continue assim.
  */
 function congelarFundo(snapshot: SnapshotConfig): SnapshotConfig {

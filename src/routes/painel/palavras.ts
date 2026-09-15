@@ -1,5 +1,5 @@
 /**
- * `GET /painel/palavras` — as palavras que ligam a automacao, em modo leitura.
+ * `GET /painel/palavras`, as palavras que ligam a automacao, em modo leitura.
  *
  * A tela cabe numa frase: **o que uma pessoa precisa comentar para receber o
  * Direct**. Ela mostra as palavras salvas, o modo de comparacao escrito sem
@@ -7,7 +7,7 @@
  * dono.
  *
  * **Os exemplos usam `matchKeyword`, a funcao de producao** (§12.1 regra 4).
- * Nao existe segunda implementacao do casamento — nem aqui, nem em JavaScript
+ * Nao existe segunda implementacao do casamento, nem aqui, nem em JavaScript
  * no navegador. Uma copia que divergisse mostraria "✓ aciona" numa tela para um
  * comentario que o Worker ignora, e a pessoa so descobriria pelo cliente que
  * nao recebeu.
@@ -16,7 +16,7 @@
  * pergunta sobre a conta. Nenhuma chamada a Meta. §12.10 orca 2 para esta
  * tela, e o terceiro e a conta: a barra do topo e a MESMA em toda tela (§12.1)
  * e carrega o estado global, e sem a conta ela diria "Ligada e respondendo"
- * numa instalacao que nao consegue enviar nada — o silencio que §12.1 regra 3
+ * numa instalacao que nao consegue enviar nada, o silencio que §12.1 regra 3
  * existe para acabar. O mesmo vale para Mensagem e Ajustes.
  */
 import type { AutomationConfig } from '../../config'
@@ -43,7 +43,7 @@ import { telaDoPainel } from './tela'
 /**
  * Os campos que ESTA tela grava (Ruling 70).
  *
- * As palavras e o modo de comparacao — os dois controles do formulario, e nada
+ * As palavras e o modo de comparacao, os dois controles do formulario, e nada
  * alem deles. `matchMode` para "basta aparecer no meio" alarga o alcance e pede
  * a digital (§10.10); voltar estreita e nao pede.
  */
@@ -60,8 +60,8 @@ interface Exemplo {
 /**
  * Tres variacoes da palavra que o dono escolheu.
  *
- * Elas sao MECANICAS — a mesma, em maiusculas com ponto, e com um pedaco a
- * mais depois — e nao frases prontas. Uma frase pronta em portugues ("nao e
+ * Elas sao MECANICAS, a mesma, em maiusculas com ponto, e com um pedaco a
+ * mais depois, e nao frases prontas. Uma frase pronta em portugues ("nao e
  * isso que eu quero") so funciona para a palavra do exemplo da spec; gerada
  * para "cardapio" ela sairia errada, e §3 e explicito: os exemplos sao da
  * palavra da pessoa, nao genericos.
@@ -92,7 +92,7 @@ function blocoDeExemplos(config: AutomationConfig): HtmlSeguro {
     (exemplo) =>
       html`<li><span aria-hidden="true">${exemplo.aciona ? '✓' : '✕'}</span> &ldquo;${
         exemplo.comentario
-      }&rdquo; &mdash; ${exemplo.aciona ? 'aciona' : 'não aciona'}${
+      }&rdquo;, ${exemplo.aciona ? 'aciona' : 'não aciona'}${
         exemplo.surpreende
           ? html` <em>(responde tamb&eacute;m, e talvez voc&ecirc; n&atilde;o queira)</em>`
           : null
@@ -111,7 +111,7 @@ usa para responder de verdade.</p>
 function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
   // O MODO nao aparece mais aqui: ele virou escolha dentro do formulario, e um
   // eco em leitura ao lado de um controle editavel seriam duas telas dizendo o
-  // mesmo valor — a primeira a divergir seria a que ninguem atualizou.
+  // mesmo valor, a primeira a divergir seria a que ninguem atualizou.
   return html`<section>
 <h2>Como o coment&aacute;rio &eacute; comparado</h2>
 <ul>
@@ -128,7 +128,7 @@ function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
  * **Uma caixa de texto, e nao vinte campos.** Sem JavaScript nao ha como
  * acrescentar um campo, e vinte campos fixos numa tela de celular seriam vinte
  * caixas vazias. Uma linha por palavra e o formato que a propria pessoa ja usa
- * quando escreve uma lista, e a linha em branco e o Enter dela — nao um item.
+ * quando escreve uma lista, e a linha em branco e o Enter dela, nao um item.
  *
  * O formulario grava SO as palavras. As tres chaves de comparacao aparecem
  * aqui como explicacao e sao editadas em Ajustes (§3), onde elas moram: dois
@@ -160,7 +160,7 @@ ${escolhaDeModo(config)}
  * pede. E a promessa do rodape dos Ajustes escrita dentro do controle que a
  * exerce, e por isso o botao diz so "Salvar": §12.3 manda que, nas telas em que
  * so PARTE dos campos e protegida, quem avisa seja o cadeado no campo mais a
- * tela de conferencia — nunca uma surpresa biometrica.
+ * tela de conferencia, nunca uma surpresa biometrica.
  */
 function escolhaDeModo(config: AutomationConfig): HtmlSeguro {
   return html`<fieldset>
@@ -197,7 +197,7 @@ ${blocoDeConfirmacao(entrada.request)}
 ${
   global.triggerKeywords.length === 0
     ? html`<p class="faixa faixa-aviso" role="status">Sem nenhuma palavra a automa&ccedil;&atilde;o
-nunca responde. Ou escreva pelo menos uma, ou desligue &mdash; as duas s&atilde;o seguras, mas
+nunca responde. Ou escreva pelo menos uma, ou desligue, as duas s&atilde;o seguras, mas
 s&oacute; uma fica clara no seu painel.</p>`
     : html`<ul class="fichas">${fichas}</ul>`
 }

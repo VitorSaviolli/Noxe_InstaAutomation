@@ -1,5 +1,5 @@
 /**
- * As tres respostas do painel — `erro()`, `redirecionar()` e `json()` — e a
+ * As tres respostas do painel, `erro()`, `redirecionar()` e `json()`, e a
  * tabela canonica de codigos de §11.4.
  *
  * **Esta tabela e a UNICA.** As nove grafias divergentes do material de origem
@@ -18,7 +18,7 @@
  *
  * **Nunca** ha campo `detalhe`, `stack`, `cause` ou mensagem de excecao no
  * corpo: a `mensagem` sai da tabela, e nao do erro que aconteceu. O `console`
- * recebe metodo, caminho SEM query string, status e o codigo — nenhum valor,
+ * recebe metodo, caminho SEM query string, status e o codigo, nenhum valor,
  * nunca (§11.7), e em argumentos separados, para que nao exista o caminho em
  * que alguem interpola um `destinationUrl` por engano.
  */
@@ -28,7 +28,7 @@ import type { FormatoDeRota } from './rotas'
 /**
  * A tabela canonica de §11.4, inteira.
  *
- * Ela nasce completa — e nao so com o recorte que as rotas de hoje usam —
+ * Ela nasce completa, e nao so com o recorte que as rotas de hoje usam,
  * porque o valor dela e ser a UNICA: um codigo que falta e um literal que
  * alguem escreve na rota, e o literal e que vira a decima grafia divergente.
  */
@@ -67,7 +67,7 @@ export type CodigoDeErro = keyof typeof ERROS
 /** O que muda de um erro para outro. Tudo o mais vem da tabela. */
 export interface ContextoDoErro {
   readonly request: Request
-  /** O caminho da rota, SEM query string — §11.7 nao admite query no log. */
+  /** O caminho da rota, SEM query string, §11.7 nao admite query no log. */
   readonly caminho: string
   /** `json` responde `{erro, mensagem}`; `pagina` mostra a mesma frase na tela. */
   readonly formato: FormatoDeRota
@@ -78,7 +78,7 @@ export interface ContextoDoErro {
    *
    * Existe para a fronteira do login, onde §10.3 manda colapsar todo motivo em
    * `credencial_invalida` e o dono ainda precisa saber qual foi. Ele entra na
-   * MESMA linha de `console.warn` — nunca numa segunda: duas linhas por
+   * MESMA linha de `console.warn`, nunca numa segunda: duas linhas por
    * tentativa recusada sao amplificacao de log na rota nao autenticada mais
    * exposta do painel, e quem paga os Workers Logs e o dono (mesma classe do
    * Ruling 27).
@@ -89,8 +89,8 @@ export interface ContextoDoErro {
    * **A forma e conferida em tempo de execucao** (`FORMA_DO_MOTIVO`), e a
    * conferencia nao e paranoia: `motivoInterno` e o unico campo desta interface
    * que vai para o `console`, e um `motivoInterno: corpo.campos.toString()`
-   * escrito por engano publicaria o formulario inteiro — palavras, link e texto
-   * do Direct — nos Workers Logs, que §9.9 proibe em letras. O que nao casa a
+   * escrito por engano publicaria o formulario inteiro, palavras, link e texto
+   * do Direct, nos Workers Logs, que §9.9 proibe em letras. O que nao casa a
    * forma e DESCARTADO: o codigo e o status continuam no log, e a direcao do
    * erro e a segura.
    */
@@ -98,18 +98,18 @@ export interface ContextoDoErro {
   /**
    * Os campos que a recusa acusa, pelo nome tecnico (§11.4, `dados_invalidos`).
    *
-   * **Nomes, nunca valores.** Vao para o corpo JSON como `campos: string[]` — a
-   * unica chave que §11.4 acrescenta a `{erro, mensagem}` — e NAO vao para o
+   * **Nomes, nunca valores.** Vao para o corpo JSON como `campos: string[]`, a
+   * unica chave que §11.4 acrescenta a `{erro, mensagem}`, e NAO vao para o
    * `console`: o log tem o codigo, e o codigo basta para saber o que aconteceu.
    */
   readonly campos?: readonly string[]
   /**
    * O bloco que explica a recusa na TELA, e so na tela.
    *
-   * §11.4 fixa a `mensagem` — uma frase por codigo, igual nos dois formatos — e
+   * §11.4 fixa a `mensagem`, uma frase por codigo, igual nos dois formatos, e
    * §12.4 exige que a pessoa saiba QUAL campo e POR QUE. As duas coisas convivem
    * porque sao camadas diferentes: a frase e o cabecalho da pagina, e isto e o
-   * corpo dela. Nunca entra no JSON, e nunca carrega rastro de excecao — quem o
+   * corpo dela. Nunca entra no JSON, e nunca carrega rastro de excecao, quem o
    * monta e a rota, com frases do dicionario.
    */
   readonly explicacao?: HtmlSeguro
@@ -154,7 +154,7 @@ export function erro(codigo: CodigoDeErro, contexto: ContextoDoErro): Response {
   if (contexto.formato === 'json') {
     return Response.json(
       // `campos` e a UNICA chave que §11.4 acrescenta a `{erro, mensagem}`, e ela
-      // carrega nomes — nunca valores. Ausente quando a recusa nao acusa campo.
+      // carrega nomes, nunca valores. Ausente quando a recusa nao acusa campo.
       contexto.campos === undefined
         ? { erro: codigo, mensagem }
         : { erro: codigo, mensagem, campos: [...contexto.campos] },
@@ -190,7 +190,7 @@ ${contexto.explicacao ?? null}
  * `cookies` e uma LISTA, e nao mais uma chave de `extras`, porque o `303` do
  * step-up carrega **dois** `Set-Cookie` na mesma resposta: a sessao rotacionada
  * e o envelope expirado (§10.10, passo 4). Um `Record<string, string>` nao
- * consegue ter a mesma chave duas vezes — o segundo cookie apagaria o primeiro
+ * consegue ter a mesma chave duas vezes, o segundo cookie apagaria o primeiro
  * em silencio, e o silencio seria "o dono deslogado" ou "o envelope vivo depois
  * de usado", conforme qual dos dois sobrasse.
  */
@@ -210,7 +210,7 @@ export function redirecionar(
 /**
  * Uma resposta JSON de sucesso das rotas `/painel/api/*`.
  *
- * `extras` existe para o `set-cookie` — o cookie de desafio das opcoes e o de
+ * `extras` existe para o `set-cookie`, o cookie de desafio das opcoes e o de
  * sessao do login. Ele vem ANTES dos cabecalhos de §11.5 pela mesma razao de
  * sempre: os de seguranca ganham de quem tentar sobrescreve-los.
  */

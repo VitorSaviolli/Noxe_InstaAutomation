@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * noxe-insta-automation — ponto de entrada do Worker
+ * noxe-insta-automation, ponto de entrada do Worker
  * ============================================================
  *
  * Software SEM FINS LUCRATIVOS.
@@ -9,11 +9,11 @@
  * guarda fica no SEU banco de dados D1, dentro da SUA conta da Cloudflare:
  * o IGSID de quem comentou e gravado apenas como SHA-256, o texto do
  * comentario e o username nao sao armazenados, e o token do Instagram fica
- * cifrado com AES-GCM. Nada e enviado ao autor deste codigo nem a terceiros —
+ * cifrado com AES-GCM. Nada e enviado ao autor deste codigo nem a terceiros,
  * nao existe servidor nosso no meio. Os detalhes estao na politica de
  * privacidade servida em /privacy-policy e no SECURITY.md.
  *
- * Desenvolvido por Vitor S. Gonsalez — Noxelora.
+ * Desenvolvido por Vitor S. Gonsalez, Noxelora.
  *
  * Se o projeto deu certo para voce, deixe uma estrela no GitHub. E totalmente
  * de graca e ajuda outras pessoas a encontrarem o projeto:
@@ -22,7 +22,7 @@
  * Quer apoiar? PIX: saviolligonsalez@gmail.com
  * Doacoes ajudam a manter projetos como este 100% gratuitos.
  *
- * Licenca MIT — veja o arquivo LICENSE.
+ * Licenca MIT, veja o arquivo LICENSE.
  * ============================================================
  */
 import {
@@ -64,7 +64,7 @@ import {
   processComment,
 } from './services/automation'
 import { carregarConfigEfetiva } from './services/config-store'
-import { isRetryable, MetaApiClient } from './services/meta-api'
+import { ehFalhaDeConta, isRetryable, MetaApiClient } from './services/meta-api'
 import {
   loadAccessToken,
   refreshLongLivedToken,
@@ -91,7 +91,7 @@ const WEBHOOK_PATH = '/webhooks/instagram'
  *
  * Sobram 12, e o pior caso gasta 5 deles: um `getMediaInfo` de fallback por
  * comentario, quando o webhook nao informa o tipo da midia. Com 6 seriam
- * `6 x 8 + 3 = 51` e o teto ja estouraria — 5 e o maior valor que cabe, e e o
+ * `6 x 8 + 3 = 51` e o teto ja estouraria, 5 e o maior valor que cabe, e e o
  * numero que a spec cita de exemplo.
  */
 const MAX_COMENTARIOS_POR_INVOCACAO = 5
@@ -102,7 +102,7 @@ const MAX_COMENTARIOS_POR_INVOCACAO = 5
  * O mesmo teto de 50 subrequests vale aqui, e a retentativa custa 4 por
  * registro (Direct + `markPrivateSent` + resposta publica + `markCompleted`)
  * mais ate 7 fixos da renovacao do token. Com 10: 10 x 4 + 7 = 47 <= 50. Era
- * 20 — o que ja estourava o teto hoje, e estouraria sempre agora que o
+ * 20, o que ja estourava o teto hoje, e estouraria sempre agora que o
  * excedente do webhook e drenado por aqui. (§16.1)
  */
 const RETRY_BATCH_SIZE = 10
@@ -110,7 +110,7 @@ const RETRY_BATCH_SIZE = 10
 /**
  * O que o pipeline de entrega busca fora de si mesmo.
  *
- * Existe para o teste injetar dubles por parametro — o projeto nao usa mock de
+ * Existe para o teste injetar dubles por parametro, o projeto nao usa mock de
  * modulo. Os valores padrao sao exatamente o que roda em producao.
  */
 export interface BatchDeps {
@@ -119,7 +119,7 @@ export interface BatchDeps {
   /**
    * Resolucao da config, para o teste fixar um cenario sem passar pelo banco.
    *
-   * Ausente — que e o caso em producao — o lote carrega o snapshot do D1 UMA
+   * Ausente, que e o caso em producao, o lote carrega o snapshot do D1 UMA
    * vez, antes do laco, e resolve a partir dele (§9.5).
    */
   resolveConfig?: (mediaId: string) => AutomationConfig
@@ -135,7 +135,7 @@ const DEFAULT_BATCH_DEPS: BatchDeps = {
  * Trava de CFG-11 e de CFG-12 (§9.5).
  *
  * `src/index.ts` chamava `resolveConfigForMedia(event.mediaId)` DENTRO do laco
- * de eventos. Com a config vindo do D1 isso viraria N leituras e — pior — um
+ * de eventos. Com a config vindo do D1 isso viraria N leituras e, pior, um
  * snapshot inconsistente no meio do lote, com os primeiros comentarios
  * decididos por uma config e os ultimos por outra.
  *
@@ -193,7 +193,7 @@ export default {
       // A parada de emergencia entra por `case` proprio, e nao pelo `default:`
       // onde o resto do painel vai morar: ela e a ultima rota que precisa
       // funcionar e nao pode passar pelo portao de sanidade do painel, que
-      // exige `PANEL_RP_ID` — um dado do subsistema WebAuthn (§11.1).
+      // exige `PANEL_RP_ID`, um dado do subsistema WebAuthn (§11.1).
       case CAMINHO_DA_PARADA:
         return handleParada(request, env, now)
 
@@ -208,7 +208,7 @@ export default {
 
       // O ultimo recurso quando o dono perdeu todos os aparelhos E o papel dos
       // codigos (§7.1, §10.8). Ela apaga sessoes e, com `?tudo=1`, tambem as
-      // credenciais — e NAO toca `account_tokens`: a conexao com o Instagram nao
+      // credenciais, e NAO toca `account_tokens`: a conexao com o Instagram nao
       // e acesso ao painel, e derruba-la junto faria uma rota de recuperacao de
       // acesso desligar a automacao. Como a irma acima, ela e do assistente
       // local, autenticada por Bearer, e por isso nao entra no painel.
@@ -222,7 +222,7 @@ export default {
       // pode ser avaliado antes de `case WEBHOOK_PATH`, cuja assinatura e
       // calculada sobre o corpo cru e nao sobrevive a qualquer codigo que leia
       // o corpo antes. `routePainel` devolve `null` para quem nao e do painel,
-      // e e esse `null` que preserva o 404 de hoje — `/painelzinho` continua
+      // e e esse `null` que preserva o 404 de hoje, `/painelzinho` continua
       // caindo aqui, porque `/painel/` e `/painel` sao as unicas grafias que
       // ele reconhece.
       default: {
@@ -241,7 +241,7 @@ export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     // O `.catch` nao e decoracao: `runScheduledTasks` isola cada etapa, mas uma
     // rejeicao fora delas viraria unhandled rejection dentro do `waitUntil` e
-    // sumiria sem log — a mesma cegueira que este commit existe para fechar.
+    // sumiria sem log, a mesma cegueira que este commit existe para fechar.
     ctx.waitUntil(
       runScheduledTasks(env, Date.now()).catch((cause) => {
         console.error('cron:', 'falhou', cause instanceof Error ? cause.message : cause)
@@ -269,10 +269,37 @@ async function handleWebhook(
   // A Meta reenvia o evento se demorarmos a responder, entao confirmamos
   // imediatamente e processamos em segundo plano.
   if (parsed.events.length > 0) {
-    ctx.waitUntil(processEvents(parsed.events, env, now))
+    // Mesmo `.catch` de `scheduled`: `processEvents` ja nao deixa erro escapar,
+    // e este e o cinto por cima do suspensorio para o dia em que deixar.
+    ctx.waitUntil(
+      processEvents(parsed.events, env, now).catch((cause) => {
+        console.error('webhook:', 'falhou', cause instanceof Error ? cause.message : cause)
+      }),
+    )
   }
 
   return new Response('EVENT_RECEIVED', { status: 200 })
+}
+
+/**
+ * O que o lote precisa antes do laco: conta, credencial e configuracao.
+ *
+ * `null` quando nao ha o que fazer (nenhuma conta, nenhum token). Lanca quando o
+ * D1 ou o `decrypt` falham, e `processEvents` quem registra.
+ */
+async function prepararLote(env: Env, now: number, deps: BatchDeps) {
+  const conta = await new TokensRepository(env.DB).get()
+  if (!conta) {
+    console.warn('Evento recebido mas nenhuma conta esta conectada. Rode /setup/authorize.')
+    return null
+  }
+
+  const credencial = await loadAccessToken(env)
+  if (!credencial) return null
+
+  // UMA carga por lote, antes do laco. Do cache na maioria das invocacoes.
+  const resolveConfig = await resolucaoDoLote(env, now, deps)
+  return { conta, credencial, resolveConfig }
 }
 
 /** Processa os eventos do lote em sequencia, sem deixar erro escapar. */
@@ -282,21 +309,26 @@ export async function processEvents(
   now: number,
   deps: BatchDeps = DEFAULT_BATCH_DEPS,
 ): Promise<void> {
-  const conta = await new TokensRepository(env.DB).get()
-  if (!conta) {
-    console.warn('Evento recebido mas nenhuma conta esta conectada. Rode /setup/authorize.')
+  // As tres leituras de antes do laco ficavam FORA de qualquer `try`: um soluco
+  // do D1 ou um `decrypt` que lanca (chave trocada) rejeitava a funcao inteira
+  // dentro do `waitUntil`, e o lote sumia sem uma linha de log. O lote continua
+  // perdido, a Meta ja recebeu o 200 e nao reenvia, mas agora com rastro.
+  let preparo: Awaited<ReturnType<typeof prepararLote>>
+  try {
+    preparo = await prepararLote(env, now, deps)
+  } catch (cause) {
+    console.error(
+      `Lote de ${events.length} comentario(s) descartado antes do laco:`,
+      cause instanceof Error ? cause.message : cause,
+    )
     return
   }
+  if (preparo === null) return
 
-  const credencial = await loadAccessToken(env)
-  if (!credencial) return
-
+  const { conta, credencial, resolveConfig } = preparo
   const api = deps.createApi(env.META_API_VERSION, credencial.token)
   const repo = new CommentsRepository(env.DB)
   const accountUsername = conta.username ?? ''
-
-  // UMA carga por lote, antes do laco. Do cache na maioria das invocacoes.
-  const resolveConfig = await resolucaoDoLote(env, now, deps)
 
   for (const event of events.slice(0, MAX_COMENTARIOS_POR_INVOCACAO)) {
     try {
@@ -332,13 +364,13 @@ export async function processEvents(
  * Reagendar so pode acontecer para o comentario que HOJE seria entregue, senao
  * o cron mandaria Direct para quem nunca digitou a palavra-gatilho. Os portoes
  * gratuitos ficam aqui: o veredito de `evaluateComment` e a confirmacao de Reel
- * que veio no proprio webhook. Os dois que custam consulta — dedup e cooldown —
+ * que veio no proprio webhook. Os dois que custam consulta, dedup e cooldown,
  * viajam dentro do proprio INSERT, em `deferForRetry`.
  *
  * Quando `processOnlyReels` esta ligado e o webhook NAO informou o tipo da
  * midia, o comentario nao e reagendado. Perguntar a Meta custaria uma chamada
  * por comentario, que e o gasto que a fatia existe para evitar, e a alternativa
- * seria reagendar sem saber — o `retryPending` entrega sem consultar nada, e ai
+ * seria reagendar sem saber, o `retryPending` entrega sem consultar nada, e ai
  * o Direct sairia numa publicacao que talvez nao seja Reel. Na duvida NAO
  * processamos, que e a mesma escolha do caminho inline (`isReel`): e melhor
  * perder um acionamento do que responder na publicacao errada. Na pratica o
@@ -409,7 +441,7 @@ async function reagendarExcedente(
  * comentario a partir do sexto de cada lote, entao um soluco do D1 na renovacao
  * do token nao pode levar a fila de pendentes junto.
  *
- * O log segue a forma de §11.7 — argumentos separados, NUNCA template string
+ * O log segue a forma de §11.7, argumentos separados, NUNCA template string
  * com dado variavel dentro.
  */
 async function executarEtapa(nome: string, etapa: () => Promise<void>): Promise<void> {
@@ -442,13 +474,13 @@ export async function runScheduledTasks(
  *
  * Mora no cron para NUNCA entrar no caminho de gravacao do painel: quem salva
  * uma tela nao pode pagar a varredura de retencao. Custa uma leitura barata de
- * no maximo 501 linhas pelo rowid e so escreve quando ha o que apagar — sem
+ * no maximo 501 linhas pelo rowid e so escreve quando ha o que apagar, sem
  * `COUNT(*)`, que varreria a tabela inteira e contaria tudo na cota.
  *
  * Por ultimo, e num `try` proprio: a poda e higiene de armazenamento, e uma
  * falha nela nao pode derrubar a renovacao do token nem a fila de pendentes.
  *
- * Os dois `console` daqui seguem o formato de §11.7 — argumentos separados,
+ * Os dois `console` daqui seguem o formato de §11.7, argumentos separados,
  * **sem template string com dado variavel dentro**. O numero de linhas
  * apagadas e inofensivo; o que a regra impede e o PRECEDENTE: enquanto nao
  * existir no painel um `console` que interpole valor, nao existe o caminho em
@@ -473,7 +505,7 @@ async function maybeRefreshToken(env: Env, now: number): Promise<void> {
     if (!record) return
 
     // O prazo VENCIDO nao e "nada a fazer": `shouldRefresh` responde `false`
-    // aos dois casos opostos — "ainda cedo" e "tarde demais" —, e o segundo e o
+    // aos dois casos opostos, "ainda cedo" e "tarde demais", e o segundo e o
     // fim da linha. A Meta nao renova token expirado, entao o cron nunca mais
     // tenta e a conta fica morta em silencio. O `console.warn` e o unico rastro
     // que existe disso, e e por ele que o dono descobre que precisa reconectar
@@ -504,27 +536,10 @@ async function maybeRefreshToken(env: Env, now: number): Promise<void> {
   }
 }
 
-/**
- * Falhas que sao da CONTA, e nao daquele comentario.
- *
- * A diferenca decide o que se escreve no banco. `isRetryable` responde "vale
- * outra tentativa AGORA?", e para estes tres a resposta e nao — o que levava
- * `reentregar` a marcar `failed`, que e TERMINAL. Com o token morto, a
- * varredura marcava failed os dez pendentes do tique e os apagava do mundo por
- * um problema que nao era deles: quem digitou a palavra-gatilho nunca receberia
- * o Direct, nem depois de o dono reconectar a conta.
- *
- * Sao os mesmos codigos que `classify` produz para 190, 401 e 403
- * (`src/services/meta-api.ts`) — token revogado por troca de senha, checkpoint
- * ou conta restringida. Todos passam quando o dono reconecta, e nenhum melhora
- * por insistir: continuar o laco martelando uma conta ja sinalizada e como um
- * aviso vira bloqueio.
- */
-const FALHAS_DE_CONTA: readonly string[] = ['TOKEN_INVALIDO', 'NAO_AUTORIZADO', 'PROIBIDO']
-
-function ehFalhaDeConta(shortCode: string): boolean {
-  return FALHAS_DE_CONTA.includes(shortCode)
-}
+// `ehFalhaDeConta` mora em `src/services/meta-api.ts`, ao lado de `isRetryable`.
+// No cron ela tem um papel a mais: continuar o laco martelando uma conta ja
+// sinalizada e como um aviso vira bloqueio, entao a primeira falha de conta
+// encerra a varredura.
 
 async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<void> {
   const repo = new CommentsRepository(env.DB)
@@ -550,7 +565,7 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
 
     // Trava de CFG-02 e CFG-14: "em nenhum caminho".
     //
-    // `reentregar` renderiza e envia SEM consultar a config — e o cron drena,
+    // `reentregar` renderiza e envia SEM consultar a config, e o cron drena,
     // desde §16.1, todo comentario a partir do sexto de cada lote. Sem este
     // portao, o dono corromperia `destination_url` a mao, veria `processEvents`
     // parar como prometido, e cinco minutos depois o cron entregaria os
@@ -558,7 +573,7 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
     // parar, e o valor de fabrica no lugar do campo invalido: as duas metades
     // da restricao furadas de uma vez.
     //
-    // O registro fica exatamente como esta — `retry_pending`, sem gastar
+    // O registro fica exatamente como esta, `retry_pending`, sem gastar
     // tentativa e sem custar consulta. Parar e REVERSIVEL: o dono conserta o
     // link e a fila drena na varredura seguinte. Marcar `ignored` seria
     // irreversivel e apagaria, por um erro NOSSO, o comentario de quem digitou
@@ -577,8 +592,8 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
     })
 
     // Mesmo enquadramento do portao de configuracao acima: parar e REVERSIVEL.
-    // O resto de `pendentes` fica exatamente como esta — `retry_pending`, sem
-    // gastar tentativa e sem custar consulta — e a proxima varredura entrega
+    // O resto de `pendentes` fica exatamente como esta, `retry_pending`, sem
+    // gastar tentativa e sem custar consulta, e a proxima varredura entrega
     // quando o dono reconectar.
     if (falhaDaConta !== null) {
       console.warn('cron:', 'conta_parada', falhaDaConta)
@@ -598,7 +613,7 @@ async function retryPending(env: Env, now: number, deps: BatchDeps): Promise<voi
  * Reenvia o Direct de UM pendente e atualiza o estado.
  *
  * O texto do comentario e o username nao sao guardados (coleta minima), entao
- * a nova tentativa reenvia so o Direct — a etapa que faltou.
+ * a nova tentativa reenvia so o Direct, a etapa que faltou.
  *
  * Devolve o `shortCode` quando a falha e da CONTA e o registro foi deixado
  * intacto, para quem chama abandonar o resto da fila. `null` em todo o resto,
@@ -618,7 +633,7 @@ async function reentregar(
 
   // Aqui havia um `.replace('{link}', ...)` cru: trocava so a PRIMEIRA
   // ocorrencia e nao sanitizava. `renderTemplate` usa `replaceAll` e limpa
-  // caracteres de controle — e e o unico ponto de renderizacao do projeto.
+  // caracteres de controle, e e o unico ponto de renderizacao do projeto.
   // (§16.3)
   const texto = renderTemplate(config.privateReplyText, {
     username: '',
@@ -631,7 +646,7 @@ async function reentregar(
     const { shortCode } = envio.error
 
     // A conta parou: NAO e falha deste comentario e nao pode virar `failed`,
-    // que e terminal. Sai sem escrever nada — o registro segue `retry_pending`.
+    // que e terminal. Sai sem escrever nada, o registro segue `retry_pending`.
     if (ehFalhaDeConta(shortCode)) return shortCode
 
     // Mesma escada do caminho inline: ate MAX_ATTEMPTS com espera exponencial.
@@ -658,7 +673,7 @@ async function reentregar(
   await repo.markStatus(registro.comment_id, 'uncertain', now, resposta.error.shortCode)
 
   // O Direct DESTE registro ja saiu e o estado ja foi gravado, entao nao ha o
-  // que preservar aqui — mas se a conta parou, o proximo da fila sofreria a
+  // que preservar aqui, mas se a conta parou, o proximo da fila sofreria a
   // mesma coisa. Avisa quem chama para abandonar o resto.
   return ehFalhaDeConta(resposta.error.shortCode) ? resposta.error.shortCode : null
 }

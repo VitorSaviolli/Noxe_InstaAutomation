@@ -6,7 +6,7 @@ import type { Env as WorkerEnv } from '../src/types/env'
  *
  * O pacote declara `export const env: Cloudflare.Env`, entao quem precisa
  * ensinar o TypeScript sobre os bindings do projeto e o namespace global
- * `Cloudflare` — e nao um `ProvidedEnv`, que versoes antigas expunham e esta
+ * `Cloudflare`, e nao um `ProvidedEnv`, que versoes antigas expunham e esta
  * nao expoe mais.
  *
  * `TEST_MIGRATIONS` nao existe em producao: e injetado pelo vitest.config.ts

@@ -1,7 +1,7 @@
 /**
  * Envelope assinado com proposito, claims e prazo.
  *
- * Generaliza o desenho de `oauth-state.ts` — que ja e um JWT minimo — para
+ * Generaliza o desenho de `oauth-state.ts`, que ja e um JWT minimo, para
  * carregar um PROPOSITO e um conjunto de CLAIMS, com prazo proprio de cada
  * proposito. `oauth-state.ts` continua fazendo exatamente o que fazia: as
  * garantias REG de `tests/regressao-oauth.test.ts` congelam o `state` do OAuth
@@ -16,7 +16,7 @@
  * esta certo com as tres: o proposito entra no TEXTO ASSINADO, entra na
  * DERIVACAO DA CHAVE (mesmo que um bug de parser ignore o campo, a assinatura
  * nao fecha) e entra no NOME DO COOKIE (§7.2, quem monta o cookie). Sem elas,
- * um desafio de REGISTRO — que qualquer pessoa com um convite consegue — valeria
+ * um desafio de REGISTRO, que qualquer pessoa com um convite consegue, valeria
  * como autorizacao de step-up.
  *
  * A palavra do dominio e "claims". O conteudo assinado nao tem outro nome neste
@@ -97,7 +97,7 @@ function textoAssinado(proposito: string, claimsB64: string, expiraEm: string): 
 /**
  * Emite um envelope. `now` e injetado: o modulo nunca le o relogio sozinho.
  *
- * A `chave` ja vem derivada do proposito — quem deriva e
+ * A `chave` ja vem derivada do proposito, quem deriva e
  * `chaveDeEnvelope()` em `src/services/panel-session.ts`.
  */
 export async function criarEnvelope(
@@ -148,7 +148,7 @@ export async function abrirEnvelope(
   if (versao !== VERSAO) return { valido: false, motivo: 'malformado' }
   // Primeira das tres defesas contra confusao de proposito (§10.3).
   // Trava de SES-04 e de WA-04: e esta linha que impede um desafio de REGISTRO
-  // — que qualquer pessoa com um convite consegue — de valer como desafio de
+  // que qualquer pessoa com um convite consegue, de valer como desafio de
   // login ou de step-up.
   if (propositoRecebido !== proposito) return { valido: false, motivo: 'malformado' }
 

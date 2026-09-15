@@ -1,20 +1,20 @@
 /**
- * `GET (?midia=), POST /painel/reel` — "Este Reel responde diferente" (§3).
+ * `GET (?midia=), POST /painel/reel`, "Este Reel responde diferente" (§3).
  *
  * **A palavra "sobreposicao" nunca aparece na tela** (§3): cada linha mostra o
  * que vale hoje naquele Reel, e o valor herdado fica escrito entre parenteses.
  *
  * **O Reel vem na QUERY STRING, e nenhum caminho tem segmento variavel** (§7.1,
- * Ruling 93). `media_id` nao e segredo — ele aparece no permalink publico do
- * Reel —, entao a regra "segredo nunca na query string" nao e violada. Na
+ * Ruling 93). `media_id` nao e segredo, ele aparece no permalink publico do
+ * Reel, entao a regra "segredo nunca na query string" nao e violada. Na
  * ESCRITA ele vai no corpo do POST, como todo identificador de escrita. E um id
  * que nao casa com linha nenhuma e **recusado**, nao ignorado.
  *
  * **Tres operacoes declaradas**, todas pela extensao do funil (Ruling 91):
  *
- *   - `acao=pausar`  — este Reel para de responder (`enabled = 0`)
- *   - `acao=religar` — este Reel volta a seguir a chave geral (`enabled = NULL`)
- *   - `acao=geral`   — "Voltar tudo a seguir a regra geral": as treze colunas
+ *   - `acao=pausar` , este Reel para de responder (`enabled = 0`)
+ *   - `acao=religar`, este Reel volta a seguir a chave geral (`enabled = NULL`)
+ *   - `acao=geral`  , "Voltar tudo a seguir a regra geral": as treze colunas
  *                      de sobreposicao voltam a `NULL` num statement so
  *
  * **Ruling 92 vive aqui**: `enabled` por midia so aceita `0`. A recusa nasce no
@@ -25,8 +25,8 @@
  * **§3 x §10.10, uma tensao que a spec carrega e que este arquivo resolve pelo
  * classificador.** §3 diz que "Voltar tudo a seguir a regra geral" nao pede
  * digital, "porque desfazer e sempre a direcao segura". Nao e sempre: se a
- * sobreposicao daquele Reel ESTREITAVA — um intervalo por pessoa maior que o
- * geral, por exemplo —, desfaze-la ALARGA, e §10.10 lista o alargamento entre o
+ * sobreposicao daquele Reel ESTREITAVA, um intervalo por pessoa maior que o
+ * geral, por exemplo, desfaze-la ALARGA, e §10.10 lista o alargamento entre o
  * que pede a digital. Quem decide aqui e `camposProtegidos`, a tabela da propria
  * spec: no caso comum, em que a sobreposicao alargava ou era neutra, o botao nao
  * pede nada e §3 esta cumprida a letra; no caso em que desfazer alarga, ele
@@ -112,7 +112,7 @@ export const CAMPOS_DO_REEL: readonly CampoDaConfig[] = [
  *
  * Devolve o codigo da recusa, ou `null` quando a sobreposicao presta. A recusa
  * nasce AQUI, e nao no `CHECK` do banco, porque um erro de D1 dentro do Worker
- * vira `500` sem frase de tela — e a pessoa ficaria com "algo deu errado" no
+ * vira `500` sem frase de tela, e a pessoa ficaria com "algo deu errado" no
  * lugar de "a chave geral e quem manda". O `CHECK` continua sendo a segunda
  * linha, e ele existe porque uma linha pode entrar por `wrangler d1 execute`.
  */
@@ -147,7 +147,7 @@ ${
  * As linhas que a tela mostra, e so elas.
  *
  * Sao os campos de `CAMPOS_DO_REEL`: o que este Reel pode ter de proprio. Os
- * dois interruptores de canal ficam de fora pela mesma razao das outras telas —
+ * dois interruptores de canal ficam de fora pela mesma razao das outras telas,
  * eles ainda nao tem formulario em lugar nenhum (Ruling 82).
  */
 function blocoDosAjustes(
@@ -173,7 +173,7 @@ function blocoDosAjustes(
  * **Uma grafia so, e ela serve a tela E a gravacao.** `gravarNoReel` a usa para
  * montar o `patchDoHandler`, e a tela a usa para saber, ANTES de desenhar o
  * botao, se aquele toque vai pedir a digital. Duas expressoes separadas eram o
- * caminho para a tela dizer "livre" onde o funil diz "protegido" — e a
+ * caminho para a tela dizer "livre" onde o funil diz "protegido", e a
  * divergencia apareceria como surpresa biometrica, que e o que §12.3 proibe
  * com todas as letras.
  */
@@ -208,14 +208,14 @@ function protegidosDaOperacao(
  * Os botoes das tres operacoes, cada um no proprio formulario.
  *
  * **§12.3, e esta tela era a unica que o descumpria**: "quem garante o aviso e
- * o cadeado no campo mais a tela de conferencia — **nunca uma surpresa
+ * o cadeado no campo mais a tela de conferencia, **nunca uma surpresa
  * biometrica**". "Voltar tudo a seguir a regra geral" PODE cair na cerimonia
  * (MID-21): quando a sobreposicao daquele Reel estreitava, desfaze-la alarga, e
  * §10.10 lista o alargamento entre o que pede a digital. Ate esta rodada o
  * botao nao dizia nada, e o dono descobria pelo leitor de digital.
  *
- * A tela tem tudo para decidir na renderizacao — `antes`, `depois` e a tabela
- * de §10.10 —, entao ela decide, e emite os tres sinais de §12.3 juntos: o
+ * A tela tem tudo para decidir na renderizacao, `antes`, `depois` e a tabela
+ * de §10.10, entao ela decide, e emite os tres sinais de §12.3 juntos: o
  * cadeado com a palavra "protegido", a classe que pinta a borda ambar e a frase
  * antes do botao. E o botao diz o que vai acontecer.
  */
@@ -299,8 +299,8 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
   // propria** (§12.10). `configDaTela` pede `painel_midias` inteira dentro do
   // `db.batch()` que a configuracao ja fazia, e um `batch` vale UM subrequest:
   // esta tela caiu de 4 para os 3 da tabela, e o desvio declarado no TELA-20
-  // saiu junto. A ordem inverteu — a config vem antes da recusa por id
-  // desconhecido —, e nao ha custo nisso: os dois caminhos leem o mesmo lote, e
+  // saiu junto. A ordem inverteu, a config vem antes da recusa por id
+  // desconhecido, e nao ha custo nisso: os dois caminhos leem o mesmo lote, e
   // a recusa continua acontecendo antes de qualquer escrita.
   const snapshot = await configDaTela(env, now)
   const linha = linhaDoReel(snapshot, mediaId)
@@ -327,10 +327,10 @@ ${blocoDeConfirmacao(request)}
 ${
   linha.ativo === 1
     ? null
-    : // §12.5 escreve o rotulo como acao — "[Incluir este Reel na lista]" — e o
+    : // §12.5 escreve o rotulo como acao, "[Incluir este Reel na lista]", e o
       // que a tela entrega e um LINK para "Meus Reels", onde a pessoa marca o
       // Reel e salva. Aceitavel sem JavaScript: incluir um Reel e uma GRAVACAO,
-      // e uma gravacao precisa da ficha, da versao e do funil inteiro — um
+      // e uma gravacao precisa da ficha, da versao e do funil inteiro, um
       // `<form>` aqui seria a segunda grafia do POST de `/painel/reels`, com a
       // revalidacao dos ids novos e o teto de 200 por conta propria. Fica
       // REGISTRADO como divergencia de rotulo, e nao como funcionalidade
@@ -373,7 +373,7 @@ function faixaDeLinhaInvalida(sobreposicao: Sobreposicao): HtmlSeguro {
  *
  * `antes` e o estado EFETIVO deste Reel; `patchDoHandler` e o `depois` que a
  * operacao produz. Com os dois, a classificacao de risco de §10.10, a tela de
- * conferencia, o `op_hash` e o JSON da auditoria sao os MESMOS de sempre — nao
+ * conferencia, o `op_hash` e o JSON da auditoria sao os MESMOS de sempre, nao
  * ha uma segunda grafia de nenhum dos quatro.
  */
 async function gravarNoReel(
@@ -437,8 +437,8 @@ async function gravarNoReel(
       // **Calculado, e nao `true` fixo.** Um `true` fixo derrotava
       // `mudouAlgumaCoisa` no funil e transformava todo POST desta tela numa
       // gravacao: `acao=religar` num Reel SEM sobreposicao nenhuma respondia
-      // `303 ?ok=salvo`, gravava uma linha de auditoria com `campos: []` — que
-      // nao nomeia campo nenhum — e subia `painel_config.versao`, invalidando a
+      // `303 ?ok=salvo`, gravava uma linha de auditoria com `campos: []`, que
+      // nao nomeia campo nenhum, e subia `painel_config.versao`, invalidando a
       // trava otimista de TODA aba aberta do painel, Palavras e Mensagem
       // inclusive. E a faixa verde dizia "Pronto, salvo" para uma gravacao que
       // nao gravou, contra §12.1 regra 4. §9.9 registra GRAVACAO, e um
@@ -451,8 +451,8 @@ async function gravarNoReel(
 /**
  * A sobreposicao nova difere da que esta no banco?
  *
- * `COLUNAS_DE_SOBREPOSICAO` e a lista FECHADA do schema, e comparar por ela — e
- * nao por `Object.keys` de um dos dois — e o que impede uma coluna nova de
+ * `COLUNAS_DE_SOBREPOSICAO` e a lista FECHADA do schema, e comparar por ela, e
+ * nao por `Object.keys` de um dos dois, e o que impede uma coluna nova de
  * entrar no banco e ficar de fora desta pergunta em silencio.
  */
 function mudouASobreposicao(atual: Sobreposicao, nova: Sobreposicao): boolean {

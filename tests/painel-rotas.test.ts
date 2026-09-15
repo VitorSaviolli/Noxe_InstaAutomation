@@ -54,12 +54,12 @@ import {
 } from './fixtures/dubles'
 
 /**
- * ROTA · HDR · SES(06,07) — o portao de rotas, o login e os cabecalhos.
+ * ROTA · HDR · SES(06,07), o portao de rotas, o login e os cabecalhos.
  *
  * `now` e sempre injetado nos testes que medem prazo ou contam consulta: eles
  * dirigem `despachar`, que e a mesma funcao que o roteador usa. Os poucos que
- * passam pelo Worker inteiro (`responder`) existem so para provar a LIGACAO —
- * que o caminho chega mesmo ao handler — e nao afirmam nada sobre relogio.
+ * passam pelo Worker inteiro (`responder`) existem so para provar a LIGACAO,
+ * que o caminho chega mesmo ao handler, e nao afirmam nada sobre relogio.
  */
 
 const HANDLE_DO_DONO = 'handle-do-dono-de-teste'
@@ -117,7 +117,7 @@ function postDeApi(caminho: string, corpo: unknown, cabecalhosExtras: Record<str
 /**
  * Uma requisicao BEM formada para qualquer linha da tabela.
  *
- * Ela e derivada da propria linha — metodo, familia e origem —, entao uma rota
+ * Ela e derivada da propria linha, metodo, familia e origem, entao uma rota
  * nova entra nos lacos que a percorrem sem ninguem escrever nada a mao.
  */
 function pedirDaRota(rota: RotaDoPainel): Request {
@@ -157,13 +157,13 @@ async function pedirDesafio(
   }
 }
 
-describe('ROTA — o portao de sanidade e o despacho', () => {
+describe('ROTA: o portao de sanidade e o despacho', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
   })
 
-  test('routePainel devolve null para quem nao e do painel — e e isso que preserva o 404', async () => {
+  test('routePainel devolve null para quem nao e do painel: e e isso que preserva o 404', async () => {
     for (const caminho of ['/health', '/webhooks/instagram', '/painelzinho', '/', '/setup']) {
       const url = new URL(`${RAIZ}${caminho}`)
       const resultado = await routePainel(pedir(caminho), env, url, AGORA)
@@ -300,7 +300,7 @@ describe('ROTA — o portao de sanidade e o despacho', () => {
   })
 })
 
-describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
+describe('ROTA: o portao de sessao (§11.3, passos 6 e 9)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
@@ -387,7 +387,7 @@ describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
     expect(daPagina.headers.get('location')).toBe('/painel/entrar')
   })
 
-  test('cookie com MAC valido mas SEM linha no banco e recusado — a linha e a autoridade', async () => {
+  test('cookie com MAC valido mas SEM linha no banco e recusado: a linha e a autoridade', async () => {
     const sessao = await emitirSessao(env, AGORA)
 
     const resposta = await despachar(
@@ -435,7 +435,7 @@ describe('ROTA — o portao de sessao (§11.3, passos 6 e 9)', () => {
   })
 })
 
-describe('ROTA — a tela de entrar, e o custo dela', () => {
+describe('ROTA: a tela de entrar, e o custo dela', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
@@ -482,7 +482,7 @@ describe('ROTA — a tela de entrar, e o custo dela', () => {
 
   test('o Worker inteiro liga os caminhos do painel aos handlers', async () => {
     // A prova de LIGACAO: o `default:` de `src/index.ts` chega ao roteador, e o
-    // roteador chega a cada handler. Sem relogio injetado, e de proposito — o
+    // roteador chega a cada handler. Sem relogio injetado, e de proposito, o
     // que se afirma aqui e o fio, e nao o prazo.
     const entrar = await responder(pedir('/painel/entrar'), env)
     const inicio = await responder(pedir('/painel'), env)
@@ -498,7 +498,7 @@ describe('ROTA — a tela de entrar, e o custo dela', () => {
   })
 })
 
-describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
+describe('ROTA: o login, e a sessao que so nasce aqui (§10.7)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
@@ -589,8 +589,8 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
     // coberto em `painel-convite.test.ts`): a tabela canonica de §11.4 da
     // `indisponivel` (503) a "D1 indisponivel ou cota estourada" e
     // `falha_interna` (500) a "qualquer excecao nao prevista". Uma assertion
-    // GENUINA e valida — a leitura da credencial e a verificacao da assinatura
-    // fecham as duas — e so o `db.batch()` final de `abrirSessao` que estoura,
+    // GENUINA e valida, a leitura da credencial e a verificacao da assinatura
+    // fecham as duas, e so o `db.batch()` final de `abrirSessao` que estoura,
     // exatamente como um D1 fora do ar quebraria no meio da escrita.
     const aparelho = await AutenticadorFalso.criar('ES256')
     await cadastrarAparelho(aparelho)
@@ -625,6 +625,20 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
     expect(sessoes?.n).toBe(0)
   })
 
+  test('login bem-sucedido expira o cookie do desafio junto com a sessao nova', async () => {
+    const aparelho = await AutenticadorFalso.criar('ES256')
+    await cadastrarAparelho(aparelho)
+
+    const resposta = await entrar(aparelho)
+    const cookies = resposta.headers.getSetCookie()
+
+    expect(cookies).toHaveLength(2)
+    expect(cookies[0]?.startsWith('__Host-painel_sessao=')).toBe(true)
+    // O mesmo carimbo de `registrar.ts`: valor vazio e `Max-Age=0`.
+    expect(cookies[1]).toMatch(/^__Host-painel_desafio=;/)
+    expect(cookies[1]).toContain('Max-Age=0')
+  })
+
   test('SES-06: o cookie de sessao sai com os QUATRO atributos', async () => {
     const aparelho = await AutenticadorFalso.criar('ES256')
     await cadastrarAparelho(aparelho)
@@ -639,7 +653,7 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
     expect(cookie).toContain('; Path=/')
     // `Path=/painel` e INVALIDO: o prefixo `__Host-` exige `Path=/` (§7.2).
     expect(cookie).not.toContain('Path=/painel')
-    // `Max-Age` e o restante do prazo absoluto — 12 h a partir do login.
+    // `Max-Age` e o restante do prazo absoluto, 12 h a partir do login.
     expect(cookie).toContain(`Max-Age=${PRAZO_ABSOLUTO_DE_SESSAO_MS / 1000}`)
     expect(cookie).not.toContain('Domain=')
   })
@@ -817,7 +831,7 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
     // UMA linha por tentativa recusada, carregando os DOIS codigos: o canonico
     // que §11.4 manda registrar e o motivo interno que o dono precisa para
     // depurar. Duas linhas seriam amplificacao de log na rota nao autenticada
-    // mais exposta do painel — mesma classe do Ruling 27 da Task 6.
+    // mais exposta do painel, mesma classe do Ruling 27 da Task 6.
     expect(doPainel).toHaveLength(1)
     expect(doPainel[0]).toContain('credencial_invalida')
     expect(doPainel[0]).toContain('verificacao_de_usuario_ausente')
@@ -940,7 +954,7 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
 
   test('RL-01: sem login que feche a assinatura, a decima primeira tentativa e 429', async () => {
     // O contrapositivo do teste acima, e o que o torna discriminante: e o mesmo
-    // balde, o mesmo teto e a mesma janela — muda so o login no meio.
+    // balde, o mesmo teto e a mesma janela, muda so o login no meio.
     const opcoes = () =>
       despachar(
         postDeApi('/painel/api/entrar/opcoes', {}),
@@ -1010,10 +1024,10 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
     })
   })
 
-  test('instalacao sem dono responde igual a credencial errada — nunca um codigo proprio', async () => {
+  test('instalacao sem dono responde igual a credencial errada: nunca um codigo proprio', async () => {
     // Banco vazio: nao existe `painel_estado`, entao nao existe dono. Um codigo
     // ou um status diferente aqui seria um oraculo de graca: qualquer anonimo
-    // descobriria, por polling barato, que a instalacao ainda nao tem passkey —
+    // descobriria, por polling barato, que a instalacao ainda nao tem passkey,
     // que e exatamente o instante em que um convite `pre=0` interceptado ainda
     // funciona (§15.4).
     const aparelho = await AutenticadorFalso.criar('ES256')
@@ -1028,7 +1042,7 @@ describe('ROTA — o login, e a sessao que so nasce aqui (§10.7)', () => {
   })
 })
 
-describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)', () => {
+describe('ROTA: os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)', () => {
   /** Uma rota de FORMULARIO, para o teto de 32 KB ter onde ser exercido. */
   const ROTA_DE_FORMULARIO: RotaDoPainel = {
     caminho: '/painel/ajustes',
@@ -1196,7 +1210,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
       const contador = new D1Contador(env.DB)
       const resposta = await responder(pedirDaRota(rota), ambienteCom({ DB: comoD1(contador) }))
 
-      // O status nao importa aqui — importa que nada foi gravado, seja ela
+      // O status nao importa aqui, importa que nada foi gravado, seja ela
       // atendida, redirecionada ou recusada.
       expect({ [rota.caminho]: contador.escritas, status: resposta.status < 500 }).toEqual({
         [rota.caminho]: 0,
@@ -1206,19 +1220,19 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
 
     // **A METADE QUE FALTAVA, e sem ela o laco acima nao provava o que o nome
     // promete.** `pedirDaRota` monta a requisicao SEM cookie, entao toda rota com
-    // `sessao: true` era recusada no passo 6 e o que se media era a RECUSA — uma
+    // `sessao: true` era recusada no passo 6 e o que se media era a RECUSA, uma
     // escrita dentro do handler de `/painel` ou de `/painel/atividade` passava
     // por aqui sem uma linha vermelha. O laco abaixo abre a rota de verdade.
     //
     // A sessao nasce com `vista_em = AGORA` de proposito: nesse estado a
     // escrituracao de §10.8 nao grava (o intervalo de 15 min nao venceu), entao
     // o "zero escritas" continua sendo afirmacao limpa sobre o HANDLER. O estado
-    // retomado — em que a guarda grava uma vez — e afirmado por TELA-19, que
+    // retomado, em que a guarda grava uma vez, e afirmado por TELA-19, que
     // separa escrita de CONTEUDO de escrituracao de SESSAO.
     //
     // **Nenhuma rota fica de fora, e a primeira versao deste laco excluia a que
     // MAIS faltava.** Ela dispensava as rotas com `csrf: true` alegando que a
-    // suite de step-up cobria a unica delas — mas aquela suite nao conta escrita
+    // suite de step-up cobria a unica delas, mas aquela suite nao conta escrita
     // nenhuma, entao a exclusao era um buraco com cara de nota de rodape. A ficha
     // e derivavel aqui (`fichaCsrf`), e na familia `json` ela viaja no cabecalho
     // `x-painel-csrf`; com sessao viva e ficha valida a rota passa os quatro
@@ -1233,7 +1247,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
     const comSessao = semEscrita.filter((rota) => rota.sessao)
 
     // Contrapositivo: se um dia nenhuma rota casar o filtro, o laco passaria
-    // calado — e era exatamente essa a forma do defeito que ele conserta.
+    // calado, e era exatamente essa a forma do defeito que ele conserta.
     expect(comSessao.map((rota) => rota.caminho)).toEqual([
       ROTA_INICIO.caminho,
       ROTA_ATIVIDADE.caminho,
@@ -1281,7 +1295,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
       const contador = new D1Contador(env.DB)
       // `despachar` e nao `responder`: o Worker inteiro calcula `now` com
       // `Date.now()`, e uma sessao gravada com o `AGORA` fixo do fixture
-      // pareceria expirada — era 303, e a rota continuaria sem abrir, que e o
+      // pareceria expirada, era 303, e a rota continuaria sem abrir, que e o
       // defeito que este laco existe para consertar. As tres rotas daqui passam
       // por `despachar` em producao, entao nada e contornado.
       const resposta = await despachar(
@@ -1294,7 +1308,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
 
       // **A afirmacao e ZERO ESCRITA, e ela vale em qualquer desfecho.** O status
       // esperado difere porque as duas telas ABREM (200) e a rota de step-up
-      // recebe corpo vazio de proposito — ela chega ao handler, valida e recusa.
+      // recebe corpo vazio de proposito, ela chega ao handler, valida e recusa.
       // Chegar ao handler e o que importa: e o que a versao anterior deste laco
       // nao conseguia, porque parava no portao de sessao.
       expect({ [rota.caminho]: contador.escritas }).toEqual({ [rota.caminho]: 0 })
@@ -1344,7 +1358,7 @@ describe('ROTA — os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)',
   })
 })
 
-describe('HDR — cabecalhos e CSP (§11.5)', () => {
+describe('HDR: cabecalhos e CSP (§11.5)', () => {
   const CABECALHOS_DE_PAGINA: Record<string, string> = {
     'cache-control': 'private, no-store',
     'content-security-policy':
@@ -1476,8 +1490,8 @@ describe('HDR — cabecalhos e CSP (§11.5)', () => {
   test('a marca de "ja seguro" e um Symbol: um corpo do cliente nao consegue forjar', async () => {
     const { html, cru } = await import('../src/routes/painel/html')
 
-    // A razao de existir do `Symbol`: um objeto que veio de `JSON.parse` — isto
-    // e, do corpo de uma requisicao — nunca carrega um simbolo. Se a marca
+    // A razao de existir do `Symbol`: um objeto que veio de `JSON.parse`, isto
+    // e, do corpo de uma requisicao, nunca carrega um simbolo. Se a marca
     // fosse a presenca do campo `texto`, este corpo se declararia seguro
     // sozinho e emitiria script cru na tela do dono.
     const forjado = JSON.parse('{"texto":"<script>alert(1)</script>"}') as unknown
@@ -1493,7 +1507,7 @@ describe('HDR — cabecalhos e CSP (§11.5)', () => {
     const comCampos = JSON.parse('{"texto":"<b>x</b>","seguro":true}') as unknown
     expect(html`${comCampos}`.texto).toBe('[object Object]')
 
-    // E o contrapositivo: o que passou por `cru()` — a UNICA porta — entra como
+    // E o contrapositivo: o que passou por `cru()`, a UNICA porta, entra como
     // esta, senao o teste acima passaria com a tag escapando tudo sempre.
     expect(html`${cru('<b>ok</b>')}`.texto).toBe('<b>ok</b>')
     expect(html`${html`<i>ok</i>`}`.texto).toBe('<i>ok</i>')

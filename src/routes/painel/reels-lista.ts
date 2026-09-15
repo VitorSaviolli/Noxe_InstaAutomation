@@ -2,7 +2,7 @@
  * O DESENHO da tela "Meus Reels": o que ela mostra, e os campos que ela reemite.
  *
  * **A separacao nao e de tamanho, e o corte tem uma regra.** `reels.ts` e a
- * ROTA — le o corpo, decide qual das tres operacoes e aquela, revalida os ids
+ * ROTA, le o corpo, decide qual das tres operacoes e aquela, revalida os ids
  * novos e grava pelo funil. Este arquivo nao decide nada e nao conhece `Env`,
  * `Response`, o D1 nem a tabela de erros: ele recebe o que ja foi lido e
  * devolve `HtmlSeguro`. E por isso que ele pode ser lido de cima a baixo para
@@ -15,8 +15,8 @@
  * caber, e nesta branch a explicacao escrita e metade do valor entregue.
  *
  * **Os nomes dos campos escondidos moram aqui**, com quem os EMITE. Quem os le
- * — `lerEscolha`, e a lista de estruturais que os deixa passar pelo passo 6 de
- * §11.3 — importa daqui. A direcao unica (`reels.ts` -> este arquivo) e o que
+ * `lerEscolha`, e a lista de estruturais que os deixa passar pelo passo 6 de
+ * §11.3, importa daqui. A direcao unica (`reels.ts` -> este arquivo) e o que
  * mantem o projeto sem ciclo de import; a direcao contraria nasceria no dia em
  * que um `<input>` daqui precisasse do valor de uma acao de la, e por isso
  * `carregar` e `atualizar` tambem vieram junto.
@@ -40,7 +40,7 @@ export const CARREGAR = 'carregar'
  * O botao Atualizar de §12.5. Ele nao grava e nao responde `303`.
  *
  * **Ele e a outra metade do cache de 10 minutos** (Ruling 98): o cache e o que
- * cumpre §12.1 regra 5 — "sem buscar lista a cada render" — e este botao e o
+ * cumpre §12.1 regra 5, "sem buscar lista a cada render", e este botao e o
  * unico jeito de a pessoa sair dele. Sem o botao, o cache prenderia a tela; sem
  * o cache, cada render gastaria ate quatro chamadas a Meta. Entregar um sem o
  * outro seria trocar um defeito por outro, e duas frases da tela ja mandavam
@@ -61,8 +61,8 @@ export const CAMPO_DO_CURSOR = 'depois'
  * A conta do Instagram esta ligada? A listagem ja respondeu.
  *
  * `sem_conta` e o unico motivo que significa "nao ha linha em
- * `account_tokens`"; `falha_meta` acontece **com** a conta ligada — o token
- * existe e foi a Meta que nao respondeu —, e dizer "nao conectada" ali seria a
+ * `account_tokens`"; `falha_meta` acontece **com** a conta ligada, o token
+ * existe e foi a Meta que nao respondeu, e dizer "nao conectada" ali seria a
  * afirmacao falsa que §12.1 regra 3 proibe.
  */
 export function contaDaListagem(listagem: Awaited<ReturnType<typeof buscarPagina>>): boolean {
@@ -170,8 +170,8 @@ ${
  * nao e cosmetica: ou `painel.js` ganha um sexto trabalho (§12.8 fecha a lista
  * em cinco) e esta tela passa a carregar o script, que `telaDoPainel` nao
  * carrega nas telas de leitura de proposito (§12.9, conexao ruim); ou ele vira
- * um `acao=` a mais que so re-renderiza — o desenho que funciona SEM
- * JavaScript, como "Carregar mais" e "Atualizar" —, e ai ele precisa saber
+ * um `acao=` a mais que so re-renderiza, o desenho que funciona SEM
+ * JavaScript, como "Carregar mais" e "Atualizar", e ai ele precisa saber
  * quais ids estao na tela depois do re-render, o que interage com o teto de
  * HTML de §12.9. As duas saidas sao decisao de desenho, e vao com o resto de §3
  * para a Task 13b.
@@ -238,7 +238,7 @@ export function cartoesSumidos(
  *
  * Sem eles, salvar depois de "Carregar mais" desmarcaria tudo o que ficou na
  * pagina anterior. Junto vao os `visto`, que dizem ao funil o que a pessoa
- * PODIA desmarcar — e e essa lista, e nao a de marcados, que impede a tela de
+ * PODIA desmarcar, e e essa lista, e nao a de marcados, que impede a tela de
  * apagar o que ela nunca mostrou.
  */
 export function escondidosPreservados(
@@ -279,14 +279,14 @@ export function botaoDeAtualizar(
   // **So o que o banco ainda NAO sabe**, e nao a selecao inteira. Reemitir os
   // ativos aqui seria a terceira copia de ate 200 campos escondidos na mesma
   // pagina; o que este formulario precisa preservar e o que se perderia de
-  // verdade — as marcacoes que a pessoa fez e ainda nao salvou.
+  // verdade, as marcacoes que a pessoa fez e ainda nao salvou.
   //
   // **Quem devolve os ativos e `marcadosDesta`, no servidor, e nao este
   // formulario.** O docblock anterior afirmava que um Reel ativo "volta marcado
   // sozinho porque `marcados` cai em `ativos`": ele cai em `ativos` SO quando a
   // tela nao carrega nada, e o corpo deste POST carrega um array vazio, que o
   // `??` nao trata como ausencia. A frase confiante e errada sustentou a
-  // otimizacao ate a re-revisao medir a perda — tres Reels salvos, dois
+  // otimizacao ate a re-revisao medir a perda, tres Reels salvos, dois
   // desativados em silencio.
   //
   // A perda que sobra esta declarada, e agora e verdadeira: DESmarcar um Reel

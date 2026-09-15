@@ -53,7 +53,7 @@ export interface MediaInfoResponse {
  * Um item da listagem `me/media` (§12.5).
  *
  * Modelado como "tudo pode faltar" pelo mesmo motivo dos outros: o corpo vem
- * de fora. `id` continua STRING em todo o caminho — `JSON.parse` de um id de
+ * de fora. `id` continua STRING em todo o caminho, `JSON.parse` de um id de
  * 18 digitos SEM aspas devolveria um `number` corrompido em silencio, e o
  * painel passaria a responder no Reel errado sem nenhum erro (Ruling 90).
  *

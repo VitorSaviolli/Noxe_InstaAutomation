@@ -130,15 +130,15 @@ function rodarGit(argumentos) {
  *
  * A distincao existe porque este projeto separa de proposito as duas coisas
  * (a "Ruling 2" do ledger): a arvore de trabalho carrega os valores REAIS do
- * dono — o `database_id` do banco dele, o host do Worker dele, o e-mail de
- * contato dele —, e o commit carrega os placeholders, porque e o commit que
+ * dono, o `database_id` do banco dele, o host do Worker dele, o e-mail de
+ * contato dele, e o commit carrega os placeholders, porque e o commit que
  * vira repositorio-template para outra pessoa clonar.
  *
  * Enquanto a varredura de identidade lia o DISCO, ela era insatisfazivel para o
  * autor original: a checagem 5 exige o contato preenchido em `legal.ts` e a
  * checagem 3 proibia justamente aquele contato. Nenhum estado do arquivo
  * agradava as duas. Lendo o INDICE, a pergunta volta a ser a que o titulo do
- * script faz — "o que vai para o GitHub?" — e as duas ficam satisfazivel ao
+ * script faz, "o que vai para o GitHub?", e as duas ficam satisfazivel ao
  * mesmo tempo.
  *
  * Devolve null quando nao ha git, nao ha indice ou o caminho nao esta
@@ -302,21 +302,32 @@ function checagem2(temGit) {
 // ---------------------------------------------------------------------------
 
 /**
- * Os trechos ficam quebrados em pedacos de proposito.
+ * Os seus dados pessoais moram num arquivo LOCAL, fora do git.
  *
- * Se as palavras estivessem inteiras aqui, este proprio script apareceria na
- * varredura como se fosse um vazamento.
+ * Eles ja moraram aqui, quebrados em pedacos. So que este script vai para o
+ * GitHub junto com o resto, e os pedacos juntos entregavam exatamente o que a
+ * varredura existe para proteger. Uma lista de "o que nao pode vazar" nao pode
+ * estar num arquivo publico.
+ *
+ * Formato: um trecho por linha, sem aspas. Linha vazia e linha comecando com
+ * `#` sao ignoradas. A comparacao nao diferencia maiuscula de minuscula.
+ * Coloque o que so voce tem: seu e-mail, seu usuario do workers.dev, o comeco
+ * do ID do seu banco D1, o META_APP_ID do seu app. Nao coloque o nome de
+ * empresa que aparece de proposito nos creditos: daria alarme em LICENSE e
+ * README em toda execucao.
  */
-const IDENTIDADE = [
-  { rotulo: 'usuario pessoal do autor original (workers.dev)', pedacos: ['vitors', 'gonsalez'] },
-  // So o handle COMPLETO conta como vazamento. O nome "Noxelora" sozinho e a
-  // empresa que assina o projeto e aparece de proposito nos creditos; barrar
-  // ele aqui daria falso positivo em LICENSE, README e package.json.
-  { rotulo: 'handle pessoal de Instagram do autor original', pedacos: ['noxe', 'lora.official'] },
-  { rotulo: 'inicio do ID do banco D1 do autor original', pedacos: ['8fc2', '8619'] },
-  { rotulo: 'META_APP_ID do app do autor original', pedacos: ['46839990', '81820430'] },
-  { rotulo: 'e-mail pessoal do autor original', pedacos: ['vitors', 'gonsalez@gmail', '.com'] },
-]
+const ARQUIVO_IDENTIDADE = '.identidade-local.txt'
+
+/** Os trechos do arquivo local, ou null se ele nao existe. */
+function carregarIdentidade() {
+  const conteudo = lerTexto(join(RAIZ, ARQUIVO_IDENTIDADE))
+  if (conteudo === null) return null
+  return conteudo
+    .split('\n')
+    .map((linha) => linha.trim())
+    .filter((linha) => linha.length > 0 && !linha.startsWith('#'))
+    .map((trecho) => trecho.toLowerCase())
+}
 
 /** Valor aleatorio de verdade mistura minuscula, maiuscula e numero. */
 function pareceAleatorio(texto) {
@@ -329,7 +340,7 @@ function pareceAleatorio(texto) {
  * Uma chave aleatoria de 32 bytes, ao ser decodificada, vira lixo binario.
  * Um valor de teste como "0123456789abcdef..." decodifica para texto legivel.
  * Sem esta conferencia, os valores ficticios usados nos testes apareceriam
- * como vazamento em toda execucao — e um alarme que toca sempre acaba sendo
+ * como vazamento em toda execucao, e um alarme que toca sempre acaba sendo
  * ignorado justo no dia em que estiver certo.
  */
 function decodificaParaLixoBinario(valor, codificacao) {
@@ -386,7 +397,7 @@ const REGRAS_DE_SEGREDO = [
  * A alternativa era isentar os ARQUIVOS, e ela e pior: um segredo de verdade
  * colado depois em `tests/regressao-oauth.test.ts` deixaria de ser visto.
  * Aqui a isencao vale para UM valor, e acrescentar outro e uma decisao que
- * aparece na revisao — o mesmo desenho de AUTORIZADOS_A_USAR_CRU.
+ * aparece na revisao, o mesmo desenho de AUTORIZADOS_A_USAR_CRU.
  *
  * Por que cada um esta aqui, e nao "porque o alarme incomodava":
  *   - as duas primeiras sao as coordenadas x e y de uma chave EC P-256
@@ -400,7 +411,7 @@ const REGRAS_DE_SEGREDO = [
  *     chave de teste, e nao chave.
  *
  * Nenhum deles decodifica para texto legivel, entao os dois filtros de
- * `pareceChaveDeVerdade` os deixam passar — e e por isso que o alarme tocava
+ * `pareceChaveDeVerdade` os deixam passar, e e por isso que o alarme tocava
  * em toda execucao. Um alarme que toca sempre e o comentario de `decodifica-
  * ParaLixoBinario` ja diz: ignorado justo no dia em que estiver certo.
  */
@@ -431,6 +442,7 @@ function encurtar(texto) {
 
 function ehVarrivel(caminho) {
   if (caminho === MEU_CAMINHO) return false
+  if (caminho === ARQUIVO_IDENTIDADE) return false
   if (ehArquivoDeSegredo(basename(caminho))) return false
   if (caminho.endsWith('.bak')) return false
   return !EXTENSOES_BINARIAS.has(extname(caminho).toLowerCase())
@@ -457,15 +469,14 @@ function procurarSegredosNoTexto(caminho, linhas, achados) {
   }
 }
 
-function procurarIdentidadeNoTexto(caminho, linhas, achados) {
-  for (const item of IDENTIDADE) {
-    const agulha = item.pedacos.join('').toLowerCase()
+function procurarIdentidadeNoTexto(caminho, linhas, identidade, achados) {
+  for (const agulha of identidade) {
     linhas.forEach((linha, indice) => {
       if (!linha.toLowerCase().includes(agulha)) return
       achados.push({
         caminho,
         numeroDaLinha: indice + 1,
-        rotulo: item.rotulo,
+        rotulo: `dado pessoal listado em ${ARQUIVO_IDENTIDADE}`,
         trecho: 'trocar pelo placeholder do README',
       })
     })
@@ -475,6 +486,16 @@ function procurarIdentidadeNoTexto(caminho, linhas, achados) {
 function checagem3(arquivos) {
   secao('3. Nenhum segredo ou dado pessoal dentro dos arquivos')
   const achados = []
+  const identidade = carregarIdentidade() ?? []
+
+  if (identidade.length === 0) {
+    aviso(`Sem ${ARQUIVO_IDENTIDADE}: a busca por dado pessoal esta desligada.`, [
+      'A busca por segredo continua valendo. Para ligar a de dado pessoal, crie',
+      `o arquivo ${ARQUIVO_IDENTIDADE} na raiz do projeto com um trecho por linha`,
+      '(seu e-mail, seu usuario do workers.dev, o META_APP_ID do seu app).',
+      'Ele ja esta no .gitignore: nunca vai para o GitHub.',
+    ])
+  }
 
   for (const caminho of arquivos) {
     if (!ehVarrivel(caminho)) continue
@@ -492,7 +513,7 @@ function checagem3(arquivos) {
     // e acusa-los aqui tornava a checagem 3 e a checagem 5 insatisfazivel juntas.
     const paraOGitHub = conteudoEstagiado(caminho) ?? naArvore
     if (paraOGitHub !== null) {
-      procurarIdentidadeNoTexto(caminho, paraOGitHub.split('\n'), achados)
+      procurarIdentidadeNoTexto(caminho, paraOGitHub.split('\n'), identidade, achados)
     }
   }
 
@@ -556,7 +577,7 @@ function checagem4() {
 
   // O INDICE, e nao o disco, pelo mesmo motivo da varredura de identidade: esta
   // checagem pergunta "o que quem clonar vai receber?", e quem clona recebe o
-  // commit. O disco tem os valores reais do dono de proposito — sem eles o
+  // commit. O disco tem os valores reais do dono de proposito, sem eles o
   // `npm run deploy` nao acha o banco nem o app.
   //
   // As checagens 9 e 10 continuam lendo o DISCO, e a diferenca e deliberada:
@@ -587,7 +608,7 @@ function checagem4() {
 /**
  * Os nomes de `secrets.required` do wrangler.jsonc.
  *
- * `valorNoJsonc` so le valor escalar, e este e um array — por isso o recorte
+ * `valorNoJsonc` so le valor escalar, e este e um array, por isso o recorte
  * do bloco antes do split.
  */
 function segredosExigidos(conteudo) {
@@ -602,7 +623,7 @@ function segredosExigidos(conteudo) {
  * Esta checagem existe por um caso real: a `PANEL_SESSION_KEY` estava em
  * `secrets.required` e em `src/types/env.ts`, e em lugar nenhum do
  * `gerar-segredos.mjs`, do `configurar.mjs` ou dos quatro guias. Quem seguia a
- * documentacao a risca publicava sem ela — e o painel, o recurso principal do
+ * documentacao a risca publicava sem ela, e o painel, o recurso principal do
  * projeto, respondia 503 sem nenhum documento explicando por que.
  *
  * A lista mora em cinco arquivos. Enquanto morar, alguem precisa compara-los.
@@ -674,7 +695,7 @@ function checagem4b() {
  * num no-op silencioso que so quebra la na frente, com `no such column`.
  *
  * O que faltava era quem confere. A regra estava escrita, e o arquivo sugeria
- * `sha256sum -c` — um comando que so roda se alguem lembrar dele, num projeto
+ * `sha256sum -c`, um comando que so roda se alguem lembrar dele, num projeto
  * cujo publico-alvo nao sabe programar. Editar a 0001 e publicar passava por
  * `npm run verificar` inteiro sem uma linha vermelha.
  *
@@ -716,7 +737,7 @@ function checagem15() {
       continue
     }
     // `.gitattributes` fixa `eol=lf`, entao o hash e o mesmo no Windows, no Mac
-    // e no Linux — e por isso o arquivo e lido como BYTES, sem normalizar nada:
+    // e no Linux, e por isso o arquivo e lido como BYTES, sem normalizar nada:
     // normalizar aqui esconderia justamente um fim de linha que escapou.
     if (createHash('sha256').update(bruto).digest('hex') !== hash) divergentes.push(nome)
   }
@@ -743,7 +764,7 @@ function checagem15() {
   if (sumidas.length > 0) {
     falha(`Migration listada no CHECKSUMS.txt mas ausente: ${sumidas.join(', ')}`, [
       'Um banco ja publicado aplicou essa migration. Sem o arquivo, um banco',
-      'novo nasce com outra forma — e as duas instalacoes divergem em silencio.',
+      'novo nasce com outra forma, e as duas instalacoes divergem em silencio.',
     ])
   }
 
@@ -864,7 +885,7 @@ function checagem7(arquivos) {
 //   - `vitest.config.ts`  -> sem o binding la, o teste roda com outro ambiente
 //
 // EXCECAO DECLARADA: os tres `PANEL_LIMITER_*`. Eles sao opcionais (`?` em
-// `Env`) e a ausencia deles no ambiente de teste NAO e esquecimento — e a
+// `Env`) e a ausencia deles no ambiente de teste NAO e esquecimento, e a
 // prova, exigida por 7.4, de que o painel funciona sem a camada de limitacao.
 
 /**
@@ -873,7 +894,7 @@ function checagem7(arquivos) {
  * Elas importam porque o `vitest.config.ts` NAO lista var por var: ele escreve
  * `...producao.vars` e deixa todas entrarem de uma vez. Procurar o nome literal
  * naquele arquivo acusaria `META_APP_ID` de nao ter sido propagado justamente
- * quando a propagacao esta certa — e um alarme falso em trava de seguranca
+ * quando a propagacao esta certa, e um alarme falso em trava de seguranca
  * custa mais do que a trava vale.
  */
 function varsDoWrangler(conteudo) {
@@ -924,7 +945,7 @@ function checagem8() {
 
   // `...producao.vars` entrega TODAS as vars do wrangler.jsonc ao ambiente de
   // teste de uma vez. Onde ele aparece, o nome literal da var nao precisa
-  // aparecer — e exigi-lo transformaria a propagacao correta em falha.
+  // aparecer, e exigi-lo transformaria a propagacao correta em falha.
   const espalhaAsVars = vitest.includes('...producao.vars')
 
   const pendencias = []
@@ -942,7 +963,7 @@ function checagem8() {
 
     // O `.dev.vars.example` e o arquivo dos SEGREDOS. Exigir `DB` ou
     // `META_APP_ID` la seria pedir que ele deixe de ser o que a pessoa copia
-    // para `.dev.vars` — e um campo a mais nesse arquivo e um campo a mais que
+    // para `.dev.vars`, e um campo a mais nesse arquivo e um campo a mais que
     // alguem preenche com um valor que nao vai a lugar nenhum.
     if (segredos.has(nome) && !exemplo.includes(nome)) {
       pendencias.push(`${nome} e segredo exigido e nao aparece em .dev.vars.example`)
@@ -958,7 +979,7 @@ function checagem8() {
     ...pendencias,
     '',
     'Nada disso quebra a compilacao: o campo existe no tipo, o codigo usa, e o',
-    'valor chega `undefined` em producao. Nos testes e pior — o binding nem',
+    'valor chega `undefined` em producao. Nos testes e pior, o binding nem',
     'existe e o teste passa por outro caminho.',
   ])
 }
@@ -973,7 +994,7 @@ function checagem8() {
 //
 // O que esta checagem afirma e outra coisa: quem esta prestes a publicar o
 // PROPRIO Worker com a lista vazia vai abrir o painel, digitar o link novo,
-// salvar — e o painel vai recusar. Sem esta linha vermelha a pessoa descobre
+// salvar, e o painel vai recusar. Sem esta linha vermelha a pessoa descobre
 // isso no meio de uma troca de link, achando que o painel quebrou.
 
 /** Dominios que so existem em exemplo de documentacao. */
@@ -1025,7 +1046,7 @@ function checagem9() {
 //   3. com esquema ou barra -> `https://x.dev/` nao e um host
 //
 // E o erro caro nao e o 503: e cadastrar uma passkey com `rpId` errado.
-// Credencial criada assim e IRRECUPERAVEL — nao ha login que a leia depois.
+// Credencial criada assim e IRRECUPERAVEL, nao ha login que a leia depois.
 
 function checagem10() {
   secao('10. O PANEL_RP_ID e um host valido para o WebAuthn')
@@ -1058,7 +1079,7 @@ function checagem10() {
   if (valor.toLowerCase() === 'workers.dev') {
     falha('PANEL_RP_ID esta como "workers.dev" puro.', [
       '"workers.dev" esta na secao de dominios privados da Public Suffix List,',
-      'ou seja, e um eTLD — e o navegador RECUSA um rpId assim.',
+      'ou seja, e um eTLD, e o navegador RECUSA um rpId assim.',
       'Use o host COMPLETO do seu Worker, com o subdominio da sua conta:',
       '  meu-worker.minha-conta.workers.dev',
       'Nunca use so "<conta>.workers.dev": isso faria qualquer outro Worker seu',
@@ -1081,7 +1102,7 @@ function checagem10() {
 // Por que reutilizar e grave, sendo os tres segredos igualmente aleatorios:
 // eles tem CICLOS DE VIDA diferentes. Rotacionar o `SETUP_ADMIN_TOKEN` e
 // rotina; se ele for tambem a chave de sessao, cada rotacao derruba todos os
-// aparelhos e invalida os codigos de recuperacao — no exato momento em que a
+// aparelhos e invalida os codigos de recuperacao, no exato momento em que a
 // pessoa mais precisa entrar. E um convite vazado, que e assinado com o admin
 // token, passaria a entregar tambem a chave das sessoes.
 
@@ -1126,7 +1147,7 @@ function checagem12() {
       'Os tres sao aleatorios, mas tem ciclos de vida diferentes.',
       'Rotacionar o admin token e rotina; se ele for tambem a chave de sessao,',
       'cada rotacao derruba TODOS os aparelhos e invalida os codigos de',
-      'recuperacao — bem na hora em que voce mais precisa entrar.',
+      'recuperacao, bem na hora em que voce mais precisa entrar.',
       'Gere valores separados com: npm run gerar:segredos',
     ])
     return
@@ -1140,7 +1161,7 @@ function checagem12() {
 // ---------------------------------------------------------------------------
 //
 // Esta checagem cobre SO `public/`. A proibicao de `onclick=` e `javascript:`
-// no HTML GERADO pelo Worker e teste (familia HDR), nao grep — e essa e uma
+// no HTML GERADO pelo Worker e teste (familia HDR), nao grep, e essa e uma
 // das consequencias praticas de o HTML nascer dentro do Worker.
 //
 // `public/` e diferente porque esses arquivos sao servidos pela plataforma,
@@ -1169,7 +1190,7 @@ function checagem13() {
       continue
     }
     // `painel.js` e um arquivo de script, e por isso a busca e por `<script`,
-    // por manipulador em atributo e por `javascript:` — nunca por "tem codigo
+    // por manipulador em atributo e por `javascript:`, nunca por "tem codigo
     // dentro". O que se proibe e script EMBUTIDO em marcacao.
     if (/<script\b/i.test(conteudo)) achados.push(`${caminho}: tem <script> embutido`)
     if (/\son[a-z]+\s*=\s*["']/i.test(conteudo)) {
@@ -1197,7 +1218,7 @@ function checagem13() {
 // ---------------------------------------------------------------------------
 //
 // Esta e uma checagem SOBRE outra checagem, e existe porque a checagem 3 varre
-// "os arquivos rastreados pelo git" — uma lista que muda sozinha quando alguem
+// "os arquivos rastreados pelo git", uma lista que muda sozinha quando alguem
 // mexe no `.gitignore` ou acrescenta uma pasta a PASTAS_IGNORADAS. No dia em
 // que `public/` sair dessa lista, a checagem 3 continua VERDE e passa a nao
 // olhar mais o que precisa olhar. Verde por nao ter olhado e o pior estado
@@ -1239,7 +1260,7 @@ function checagem14() {
     ...problemas,
     '',
     'A checagem 3 varre a lista de arquivos rastreados pelo git. Quando um',
-    'caminho sai dessa lista — por .gitignore ou por PASTAS_IGNORADAS — ela',
+    'caminho sai dessa lista, por .gitignore ou por PASTAS_IGNORADAS, ela',
     'continua VERDE e simplesmente deixa de olhar. O corpo da resposta de',
     '/setup/painel/codigos leva os codigos de recuperacao em texto claro.',
   ])
@@ -1249,7 +1270,7 @@ function checagem14() {
 // Checagem 15 - vive acima, junto das outras checagens de manifesto
 // ---------------------------------------------------------------------------
 //
-// Ela nasceu como "4c" porque e prima da 4 e da 4b — as tres leem manifestos e
+// Ela nasceu como "4c" porque e prima da 4 e da 4b, as tres leem manifestos e
 // perguntam "o arquivo continua sendo o que foi entregue?". So que 13.5 reserva
 // o NUMERO 15 para ela, e o numero e o que as pessoas citam em revisao. Ficou
 // com o numero da spec e com a vizinhanca que ajuda a ler: a funcao se chama
@@ -1262,7 +1283,7 @@ function checagem14() {
 //
 // AVISO, e nao falha: um texto desatualizado nao quebra ninguem hoje. Mas o
 // cabecalho do `configurar.mjs` explicava por que este projeto NAO tinha
-// painel — e o projeto passou a ter um. Quem abre o assistente e le que um
+// painel, e o projeto passou a ter um. Quem abre o assistente e le que um
 // painel na internet "viraria uma maquina de golpe" e depois encontra o painel
 // no menu conclui, com razao, que alguem fez o que o proprio codigo desaconselha.
 //
@@ -1308,7 +1329,7 @@ function checagem16() {
 //
 // AVISO, e nao falha: nem toda mudanca em `src/routes/painel/` muda o que a
 // documentacao promete, e transformar isso em falha treinaria a pessoa a
-// tocar num arquivo so para calar o script — que e o oposto do objetivo.
+// tocar num arquivo so para calar o script, que e o oposto do objetivo.
 //
 // O sinal e barato e util: se o painel mudou depois da ultima vez que alguem
 // mexeu nos cinco documentos, provavelmente ha uma frase la que envelheceu.
@@ -1356,7 +1377,7 @@ function checagem17() {
   }
 
   aviso(`Documento mais antigo que a ultima mudanca do painel: ${atrasados.join(', ')}`, [
-    'Nem toda mudanca no painel muda o que a documentacao promete — por isso',
+    'Nem toda mudanca no painel muda o que a documentacao promete, por isso',
     'isto e aviso e nao falha. Mas vale reler esses arquivos procurando frase',
     'que envelheceu: nome de tela, nome de campo, ou passo que mudou de ordem.',
   ])
@@ -1368,7 +1389,7 @@ function checagem17() {
 //
 // O modo de falha e silencioso, e e o mesmo que o CHECKSUMS.txt existe para
 // impedir pelo outro lado: `CREATE TABLE IF NOT EXISTS` sobre uma tabela que
-// ja existe COM OUTRA FORMA nao da erro — ele nao faz nada. Duas migrations
+// ja existe COM OUTRA FORMA nao da erro, ele nao faz nada. Duas migrations
 // criando `painel_config` significa que, num banco que aplicou as duas, vale a
 // forma da PRIMEIRA, e o defeito aparece semanas depois como `no such column`.
 //
@@ -1419,7 +1440,7 @@ function checagem18() {
     '',
     'CREATE TABLE IF NOT EXISTS sobre uma tabela que ja existe com OUTRA forma',
     'nao da erro: ele nao faz nada. Num banco que aplicou as duas migrations,',
-    'vale a forma da primeira — e o defeito aparece semanas depois como',
+    'vale a forma da primeira, e o defeito aparece semanas depois como',
     '"no such column". Em banco novo o resultado e o mesmo, entao nenhum teste',
     'pega isso: teste sempre roda em banco novo.',
     'Para mudar uma tabela ja entregue, use ALTER TABLE numa migration nova.',
@@ -1432,13 +1453,13 @@ function checagem18() {
 //
 // `cru()` e a valvula de escape da tag `html``: ela marca uma string como HTML
 // seguro e PULA o escape. Cada uso e um lugar onde um valor vindo do banco
-// poderia virar marcacao — ou seja, cada uso e um XSS em potencial, e a lista
+// poderia virar marcacao, ou seja, cada uso e um XSS em potencial, e a lista
 // autorizada existe para que acrescentar um seja uma decisao consciente e
 // visivel na revisao, nunca um detalhe que passa no diff.
 //
 // POR QUE AQUI, E NAO NUM TESTE: a garantia e sobre ARQUIVOS, e de dentro do
 // workerd nao existe sistema de arquivos. Sob `vitest-pool-workers` o `?raw`
-// devolve string vazia, e um teste escrito assim passaria sempre — inclusive
+// devolve string vazia, e um teste escrito assim passaria sempre, inclusive
 // com dez `cru(` novos espalhados. E o mesmo motivo que poe a checagem 20 aqui:
 // uma garantia que pode nascer quebrada por detalhe de bundler ensina a equipe
 // a ignora-la.
@@ -1457,7 +1478,7 @@ const AUTORIZADOS_A_USAR_CRU = ['src/routes/painel/html.ts']
  * Tira comentario de TypeScript, para a busca ver so codigo.
  *
  * Sem isto o script acusava `src/routes/painel/recusa.ts`, que nao usa a
- * funcao: o comentario de la diz "nunca o id cru (9.9)" — a palavra "cru" em
+ * funcao: o comentario de la diz "nunca o id cru (9.9)", a palavra "cru" em
  * portugues, seguida de um parenteses de prosa. Uma trava que grita no arquivo
  * errado e uma trava que a proxima pessoa aprende a ignorar.
  *
@@ -1500,7 +1521,7 @@ function checagem19() {
     '`cru()` marca uma string como HTML seguro e PULA o escape. Cada uso e um',
     'lugar onde um valor vindo do banco ou da Meta pode virar marcacao.',
     'Se o uso for mesmo necessario, acrescente o caminho a lista',
-    'AUTORIZADOS_A_USAR_CRU deste script — de proposito, para que a decisao',
+    'AUTORIZADOS_A_USAR_CRU deste script, de proposito, para que a decisao',
     'apareca na revisao em vez de passar escondida no diff.',
   ])
 }
@@ -1511,7 +1532,7 @@ function checagem19() {
 //
 // **Por que aqui, e nao num teste.** A garantia e sobre um ARQUIVO, e de dentro
 // do workerd nao existe sistema de arquivos: sob `vitest-pool-workers` o
-// `?raw` de um `.css` devolve string VAZIA — conferido no `import` direto e no
+// `?raw` de um `.css` devolve string VAZIA, conferido no `import` direto e no
 // `import.meta.glob`. Um teste escrito assim passa sempre, inclusive com a
 // folha dobrando de tamanho e com um `@import` de outro host dentro. E a mesma
 // razao que §13.5 escreve para a checagem 19 morar aqui: "uma garantia que pode
@@ -1547,7 +1568,7 @@ function checagem20() {
       'A secao 12.9 do desenho orca "~6 KB" pensando em conexao ruim; o arquivo',
       'passa disso porque quase todo o excedente e comentario explicando por que',
       'cada trava existe (area segura, alvo de 44px, foco de 2px, estado que',
-      'nunca e so cor) — e neste projeto o comentario e o motivo de a trava',
+      'nunca e so cor), e neste projeto o comentario e o motivo de a trava',
       'sobreviver a proxima etapa. O arquivo nao passa por build, entao o',
       'comentario viaja junto; ele viaja comprimido.',
       'Se voce chegou aqui, a folha cresceu ALEM disso. Confira se o bloco novo',
@@ -1562,7 +1583,7 @@ function checagem20() {
       'A secao 12.9 pede "sem fonte externa, sem imagem alem das miniaturas":',
       'num celular com conexao ruim cada pedido a mais e uma tela em branco a',
       'mais. E a CSP do painel nao libera outro host, entao o pedido falharia',
-      'em silencio em producao — a folha carregaria sem a fonte.',
+      'em silencio em producao, a folha carregaria sem a fonte.',
       'Use as fontes do proprio sistema, como o resto do arquivo ja faz.',
     ])
   } else {

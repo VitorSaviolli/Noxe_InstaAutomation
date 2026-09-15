@@ -3,7 +3,7 @@
  *
  * O Worker e stateless, entao em vez de guardar o `state` numa sessao ele e
  * ASSINADO com HMAC-SHA256 e carrega o proprio prazo de validade. O callback
- * so precisa recalcular a assinatura — sem round trip ao banco.
+ * so precisa recalcular a assinatura, sem round trip ao banco.
  *
  * Formato: base64url(nonce) "." expiraEm "." base64url(hmac)
  */

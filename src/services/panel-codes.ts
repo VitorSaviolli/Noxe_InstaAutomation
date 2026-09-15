@@ -2,7 +2,7 @@
  * Os codigos impressos no papel: 6 de recuperacao e 1 de parada (§10.11, §10.12).
  *
  * Tres operacoes e nada mais: **sortear**, **normalizar** e **verificar**. O
- * modulo nao toca no D1, nao toca em `Request` e nao le o relogio — quem faz
+ * modulo nao toca no D1, nao toca em `Request` e nao le o relogio, quem faz
  * isso sao `painel-codigos-repository.ts` e as rotas.
  *
  * **Quem sorteia e o Worker, nunca o assistente** (§10.11). Para calcular a
@@ -36,7 +36,7 @@ export const ALFABETO_DOS_CODIGOS = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
  * Tamanho de cada familia, em caracteres. Cada caractere vale 5 bits.
  *
  * `recuperacao`: 20 caracteres = **100 bits**. `parada`: 16 = **80 bits**. O
- * codigo de parada e menor de proposito — ele compra tao pouco (so sabe dizer
+ * codigo de parada e menor de proposito, ele compra tao pouco (so sabe dizer
  * `enabled = 0`) que 80 bits sobram, e ele e o que a pessoa digita do papel no
  * pior dia do projeto.
  */
@@ -52,7 +52,7 @@ export const CODIGOS_DE_RECUPERACAO = 6
  * Versao do esquema de hash, dentro do texto assinado.
  *
  * Trocar o algoritmo um dia significa subir este numero e gravar `versao_hash`
- * junto — nunca reinterpretar em silencio o que ja esta no banco.
+ * junto, nunca reinterpretar em silencio o que ja esta no banco.
  */
 export const VERSAO_DO_HASH = 1
 
@@ -71,7 +71,7 @@ const SEPARADORES = /[\s-]+/g
  * Trava de STOP-10, a metade que o comparador duble nao alcanca. O duble prova
  * que nao existe um segundo caminho de comparacao escondido na rota; ele nao
  * consegue provar que o padrao e `timingSafeEqual`, porque comparacao em tempo
- * constante e, por construcao, funcionalmente IDENTICA a `===` — nenhum teste
+ * constante e, por construcao, funcionalmente IDENTICA a `===`, nenhum teste
  * de caixa-preta separa as duas. Sobra a identidade: este binding e o unico
  * lugar do projeto que nomeia o comparador do caminho dos codigos, e
  * `expect(COMPARADOR_PADRAO).toBe(timingSafeEqual)` e o que o congela.
@@ -110,7 +110,7 @@ export function sortearConjunto(): { recuperacao: string[]; parada: string } {
 }
 
 /**
- * `XXXXX-XXXXX-XXXXX-XXXXX` — hifens SO na exibicao (§10.11).
+ * `XXXXX-XXXXX-XXXXX-XXXXX`, hifens SO na exibicao (§10.11).
  *
  * O ultimo grupo absorve o resto, para que o codigo de parada saia
  * `XXXXX-XXXXX-XXXXXX` em vez de terminar num grupo de um caractere so, que a
@@ -133,7 +133,7 @@ export function formatarCodigo(codigo: string): string {
  *
  * Maiusculas, fora espacos e hifens, `I`/`L` viram `1` e `O` vira `0`; depois
  * exige EXATAMENTE o tamanho do tipo, so com caracteres do alfabeto. A recusa
- * acontece **antes** de qualquer consulta ao D1 — e o que faz um bot mandando
+ * acontece **antes** de qualquer consulta ao D1, e o que faz um bot mandando
  * lixo custar zero leitura (§10.12).
  *
  * O `U` nao e mapeado de proposito: Crockford o exclui para nao formar
@@ -183,7 +183,7 @@ export async function hashDoCodigo(
  * Trava de STOP-10: a comparacao passa SEMPRE por `COMPARADOR_PADRAO`, que e
  * `timingSafeEqual`, nunca por `===`. `comparar` e parametro com esse padrao
  * exatamente para que o teste consiga injetar um duble e provar que nao existe
- * um segundo caminho de comparacao escondido — e nao para que alguem troque a
+ * um segundo caminho de comparacao escondido, e nao para que alguem troque a
  * funcao em producao. Que valor o padrao tem e afirmado a parte, pela
  * identidade de `COMPARADOR_PADRAO`.
  *

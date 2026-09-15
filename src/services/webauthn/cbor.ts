@@ -3,7 +3,7 @@
  *
  * Escrito a mao porque o projeto nao ganha dependencia nova. O subconjunto e o
  * de §10.5: inteiros, byte strings, text strings, arrays e mapas. Nada de
- * float, nada de tag, nada de `true`/`false`/`null` — o que nao esta aqui e
+ * float, nada de tag, nada de `true`/`false`/`null`, o que nao esta aqui e
  * RECUSADO, nunca "aceito e ignorado".
  *
  * **Este decodificador so roda no REGISTRO** (§10.5). O login nao toca CBOR: a
@@ -24,11 +24,11 @@
  *    impede anexar conteudo depois de um `attestationObject` valido.
  * 5. **Nunca lanca.** Devolve uniao discriminada, no formato que `webhook.ts` ja
  *    usa. A entrada vem do corpo de uma requisicao, isto e, de qualquer pessoa
- *    na internet — uma excecao aqui viraria `500` numa rota que deveria
+ *    na internet, uma excecao aqui viraria `500` numa rota que deveria
  *    responder "credencial invalida".
  * 6. **Argumento na forma mais curta.** RFC 8949 §4.2.1: o valor 5 se escreve
- *    `05`, nunca `18 05`. E o item 1 outra vez — grafia dupla e por onde entra
- *    confusao de forma canonica — so que aplicado ao argumento.
+ *    `05`, nunca `18 05`. E o item 1 outra vez, grafia dupla e por onde entra
+ *    confusao de forma canonica, so que aplicado ao argumento.
  *
  * O codificador CBOR do teste (`tests/fixtures/autenticador.ts`) e escrito
  * SEPARADO deste arquivo, de proposito: as duas pontas do metodo T2 (§13.3) so
@@ -142,7 +142,7 @@ function menorArgumentoDe(info: number): number {
  *
  * A forma tem que ser a MAIS CURTA possivel (RFC 8949 §4.2.1): o valor 5 se
  * escreve `05`, nunca `18 05`. E o mesmo principio do item 1 do cabecalho deste
- * arquivo — grafia dupla e por onde entra confusao de forma canonica — aplicado
+ * arquivo, grafia dupla e por onde entra confusao de forma canonica, aplicado
  * ao argumento em vez do comprimento. Hoje nenhum ponto do painel trata os
  * bytes crus do CBOR como identidade a ser comparada ou hasheada, entao isto e
  * defesa em profundidade: fecha a porta antes de existir um caminho que passe
@@ -265,7 +265,7 @@ function impressaoDeChave(chave: ValorCbor): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Leitura tipada de mapa — a unica porta para quem consome
+// Leitura tipada de mapa, a unica porta para quem consome
 // ---------------------------------------------------------------------------
 
 /** O valor de `chave` no mapa, ou `null` se nao for mapa ou a chave faltar. */

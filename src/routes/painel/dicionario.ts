@@ -4,7 +4,7 @@
  * Ele existe porque §12.1 nao pede "linguagem simples" como estilo: pede uma
  * lista fechada de palavras que a tela **nunca** escreve, e o par de cada uma
  * delas. Sem um lugar unico, cada tela inventaria a propria traducao de
- * `matchMode` e o painel falaria cinco portugueses diferentes — que e a mesma
+ * `matchMode` e o painel falaria cinco portugueses diferentes, que e a mesma
  * classe de defeito que "um nome por conceito" mata do lado do codigo.
  *
  * **A trava mais forte deste arquivo e de tipo, e nao de teste.**
@@ -13,7 +13,7 @@
  * antes de qualquer teste rodar. Um `Record<string, string>` deixaria o campo
  * novo aparecer na tela com o nome tecnico e ninguem saberia.
  *
- * `allowedMediaIds` esta EXCLUIDO de proposito: ele nao e campo gravavel — e
+ * `allowedMediaIds` esta EXCLUIDO de proposito: ele nao e campo gravavel, e
  * derivado das linhas ativas de `painel_midias` (§9.4). O gravavel e
  * `mediaScope`, que nao existe em `AutomationConfig` e por isso entra a mao.
  */
@@ -62,7 +62,7 @@ export const NOME_DO_CAMPO: Record<CampoDaConfig, string> = {
  * Os dois modos de comparacao, com as frases de §3.
  *
  * `exact` e `contains` sao palavras em ingles e §12.1 as proibe na tela. Elas
- * continuam sendo os valores do banco — o dicionario e a fronteira entre os
+ * continuam sendo os valores do banco, o dicionario e a fronteira entre os
  * dois vocabularios, e e por isso que ele mora numa rota e nao no `config.ts`.
  */
 export const MODO_DE_COMPARACAO: Record<MatchMode, string> = {
@@ -96,7 +96,7 @@ export const ORIGEM_DOS_AJUSTES: Record<OrigemConfig, string> = {
  * fuso da instalacao nao esta em lugar nenhum do contrato de ambiente: uma hora
  * escrita em UTC estaria tres horas errada para quem le no Brasil, e uma hora
  * errada numa tela que existe para explicar e pior que nenhuma hora. A data
- * responde a pergunta que a tela faz — "desde quando?" — e so erra na virada da
+ * responde a pergunta que a tela faz, "desde quando?", e so erra na virada da
  * meia-noite. Quando a tela de "O que aconteceu" precisar de hora, o fuso vira
  * dado de ambiente e esta funcao ganha o par dela.
  */
@@ -112,7 +112,7 @@ export function dataEmPortugues(epochMs: number): string {
  *
  * `POST /painel/<tela>` grava e responde `303` para `GET
  * /painel/<tela>?ok=<codigo>`; a faixa verde nasce desse `?ok=`. A tela NUNCA
- * escreve na pagina o que veio da query string — ela procura o codigo AQUI e
+ * escreve na pagina o que veio da query string, ela procura o codigo AQUI e
  * mostra a frase daqui. Um `?ok=` desconhecido nao mostra faixa nenhuma, e e
  * essa consulta a uma tabela fechada, e nao um escape, que impede a query
  * string de virar conteudo da pagina.
@@ -131,7 +131,7 @@ export const CONFIRMACOES = {
   // sessao de quem apertou, entao um `303` para `/painel/aparelhos` cairia no
   // `303` do passo 6 da escada e a frase morreria no caminho. Os dois apontam
   // para `/painel/entrar`, que e a tela onde a pessoa esta a partir daquele
-  // instante — e e la que a frase precisa aparecer para o gesto nao parecer
+  // instante, e e la que a frase precisa aparecer para o gesto nao parecer
   // uma falha (§10.13).
   //
   // As frases sao DIFERENTES de proposito: quem sai deste aparelho precisa
@@ -156,26 +156,26 @@ export function fraseDeConfirmacao(codigo: string | null): string | null {
  *
  * A chave e o `codigo` do achado do validador, e nao a `mensagem` dele. A
  * diferenca importa: a `mensagem` do validador e escrita para quem instala o
- * projeto — ela diz "no modo contains", "placeholders", "normalizacao" —, e
+ * projeto, ela diz "no modo contains", "placeholders", "normalizacao", e
  * `contains` e `placeholder` estao na lista de palavras que a tela NUNCA
  * escreve. Traduzir pelo codigo mantem o validador com uma linguagem so, a tela
  * com outra, e o dicionario como a unica fronteira entre as duas.
  *
  * Os textos sao os da tabela de §12.4, palavra por palavra. Onde §12.4 escreve
  * a palavra do dono entre aspas, a frase aqui e generica: o valor recusado NAO
- * volta para a tela por este caminho — ele volta no formulario, que e onde a
+ * volta para a tela por este caminho, ele volta no formulario, que e onde a
  * pessoa o ve no contexto em que o digitou.
  */
 export const MOTIVO_DA_RECUSA: Record<string, string> = {
   gatilho_curto:
-    'Esta palavra é curta demais para o modo que está valendo. Escreva mais letras — no modo “basta aparecer no meio”, pelo menos duas palavras.',
+    'Esta palavra é curta demais para o modo que está valendo. Escreva mais letras, no modo “basta aparecer no meio”, pelo menos duas palavras.',
   gatilho_longo: 'Esta frase é longa demais. Use no máximo 40 letras.',
   gatilho_vazio:
     'Isto não vai funcionar nunca. A automação ignora emojis e pontuação ao comparar, então esta palavra fica vazia e é pulada em silêncio.',
   gatilho_duplicado: 'Duas palavras ficam iguais na hora de comparar. Apague uma delas.',
   gatilhos_demais: 'Você chegou a 20 palavras, o máximo. Apague uma para adicionar outra.',
   lista_vazia_com_automacao_ligada:
-    'Sem nenhuma palavra a automação nunca responde. Ou escreva pelo menos uma, ou desligue — as duas são seguras, mas só uma fica clara no seu painel.',
+    'Sem nenhuma palavra a automação nunca responde. Ou escreva pelo menos uma, ou desligue, as duas são seguras, mas só uma fica clara no seu painel.',
   nao_e_lista_de_texto: 'Não conseguimos entender a lista de palavras que chegou.',
   cooldown_fora_da_faixa: 'A espera precisa ser um número inteiro de horas, de 0 até 8760.',
   nao_e_booleano: 'Este ajuste só aceita sim ou não.',
@@ -190,9 +190,9 @@ export const MOTIVO_DA_RECUSA: Record<string, string> = {
   reel_repetido: 'Você marcou o mesmo Reel duas vezes. Marque uma só.',
   reels_demais: 'Você chegou a 200 Reels, o máximo. Desmarque algum para escolher outro.',
   reels_novos_demais:
-    'Marque até 20 Reels novos por vez. Salve estes e continue — o que já estava escolhido continua valendo.',
+    'Marque até 20 Reels novos por vez. Salve estes e continue, o que já estava escolhido continua valendo.',
   selecao_vazia_com_automacao_ligada:
-    'Você escolheu “só nos que eu escolher” e não marcou nenhum Reel. Ou marque pelo menos um, ou desligue a automação — as duas são seguras, mas só uma fica clara no seu painel.',
+    'Você escolheu “só nos que eu escolher” e não marcou nenhum Reel. Ou marque pelo menos um, ou desligue a automação, as duas são seguras, mas só uma fica clara no seu painel.',
   listagem_indisponivel:
     'Não conseguimos falar com o Instagram agora, então não dá para salvar a sua escolha de Reels. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
   reel_nao_pode_ligar:
@@ -213,11 +213,11 @@ export function motivoDaRecusa(codigo: string): string {
  *
  * **Uma grafia, e as tres telas a usam.** Ele nasceu em `/painel/mensagem` e foi
  * copiado a mao para `/painel/ajustes` e `/painel/palavras` quando aquelas
- * ganharam campo protegido — tres copias sao tres chances de uma delas perder um
+ * ganharam campo protegido, tres copias sao tres chances de uma delas perder um
  * dos tres sinais, e §12.3 os exige **sempre juntos, nunca so cor**.
  *
  * Aqui mora so a PALAVRA, porque `dicionario.ts` nao conhece a tag `html`. Quem
- * a transforma nos tres sinais e `seloProtegido()`, em `inicio.ts` — a mesma
+ * a transforma nos tres sinais e `seloProtegido()`, em `inicio.ts`, a mesma
  * divisao de sempre: a frase no dicionario, a marcacao na tela.
  */
 export const SELO_PROTEGIDO = 'protegido'
@@ -227,11 +227,11 @@ export const SELO_PROTEGIDO = 'protegido'
  *
  * Elas moram aqui pelo mesmo motivo que todas as outras: nenhuma frase de tela
  * nasce fora do dicionario. `protegido` e a promessa de §12.3 dita ao
- * contrario — a pessoa tentou aumentar o alcance, e aumentar pede a digital.
+ * contrario, a pessoa tentou aumentar o alcance, e aumentar pede a digital.
  *
  * **`protegido` mudou nesta etapa, e a mudanca e uma divida quitada.** Enquanto
  * o verificador nao existia, ela terminava em "Essa parte do painel chega em
- * seguida" — uma frase que prometia uma continuacao que o `403` nao tinha. Agora
+ * seguida", uma frase que prometia uma continuacao que o `403` nao tinha. Agora
  * a continuacao existe logo abaixo dela, na tela de conferencia, e a frase diz
  * o que de fato acontece.
  */
@@ -239,13 +239,13 @@ export const SELO_PROTEGIDO = 'protegido'
  * Onde cada campo E editavel, para a recusa poder dizer o caminho (Ruling 75).
  *
  * `RECUSA_SEM_VALOR.naoGravavel` dizia "Este ajuste **ainda** nao pode ser
- * mudado por aqui" para tudo o que caia fora da lista da rota — e depois do
+ * mudado por aqui" para tudo o que caia fora da lista da rota, e depois do
  * Ruling 70 isso passou a alcancar campo que ja e editavel, so que em outra
  * tela. "Ainda" e falso para o que existe hoje, e mandar a pessoa esperar por
  * uma tela que ja esta pronta e pior do que nao dizer nada.
  *
  * Quem nao esta em NENHUM dos dois mapas daqui nao e editavel nem visivel em
- * lugar nenhum — e ai a frase com "ainda" e verdadeira.
+ * lugar nenhum, e ai a frase com "ainda" e verdadeira.
  */
 export const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
   enabled: 'no bot\u00e3o do In\u00edcio',
@@ -270,7 +270,7 @@ export const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
  *
  * A terceira frase existe porque as outras duas mentiam para estes dois.
  * `RECUSA_SEM_VALOR.naoGravavel` promete que "a tela que cuida dele chega em uma
- * proxima parte" — verdade para `mediaScope`, que e a Etapa 12 de §14. Para
+ * proxima parte", verdade para `mediaScope`, que e a Etapa 12 de §14. Para
  * `publicReplyEnabled` e `privateReplyEnabled` e falso nas duas metades: §3 os
  * poe em "Ajustes finos", tela que JA existe e que ja os mostra ("Direct:
  * Ligado", "Resposta no comentario: Desligada"), e nenhuma etapa de §14 os
@@ -292,7 +292,7 @@ export const TELA_QUE_SO_MOSTRA: Partial<Record<CampoDaConfig, string>> = {
  * Tres frases, e a diferenca importa para quem esta na tela: um campo que mora
  * em outra tela pede o CAMINHO; um campo que uma tela ja MOSTRA sem deixar mudar
  * pede que se diga isso, senao a pessoa vai procurar o botao onde ele nao esta;
- * e um campo que nao aparece em lugar nenhum pede a verdade — que ele ainda nao
+ * e um campo que nao aparece em lugar nenhum pede a verdade, que ele ainda nao
  * da para mudar.
  */
 export function motivoDeCampoForaDaTela(campo: string): string {
@@ -341,7 +341,7 @@ export type CampoDeComparacao =
  * campo para campo: em `caseSensitive`, `sim` era a frase de `true`; em
  * `normalizeAccents` e `ignorePunctuation`, era a de `false`, e cada tela
  * compensava com um ternario invertido. A saida saia certa e a FORMA era uma
- * armadilha — quem escrevesse o obvio, `config.X ? sim : nao`, imprimiria o
+ * armadilha, quem escrevesse o obvio, `config.X ? sim : nao`, imprimiria o
  * contrario da verdade em dois dos quatro campos. Numa tela que existe para
  * explicar a automacao, "uma explicacao que mente e pior do que nenhuma".
  * Agora a chave e o proprio booleano, e o ternario sumiu de todas as telas:
@@ -389,12 +389,12 @@ const CANAL_DESLIGADO = 'Desligada, e nada e enviado por aqui.'
  * §10.10 exige o **valor literal** antes da biometria, e §12.1 proibe o
  * vocabulario do banco na tela. Os dois convivem porque os campos sao de duas
  * especies: o link e os dois textos SAO texto do dono, e o literal deles e o
- * proprio texto — ele sai como esta, sem recorte e sem reticencias. Os
+ * proprio texto, ele sai como esta, sem recorte e sem reticencias. Os
  * enumerados e os booleanos guardam `exact`, `contains`, `todas`, `0` e `1`, que
  * §12.1 nao deixa escrever, entao o literal deles e a frase que a tela ja usa em
  * todo lugar.
  *
- * As frases vem das MESMAS tabelas que as telas de leitura usam — nao ha uma
+ * As frases vem das MESMAS tabelas que as telas de leitura usam, nao ha uma
  * segunda traducao de `matchMode` nascendo aqui. Um segundo par de frases seria
  * a chance de a tela de conferencia dizer uma coisa e a tela de Ajustes dizer
  * outra sobre o mesmo valor, no exato momento em que a pessoa decide assinar.
@@ -425,7 +425,7 @@ export function valorNaTela(campo: CampoDaConfig, valor: unknown): string {
     case 'privateReplyEnabled':
       return valor === true ? CANAL_LIGADO : CANAL_DESLIGADO
     // O link e os dois textos: o literal deles e o proprio texto do dono, sem
-    // recorte e sem reticencias — quem vai assinar precisa ler o que assina.
+    // recorte e sem reticencias, quem vai assinar precisa ler o que assina.
     default:
       return String(valor)
   }
@@ -467,7 +467,7 @@ export function nomeDoCampoDoAviso(aviso: string): string | null {
  *
  * A `mensagem` tecnica do achado NAO vai para a tela, e a omissao e decisao:
  * ela carrega "placeholders", "palavras-gatilho" e "normalizacao", tres
- * palavras que §12.1 proibe. O que a tela precisa e o CAMPO — e §12.6 escreve
+ * palavras que §12.1 proibe. O que a tela precisa e o CAMPO, e §12.6 escreve
  * exatamente esta frase. O detalhe tecnico continua no `console`, onde
  * `config-store.ts` ja o publica, e e la que quem instalou vai ler.
  */
@@ -487,7 +487,7 @@ export function traduzirAviso(aviso: string): string {
  * A lista e o lado esquerdo do glossario obrigatorio, mais as tres de §7.8 que
  * sao proibidas no projeto inteiro. Ela existe em codigo, e nao so no
  * documento, porque um laco de teste consegue percorrer as cinco telas e
- * falhar no dia em que uma delas escrever "cooldown" — e nenhuma revisao
+ * falhar no dia em que uma delas escrever "cooldown", e nenhuma revisao
  * humana faz isso toda vez.
  *
  * Sao comparadas com fronteira de palavra: proibir a SUBSTRING "api" reprovaria
@@ -547,7 +547,7 @@ export function escopoDeMidias(config: AutomationConfig): EscopoDeMidias {
  * As frases das duas telas de Reels (§3 e §12.5).
  *
  * Elas moram aqui pelo mesmo motivo de todas as outras: nenhuma frase de tela
- * nasce fora do dicionario. E ha uma razao a mais nesta tela — §12.5 escreve
+ * nasce fora do dicionario. E ha uma razao a mais nesta tela, §12.5 escreve
  * cinco estados especiais palavra por palavra, e uma tela que os reescrevesse
  * a mao perderia o pedaco que importa em cada um. O pedaco que importa e
  * sempre o mesmo: **a automacao continua funcionando**. Quem abre a tela de
@@ -574,10 +574,10 @@ export const TELA_DOS_REELS = {
   orfas:
     'Encontramos escolhas de Reels sem uma configuração salva. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
   /**
-   * §12.5, cursor vencido. **NAO RENDERIZADA HOJE** — zero usos em `src/`.
+   * §12.5, cursor vencido. **NAO RENDERIZADA HOJE**, zero usos em `src/`.
    *
-   * Ela e um dos cinco estados especiais de §12.5, e o estado que a produz — o
-   * cursor que venceu enquanto a pagina estava aberta — nao e detectado por
+   * Ela e um dos cinco estados especiais de §12.5, e o estado que a produz, o
+   * cursor que venceu enquanto a pagina estava aberta, nao e detectado por
    * nenhum caminho de `reels.ts`. A constante fica, e a ausencia fica ESCRITA:
    * o estado vai para a Task 13b. Ate la, nenhum teste pode dar a entender que
    * esta frase e alcancavel (§13.1).
@@ -588,18 +588,18 @@ export const TELA_DOS_REELS = {
   reelApagado: 'Este Reel não existe mais',
   tirarDaLista: 'Tirar da lista',
   /**
-   * §3, miniatura vencida. **NAO RENDERIZADA HOJE** — zero usos em `src/`.
+   * §3, miniatura vencida. **NAO RENDERIZADA HOJE**, zero usos em `src/`.
    *
    * A tela ja aguenta a miniatura quebrada (o cartao cai num bloco cinza e
-   * continua selecionavel), mas a FAIXA que explica "as miniaturas venceram —
+   * continua selecionavel), mas a FAIXA que explica "as miniaturas venceram,
    * e normal, elas duram pouco" nao e emitida em lugar nenhum, porque nada
    * detecta o vencimento: um `<img>` que falha falha no navegador, e o servidor
    * nao sabe. Mesma situacao de `cursorVencido`, e o mesmo destino: Task 13b.
    */
   miniaturaVencida:
-    'as miniaturas venceram — é normal, elas duram pouco. Nada da sua configuração foi perdido.',
+    'as miniaturas venceram, é normal, elas duram pouco. Nada da sua configuração foi perdido.',
   /** §12.5, as quatro paginas renderam quase nada. */
-  poucosReels: 'Estas últimas publicações não são Reels — toque de novo para continuar procurando.',
+  poucosReels: 'Estas últimas publicações não são Reels, toque de novo para continuar procurando.',
   /** §12.5, o teto chegando. */
   quaseNoTeto: 'Você está perto do máximo de 200 Reels escolhidos.',
   /** §12.5, o selo de quem tem regras proprias. */
@@ -611,12 +611,12 @@ export const TELA_DOS_REELS = {
   /** §3, o rotulo do que a listagem nao conseguiu confirmar (§15.2, pend. 7). */
   videoOuReel: 'vídeo/Reel',
   /**
-   * §3, o botao de marcar em lote. **NAO RENDERIZADO HOJE** — zero usos.
+   * §3, o botao de marcar em lote. **NAO RENDERIZADO HOJE**, zero usos.
    *
    * O botao existia como `<button type="button" class="marcar-lote">`, a classe
    * era a unica ocorrencia dela no repositorio e `painel.js` nao a conhecia:
-   * ele nao fazia nada. Saiu de `reels.ts` nesta rodada — um controle que nao
-   * faz o que promete e defeito (R-6, §12.4) —, e as duas frases ficam aqui
+   * ele nao fazia nada. Saiu de `reels.ts` nesta rodada, um controle que nao
+   * faz o que promete e defeito (R-6, §12.4), e as duas frases ficam aqui
    * porque o botao e §3 e volta na Task 13b, com o desenho escrito no docblock
    * de `listaDeReels`.
    *
@@ -634,8 +634,8 @@ export const TELA_DOS_REELS = {
    * pode ser escrita aqui.** O docblock de `dataEmPortugues` ja fixou a razao:
    * o Worker roda em UTC, o fuso da instalacao nao esta no contrato de
    * ambiente, e uma hora tres horas errada numa tela que existe para explicar e
-   * pior do que nenhuma hora. A IDADE responde a mesma pergunta — "de quando
-   * ela e?" — e nao depende de fuso nenhum. Quando o fuso virar dado de
+   * pior do que nenhuma hora. A IDADE responde a mesma pergunta, "de quando
+   * ela e?", e nao depende de fuso nenhum. Quando o fuso virar dado de
    * ambiente, esta frase vira a de §12.5 palavra por palavra.
    */
   listaBuscadaAgora: 'Esta lista acabou de ser buscada no Instagram.',
@@ -654,7 +654,7 @@ export const TELA_DOS_REELS = {
    * §10.10: a tela de conferencia NOMEIA o Reel antes de pedir a digital.
    *
    * Sem ela o dono lia "Intervalo por pessoa: 48 para 24" sem saber em qual
-   * Reel estava encostando o dedo — e a mudanca assinada era identica para
+   * Reel estava encostando o dedo, e a mudanca assinada era identica para
    * todos eles (Ruling 96).
    */
   soNesteReel: 'Estas mudanças valem só neste Reel:',
@@ -664,10 +664,10 @@ export const TELA_DOS_REELS = {
    * "Voltar tudo a seguir a regra geral" alarga quando a sobreposicao daquele
    * Reel estreitava, e §10.10 lista o alargamento entre o que pede a digital.
    * §12.3 e literal: "quem garante o aviso e o cadeado no campo mais a tela de
-   * conferencia — nunca uma surpresa biometrica".
+   * conferencia, nunca uma surpresa biometrica".
    */
   esteBotaoPedeDigital:
-    'Neste Reel, este botão aumenta o alcance da automação — então ele vai pedir a sua digital ou o seu rosto, e mostrar antes o que muda.',
+    'Neste Reel, este botão aumenta o alcance da automação, então ele vai pedir a sua digital ou o seu rosto, e mostrar antes o que muda.',
   /** O que o botao acrescenta ao proprio rotulo, para dizer o que vai acontecer. */
   vaiPedirADigital: '(vai pedir a sua digital)',
 } as const
@@ -688,7 +688,7 @@ export interface ResultadoNaTela {
  *
  * **O enum que governa esta tela e `CommentStatus`, e ele NAO e o dos motivos
  * de ignorar.** `SkipReason` e `ProcessOutcome` (`automation.ts`) sao resultados
- * em memoria do processamento e nao chegam a coluna nenhuma — o material de
+ * em memoria do processamento e nao chegam a coluna nenhuma, o material de
  * origem misturava os tres numa citacao so. Quem a tela le e `status`, e a
  * unica lista fechada que responde por ele e a de
  * `src/repositories/comments-repository.ts` (§15.3, decisao 7). Um dicionario de
@@ -696,7 +696,7 @@ export interface ResultadoNaTela {
  *
  * **A trava e de TIPO**, como a de `NOME_DO_CAMPO`: `Record<CommentStatus, …>`
  * nao compila com um membro faltando, entao um valor novo no enum quebra o
- * `tsc` antes de qualquer teste — e sem ele a tela imprimiria o nome tecnico
+ * `tsc` antes de qualquer teste, e sem ele a tela imprimiria o nome tecnico
  * cru, que e o defeito que §12.7 proibe em letras.
  *
  * **Hoje so cinco destes oito existem no banco, e a frase honesta e a que a
@@ -704,7 +704,7 @@ export interface ResultadoNaTela {
  * que grava `processing`, e em `processComment` **todo** `skipped` acontece
  * ANTES dele: comentario ignorado nao deixa linha nenhuma. `received` e
  * `ignored` estao declarados no tipo e nao sao escritos em lugar nenhum de
- * `src/`. As oito frases continuam obrigatorias assim mesmo — `processing` E o
+ * `src/`. As oito frases continuam obrigatorias assim mesmo, `processing` E o
  * valor que o claim grava e pode ser lido numa corrida real, e um valor de enum
  * sem frase e o bug que a tela mostraria como texto cru. O que nenhum teste
  * pode afirmar, sob pena de virar promessa falsa, e que todo valor traduzido
@@ -740,8 +740,8 @@ export const RESULTADO_DO_COMENTARIO: Record<CommentStatus, ResultadoNaTela> = {
  *
  * Ela existe porque a coluna e TEXT e a tela le o que estiver la: uma linha
  * gravada por uma versao futura, ou corrompida, nao pode virar o nome tecnico
- * impresso na tela (§12.7). A direcao e a mesma de `motivoDaRecusa` — frase
- * generica em vez de texto cru — e nao a de `traduzirAviso`, que nomeia o campo.
+ * impresso na tela (§12.7). A direcao e a mesma de `motivoDaRecusa`, frase
+ * generica em vez de texto cru, e nao a de `traduzirAviso`, que nomeia o campo.
  */
 export const RESULTADO_DESCONHECIDO: ResultadoNaTela = {
   icone: '–',

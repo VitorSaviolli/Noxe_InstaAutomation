@@ -5,7 +5,7 @@
  * **Esta e a rede de seguranca do dono, e por isso ela e a tela que mais
  * explica.** Todo o resto do painel muda o que a automacao faz; aqui se muda
  * QUEM entra. Um erro nas outras telas custa um Direct errado; um erro nesta
- * custa o painel inteiro — e o unico caminho de volta e um pedaco de papel.
+ * custa o painel inteiro, e o unico caminho de volta e um pedaco de papel.
  *
  * **As tres acoes tem exigencias DIFERENTES, e e por isso que a tabela de rotas
  * declara `stepUp: false`** (§7.1, §10.10, §15.4):
@@ -17,29 +17,29 @@
  * | `sair_de_tudo` | **nao** | desligar e barato: e a direcao segura de §10.10 |
  *
  * Cobrar biometria de "sair de todos os aparelhos" seria pedir a digital de
- * quem esta correndo para se proteger — e a versao comprimida do contrato
+ * quem esta correndo para se proteger, e a versao comprimida do contrato
  * chegou a marcar a tela inteira como step-up "sim", o que §15.4 corrigiu
  * nomeando o caso.
  *
  * **A tela nao usa `telaDoPainel`, e a ausencia e decisao.** A moldura das
  * telas de leitura deixa o `painel.js` de fora de proposito (§12.9: carregar um
  * arquivo a mais numa conexao ruim onde ele nao tem trabalho), e esta e a unica
- * tela autenticada que LE A DIGITAL — duas vezes, no caso de cadastrar outro
+ * tela autenticada que LE A DIGITAL, duas vezes, no caso de cadastrar outro
  * aparelho. Passar `comScript` pela moldura carregaria o script nas seis telas
  * que nao precisam dele, e a barra de baixo de §12.1 tem seis itens e nenhuma
  * vaga ate o "Mais" nascer. O freio de §12.1 continua aqui: `/painel/parar`
  * aparece nesta pagina como em toda outra.
  *
  * **Nunca o `credential_id` inteiro na tela** (§10.13). Sao tres destinos e uma
- * regra — tela, `console` e `painel_auditoria` veem o mesmo `passkey:<8 hex do
+ * regra, tela, `console` e `painel_auditoria` veem o mesmo `passkey:<8 hex do
  * sha256>`, nunca o valor cru. O id cru existe nesta pagina em UM lugar so: o
  * `value` do campo escondido da remocao, porque o POST precisa dizer QUAL linha
- * apagar. Ele nao e segredo — quem tem a sessao ja pode le-lo —, mas um
+ * apagar. Ele nao e segredo, quem tem a sessao ja pode le-lo, mas um
  * identificador inteiro escrito para a pessoa ler nao diferencia melhor que
  * oito caracteres e convida a copiar credencial para lugar nenhum.
  *
  * **A MARCACAO da tela mora em `aparelhos-tela.ts`.** O corte e por
- * responsabilidade — aqui, o que cada acao FAZ; la, como a tela se parece —, e
+ * responsabilidade, aqui, o que cada acao FAZ; la, como a tela se parece, e
  * o teto de 800 linhas foi so o gatilho: o arquivo unico chegou a 867. A
  * dependencia e de mao unica, e o vocabulario do formulario mora do lado de la,
  * com quem desenha os `<input>`.
@@ -90,13 +90,13 @@ import { cookieDeStepUpExpirado, exigirStepUp, type MudancaCanonica, opHash } fr
 const ACAO_CANONICA_DE_REMOVER = 'remover_passkey'
 
 // ---------------------------------------------------------------------------
-// GET /painel/aparelhos — a tela
+// GET /painel/aparelhos, a tela
 // ---------------------------------------------------------------------------
 
 /**
  * `GET+POST /painel/aparelhos`.
  *
- * Custo do GET: **2 leituras** — os aparelhos e quantos codigos de recuperacao
+ * Custo do GET: **2 leituras**, os aparelhos e quantos codigos de recuperacao
  * ainda valem. Elas nao entram num lote so porque as duas respostas alimentam
  * partes diferentes da pagina e o `db.batch()` do painel existe para prender
  * escritas juntas (§8.8), nao para economizar leitura de tela; e esta tela nao
@@ -127,7 +127,7 @@ export async function handleAparelhos(entrada: EntradaDaRota): Promise<Response>
       return await gerarCodigos(entrada, sessao, campos)
     default:
       // Um `acao` que a rota nao conhece e cliente adulterado ou botao que
-      // ninguem desenhou — §9.2 proibe conserto nas duas hipoteses.
+      // ninguem desenhou, §9.2 proibe conserto nas duas hipoteses.
       return erro('dados_invalidos', { ...contexto, motivoInterno: 'acao_desconhecida' })
   }
 }
@@ -149,7 +149,7 @@ type Passagem = { readonly resposta: Response } | { readonly credentialId: strin
  * **O que muda em relacao a `passarPeloStepUp` e so o que esta rota nao tem**:
  * nao ha campos de configuracao para classificar (as duas acoes protegidas sao
  * protegidas SEMPRE, e nao conforme o conteudo), nao ha trava otimista de
- * versao e nao ha `SnapshotConfig` — a linha de auditoria sai com `versao: 0`,
+ * versao e nao ha `SnapshotConfig`, a linha de auditoria sai com `versao: 0`,
  * o mesmo carimbo que `codigos_gerados` ja usa, porque perguntar a versao da
  * configuracao custaria uma leitura de `painel_config` que esta rota nao tem no
  * orcamento e que nada aqui altera (§9.9).
@@ -170,17 +170,17 @@ async function passarPeloStepUp(
    * E uma funcao, e nao um `HtmlSeguro` pronto, porque a explicacao da remocao
    * precisa LER a linha do aparelho para mostrar de qual aparelho se trata
    * (§10.10). Pronta no call site, essa leitura seria paga tambem pelo envio que
-   * ja traz a digital — o caminho que nao desenha tela nenhuma.
+   * ja traz a digital, o caminho que nao desenha tela nenhuma.
    */
   explicacao: () => HtmlSeguro | Promise<HtmlSeguro>,
   /**
-   * O `alvo` da LINHA DE AUDITORIA, ja recortado — nunca `mudanca.alvo`.
+   * O `alvo` da LINHA DE AUDITORIA, ja recortado, nunca `mudanca.alvo`.
    *
    * Os dois sao a mesma entidade em vocabularios diferentes: a mudanca canonica
    * carrega o `credential_id` inteiro, porque e ele que entra no `op_hash` e o
    * hash tem de fechar com o que o cliente assinou; a coluna `alvo` guarda o
    * `passkey:<8 hex>` de §9.9. Passar a mudanca direto para a auditoria escrevia
-   * o id cru no banco — o terceiro dos tres destinos que §10.13 proibe — e a
+   * o id cru no banco, o terceiro dos tres destinos que §10.13 proibe, e a
    * coluna, que tem `CHECK (length(alvo) <= 32)`, derrubava a recusa inteira em
    * `500`: a tela de conferencia nunca chegava a aparecer.
    */
@@ -247,11 +247,11 @@ async function passarPeloStepUp(
 }
 
 // ---------------------------------------------------------------------------
-// acao=sair_de_tudo — sessao + ficha, e NENHUM step-up (§10.13, §15.4)
+// acao=sair_de_tudo, sessao + ficha, e NENHUM step-up (§10.13, §15.4)
 // ---------------------------------------------------------------------------
 
 /**
- * "Sair de todos os aparelhos": `DELETE FROM painel_sessoes` — **1 escrita** —
+ * "Sair de todos os aparelhos": `DELETE FROM painel_sessoes`, **1 escrita**,
  * mais a linha de auditoria, no mesmo lote (§8.8).
  *
  * **O `303` aponta para `/painel/entrar`, e nao para esta tela.** E a unica
@@ -277,7 +277,7 @@ async function sairDeTudo(entrada: EntradaDaRota, sessao: LinhaDeSessao): Promis
       alvo: null,
       campos: [ACAO_SAIR_DE_TUDO],
       // A coluna responde "esta mudanca passou pela digital?", e aqui a resposta
-      // e nao — de proposito (§10.10: desligar e a direcao segura).
+      // e nao, de proposito (§10.10: desligar e a direcao segura).
       stepUp: false,
       ator,
     }),
@@ -289,7 +289,7 @@ async function sairDeTudo(entrada: EntradaDaRota, sessao: LinhaDeSessao): Promis
 }
 
 // ---------------------------------------------------------------------------
-// acao=remover_passkey — step-up, e a regra da ultima (§10.13)
+// acao=remover_passkey, step-up, e a regra da ultima (§10.13)
 // ---------------------------------------------------------------------------
 
 /**
@@ -297,16 +297,16 @@ async function sairDeTudo(entrada: EntradaDaRota, sessao: LinhaDeSessao): Promis
  *
  * O lote e uma CADEIA de `changes()`, e a ordem dele e parte da garantia:
  *
- *   1. `DELETE` da credencial — altera 0 ou 1 linha, e a subconsulta de
+ *   1. `DELETE` da credencial, altera 0 ou 1 linha, e a subconsulta de
  *      `statementDeRemocao` e quem responde "esta e a ultima DESTE endereco?"
  *      de forma atomica;
- *   2. a linha de auditoria, `presoAMudanca` — so entra se (1) apagou;
- *   3. a rotacao do `sid`, `presoAMudanca` — so entra se (2) inseriu;
- *   4. `DELETE` das sessoes daquela credencial, `presoAMudanca` — so entra se
+ *   2. a linha de auditoria, `presoAMudanca`, so entra se (1) apagou;
+ *   3. a rotacao do `sid`, `presoAMudanca`, so entra se (2) inseriu;
+ *   4. `DELETE` das sessoes daquela credencial, `presoAMudanca`, so entra se
  *      (3) rotacionou, isto e, se (1) apagou.
  *
  * O `changes()` do SQLite vale a contagem do statement IMEDIATAMENTE anterior,
- * entao a auditoria tem de vir logo depois da remocao — se as sessoes viessem
+ * entao a auditoria tem de vir logo depois da remocao, se as sessoes viessem
  * no meio, um aparelho sem nenhuma sessao aberta faria `changes()` valer 0 e a
  * linha de auditoria sumiria de uma remocao que aconteceu.
  *
@@ -314,16 +314,16 @@ async function sairDeTudo(entrada: EntradaDaRota, sessao: LinhaDeSessao): Promis
  * dentro do painel ate o prazo ocioso de 2 h vencer.
  *
  * **A rotacao do `sid` entra em TERCEIRO, e a posicao e a mesma garantia.** Ela
- * so pode acontecer se a remocao aconteceu — senao o dono seria deslogado por
- * uma remocao recusada, sem sequer receber o cookie novo —, e o `changes()` que
+ * so pode acontecer se a remocao aconteceu, senao o dono seria deslogado por
+ * uma remocao recusada, sem sequer receber o cookie novo, e o `changes()` que
  * ela le tem de ser o da linha de auditoria, que vale 1 exatamente quando o
  * `DELETE` apagou. Posta no FIM, ela leria o `changes()` do `DELETE` das
  * sessoes, que e 0 sempre que o aparelho removido nao tinha sessao aberta: o
- * `sid` no banco ficaria o antigo e a resposta mandaria um cookie novo — o dono
+ * `sid` no banco ficaria o antigo e a resposta mandaria um cookie novo, o dono
  * deslogado por uma remocao que deu certo. E o `DELETE` das sessoes, agora
  * preso ao `changes()` da rotacao, continua correto: a rotacao altera a linha da
  * sessao de quem esta pedindo, que acabou de passar por `exigirSessaoViva` e
- * esta dentro da mesma transacao — 1 linha, sempre.
+ * esta dentro da mesma transacao, 1 linha, sempre.
  */
 async function removerAparelho(
   entrada: EntradaDaRota,
@@ -353,7 +353,7 @@ async function removerAparelho(
     mudanca,
     // "Confira o aparelho abaixo" so e verdade porque `resumoDoAparelho` desenha
     // o aparelho abaixo (§10.10): a frase existia antes dele, e apontava para
-    // uma tela onde nao havia aparelho nenhum — nem apelido, nem data, nem o
+    // uma tela onde nao havia aparelho nenhum, nem apelido, nem data, nem o
     // prefixo de 8 hex, nem o aviso de §10.13 sobre o aparelho de agora.
     async () => html`<p>Remover um aparelho tira o acesso dele <strong>na hora</strong> e encerra a
 sess&atilde;o que ele tiver aberta. Confira o aparelho abaixo antes de confirmar.</p>
@@ -365,7 +365,7 @@ ${await resumoDoAparelho(env, alvo, sessao)}`,
   const credenciais = new PainelCredenciaisRepository(env.DB)
   const sessoes = new PainelSessoesRepository(env.DB)
 
-  // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo —
+  // §10.8: o `sid` rotaciona em exatamente dois momentos, e este e o segundo,
   // a sessao muda de "conseguiu ler" para "acabou de autorizar". O prazo
   // absoluto e o que JA estava valendo: SES-01 diz que ele nunca e estendido.
   const sessaoNova = await rotacionarSessao(env, sessao.expiraEm)
@@ -391,13 +391,13 @@ ${await resumoDoAparelho(env, alvo, sessao)}`,
   ])
 
   // `changes === 0` e a regra da ultima falando (§10.13), e tambem um `alvo`
-  // que nao existe — inclusive o reenvio de uma remocao que outra aba ja fez.
+  // que nao existe, inclusive o reenvio de uma remocao que outra aba ja fez.
   // As duas respostas sao a mesma frase de propósito: o que a pessoa precisa
   // saber e que ela precisa de outro aparelho antes.
   //
   // Uma credencial de ENDERECO ANTIGO ja nao cai mais aqui: ela sai livre, como
   // §10.14 desenha e como o cartao dela promete. Enquanto caia, esta frase era
-  // uma mentira sem saida — "cadastre outra passkey" com duas cadastradas.
+  // uma mentira sem saida, "cadastre outra passkey" com duas cadastradas.
   if ((lote[0]?.meta.changes ?? 0) === 0) {
     return erro('ultima_passkey', { ...contexto, motivoInterno: 'remocao_sem_efeito' })
   }
@@ -405,8 +405,8 @@ ${await resumoDoAparelho(env, alvo, sessao)}`,
   // §10.10, fim do passo 4: aplica, **expira o cookie**, rotaciona o `sid`,
   // responde `303`. Os dois `Set-Cookie` juntos sao o que garante que o mesmo
   // step-up nao serve para duas operacoes: o envelope morre, e o `sid` que a
-  // assinatura dele nomeia deixa de existir. Sem eles — e ate esta linha nao
-  // havia nenhum —, o par (envelope + assertion) que o dono acabou de produzir
+  // assinatura dele nomeia deixa de existir. Sem eles, e ate esta linha nao
+  // havia nenhum, o par (envelope + assertion) que o dono acabou de produzir
   // continuava fechando pelo resto dos 120 s, e um gesto de biometria
   // autorizava N operacoes: exatamente o "modo privilegiado por 120 s" que o
   // cabecalho de `stepup.ts` diz que o desenho recusou.
@@ -425,20 +425,20 @@ ${await resumoDoAparelho(env, alvo, sessao)}`,
 }
 
 // ---------------------------------------------------------------------------
-// acao=gerar_codigos — step-up, e os codigos aparecem UMA vez (§10.11)
+// acao=gerar_codigos, step-up, e os codigos aparecem UMA vez (§10.11)
 // ---------------------------------------------------------------------------
 
 /**
  * O conjunto novo de codigos, gerado pela TELA (§10.11).
  *
  * E a mesma operacao de `POST /setup/painel/codigos`, com a mesma funcao a
- * sortear e a montar os statements — o que muda e quem autoriza: la, o
+ * sortear e a montar os statements, o que muda e quem autoriza: la, o
  * `SETUP_ADMIN_TOKEN` do assistente; aqui, sessao + ficha + step-up.
  *
  * **Esta e a unica escrita do painel que responde `200` e nao `303`**, e a
  * excecao a regra de forma de §7.1 e forcada pelo conteudo: os codigos sao
  * mostrados UMA vez e nunca mais. Um `303` os jogaria fora entre a gravacao e a
- * tela seguinte, e o dono ficaria com um conjunto novo que ninguem anotou —
+ * tela seguinte, e o dono ficaria com um conjunto novo que ninguem anotou,
  * pior do que nao ter gerado, porque o antigo ja foi apagado.
  *
  * **O corpo desta resposta nunca e logado**, em nenhum nivel (§10.11).
@@ -466,10 +466,10 @@ que desliga a automa&ccedil;&atilde;o. Tenha onde anotar antes de confirmar.</p>
 
   // A segunda metade do passo 4 de §10.10, que faltava aqui: rotacionar o
   // `sid`. Expirar o cookie sozinho protege o navegador do dono e nao protege
-  // de quem ja copiou o valor do envelope — e o inimigo nomeado por §10.10 e um
+  // de quem ja copiou o valor do envelope, e o inimigo nomeado por §10.10 e um
   // painel invadido. Como a assinatura do envelope nomeia o `sid`, e a rotacao
   // que o mata de verdade. Sem `presoAMudanca`: `db.batch` e uma transacao, e
-  // ou tudo grava ou nada grava — nao ha aqui trava otimista que altere zero
+  // ou tudo grava ou nada grava, nao ha aqui trava otimista que altere zero
   // linhas em silencio, como ha no funil de configuracao.
   const sessaoNova = await rotacionarSessao(env, sessao.expiraEm)
 
@@ -513,7 +513,7 @@ papel antigo, rasgue.</p>
   })
 
   // O SEGUNDO `Set-Cookie` vai por `append`, e nao por `extras`: aquele campo e
-  // um `Record<string, string>` e nao consegue ter a mesma chave duas vezes — o
+  // um `Record<string, string>` e nao consegue ter a mesma chave duas vezes, o
   // segundo cookie apagaria o primeiro em silencio, e o silencio seria "o dono
   // deslogado" ou "o envelope vivo depois de usado", conforme qual sobrasse.
   resposta.headers.append('set-cookie', cookieDeStepUpExpirado())
@@ -528,7 +528,7 @@ papel antigo, rasgue.</p>
  * A linha de `painel_auditoria` de uma acao desta tela.
  *
  * `versao: 0` porque nada aqui muda a configuracao, e perguntar a versao atual
- * custaria uma leitura de `painel_config` que esta rota nao tem no orcamento —
+ * custaria uma leitura de `painel_config` que esta rota nao tem no orcamento,
  * o mesmo `0` que `codigos_gerados` e `login` ja usam (§9.9).
  *
  * O `ator` e a credencial que AUTORIZOU quando houve step-up, e a que abriu a
@@ -568,7 +568,7 @@ function linhaDeAuditoria(
 /**
  * O `ator` de §9.9: `passkey:<8 hex do sha256 do credential_id>`.
  *
- * Ele e `async` e por isso e resolvido ANTES da montagem do array do lote —
+ * Ele e `async` e por isso e resolvido ANTES da montagem do array do lote,
  * um `await` dentro do array espalharia a mesma conversao por cinco lugares, e
  * o primeiro que a esquecesse gravaria o `credential_id` cru, que e o terceiro
  * destino que §10.13 proibe.
@@ -578,7 +578,7 @@ async function atorDaLinha(credentialId: string): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// POST /setup/painel/zerar — a porta do assistente (§7.1, §10.8)
+// POST /setup/painel/zerar, a porta do assistente (§7.1, §10.8)
 // ---------------------------------------------------------------------------
 
 /**
@@ -586,7 +586,7 @@ async function atorDaLinha(credentialId: string): Promise<string> {
  *
  * **Nao e caminho de painel.** Ela e do assistente local, autenticada por
  * Bearer, e mora ao lado de `/setup/painel/codigos` pelo mesmo motivo: quem
- * chega aqui nao tem sessao — na maioria das vezes porque nao consegue mais ter
+ * chega aqui nao tem sessao, na maioria das vezes porque nao consegue mais ter
  * uma. Ela e o ultimo recurso quando o dono perdeu todos os aparelhos E o papel
  * dos codigos, e o preco de usa-la e cadastrar tudo de novo por um convite.
  *
@@ -595,7 +595,7 @@ async function atorDaLinha(credentialId: string): Promise<string> {
  * e. Uma rota administrativa cujo comportamento padrao e o irreversivel seria a
  * pior forma de um comando digitado errado.
  *
- * **Ela NAO toca `account_tokens`** — e a regressao escrita em §13.2. A conexao
+ * **Ela NAO toca `account_tokens`**, e a regressao escrita em §13.2. A conexao
  * com o Instagram nao e acesso ao painel, e derruba-la junto faria uma rota de
  * recuperacao de acesso desligar a automacao de quem so queria voltar a entrar.
  */
@@ -608,7 +608,7 @@ export async function handleZerarAcesso(
     return respostaDeTexto('Metodo nao permitido', 405, { allow: 'POST' })
   }
 
-  // Bearer, nunca cookie e nunca query string — a mesma porta das irmas de
+  // Bearer, nunca cookie e nunca query string, a mesma porta das irmas de
   // `/setup/*`, com o mesmo comparador em tempo constante. Como elas, ela NAO
   // registra nada em log: §11.4 e a tabela do painel, e quem nao e painel nao
   // se anuncia como `painel:`.
@@ -621,7 +621,7 @@ export async function handleZerarAcesso(
   const credenciais = new PainelCredenciaisRepository(env.DB)
 
   // Sem log, sem mudanca (§8.8): a linha de auditoria vai no MESMO lote. O
-  // `ator` e `'assistente'`, constante, como em `codigos_gerados` — quem chamou
+  // `ator` e `'assistente'`, constante, como em `codigos_gerados`, quem chamou
   // provou o `SETUP_ADMIN_TOKEN` e nao ha credencial nenhuma a nomear.
   await env.DB.batch([
     sessoes.statementDeApagarTodas(),
@@ -643,7 +643,7 @@ export async function handleZerarAcesso(
   // A forma da resposta e a das IRMAS de `/setup/*`, e nao a do painel
   // (Ruling 19): `Response.json` com os dois cabecalhos que `/setup/painel/
   // codigos` ja usa. O `json()` de `resposta.ts` carimba a CSP e o `sandbox` da
-  // familia `/painel/api/*`, e esta rota nao e dessa familia — quem nao e
+  // familia `/painel/api/*`, e esta rota nao e dessa familia, quem nao e
   // painel nao se veste de painel.
   return Response.json(
     {

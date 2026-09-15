@@ -12,7 +12,7 @@
  *
  * **Nenhum metodo daqui grava por conta propria.** Os dois que escrevem
  * devolvem statements para o chamador juntar num unico `db.batch()` com a
- * linha de auditoria — e a regra de ouro de §8.8: sem log, sem mudanca.
+ * linha de auditoria, e a regra de ouro de §8.8: sem log, sem mudanca.
  */
 
 /** As duas familias de codigo. Nao existe uma terceira. */
@@ -38,20 +38,20 @@ export class PainelCodigosRepository {
    * **`usado_em` entra no filtro so para `recuperacao`, e a assimetria e o
    * ponto.** O codigo de PARADA nao e de uso unico (§10.12): filtra-lo faria o
    * freio de emergencia parar de funcionar na segunda vez que o dono precisasse
-   * dele — o pior momento possivel para descobrir isso.
+   * dele, o pior momento possivel para descobrir isso.
    *
    * O de RECUPERACAO e de uso unico, e a unicidade continua garantida no
    * CONSUMO, com `WHERE hash = ? AND usado_em IS NULL` exigindo
-   * `changes === 1` — atomico, e e ele que impede o reuso. O filtro aqui nao
+   * `changes === 1`, atomico, e e ele que impede o reuso. O filtro aqui nao
    * substitui aquela trava; ele conserta outra coisa: sem ele, um codigo JA
-   * GASTO passava nesta porta, o dono percorria a cerimonia WebAuthn inteira —
-   * dois gestos de biometria e uma chave nova criada no aparelho — e so no fim
+   * GASTO passava nesta porta, o dono percorria a cerimonia WebAuthn inteira,
+   * dois gestos de biometria e uma chave nova criada no aparelho, e so no fim
    * levava `credencial_invalida`, sem nenhuma pista de que o problema era o
    * codigo. Recusar aqui custa zero consulta a mais e diz a verdade na primeira
    * tela.
    */
   async hashesVivos(tipo: TipoDeCodigo): Promise<string[]> {
-    // Uma leitura so, nos dois casos — o que §10.11 orca para o POST do codigo.
+    // Uma leitura so, nos dois casos, o que §10.11 orca para o POST do codigo.
     const sql =
       tipo === 'recuperacao'
         ? 'SELECT hash FROM painel_codigos WHERE tipo = ? AND invalidado_em IS NULL AND usado_em IS NULL'
@@ -95,13 +95,13 @@ export class PainelCodigosRepository {
    *
    * `changes === 1` e a prova do uso unico, e ela e ATOMICA: o `WHERE` carrega
    * `usado_em IS NULL`, entao duas requisicoes com o mesmo codigo nao podem
-   * ambas ver `1` — o D1 e SQLite com escritor unico, o mesmo padrao do
+   * ambas ver `1`, o D1 e SQLite com escritor unico, o mesmo padrao do
    * `claimComment` que o projeto ja usa.
    *
    * Statement, e nao gravacao, mas por um motivo DIFERENTE do resto do painel:
    * este aqui vai sozinho, ANTES do lote, porque §10.5 manda consumir a
    * autorizacao antes de inserir a credencial e aceita explicitamente o preco
-   * — se a insercao falhar, o codigo foi queimado por nada. Se ele viajasse
+   * se a insercao falhar, o codigo foi queimado por nada. Se ele viajasse
    * dentro do lote, uma falha na credencial devolveria o codigo ao mundo, e ai
    * duas requisicoes com o mesmo codigo poderiam registrar duas passkeys.
    */
@@ -120,7 +120,7 @@ export class PainelCodigosRepository {
    *
    * Justificativa da spec, em uma linha: se um codigo foi usado por quem nao
    * devia, os outros estao na mesma lista vazada. O codigo de PARADA nao entra
-   * — ele nao abre cadastro nenhum, e derrubar o freio de emergencia junto
+   * ele nao abre cadastro nenhum, e derrubar o freio de emergencia junto
    * seria punir o dono no pior dia possivel.
    */
   statementDeInvalidacaoDosDemais(hash: string, now: number): D1PreparedStatement {

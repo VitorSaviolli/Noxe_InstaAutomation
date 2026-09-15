@@ -38,10 +38,10 @@ import { gravarConfig, gravarMidia, limparBanco } from './fixtures/banco'
 import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
 
 /**
- * STEP — o step-up de §10.10: uma operacao, presa ao conteudo.
+ * STEP, o step-up de §10.10: uma operacao, presa ao conteudo.
  *
  * As 17 garantias de §13.2 sao STEP-01 a STEP-17; STEP-18 a STEP-21 sao o
- * "mais" da mesma linha — `json_canonico` com vetores congelados e o mesmo hash
+ * "mais" da mesma linha, `json_canonico` com vetores congelados e o mesmo hash
  * a partir do JSON da cerimonia e do formulario urlencoded. STEP-22 em diante
  * sao as travas da cerimonia e da tela que as dezessete nao nomeiam mas das
  * quais dependem. STEP-39 mora junto dos vetores por assunto e nao por numero:
@@ -51,7 +51,7 @@ import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
  * **A cerimonia e feita de verdade, ponta a ponta.** Nada de `vi.mock`: o
  * `AutenticadorFalso` produz os mesmos bytes que um autenticador real
  * produziria, e as rotas sao chamadas por `despachar`, a MESMA funcao que o
- * roteador usa — um teste que chamasse o handler direto pularia a escada de
+ * roteador usa, um teste que chamasse o handler direto pularia a escada de
  * §11.3 e afirmaria menos do que parece.
  *
  * **Nenhum valor da instalacao do dono entra neste arquivo.** Texto, link e
@@ -80,7 +80,7 @@ const LINK_PROIBIDO = 'https://outro-dominio-ficticio.example/promocao'
  * O `env` do `vitest.config.ts` traz `ALLOWED_LINK_DOMAINS: ''`, e lista vazia
  * nao "passa tudo": ela recusa qualquer mudanca de endereco (§9.8, §12.7,
  * LNK-12). Sem esta linha, a metade POSITIVA das garantias do link e dos dois
- * textos nao teria como existir — e um teste que so consegue provar a recusa e
+ * textos nao teria como existir, e um teste que so consegue provar a recusa e
  * exatamente o que §13.1 proibe. STEP-29 usa o `env` cru, e afirma a recusa.
  */
 const AMBIENTE = { ...env, ALLOWED_LINK_DOMAINS: DOMINIO_DE_TESTE } as unknown as typeof env
@@ -147,7 +147,7 @@ async function cadastrarAparelho(aparelho: AutenticadorFalso): Promise<void> {
  * Uma SEGUNDA credencial do mesmo dono, sem tocar em `painel_estado`.
  *
  * Existe para separar "a passkey que abriu a sessao" de "a passkey que
- * autorizou a mudanca" — §9.9 quer a segunda no `ator`, e enquanto so houvesse
+ * autorizou a mudanca", §9.9 quer a segunda no `ator`, e enquanto so houvesse
  * uma credencial cadastrada as duas coincidiam e a distincao era indistinguivel.
  */
 async function cadastrarSegundoAparelho(outro: AutenticadorFalso): Promise<void> {
@@ -187,13 +187,13 @@ const REELS: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   handler: handleReels,
 }
 
-/** A tela de UM Reel — a unica rota cuja gravacao tem um ALVO (Ruling 96). */
+/** A tela de UM Reel, a unica rota cuja gravacao tem um ALVO (Ruling 96). */
 const REEL: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_REEL,
   handler: handleReel,
 }
 
-/** A rota dona de `enabled` — a unica que o declara fora da restauracao. */
+/** A rota dona de `enabled`, a unica que o declara fora da restauracao. */
 const CHAVE: { rota: RotaDoPainel; handler: HandlerDoPainel } = {
   rota: ROTA_CHAVE,
   handler: handleChave,
@@ -208,7 +208,7 @@ const DESLIGAR = 'desligar'
  *
  * Nenhuma rota de `src/` tem essa forma hoje, e e por isso que o buraco do
  * Ruling 86 era inalcancavel: `/painel/chave` e a unica que usa `patchDoHandler`
- * e ela so escreve `enabled`, que nunca e protegido — entao aquela rota nunca
+ * e ela so escreve `enabled`, que nunca e protegido, entao aquela rota nunca
  * chega a tela de conferencia. O que fecha o buraco antes de ele ser alcancavel
  * e testa-lo onde ele existe de verdade: no funil.
  *
@@ -246,7 +246,7 @@ interface OpcoesDeEnvio {
   readonly digital?: string
 }
 
-/** Um POST completo — ficha, versao e o corpo — pela escada de §11.3. */
+/** Um POST completo, ficha, versao e o corpo, pela escada de §11.3. */
 async function postar(
   alvo: { rota: RotaDoPainel; handler: HandlerDoPainel },
   campos: string,
@@ -288,7 +288,7 @@ function desescapar(valor: string): string {
  * Um texto escrito como a LISTA dos pontos de codigo dele.
  *
  * STEP-39 compara formas que sao visualmente identicas e diferentes ponto a
- * ponto — e essa diferenca invisivel e o assunto do teste. Impressa como
+ * ponto, e essa diferenca invisivel e o assunto do teste. Impressa como
  * texto, a falha mostraria a MESMA letra acentuada nos dois lados e ninguem
  * entenderia por que o teste quebrou; impressa como `U+0061 U+0301` contra
  * `U+00E1`, ela se explica sozinha.
@@ -311,15 +311,15 @@ function mudancaDaTela(corpo: string): Record<string, unknown> {
  * leria: o `action`, e cada `<input type="hidden">` com nome e valor.
  *
  * **Nenhum teste desta suite montava o segundo POST a partir do formulario de
- * verdade** — todos remontavam o corpo da ficha e da versao que o proprio teste
+ * verdade**, todos remontavam o corpo da ficha e da versao que o proprio teste
  * guardava, e por isso tres quebras de uma linha na tela de conferencia
  * sobreviviam a suite inteira: a ficha virar constante (o botao daria `403
  * csrf_invalido` e o step-up seria IMPOSSIVEL), a `versao` sair incrementada (a
  * trava otimista virava carimbo automatico no unico formulario que pede
  * biometria) e o `action` apontar para outra tela.
  *
- * E a mesma classe do achado I-5 da Task 11 — nada ligava o formulario
- * renderizado ao funil que o le — reaparecendo na tela nova.
+ * E a mesma classe do achado I-5 da Task 11, nada ligava o formulario
+ * renderizado ao funil que o le, reaparecendo na tela nova.
  */
 function formularioDeConfirmacao(corpo: string): {
   action: string
@@ -407,7 +407,7 @@ async function digitalPara(
  * string do teste era o que escondia o C-1 da rodada 2: `acao=restaurar` estava
  * na lista de estruturais da rota, a tela de conferencia nao o reemitia, e o
  * botao "Voltar a esta versao" morria em `400 dados_invalidos` DEPOIS de colher
- * a digital — enquanto um cliente que montasse o proprio corpo, como este
+ * a digital, enquanto um cliente que montasse o proprio corpo, como este
  * fixture montava, passava. A suite pegava o adulterado e deixava passar o
  * legitimo, que e a inversao exata do que ela existe para fazer.
  *
@@ -441,7 +441,7 @@ async function comDigital(
   expect(formulario.action).toBe(alvo.rota.caminho)
 
   // E o que a tela NAO pode reemitir: `confirmar` (§10.12). Um gesto que o
-  // servidor recarrega sozinho no formulario seguinte deixa de ser um gesto —
+  // servidor recarrega sozinho no formulario seguinte deixa de ser um gesto,
   // a pessoa confirmaria religar a automacao sem nunca ter marcado nada. A
   // afirmacao mora aqui, e nao num teste so, porque a tela de conferencia ja
   // perdeu uma linha quatro vezes sem a suite notar (Ruling 81).
@@ -465,7 +465,7 @@ async function comDigital(
  * escondidos que o servidor emitiu, mais a digital no campo que a tela deixou
  * vazio para ela.
  *
- * Nada daqui vem do teste — nem a ficha, nem a versao, nem os campos de
+ * Nada daqui vem do teste, nem a ficha, nem a versao, nem os campos de
  * configuracao, nem a operacao declarada. E o que faz da tela de conferencia uma
  * peca sob teste em vez de um enfeite que ninguem le.
  */
@@ -528,13 +528,13 @@ async function falhasDaSessao(sidHash: string): Promise<number | null> {
 /**
  * D1 que deixa OUTRO escritor passar na frente, DENTRO do lote.
  *
- * Duble local, injetado por parametro — nada de `vi.mock`. Ele existe para o
+ * Duble local, injetado por parametro, nada de `vi.mock`. Ele existe para o
  * unico cenario em que a trava otimista de §8.8 age depois da leitura fresca: um
  * segundo escritor empurra a `versao` entre o `SELECT` do funil e o
  * `db.batch()`, e o `UPDATE` da configuracao altera ZERO linhas sem que o lote
  * rejeite nada.
  *
- * Sem esse duble o cenario e inalcancavel — e foi exatamente ele que um mutante
+ * Sem esse duble o cenario e inalcancavel, e foi exatamente ele que um mutante
  * sobrevivente apontou: apagar o `AND changes() > 0` de `statementDeRotacao`
  * deixava a suite inteira verde.
  */
@@ -542,14 +542,14 @@ class D1ComEscritorConcorrente {
   /**
    * O lote da GRAVACAO e reconhecido pelo statement que o precede.
    *
-   * O funil tambem le a configuracao por `db.batch()` — um lote inteiro vale um
-   * subrequest —, e sabotar TODO lote empurraria a `versao` ja na leitura, que
+   * O funil tambem le a configuracao por `db.batch()`, um lote inteiro vale um
+   * subrequest, e sabotar TODO lote empurraria a `versao` ja na leitura, que
    * cairia no `409` do passo 9 sem nunca chegar ao lote. O que se quer e a
    * corrida estreita: a leitura fresca passa, e o escritor concorrente entra
    * DEPOIS dela.
    *
    * O statement da gravacao e um `INSERT ... ON CONFLICT DO UPDATE ... WHERE
-   * painel_config.versao = ?` — a trava otimista mora naquele `WHERE`, e e ele
+   * painel_config.versao = ?`, a trava otimista mora naquele `WHERE`, e e ele
    * que passa a nao casar depois da sabotagem.
    */
   private viuEscritaDeConfig = false
@@ -587,7 +587,7 @@ beforeEach(async () => {
   invalidarCacheDeConfig()
   // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
   // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
-  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // listagem que o anterior guardou, e de afirmar sobre uma Meta que nunca foi
   // chamada.
   esquecerAListagem()
   aparelho = await AutenticadorFalso.criar()
@@ -598,7 +598,7 @@ beforeEach(async () => {
 // As dezessete garantias de §13.2
 // ---------------------------------------------------------------------------
 
-describe('STEP — step-up preso ao conteudo', () => {
+describe('STEP: step-up preso ao conteudo', () => {
   test('STEP-01: step-up ausente bloqueia o texto do Direct', async () => {
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
@@ -759,7 +759,7 @@ describe('STEP — step-up preso ao conteudo', () => {
       (await env.DB.prepare('SELECT sid_hash FROM painel_sessoes').first<{ sid_hash: string }>())
         ?.sid_hash as string,
     )
-    // O enunciado da linha de §13.2 e literal — "o MESMO step-up" —, entao a
+    // O enunciado da linha de §13.2 e literal, "o MESMO step-up", entao a
     // segunda gravacao reapresenta o envelope REAL e a digital REAL da primeira,
     // e nao um par de valores-lixo. Ele nomeia um `sid` que nao existe mais, e o
     // proprio `303` acabou de apaga-lo.
@@ -774,7 +774,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await linhaDeConfig())?.private_reply_text).toBe(TEXTO_NOVO)
   })
 
-  test('STEP-07: o `op_hash` e recalculado no servidor — outro conteudo nao passa', async () => {
+  test('STEP-07: o `op_hash` e recalculado no servidor: outro conteudo nao passa', async () => {
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
 
@@ -787,7 +787,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     const cerimoniaResposta = await pedirOpcoes(sessao, mudancaDaTela(await conferencia.text()))
     const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
 
-    // E o corpo submetido carrega o texto B — o campo escondido "mexido".
+    // E o corpo submetido carrega o texto B, o campo escondido "mexido".
     const resposta = await postar(
       MENSAGEM,
       `privateReplyText=${encodeURIComponent(OUTRO_TEXTO)}`,
@@ -830,12 +830,12 @@ describe('STEP — step-up preso ao conteudo', () => {
   test('STEP-10: `mediaScope` so e gravavel pela tela dona, e alargar pede a digital', async () => {
     // **Este teste media a coisa errada, e a rodada 2 provou** (Ruling 77). Ele
     // dizia afirmar "alargar o escopo pede a digital" e conferia um `403` que
-    // vinha do escopo de `/painel/ajustes`, e nao da classificacao de risco —
+    // vinha do escopo de `/painel/ajustes`, e nao da classificacao de risco,
     // quando o Ruling 73 pos a recusa de escopo antes da cerimonia, o `403`
     // virou `400` e a garantia apareceu como o que sempre foi: um teste que
     // fingia cobrir, proibido por §13.1.
     //
-    // A classificacao de `mediaScope` — as DUAS direcoes — e afirmada em
+    // A classificacao de `mediaScope`, as DUAS direcoes, e afirmada em
     // META-06, direto sobre `camposProtegidos`. O que fica aqui e o que so o
     // HTTP prova.
     //
@@ -845,7 +845,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     // duas metades passam a valer juntas:
     //
     //   1. as tres telas que NAO sao donas dele continuam recusando por ESCOPO
-    //      — `400`, sem pedir digital nenhuma;
+    //      `400`, sem pedir digital nenhuma;
     //   2. a tela DONA aceita, e alargar para "em todos os meus Reels" pede a
     //      digital, porque §10.10 lista `mediaScope -> 'todas'` como
     //      alargamento do envelope de alcance.
@@ -866,7 +866,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     }
 
     // E a recusa e por ESCOPO, nao por step-up: nenhuma linha `stepup_recusado`
-    // e — o que importa para quem esta na tela — nenhuma digital foi pedida.
+    // e, o que importa para quem esta na tela, nenhuma digital foi pedida.
     expect((await auditoria()).map((linha) => linha.acao)).toEqual([
       'mudanca_recusada',
       'mudanca_recusada',
@@ -874,7 +874,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     ])
 
     // A metade positiva, pela tela dona. O segundo POST e dirigido pelo
-    // `<form id="confirmar">` RENDERIZADO (Ruling 81) — `comDigital` cuida
+    // `<form id="confirmar">` RENDERIZADO (Ruling 81), `comDigital` cuida
     // disso, e e ele quem prende a tela de conferencia ao funil que a le.
     //
     // **A Meta nao e tocada neste caminho**, e por isso o handler entra sem
@@ -931,10 +931,10 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await auditoria())[0]?.step_up).toBe(0)
   })
 
-  test('STEP-13: gravacao parcial e impossivel — o campo barato do lote tambem nao entra', async () => {
+  test('STEP-13: gravacao parcial e impossivel: o campo barato do lote tambem nao entra', async () => {
     // **O veiculo e `/painel/palavras`** (Ruling 78): o lote misto precisa de uma
     // rota dona dos DOIS campos, e depois do Ruling 74 `/painel/ajustes` nao
-    // escreve o link — o lote seria recusado por escopo antes de a classificacao
+    // escreve o link, o lote seria recusado por escopo antes de a classificacao
     // rodar, e o teste mediria outro portao. `triggerKeywords` (barato) com
     // `matchMode` para "no meio" (protegido) e palavra por palavra o exemplo do
     // Ruling 66.
@@ -964,7 +964,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     })
   })
 
-  test('STEP-14: nao existe janela privilegiada — duas gravacoes seguidas pedem duas digitais', async () => {
+  test('STEP-14: nao existe janela privilegiada: duas gravacoes seguidas pedem duas digitais', async () => {
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
 
@@ -1027,7 +1027,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await linhaDeConfig())?.public_reply_text).toBe(TEXTO_PUBLICO_NOVO)
   })
 
-  test('STEP-16: o cookie de step-up e amarrado ao `sid` — outra sessao nao serve', async () => {
+  test('STEP-16: o cookie de step-up e amarrado ao `sid`: outra sessao nao serve', async () => {
     await gravarConfig(env.DB)
     const primeira = await abrirSessao(aparelho.credentialId)
     const segunda = await abrirSessao(aparelho.credentialId)
@@ -1042,7 +1042,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     const { challenge } = (await cerimoniaResposta.json()) as { challenge: string }
 
     // E o envelope roubado e apresentado pela SEGUNDA. Mesmo conteudo, mesma
-    // credencial, mesma digital valida — e ainda assim recusado.
+    // credencial, mesma digital valida, e ainda assim recusado.
     const resposta = await postar(
       MENSAGEM,
       `destinationUrl=${encodeURIComponent(LINK_NOVO)}`,
@@ -1102,7 +1102,7 @@ describe('STEP — step-up preso ao conteudo', () => {
   // O "mais" de §13.2: `json_canonico` com vetores congelados
   // -------------------------------------------------------------------------
 
-  test('STEP-18: `json_canonico` congelado — chaves por code point, sem espaco, numero inteiro', () => {
+  test('STEP-18: `json_canonico` congelado: chaves por code point, sem espaco, numero inteiro', () => {
     // O vetor e ESCRITO, byte a byte, e nao derivado da funcao: um vetor
     // calculado pela propria implementacao nao congela nada.
     const canonico = jsonCanonico({
@@ -1121,7 +1121,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     )
   })
 
-  test('STEP-19: `json_canonico` normaliza — NFKC, sem invisiveis, e inteiro', () => {
+  test('STEP-19: `json_canonico` normaliza: NFKC, sem invisiveis, e inteiro', () => {
     // As tres limpezas de §10.10 numa string so: a ligadura `ﬁ` e NFKC, o
     // zero-width e `\\p{Cf}`, e o espaco das pontas sai no `trim`.
     const canonico = jsonCanonico({
@@ -1169,7 +1169,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect((await linhaDeConfig())?.user_cooldown_hours).toBe(1)
   })
 
-  test('STEP-39: `limparTexto` e IDEMPOTENTE — a propriedade, e nao os exemplos', () => {
+  test('STEP-39: `limparTexto` e IDEMPOTENTE: a propriedade, e nao os exemplos', () => {
     // A trava do achado A-1 da etapa 12b, e o motivo dela ser uma PROPRIEDADE.
     //
     // `json_canonico` normaliza com `limparTexto`, e os dois caminhos do
@@ -1178,7 +1178,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     // canonica em `data-mudanca`, o navegador a devolve, e `handleOpcoesDeStepUp`
     // canoniza de novo). Enquanto a funcao for idempotente os dois coincidem e
     // STEP-21 fecha. No dia em que deixar de ser, o envelope carrega um hash e a
-    // rota recalcula outro para AQUELE texto — `conteudo_diferente`, `403`, e o
+    // rota recalcula outro para AQUELE texto, `conteudo_diferente`, `403`, e o
     // dono encostando o dedo para ouvir um nao que ninguem consegue explicar.
     // §10.10 nomeia essa falha: "o hash recalculado diverge e a trava vira bug
     // intermitente".
@@ -1242,8 +1242,8 @@ describe('STEP — step-up preso ao conteudo', () => {
       })
     }
 
-    // **O contrapositivo que impede este teste de ser vacuo.** A ordem ANTIGA —
-    // NFKC primeiro, remocao depois — esta escrita aqui como TESTEMUNHA, e nao
+    // **O contrapositivo que impede este teste de ser vacuo.** A ordem ANTIGA,
+    // NFKC primeiro, remocao depois, esta escrita aqui como TESTEMUNHA, e nao
     // como implementacao: ela prova que o espaco varrido de fato contem as
     // entradas que a regressao quebraria. Sem ela, um alfabeto mal escolhido
     // deixaria o laco verde nos dois mundos, e o teste guardaria nada.
@@ -1262,7 +1262,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     // E a testemunha vai mais longe: onde as duas ordens divergem, a ordem NOVA
     // entrega exatamente o ponto fixo da antiga. Quer dizer que a correcao nao
-    // inventa forma nenhuma — ela so chega numa passada onde a antiga chegava
+    // inventa forma nenhuma, ela so chega numa passada onde a antiga chegava
     // em duas, que e por que os vetores congelados de §13.2 nao se mexem.
     for (const palavra of quebradosPelaOrdemAntiga) {
       let pontoFixo = ordemAntiga(palavra)
@@ -1293,7 +1293,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect(JSON.parse(canonico).alvo).toBe(REEL)
     expect(typeof JSON.parse(canonico).alvo).toBe('string')
 
-    // E dois Reels diferentes com o MESMO patch nao compartilham assinatura —
+    // E dois Reels diferentes com o MESMO patch nao compartilham assinatura,
     // que e o buraco inteiro do Ruling 96 numa linha.
     expect(canonico).not.toBe(
       jsonCanonico({ acao: 'config', alvo: VIZINHO, campos: { enabled: false } }),
@@ -1308,13 +1308,13 @@ describe('STEP — step-up preso ao conteudo', () => {
     )
   })
 
-  test('STEP-41: o `op_hash` amarra a digital AO REEL — trocar `midia` e recusado', async () => {
+  test('STEP-41: o `op_hash` amarra a digital AO REEL: trocar `midia` e recusado', async () => {
     // **A forma exata do Ruling 86, na tela que a Task 13 criou.** Ate o Ruling
     // 96, o `patchDoHandler` de `/painel/reel` era identico para qualquer Reel:
     // "voltar tudo a seguir a regra geral" produz os mesmos valores globais, e o
     // `media_id` vivia so no campo escondido `midia`, que a tela de conferencia
     // reemite e que ficava FORA da assinatura. Trocar `midia` entre os dois
-    // POSTs mantinha o `oh` do envelope valido e mudava a entidade gravada — a
+    // POSTs mantinha o `oh` do envelope valido e mudava a entidade gravada, a
     // digital do dono cobrindo outro Reel.
     //
     // Os dois Reels tem a MESMA sobreposicao de proposito: e o que faz o patch
@@ -1327,8 +1327,8 @@ describe('STEP — step-up preso ao conteudo', () => {
     await gravarMidia(env.DB, REEL_B, { user_cooldown_hours: 48 })
     const sessao = await abrirSessao(aparelho.credentialId)
 
-    // A conferencia do REEL_A. Desfazer a sobreposicao ALARGA — o intervalo cai
-    // de 48 para 24 —, entao §10.10 pede a digital (MID-21).
+    // A conferencia do REEL_A. Desfazer a sobreposicao ALARGA, o intervalo cai
+    // de 48 para 24, entao §10.10 pede a digital (MID-21).
     const conferencia = await postar(
       REEL,
       `${CAMPO_DA_ACAO}=${SEGUIR_O_GERAL}&${CAMPO_DO_REEL}=${REEL_A}`,
@@ -1355,7 +1355,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     const envelope = cookieDoEnvelope(cerimoniaResposta)
     const digital = await digitalPara(aparelho, challenge)
 
-    // **O ataque:** o mesmo envelope, a mesma digital, o mesmo formulario — com
+    // **O ataque:** o mesmo envelope, a mesma digital, o mesmo formulario, com
     // `midia` trocado para o outro Reel.
     const trocado = new URLSearchParams(formulario.campos)
     trocado.set(CAMPO_DO_REEL, REEL_B)
@@ -1377,7 +1377,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     expect(ataque.status).toBe(403)
     // **E o MOTIVO importa**: `conteudo_diferente` e o `op_hash` recalculado do
     // corpo recebido nao batendo com o que o envelope assinou. Sem esta linha,
-    // uma recusa por outra razao qualquer — ficha, versao, corpo malformado —
+    // uma recusa por outra razao qualquer, ficha, versao, corpo malformado,
     // deixaria o teste verde sem provar a amarracao.
     expect(registro.linhas.join(' ')).toContain('conteudo_diferente')
 
@@ -1421,13 +1421,13 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     // **A frase de §15.4 mudou, e a mudanca e uma frase que mentia** (Ruling
     // 75). Ela dizia "um toque so confirma os TRES campos desta tela de uma
-    // vez", e saia sempre que todos os campos mudados fossem protegidos — ou
+    // vez", e saia sempre que todos os campos mudados fossem protegidos, ou
     // seja, tambem numa tela com UMA mudanca, e tambem em `/painel/ajustes`, que
     // nao tem tres campos. Agora ela conta: com uma mudanca so nao ha o que
     // avisar, e a frase nao sai.
     expect(corpo).not.toContain('de uma vez')
 
-    // Com DUAS, ela sai — e diz o numero, que e verdade em qualquer tela.
+    // Com DUAS, ela sai, e diz o numero, que e verdade em qualquer tela.
     const duas = await (
       await postar(
         MENSAGEM,
@@ -1480,14 +1480,14 @@ describe('STEP — step-up preso ao conteudo', () => {
     //
     // §9.7 numera **7. Validacao campo a campo** e **8. Step-up**, nessa ordem,
     // e a propria linha do passo 8 antecipa a objecao: "vem depois da validacao
-    // porque o hash e sobre a mudanca canonica, que so existe depois do parse —
+    // porque o hash e sobre a mudanca canonica, que so existe depois do parse,
     // e isso nao e concessao: ate aqui nada foi gravado". O codigo fazia o
     // contrario, e era a terceira instancia viva da patologia do Ruling 73:
     // "nao existe motivo para gastar o gesto numa operacao que nao podia dar
     // certo. Uma cerimonia que nunca pode suceder ensina o dono que digital as
     // vezes nao faz nada".
     //
-    // A garantia de §13.2 LNK — "link fora da lista recusado e nada gravado" —
+    // A garantia de §13.2 LNK, "link fora da lista recusado e nada gravado",
     // continua inteira; o que mudou e que ela deixou de custar um gesto.
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
@@ -1529,7 +1529,7 @@ describe('STEP — step-up preso ao conteudo', () => {
       { acao: 'config_alterada', step_up: 1 },
     ])
 
-    // A linha e a MESMA — o prazo absoluto nao foi estendido —, e o `sid` mudou.
+    // A linha e a MESMA, o prazo absoluto nao foi estendido, e o `sid` mudou.
     const viva = await env.DB.prepare(
       'SELECT sid_hash, expira_em, criada_em FROM painel_sessoes',
     ).first<{ sid_hash: string; expira_em: number; criada_em: number }>()
@@ -1585,7 +1585,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
       // E uma acao FORA da lista tambem nao. Ate a Etapa 12 o exemplo aqui era
       // `remover_passkey`, "uma operacao que nenhuma rota de escrita sabe
-      // consumir" — a Etapa 13 deu consumidor as tres que faltavam
+      // consumir", a Etapa 13 deu consumidor as tres que faltavam
       // (`adicionar_passkey`, `remover_passkey`, `gerar_codigos`), e manter o
       // exemplo antigo mediria o oposto do que a frase promete. A trava
       // afirmada continua sendo a mesma: `OPERACOES_ACEITAS` e uma lista, e o
@@ -1599,7 +1599,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
   test('STEP-32: o formulario RENDERIZADO da tela de conferencia leva a gravacao ate o fim', async () => {
     // O segundo POST e montado a partir do `<form id="confirmar">` que o
-    // servidor desenhou — `action`, `csrf`, `versao` e os escondidos DELE —, e
+    // servidor desenhou, `action`, `csrf`, `versao` e os escondidos DELE, e
     // nao do que o teste guardou. E o que um navegador faz, e e a unica forma de
     // prender a ficha, a versao e o destino do formulario de uma vez.
     await gravarConfig(env.DB, { versao: 7 })
@@ -1674,10 +1674,10 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     // E o inverso, que e a razao de §15.4: um formulario de `/painel/palavras`
     // que carregasse o link gravaria o link sob uma digital pedida para outra
-    // coisa. A lista impede — e desde o Ruling 73 impede ANTES de pedir a
+    // coisa. A lista impede, e desde o Ruling 73 impede ANTES de pedir a
     // digital, que e o que este trecho passou a afirmar.
     //
-    // **Ele afirmava o contrario: `{ sem: 403, com: 400 }`** — a tela de
+    // **Ele afirmava o contrario: `{ sem: 403, com: 400 }`**, a tela de
     // conferencia mostrando o link literal, a digital colhida, e so entao o
     // `400`. Era o comportamento do Ruling 70, e o Ruling 73 o desfez com o
     // argumento que este teste agora guarda: uma cerimonia que nunca pode
@@ -1713,15 +1713,15 @@ describe('STEP — step-up preso ao conteudo', () => {
   test('STEP-35: a restauracao alcanca o link, e a digital fecha (Ruling 74)', async () => {
     // A metade POSITIVA da consequencia declarada do Ruling 74 (Ruling 76).
     // `acao=restaurar` e uma operacao declarada, como `acao=ligar|desligar` de
-    // §7.1, e o escopo dela e a uniao gravavel — nao a lista do formulario de
+    // §7.1, e o escopo dela e a uniao gravavel, nao a lista do formulario de
     // Ajustes. Sem isso, uma versao anterior que diferisse no link era
     // irrestauravel, e §9.9 so sanciona UMA recusa para a restauracao: "se a
     // allowlist encolheu".
     //
     // A protecao nao muda, e o teste mostra as duas metades: sem digital, a tela
     // de conferencia com o valor literal; com a digital presa ao `op_hash`,
-    // grava. Quem prova que o BOTAO da tela emite este corpo — os onze campos
-    // mais `acao=restaurar` — e GRAV-16 e GRAV-35, em `painel-auditoria`.
+    // grava. Quem prova que o BOTAO da tela emite este corpo, os onze campos
+    // mais `acao=restaurar`, e GRAV-16 e GRAV-35, em `painel-auditoria`.
     await gravarConfig(env.DB)
     const sessao = await abrirSessao(aparelho.credentialId)
 
@@ -1763,14 +1763,14 @@ describe('STEP — step-up preso ao conteudo', () => {
   test('STEP-36: a mudanca assinada cobre o campo que o HANDLER produziu (Ruling 86)', async () => {
     // §10.10 promete que o autenticador assina *aquela* mudanca, e que a tela
     // mostra o valor literal antes da biometria. Ate o Ruling 86 as duas metades
-    // discordavam: `depois` — o que a tela MOSTRA — fundia o patch do corpo com
+    // discordavam: `depois`, o que a tela MOSTRA, fundia o patch do corpo com
     // o `patchDoHandler`, e o `op_hash` saia so do patch do CORPO. Um campo
     // produzido pelo handler era exibido na conferencia e ficava FORA da
     // assinatura, que e o inverso exato da garantia.
     //
     // O teste vive no nivel do funil porque e la que o defeito mora: hoje a
     // unica rota com `patchDoHandler` e `/painel/chave`, que so escreve
-    // `enabled` — nunca protegido —, entao ela jamais renderiza a conferencia.
+    // `enabled`, nunca protegido, entao ela jamais renderiza a conferencia.
     // Esperar a rota que combine as duas coisas seria esperar a Task 13 com o
     // buraco aberto.
     await gravarConfig(env.DB)
@@ -1778,7 +1778,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     // O corpo carrega `enabled=sim` de proposito, contra a operacao declarada:
     // e o que prende a PRECEDENCIA. O handler traduz `acao=desligar` em
-    // `enabled: false`, e ele tem de vencer — se o corpo vencesse, mandar a
+    // `enabled: false`, e ele tem de vencer, se o corpo vencesse, mandar a
     // operacao junto com o campo cru deixaria um cliente adulterado escolher o
     // efeito por baixo da operacao que a tela anunciou.
     const { conferencia, envio, mudanca } = await comDigital(
@@ -1790,8 +1790,8 @@ describe('STEP — step-up preso ao conteudo', () => {
 
     expect(conferencia.status).toBe(403)
 
-    // A mudanca canonica que a tela entrega ao `painel.js` — e que o envelope
-    // assina — carrega o `enabled` do HANDLER, e nao o do corpo.
+    // A mudanca canonica que a tela entrega ao `painel.js`, e que o envelope
+    // assina, carrega o `enabled` do HANDLER, e nao o do corpo.
     expect(mudanca).toEqual({ acao: 'config', destinationUrl: LINK_NOVO, enabled: false })
 
     // E o hash fecha nos dois lados: o servidor recalcula do corpo recebido, e o
@@ -1807,7 +1807,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
   test('STEP-37: trocar a operacao entre os dois POSTs quebra o `op_hash`', async () => {
     // O caminho de ataque que o Ruling 80 abriu ao fazer `acao` sobreviver ao
-    // segundo POST — e que o Ruling 86 fecha. A digital e a do dono, o envelope
+    // segundo POST, e que o Ruling 86 fecha. A digital e a do dono, o envelope
     // esta dentro dos 120 s e o `oh` continua sendo o que ele assinou; o unico
     // campo trocado e a operacao declarada, que o handler traduz num campo de
     // configuracao. Sem o Ruling 86 esse campo nao entra no hash, entao a troca
@@ -1854,7 +1854,7 @@ describe('STEP — step-up preso ao conteudo', () => {
 
   test('STEP-34: o `ator` da auditoria e a passkey que AUTORIZOU, nao a que abriu a sessao', async () => {
     // §9.9 pergunta quem fez a mudanca, e a resposta e o aparelho que encostou o
-    // dedo. A sessao aqui e aberta pelo aparelho A e a digital vem do B — o
+    // dedo. A sessao aqui e aberta pelo aparelho A e a digital vem do B, o
     // cenario que a Task 14 vai tornar comum, e que hoje so existe porque este
     // teste cadastra a segunda credencial.
     await gravarConfig(env.DB)
@@ -1889,19 +1889,19 @@ describe('STEP — step-up preso ao conteudo', () => {
   })
 
   test('STEP-29: com a allowlist VAZIA os tres campos de endereco sao recusados', async () => {
-    // §9.8, §12.7 e LNK-12: lista nao configurada nao "passa tudo" — ela recusa
+    // §9.8, §12.7 e LNK-12: lista nao configurada nao "passa tudo", ela recusa
     // qualquer endereco. O validador devolve zero achados nesse estado de
     // proposito, e a recusa acontece na ESCRITA, perguntando a `configurada`.
     //
     // Ate a etapa do step-up esta promessa era verdadeira por ACIDENTE: os tres
     // campos paravam no `403 step_up_necessario` antes de chegar a validacao.
     // Este teste existe porque, com eles gravaveis, ela passou a depender de uma
-    // pergunta explicita — e sem ela uma instalacao sem a variavel aceitaria
+    // pergunta explicita, e sem ela uma instalacao sem a variavel aceitaria
     // qualquer link, com a digital correta.
     // **Os TRES campos, e nao so o link.** §13.2 LNK lista "URL dentro do texto
     // do Direct passa pela allowlist" e "idem no texto publico" como garantias
     // SEPARADAS. A primeira grafia deste teste exercitava so `destinationUrl`, e
-    // reduzir o predicado a `campo === 'destinationUrl'` deixava a suite verde —
+    // reduzir o predicado a `campo === 'destinationUrl'` deixava a suite verde,
     // o titulo nomeava tres e afirmava um, que e o teste que §13.1 proibe.
     const CAMPOS_DE_ENDERECO: readonly { campo: string; corpo: string; coluna: string }[] = [
       {
@@ -1931,13 +1931,13 @@ describe('STEP — step-up preso ao conteudo', () => {
 
       // **UM POST so, e a expectativa mudou na etapa 12b.** Ate aqui este teste
       // dirigia a cerimonia inteira por `comDigital` e afirmava a sequencia
-      // `['stepup_recusado', 'mudanca_recusada']` — quer dizer: o painel de uma
+      // `['stepup_recusado', 'mudanca_recusada']`, quer dizer: o painel de uma
       // instalacao sem a variavel de deploy mostrava a tela de conferencia,
       // colhia a digital do dono, VERIFICAVA a assertion com sucesso e so entao
       // dizia que nao. §9.7 poe a validacao no passo 7 e o step-up no passo 8,
       // e o Ruling 73 e literal sobre o custo de inverter isso: uma cerimonia
       // que nunca pode suceder ensina o dono que digital as vezes nao faz nada.
-      // Nao ha sequer o que confirmar aqui — nenhum endereco pode ser gravado
+      // Nao ha sequer o que confirmar aqui, nenhum endereco pode ser gravado
       // enquanto a lista nao existir.
       const recusa = await postar(MENSAGEM, caso.corpo, sessao, { ambiente: env })
       const tela = await recusa.text()
@@ -1961,7 +1961,7 @@ describe('STEP — step-up preso ao conteudo', () => {
   test('STEP-30: gravacao que perde a trava otimista NAO rotaciona o `sid`', async () => {
     // O pior desfecho possivel para quem acabou de encostar o dedo no leitor: a
     // digital fecha, a trava otimista de §8.8 recusa a gravacao, e o `sid` no
-    // banco muda assim mesmo — a rota responde `versao_desatualizada` SEM mandar
+    // banco muda assim mesmo, a rota responde `versao_desatualizada` SEM mandar
     // o cookie novo, e o dono e deslogado por uma gravacao que nunca aconteceu.
     //
     // Quem impede e o `AND changes() > 0` de `statementDeRotacao`, e este teste
@@ -2004,7 +2004,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     // servidor assina envelope e a cerimonia nunca sorteia string vazia.
     //
     // O envelope daqui e emitido pela porta de PRODUCAO, com a chave de
-    // verdade — e o que ele simula e um defeito NOSSO, nao um forjador. Sem a
+    // verdade, e o que ele simula e um defeito NOSSO, nao um forjador. Sem a
     // linha, `verificarAssertion` compararia o desafio do cliente contra `''`, e
     // quem soubesse do defeito assinaria uma cerimonia vazia.
     await gravarConfig(env.DB)
@@ -2058,7 +2058,7 @@ describe('STEP — step-up preso ao conteudo', () => {
     // A garantia que a etapa 12b acrescentou, e o veiculo e de proposito uma
     // recusa que **nao** e a da allowlist. STEP-24 e STEP-29 ja cobrem o ramo
     // do dominio; um teste que so exercitasse aquele ramo deixaria o resto do
-    // validador — tamanho, placeholder, cooldown, gatilho — fora da ordem de
+    // validador, tamanho, placeholder, cooldown, gatilho, fora da ordem de
     // §9.7, e a ordem e uma propriedade do funil, nao da allowlist.
     //
     // O veiculo e `publicReplyText` com um placeholder, que §9.7 recusa em uma
@@ -2068,8 +2068,8 @@ describe('STEP — step-up preso ao conteudo', () => {
     // duas metades num corpo so: exige a digital e nunca poderia ser gravado.
     //
     // **Este e o teste que a mutacao de ORDEM PURA mata.** Mover
-    // `validarOuRecusar` de volta para depois de `passarPeloStepUp` — sem
-    // mudar mais nada — o quebra em tres pontos de uma vez: o `400
+    // `validarOuRecusar` de volta para depois de `passarPeloStepUp`, sem
+    // mudar mais nada, o quebra em tres pontos de uma vez: o `400
     // dados_invalidos` vira `403 step_up_necessario`, a tela passa a trazer a
     // conferencia e o `data-mudanca`, e a auditoria ganha a linha
     // `stepup_recusado` na frente.

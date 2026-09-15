@@ -4,7 +4,7 @@
  *
  * §12.1 chama a barra do topo de "o UNICO elemento repetido do painel, e a
  * repeticao e proposital: a pessoa nunca precisa procurar como parar". Um
- * elemento que aparece em toda tela precisa de UM dono — cinco copias
+ * elemento que aparece em toda tela precisa de UM dono, cinco copias
  * divergem na primeira vez que uma delas ganha um item, e a que ficar para
  * tras e a tela em que o freio some.
  *
@@ -31,7 +31,7 @@ interface ItemDeNavegacao {
  * §12.1 descreve **Início · Reels · Palavras · Mensagem · Mais**. "Reels" e
  * "Mais" abrem telas que ainda nao existem, e um item que leva a um `404` e
  * pior do que um item a menos: ele ensina a pessoa a desconfiar da barra. A
- * forma de §12.1 esta respeitada — cinco itens, icone E palavra —, e as duas
+ * forma de §12.1 esta respeitada, cinco itens, icone E palavra, e as duas
  * trocas acontecem nas etapas que criam aquelas telas. O laco de teste
  * "nenhum link aponta para fora da tabela de rotas" e o que impede a barra de
  * voltar a prometer o que nao existe.
@@ -40,8 +40,8 @@ const NAVEGACAO: readonly ItemDeNavegacao[] = [
   { aba: 'inicio', para: '/painel', icone: '⌂', palavra: 'Início' },
   // A primeira das duas trocas que o paragrafo acima anunciou: a Etapa 12 criou
   // a tela de Reels, entao o item deixou de levar a um `404` e entrou. Sao SEIS
-  // itens ate a segunda troca — o "Mais" de §12.1, que absorve Ajustes e "O que
-  // aconteceu" —, e seis com destino real e melhor do que cinco com um deles
+  // itens ate a segunda troca, o "Mais" de §12.1, que absorve Ajustes e "O que
+  // aconteceu", e seis com destino real e melhor do que cinco com um deles
   // levando a lugar nenhum, que e a regra que este paragrafo ja escrevia.
   { aba: 'reels', para: '/painel/reels', icone: '▶', palavra: 'Reels' },
   { aba: 'palavras', para: '/painel/palavras', icone: '✎', palavra: 'Palavras' },
@@ -67,13 +67,13 @@ export interface Moldura {
  * A barra do topo: o estado global e o caminho para parar.
  *
  * §3 pede um botao vermelho e grande de **DESLIGAR TUDO**. Ele existe, e um
- * `POST /painel/chave`, e mora na tela de Inicio — que e a tela que o estado
+ * `POST /painel/chave`, e mora na tela de Inicio, que e a tela que o estado
  * dele muda e para onde o `303` dele volta.
  *
  * **O link daqui continua sendo `/painel/parar`, e nao e duplicata.** Um `POST`
  * na barra do topo obrigaria as cinco telas a carregar a ficha CSRF so para
  * pintar um botao, e ainda assim so funcionaria com sessao viva. `/painel/parar`
- * e o freio que funciona SEM sessao, com o codigo anotado no papel — que e o
+ * e o freio que funciona SEM sessao, com o codigo anotado no papel, que e o
  * caso em que a barra do topo precisa mesmo estar em toda tela (§12.1).
  */
 function barraDoTopo(moldura: Moldura): HtmlSeguro {

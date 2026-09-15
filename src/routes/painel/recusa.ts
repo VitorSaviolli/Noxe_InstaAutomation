@@ -1,16 +1,16 @@
 /**
- * Como o painel RECUSA uma gravacao — a explicacao na tela e a linha no D1.
+ * Como o painel RECUSA uma gravacao, a explicacao na tela e a linha no D1.
  *
  * A costura com `gravar.ts` e por responsabilidade, e nao por tamanho: aquele
  * arquivo responde "como o painel grava" e este responde "como o painel
- * recusa". As quatro pecas daqui — o bloco que nomeia o campo, o rascunho que
+ * recusa". As quatro pecas daqui, o bloco que nomeia o campo, o rascunho que
  * volta, a linha de auditoria da recusa e a recusa do corpo que nem da para
- * julgar — nunca aparecem no caminho de sucesso.
+ * julgar, nunca aparecem no caminho de sucesso.
  *
  * **A dependencia e de mao unica**, e ela precisa continuar sendo: `gravar.ts`
  * importa daqui, e este arquivo nao importa de la. E por isso que os nomes dos
  * campos estruturais do formulario chegam por PARAMETRO (`excluir`) em vez de
- * serem lidos do funil — o funil e o dono deles, e um `import` de volta fecharia
+ * serem lidos do funil, o funil e o dono deles, e um `import` de volta fecharia
  * um ciclo.
  */
 import {
@@ -29,7 +29,7 @@ import type { EntradaDaRota } from './router'
 /**
  * O que a TELA mostra debaixo da frase da tabela de erros (§12.4).
  *
- * §11.4 fixa a `mensagem` — "Confira os campos destacados." — e §12.4 exige que
+ * §11.4 fixa a `mensagem`, "Confira os campos destacados.", e §12.4 exige que
  * a pessoa saiba QUAL campo e POR QUE. Sem este bloco a tela pedia para conferir
  * campos destacados sem destacar campo nenhum, que e a frase mais inutil que o
  * painel poderia escrever.
@@ -60,13 +60,13 @@ export function recusaComMotivoUnico(campos: readonly CampoDaConfig[], motivo: s
 /** O que muda de um rascunho para outro. */
 export interface PedidoDeRascunho {
   /**
-   * O caminho do POST — a ROTA que recebeu o formulario, e nunca a tela para
+   * O caminho do POST, a ROTA que recebeu o formulario, e nunca a tela para
    * onde o sucesso redireciona.
    *
    * A distincao custou um defeito: a primeira grafia usava o destino do `303`, e
    * em `/painel/palavras` e `/painel/ajustes` os dois coincidem. Em
    * `/painel/chave` nao: o `303` dela aponta para `/painel`, que e `GET` e so
-   * `GET`, para sempre (§7.1). O botao de recuperacao morria em `405` — e
+   * `GET`, para sempre (§7.1). O botao de recuperacao morria em `405`, e
    * justamente na rota da chave, que e a que desliga a automacao.
    */
   readonly paraOPost: string
@@ -78,8 +78,8 @@ export interface PedidoDeRascunho {
    * O botao de reenvio aparece?
    *
    * `true` so no `409`, onde reenviar FUNCIONA: a trava era de concorrencia, e o
-   * rascunho volta com a versao de agora. Numa recusa de conteudo — campo
-   * invalido, campo protegido, campo ainda nao gravavel — reenviar o mesmo
+   * rascunho volta com a versao de agora. Numa recusa de conteudo, campo
+   * invalido, campo protegido, campo ainda nao gravavel, reenviar o mesmo
    * rascunho bate na mesma recusa, e um botao que sempre falha e a mesma classe
    * de promessa quebrada que esta funcao existe para consertar. Ali o rascunho
    * fica guardado na pagina, sem botao.
@@ -95,13 +95,13 @@ export interface PedidoDeRascunho {
  * palavras-gatilho digitadas num celular por causa de uma que ficou curta demais
  * e pior do que perde-las por causa de uma aba aberta em outro aparelho.
  *
- * Os campos voltam CRUS, exatamente como chegaram — nada e normalizado nem
+ * Os campos voltam CRUS, exatamente como chegaram, nada e normalizado nem
  * consertado no caminho.
  *
  * **Os estruturais NAO voltam**, e a lista vem de quem os declara. `csrf` e
  * `versao` sao reemitidos com os valores de agora; `confirmar` fica de fora e
  * essa e a parte que importa: §8.8 desenhou o incremento de versao exatamente
- * para o caso de a parada de emergencia disparar com o formulario aberto —
+ * para o caso de a parada de emergencia disparar com o formulario aberto,
  * "obrigado a recarregar e ver, em letras grandes, que a automacao foi parada e
  * desde quando". Carregar a confirmacao de §10.12 pelo `409` deixaria religar
  * num clique sem ver a parada mais nova: seria o unico caminho em que aquele
@@ -136,13 +136,13 @@ o que est&aacute; apontado acima e salve de novo.</p>`
 }
 
 /**
- * A recusa de um corpo que nao da nem para julgar — e a linha que ela deixa.
+ * A recusa de um corpo que nao da nem para julgar, e a linha que ela deixa.
  *
  * **Ruling 59.** Campo desconhecido, `versao` ausente e valor fora da
  * enumeracao chegam numa sessao AUTENTICADA: e a coisa mais parecida com sinal
  * de sequestro deste conjunto, e §9.9 diz que a linha existe justamente para
- * uma sequencia dessas nao passar sem rastro. A excecao de §9.9 — "fracasso de
- * requisicao NAO autenticada nao gera linha" — nao alcanca aqui.
+ * uma sequencia dessas nao passar sem rastro. A excecao de §9.9, "fracasso de
+ * requisicao NAO autenticada nao gera linha", nao alcanca aqui.
  *
  * `versao: 0` e `campos: '[]'` porque nada foi lido nem julgado: a recusa
  * acontece antes de qualquer consulta a `painel_config`, e o preco continua
@@ -191,8 +191,8 @@ export interface PedidoDeRecusa {
    * Escritas que acompanham a linha de auditoria, no MESMO lote.
    *
    * Existe para o contador de `falhas_stepup` de §10.10: uma falha de step-up ja
-   * custava a escrita da linha de auditoria (Ruling 59), e o incremento — ou o
-   * `DELETE` da decima falha — nao pode virar uma segunda ida ao banco nem uma
+   * custava a escrita da linha de auditoria (Ruling 59), e o incremento, ou o
+   * `DELETE` da decima falha, nao pode virar uma segunda ida ao banco nem uma
    * escrita que sobreviva sem a linha que a explica. Vazio no caminho normal.
    */
   readonly extras?: readonly D1PreparedStatement[]
@@ -209,7 +209,7 @@ export interface PedidoDeRecusa {
  *
  * **A recusa por versao desatualizada NAO passa por aqui**, e a ausencia e
  * decisao do controlador (Ruling 59): nada do conteudo enviado chegou a ser
- * julgado — a pessoa esta com uma tela velha aberta. Auditar isso faria uma aba
+ * julgado, a pessoa esta com uma tela velha aberta. Auditar isso faria uma aba
  * esquecida custar uma escrita a cada F5, num caminho que §9.10 orca em zero.
  */
 export class RecusaAuditada {
@@ -248,7 +248,7 @@ export class RecusaAuditada {
     // Uma ida ao banco nos dois casos: `.run()` quando so ha a linha, um
     // `db.batch()` quando o contador de falhas de step-up vai junto. O lote
     // existe para que a escrita que acompanha nunca sobreviva sem a linha que a
-    // explica — a mesma regra de "sem log, sem mudanca" (§8.8).
+    // explica, a mesma regra de "sem log, sem mudanca" (§8.8).
     const extras = pedido.extras ?? []
     if (extras.length === 0) await linha.run()
     else await this.env.DB.batch([linha, ...extras])

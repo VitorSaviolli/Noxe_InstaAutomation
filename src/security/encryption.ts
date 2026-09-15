@@ -2,7 +2,7 @@
  * Criptografia AES-GCM do access token guardado no D1.
  *
  * Formato do texto cifrado: base64( IV[12 bytes] || ciphertext+tag ).
- * O IV e aleatorio por operacao — reutilizar IV em GCM quebra o esquema.
+ * O IV e aleatorio por operacao, reutilizar IV em GCM quebra o esquema.
  */
 
 const ALGORITHM = 'AES-GCM'

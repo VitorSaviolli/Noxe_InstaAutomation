@@ -1,12 +1,12 @@
 /**
- * `AutenticadorFalso` — um autenticador WebAuthn de software, escrito no
+ * `AutenticadorFalso`, um autenticador WebAuthn de software, escrito no
  * proprio repositorio (§13.3).
  *
  * Ele **produz os mesmos bytes que um autenticador real produziria**, usando o
  * `crypto.subtle` do workerd. E metade do metodo T2: o software gera variacao
  * (dezenas de cerimonias, cada uma com um byte diferente) e os vetores
  * congelados de `vetores-webauthn.ts` provam que a variacao corresponde ao
- * mundo real. Sozinho, este arquivo daria testes SIMETRICOS — o mesmo autor
+ * mundo real. Sozinho, este arquivo daria testes SIMETRICOS, o mesmo autor
  * cometeria o mesmo erro dos dois lados e tudo passaria verde.
  *
  * Tres decisoes que sustentam a independencia, e nenhuma e enfeite:
@@ -17,7 +17,7 @@
  *    passaria despercebido nas duas.
  * 2. **O base64url daqui e local**, e nao o de `src/security/base64url.ts`,
  *    pelo mesmo motivo. Uma suite confere que os dois concordam.
- * 3. **A conversao de assinatura vai de CRU para DER** — o inverso do que a
+ * 3. **A conversao de assinatura vai de CRU para DER**, o inverso do que a
  *    producao faz (§13.3, item 6). O WebCrypto assina ECDSA em `r||s` cru; um
  *    autenticador real devolve ASN.1 DER. Sem este passo, `der.ts` nunca seria
  *    exercitado e a armadilha maior do projeto passaria despercebida.
@@ -228,7 +228,7 @@ const FLAG_ED = 0x80
 
 export type AlgoritmoDoFalso = 'ES256' | 'RS256'
 
-/** Rotulos COSE, escritos aqui de novo — nada vem de `src/`. */
+/** Rotulos COSE, escritos aqui de novo, nada vem de `src/`. */
 const COSE_KTY = 1
 const COSE_ALG = 3
 const COSE_CRV = -1
@@ -466,7 +466,7 @@ export class AutenticadorFalso {
   /**
    * Assina em laco ate o `r` sair com o bit mais alto ligado (~50%).
    *
-   * O DER desse `r` ganha um `0x00` na frente e passa a ter **33 bytes** — o
+   * O DER desse `r` ganha um `0x00` na frente e passa a ter **33 bytes**, o
    * caminho de WA-15. O irmao dele, o `r` de 31 bytes, precisaria de ~1500
    * voltas (~1/256) e por isso vem dos vetores congelados, nunca do laco.
    */
@@ -486,7 +486,7 @@ export class AutenticadorFalso {
         return this.montar(clientDataJSON, authData, cruParaDer(bruto), usuarioHandle)
       }
     }
-    throw new Error('200 voltas sem um r alto — algo esta errado no sorteio')
+    throw new Error('200 voltas sem um r alto, algo esta errado no sorteio')
   }
 
   /**

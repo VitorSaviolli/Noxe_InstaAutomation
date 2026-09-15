@@ -12,14 +12,14 @@ import { limparBanco } from './fixtures/banco'
 import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
 
 /**
- * REGSTEP — o step-up de `adicionar_passkey` em `POST /painel/api/registrar/opcoes`.
+ * REGSTEP, o step-up de `adicionar_passkey` em `POST /painel/api/registrar/opcoes`.
  *
  * Duas metades de §10.10 que esta rota nao tinha, e que o funil de gravacao
  * (`lote.ts`) e a tela de Aparelhos (`aparelhos.ts`) sempre tiveram:
  *
  * 1. **O envelope e consumido na requisicao que o usa** (passo 4: "aplica;
  *    expira o cookie"). Sem isso uma digital autorizava N cerimonias de
- *    registro dentro dos 120 s — o "modo privilegiado" que §10.10 recusa por
+ *    registro dentro dos 120 s, o "modo privilegiado" que §10.10 recusa por
  *    escrito.
  * 2. **A recusa conta e deixa rastro**: `painel_sessoes.falhas_stepup` sobe, na
  *    decima a sessao e apagada, e sai linha `stepup_recusado` em
@@ -27,7 +27,7 @@ import { AGORA, capturarConsole, RAIZ } from './fixtures/dubles'
  *    tenta a vontade, e sem deixar rastro.
  *
  * As tres rotas de registro NAO passam por `despachar` (`portaDaApi` ja consome
- * o corpo, §11.1), entao elas sao chamadas direto — a mesma excecao conhecida de
+ * o corpo, §11.1), entao elas sao chamadas direto, a mesma excecao conhecida de
  * `painel-recuperacao.test.ts`. A cerimonia de step-up, essa sim, vai pelo
  * roteador: e a rota de escrita normal do passo 2.
  */
@@ -182,7 +182,7 @@ async function falhasDaSessao(sidHash: string): Promise<number | null> {
   return linha?.falhas_stepup ?? null
 }
 
-describe('REGSTEP — o envelope morre na requisicao que o usa (§10.10, passo 4)', () => {
+describe('REGSTEP: o envelope morre na requisicao que o usa (§10.10, passo 4)', () => {
   let aparelho: AutenticadorFalso
 
   beforeEach(async () => {
@@ -202,8 +202,8 @@ describe('REGSTEP — o envelope morre na requisicao que o usa (§10.10, passo 4
     // O bilhete do registro continua saindo: a segunda metade da cerimonia
     // depende dele, e um `Set-Cookie` a mais nao pode ter comido o primeiro.
     expect(cookies.some((linha) => /^__Host-painel_desafio=[^;]+;/.test(linha))).toBe(true)
-    // E o envelope morre AQUI. O verificador de §10.10 e sem estado — nao ha
-    // registro de desafio usado —, entao o `Max-Age=0` E o consumo: sem ele o
+    // E o envelope morre AQUI. O verificador de §10.10 e sem estado, nao ha
+    // registro de desafio usado, entao o `Max-Age=0` E o consumo: sem ele o
     // par (cookie + assertion) continua fechando o mesmo `op_hash` pelo resto
     // dos 120 s, e como a mudanca canonica de `adicionar_passkey` nao tem alvo,
     // cada repeticao emite um bilhete de registro NOVO.
@@ -236,7 +236,7 @@ describe('REGSTEP — o envelope morre na requisicao que o usa (§10.10, passo 4
   })
 })
 
-describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
+describe('REGSTEP: a recusa conta e deixa rastro (§10.10)', () => {
   let aparelho: AutenticadorFalso
 
   beforeEach(async () => {
@@ -250,8 +250,8 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
 
     // Uma digital COLHIDA DE VERDADE, mas para outra operacao: o envelope de
     // `gerar_codigos` nao fecha o `op_hash` de `adicionar_passkey`. E o cenario
-    // do achado — quem tem o cookie de sessao martelando assertions que nao
-    // servem — com uma assertion legitima, e nao lixo.
+    // do achado, quem tem o cookie de sessao martelando assertions que nao
+    // servem, com uma assertion legitima, e nao lixo.
     const outra = await pedirOpcoesDeStepUp(sessao, { acao: 'gerar_codigos' })
     const { challenge } = (await outra.json()) as { challenge: string }
     const envelope = cookieDoEnvelope(outra)
@@ -300,7 +300,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
     }
 
     // A LINHA e a autoridade (§10.13): apagada, o cookie assinado nao vale mais
-    // nada — e e assim que o martelo para de martelar.
+    // nada, e e assim que o martelo para de martelar.
     expect(await falhasDaSessao(sessao.sidHash)).toBe(null)
     expect((await linhasDeAuditoria()).map((linha) => linha.acao)).toEqual(['stepup_recusado'])
   })
@@ -316,7 +316,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
     }
 
     // A MESMA separacao de `aparelhos.ts`: a falha INVALIDA incrementa, a
-    // AUSENTE nao — ausente e o primeiro envio, o caminho normal de quem
+    // AUSENTE nao, ausente e o primeiro envio, o caminho normal de quem
     // apertou o botao. Mas §10.10 manda auditar as duas.
     expect(await falhasDaSessao(sessao.sidHash)).toBe(0)
     expect((await linhasDeAuditoria()).map((linha) => linha.acao)).toEqual(['stepup_recusado'])
@@ -325,7 +325,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
   test('REGSTEP-06: sem LINHA de sessao nao ha o que punir, e a recusa continua fechada', async () => {
     // O cookie fecha o HMAC, mas a linha nao existe: nao ha contador a subir nem
     // `ator` a nomear. A recusa segue sendo `step_up_necessario`, e o banco fica
-    // como estava — uma escrita provocada por quem nao tem sessao seria escrita
+    // como estava, uma escrita provocada por quem nao tem sessao seria escrita
     // de estranho na cota compartilhada com o webhook (§9.9, regra 2).
     const emitida = await emitirSessao(env, AGORA)
 
@@ -351,7 +351,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
 
   test(`REGSTEP-04b: o teto e ${FALHAS_DE_STEPUP_ATE_APAGAR}, e nem uma antes nem uma depois`, async () => {
     // MUTACAO QUE ESTE TESTE MATA (nao enfraquecer): trocar o `+ 1 >=` de
-    // `registrar.ts:901` por `+ 2 >=` ou `+ 9 >=` — isto e, divergir o teto
+    // `registrar.ts:901` por `+ 2 >=` ou `+ 9 >=`, isto e, divergir o teto
     // desta rota das outras duas copias da mesma regra (`aparelhos.ts:240` e
     // `stepup.ts:799`, o risco C declarado). Com as amostras de REGSTEP-03
     // (uma falha a partir de 0) e REGSTEP-04 (uma a partir de nove) a suite
@@ -360,8 +360,8 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
     // decima nao esta protegida por um teste que nao ve o numero.
     //
     // §10.10 promete DEZ ("em **10**, a sessao e apagada"). O laco abaixo
-    // deriva o numero da constante — de proposito, para que mudar o teto mude
-    // o teste junto —, e por isso ele nao veria uma troca na PROPRIA
+    // deriva o numero da constante, de proposito, para que mudar o teto mude
+    // o teste junto, e por isso ele nao veria uma troca na PROPRIA
     // constante. Esta linha e que amarra a promessa escrita ao valor.
     expect(FALHAS_DE_STEPUP_ATE_APAGAR).toBe(10)
 
@@ -371,7 +371,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
     // §10.10 e sem estado, entao o mesmo par (cookie + assertion) deixa de
     // fechar o `op_hash` de `adicionar_passkey` toda vez, igual. Colher uma
     // digital nova por volta custaria dez cerimonias e nao provaria nada a
-    // mais — o que se mede aqui e o CONTADOR, nao a criptografia.
+    // mais, o que se mede aqui e o CONTADOR, nao a criptografia.
     const outra = await pedirOpcoesDeStepUp(sessao, { acao: 'gerar_codigos' })
     const { challenge } = (await outra.json()) as { challenge: string }
     const envelope = cookieDoEnvelope(outra)
@@ -381,8 +381,8 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
     try {
       // As NOVE primeiras sobem o contador e NAO apagam. Travar cedo demais e
       // tao defeito quanto travar tarde: o dono abre Aparelhos para cadastrar
-      // o celular novo, o Touch ID falha duas vezes com o dedo molhado — coisa
-      // banal — e ele seria jogado para /painel/entrar no meio do cadastro,
+      // o celular novo, o Touch ID falha duas vezes com o dedo molhado, coisa
+      // banal, e ele seria jogado para /painel/entrar no meio do cadastro,
       // sem mensagem nenhuma que explique, contra as dez que §10.10 promete.
       for (let tentativa = 1; tentativa < FALHAS_DE_STEPUP_ATE_APAGAR; tentativa++) {
         const recusa = await pedirOpcoesDeRegistro(sessao, digital, envelope)
@@ -395,7 +395,7 @@ describe('REGSTEP — a recusa conta e deixa rastro (§10.10)', () => {
         })
       }
 
-      // A DECIMA apaga a linha em vez de incrementar — e e a fronteira que
+      // A DECIMA apaga a linha em vez de incrementar, e e a fronteira que
       // prende o teto por cima: com o teto em 11 o contador chegaria a 10.
       expect((await pedirOpcoesDeRegistro(sessao, digital, envelope)).status).toBe(403)
       expect(await falhasDaSessao(sessao.sidHash)).toBe(null)

@@ -4,8 +4,8 @@
  * A auditoria NASCEU na etapa da parada: os dois primeiros eventos auditaveis
  * do projeto sao `codigos_gerados` e `parada_acionada`, e a parada e justamente
  * o evento que mais precisa de registro. A etapa da ESCRITA acrescentou as
- * linhas de MUDANCA DE CONFIGURACAO — as unicas que preenchem `antes` e
- * `depois` — e a leitura do historico que a tela de Ajustes mostra no fim.
+ * linhas de MUDANCA DE CONFIGURACAO, as unicas que preenchem `antes` e
+ * `depois`, e a leitura do historico que a tela de Ajustes mostra no fim.
  *
  * Duas regras de §9.9 que este arquivo existe para tornar mecanicas:
  *
@@ -14,7 +14,7 @@
  *    que grave a auditoria sozinho: "grava e depois tenta logar" nao pode ser
  *    escrito por engano se a API nao oferecer.
  * 2. **Fracasso de requisicao NAO autenticada nao gera linha.** Gravar
- *    tentativa de estranho seria escrita provocada por estranho — a cota do D1
+ *    tentativa de estranho seria escrita provocada por estranho, a cota do D1
  *    e compartilhada com o webhook. Quem cuida disso e o chamador: a rota da
  *    parada so monta o lote quando o codigo confere.
  *
@@ -61,7 +61,7 @@ export interface EventoDeAuditoria {
   /**
    * Versao RESULTANTE da configuracao (§8.8, terceira funcao da versao).
    *
-   * `0` para um evento que nao muda configuracao nenhuma — e o caso de
+   * `0` para um evento que nao muda configuracao nenhuma, e o caso de
    * `codigos_gerados`, que nao pode pagar uma leitura de `painel_config` so
    * para carimbar um numero (a contabilidade de §9.10 da 0 consultas a essa
    * rota). A coluna nao tem `CHECK` de piso justamente para caber esse caso.
@@ -97,7 +97,7 @@ export interface MudancaRegistrada {
 
 /**
  * Retencao da auditoria (§8.9). E a UNICA poda de `painel_auditoria` do
- * projeto, e ela roda no cron — nunca no caminho de gravacao do painel.
+ * projeto, e ela roda no cron, nunca no caminho de gravacao do painel.
  */
 export const RETENCAO_DE_AUDITORIA = 500
 
@@ -112,14 +112,14 @@ export class PainelAuditoriaRepository {
    *
    * **`presoAMudanca` fecha a metade contraria**, e ela tambem existe: uma
    * gravacao que PERDE a trava otimista de §8.8 e um `UPDATE` de zero linhas
-   * dentro de um lote que rodou inteiro — `db.batch()` nao rejeita por isso, e a
+   * dentro de um lote que rodou inteiro, `db.batch()` nao rejeita por isso, e a
    * linha de auditoria commitaria sozinha, afirmando um `antes`/`depois` que
    * nunca aconteceu.
    *
    * A condicao e `changes() > 0`: em SQLite, `changes()` devolve quantas linhas
    * o ULTIMO `INSERT`/`UPDATE`/`DELETE` concluido naquela conexao alterou. Num
    * `db.batch()`, o statement imediatamente anterior a este e a gravacao da
-   * configuracao — entao a pergunta que a condicao faz e exatamente "a mudanca
+   * configuracao, entao a pergunta que a condicao faz e exatamente "a mudanca
    * aconteceu?".
    *
    * **Isto so vale dentro de um lote, e logo depois da escrita que ele audita.**
@@ -129,7 +129,7 @@ export class PainelAuditoriaRepository {
    * A primeira grafia desta condicao comparava `versao` e `atualizado_em` da
    * linha de config, e ela ERRAVA: um escritor concorrente que empurrasse a
    * versao para o mesmo numero, com a linha ja carimbada no mesmo instante,
-   * satisfazia a condicao sem que este lote tivesse mudado nada — o caso que
+   * satisfazia a condicao sem que este lote tivesse mudado nada, o caso que
    * GRAV-19 constroi. `changes()` nao pergunta sobre o estado do banco, pergunta
    * sobre o efeito do statement anterior, que e a pergunta certa.
    */
@@ -169,17 +169,17 @@ export class PainelAuditoriaRepository {
    * So `config_alterada`, e so com `antes` preenchido: o bloco existe para
    * mostrar o valor anterior e oferecer o botao "Voltar a esta versao", e uma
    * linha sem `antes` nao responde nenhuma das duas perguntas. Recusa, login e
-   * parada ficam de fora — elas nao sao "mudanca", e a tela de Ajustes nao e a
+   * parada ficam de fora, elas nao sao "mudanca", e a tela de Ajustes nao e a
    * tela de seguranca.
    *
    * **`midia_alterada` fica de fora, e a decisao e "nada, por enquanto".** Uma
-   * linha de Reel tem `antes` preenchido — a config EFETIVA daquele Reel — e
+   * linha de Reel tem `antes` preenchido, a config EFETIVA daquele Reel, e
    * por isso ela cabia no `SELECT` por acidente ate a acao passar a segui-la
    * (`lote.ts`). Mostra-la aqui exigiria as duas coisas que esta consulta nao
    * tem: trazer o `alvo` e dizer de QUAL Reel a linha fala, e um botao de
    * restauracao que soubesse reenviar por `POST /painel/reel` em vez de por
    * `/painel/ajustes`. Sem as duas, a linha ou mente sobre o alvo ou oferece um
-   * botao que grava a configuracao errada — e as duas sao piores do que a
+   * botao que grava a configuracao errada, e as duas sao piores do que a
    * ausencia. O historico por Reel e da tela daquele Reel, e ele nao existe
    * ainda; enquanto nao existir, a linha fica no banco e fora da tela, que e
    * onde uma auditoria ainda cumpre a funcao dela.
@@ -213,8 +213,8 @@ export class PainelAuditoriaRepository {
    *
    * `COUNT(*)` varreria a tabela inteira e cada linha varrida conta na cota de
    * leitura. O `OFFSET` sobre o `rowid` le no maximo 501 linhas e responde a
-   * pergunta que interessa — "existe alguma linha alem das 500 mais recentes?"
-   * — e o `DELETE` so acontece quando ha o que apagar.
+   * pergunta que interessa, "existe alguma linha alem das 500 mais recentes?"
+   * e o `DELETE` so acontece quando ha o que apagar.
    *
    * `id INTEGER PRIMARY KEY` E o rowid, entao ele ja e o indice cronologico:
    * nao existe indice novo para isto, e nao pode existir.

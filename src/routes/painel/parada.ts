@@ -5,7 +5,7 @@
  * As tres rotas moram no mesmo arquivo porque sao **um subsistema so**: a rota
  * de setup existe para criar o codigo que a rota de parada consome, e as duas
  * compartilham a subchave `k_codigos`. Nenhuma delas depende de sessao, de
- * `painel_credenciais`, de `painel_sessoes` nem do `rpId` — se o WebAuthn
+ * `painel_credenciais`, de `painel_sessoes` nem do `rpId`, se o WebAuthn
  * inteiro estiver quebrado, o freio continua funcionando (§10.12).
  *
  * **Por que a parada e desviada ANTES do portao de sanidade (§11.1).** O
@@ -14,7 +14,7 @@
  * precisa funcionar. `POST /painel/parada` exige apenas a `PANEL_SESSION_KEY`,
  * que e a raiz de `k_codigos`: sem ela nao ha como comparar codigo nenhum.
  *
- * **Por que e seguro expor a parada sem login** — assimetria de consequencia,
+ * **Por que e seguro expor a parada sem login**, assimetria de consequencia,
  * nao obscuridade: ela so sabe dizer `enabled = 0`, o efeito e a direcao
  * segura, e a alternativa (o dono trancado para fora sem freio nenhum) e pior.
  *
@@ -141,11 +141,11 @@ type ExtrasDaPagina = { 'retry-after'?: string }
  * Uma das tres respostas, montada sem interpolar NADA que venha de fora.
  *
  * Nenhuma delas contem campo de configuracao, link, contagem ou estado da
- * conta — e nenhuma delas diz se existe codigo cadastrado. Trava de STOP-05,
+ * conta, e nenhuma delas diz se existe codigo cadastrado. Trava de STOP-05,
  * STOP-11 e STOP-12.
  *
  * Trava de STOP-01 e de STOP-09: a `Response` sai SEM `set-cookie`, em todas
- * as tres. Parar nao e entrar — o codigo de parada nao vira sessao, e por isso
+ * as tres. Parar nao e entrar, o codigo de parada nao vira sessao, e por isso
  * ele nao serve para logar, ler nem editar. A ausencia do cabecalho e a trava,
  * e ela mora aqui porque este e o unico construtor de resposta desta rota.
  */
@@ -171,7 +171,7 @@ function pagina(frase: string, status: number, extras: ExtrasDaPagina = {}): Res
 }
 
 // ---------------------------------------------------------------------------
-// GET /painel/parar — o formulario
+// GET /painel/parar, o formulario
 // ---------------------------------------------------------------------------
 
 /**
@@ -188,7 +188,7 @@ export function handleFormularioDeParada(request: Request): Response {
 }
 
 // ---------------------------------------------------------------------------
-// POST /painel/parada — a acao
+// POST /painel/parada, a acao
 // ---------------------------------------------------------------------------
 
 /** O que a rota busca fora de si mesma. Existe para o teste injetar dubles. */
@@ -200,7 +200,7 @@ export interface DepsDaParada {
    */
   comparar?: (a: string, b: string) => boolean
   /**
-   * Limitador de taxa. O padrao e o da familia `parada` — o binding
+   * Limitador de taxa. O padrao e o da familia `parada`, o binding
    * `PANEL_LIMITER_STOP` quando ele existe, a janela por isolate quando nao.
    * O parametro existe para o teste forcar a recusa sem depender de contagem.
    */
@@ -212,7 +212,7 @@ export interface DepsDaParada {
  *
  * Ordem obrigatoria, do mais barato ao mais caro (§10.12, §11.3):
  *
- *   1. metodo — `GET` redireciona, o resto que nao e `POST` vira `405`  (0 D1)
+ *   1. metodo, `GET` redireciona, o resto que nao e `POST` vira `405`  (0 D1)
  *   2. `content-type` de formulario                                     (0 D1)
  *   3. teto de 1 KB: `content-length` antes, e corte DURANTE a leitura (0 D1)
  *   4. limitador de taxa por IP, se o binding existir                   (0 D1)
@@ -223,7 +223,7 @@ export interface DepsDaParada {
  *   9. ja desligada? "Pronto", sem gravar                       (0 escritas)
  *  10. senao: 1 lote com o `UPDATE` e a linha de auditoria       (2 escritas)
  *
- * Nunca lanca — e a promessa vale porque TUDO o que pode estourar mora dentro
+ * Nunca lanca, e a promessa vale porque TUDO o que pode estourar mora dentro
  * do `try`, inclusive a leitura do corpo. A entrada vem de qualquer pessoa na
  * internet, por uma rede que pode cair no meio do POST, e uma excecao aqui
  * viraria `500` numa rota cuja terceira resposta ja existe exatamente para
@@ -246,12 +246,12 @@ export async function handleParada(
     return metodoNaoPermitido('GET, POST')
   }
 
-  // Ruling 20 — o TERCEIRO caso de "a frase de §10.12 vence a letra de §11.4",
+  // Ruling 20, o TERCEIRO caso de "a frase de §10.12 vence a letra de §11.4",
   // declarado como os outros dois em vez de decidido em silencio.
   //
   // O status e o codigo de log sao os exatos de `painel_desativado`, mas a
   // FRASE na tela e a terceira, e nao a mensagem daquela linha da tabela: §10.12
-  // diz "as tres respostas, e nada alem disso", e a lista e exaustiva — nao
+  // diz "as tres respostas, e nada alem disso", e a lista e exaustiva, nao
   // existe quarta pagina nesta rota. E e a frase certa pelo conteudo tambem:
   // sem a raiz de `k_codigos` a rota nao consegue confirmar coisa nenhuma, que
   // e literalmente o que ela diz. Decisao silenciosa nao vira precedente.
@@ -260,15 +260,15 @@ export async function handleParada(
     return pagina(FRASES.indisponivel, 503)
   }
 
-  // O STATUS e o codigo de log sao os exatos de §11.3/§11.4 —
-  // `tipo_nao_suportado` e `corpo_grande_demais` —, mas a FRASE na tela e a da
+  // O STATUS e o codigo de log sao os exatos de §11.3/§11.4,
+  // `tipo_nao_suportado` e `corpo_grande_demais`, mas a FRASE na tela e a da
   // segunda linha de §10.12, que cobre "codigo incorreto **ou malformado**".
   // Esta rota mostra tres frases e nada alem disso, e um corpo que nao pode ser
   // lido e, para quem esta do outro lado, exatamente um envio que nao conferiu.
   //
   // `toLowerCase()` porque media type e case-INSENSITIVE por RFC 9110:
   // `Application/x-www-form-urlencoded` e o mesmo tipo que o minusculo, e
-  // recusa-lo mostraria "Esse codigo nao confere" para um codigo que confere —
+  // recusa-lo mostraria "Esse codigo nao confere" para um codigo que confere,
   // a mentira que o argumento (c) de §10.12 existe para impedir. O
   // `trimStart()` cobre o espaco a esquerda que um cliente pode mandar antes do
   // tipo.
@@ -284,7 +284,7 @@ export async function handleParada(
     // `lerCorpoCapado` nao lanca por conta propria, mas o corpo chega pela rede:
     // um 3G que cai no meio do POST estoura no `ReadableStream`, e fora do
     // `try` isso virava `500 Internal Server Error`. Celular com sinal ruim e
-    // justamente o cenario que §10.12 nomeia — o dono precisa ler a terceira
+    // justamente o cenario que §10.12 nomeia, o dono precisa ler a terceira
     // frase, que diz o que aconteceu, e nao um erro de servidor que nao diz se
     // a automacao parou.
     const corpo = await lerCorpoCapado(request, TETO_DO_CORPO_DA_PARADA)
@@ -296,7 +296,7 @@ export async function handleParada(
     // O limitador entra AQUI, e a posicao e das duas pontas: depois do teto do
     // corpo (§11.3, passos 4 e 5) e antes da normalizacao (§10.12, passo 1).
     // Nenhuma consulta ao D1 aconteceu ate esta linha, entao uma tentativa
-    // recusada custa zero banco — trava de RL-05.
+    // recusada custa zero banco, trava de RL-05.
     //
     // O QUARTO caso de "a frase de §10.12 vence a letra de §11.4", declarado
     // como os tres anteriores em vez de decidido em silencio. O status e o
@@ -314,7 +314,7 @@ export async function handleParada(
     // limitador de reserva (§13.4), nunca em porta trancada.
     const veredito = await limitar(request, env, 'parada', now, deps.limitador)
     // Trava de RL-01: passado o teto da familia, a resposta e 429 com
-    // `Retry-After` — inclusive para um codigo malformado, porque o limitador
+    // `Retry-After`, inclusive para um codigo malformado, porque o limitador
     // esta ANTES da normalizacao e nao depois.
     if (!veredito.permitido) {
       console.warn('painel:', 'POST', CAMINHO_DA_PARADA, 429, 'muitas_tentativas')
@@ -345,7 +345,7 @@ export async function handleParada(
  * A recusa, com o codigo exclusivo desta rota (§11.4). Zero escritas, sempre.
  *
  * Trava de STOP-04: `codigo_incorreto` e o codigo desta rota e so dela.
- * `credencial_invalida` NAO se aplica aqui — a convencao de erro generico existe
+ * `credencial_invalida` NAO se aplica aqui, a convencao de erro generico existe
  * onde ha credencial a enumerar, e um codigo de parada nao enumera nada.
  */
 function recusa(): Response {
@@ -370,7 +370,7 @@ async function conferirEParar(
   // custar duas leituras na cota do dono, sem mudar uma unica resposta (§9.10).
   const vivos = await codigos.hashesVivos('parada')
   // Trava de STOP-10 e de STOP-12: a comparacao passa por `timingSafeEqual`, e
-  // a lista vazia percorre o mesmo caminho de uma lista cheia que nao bate — a
+  // a lista vazia percorre o mesmo caminho de uma lista cheia que nao bate, a
   // pagina nao pode revelar se existe codigo cadastrado.
   const confere = await conferirCodigo(normalizado, 'parada', chaveDosCodigos, vivos, deps.comparar)
   if (!confere) return recusa()
@@ -379,7 +379,7 @@ async function conferirEParar(
   const estado = await config.lerEstadoDaAutomacao()
 
   // Linha ausente NAO e "ja desligada": sem linha quem manda e a fabrica, que
-  // nasce ligada. Por isso o caminho sem linha grava — e a `INSERT` do
+  // nasce ligada. Por isso o caminho sem linha grava, e a `INSERT` do
   // statement e que materializa a configuracao (§8.3).
   if (estado !== null && estado.enabled === 0) {
     // Trava de STOP-08: acionar duas vezes e idempotente, e a segunda vez nao
@@ -394,7 +394,7 @@ async function conferirEParar(
   //
   // UM `db.batch()` so, com o `UPDATE` e a linha de auditoria dentro, nesta
   // ordem. Se qualquer metade falhar, as duas falham e a pessoa ve a terceira
-  // resposta — nunca um sucesso silencioso, e nunca a variante "grava a config,
+  // resposta, nunca um sucesso silencioso, e nunca a variante "grava a config,
   // depois tenta logar", que e o que um segundo `batch()` aqui significaria.
   await env.DB.batch([
     config.statementDeParada(now, fabricaDaConfig(automationConfig)),
@@ -408,7 +408,7 @@ async function conferirEParar(
       alvo: null,
       campos: '[]',
       // `antes` e `depois` ficam `NULL`: este evento nao muda campo de
-      // configuracao nenhum que valha historico — ele desliga (§9.9).
+      // configuracao nenhum que valha historico, ele desliga (§9.9).
       antes: null,
       depois: null,
     }),
@@ -422,7 +422,7 @@ async function conferirEParar(
 }
 
 // ---------------------------------------------------------------------------
-// POST /setup/painel/codigos — os codigos, uma unica vez
+// POST /setup/painel/codigos, os codigos, uma unica vez
 // ---------------------------------------------------------------------------
 
 /**
@@ -443,12 +443,12 @@ export async function handleGerarCodigos(
 ): Promise<Response> {
   if (request.method !== 'POST') return metodoNaoPermitido('POST')
 
-  // Bearer, nunca cookie e nunca query string — a mesma porta das outras
+  // Bearer, nunca cookie e nunca query string, a mesma porta das outras
   // rotas `/setup/*`, com o mesmo comparador em tempo constante.
   //
   // Ruling 19: esta rota e da familia `/setup/*`, e nao do painel. Ela responde
   // texto e `401` como as irmas (`oauth.ts:52`, `oauth.ts:149`) e, como elas,
-  // NAO registra nada em log — §11.4 e a tabela do painel, e quem nao e painel
+  // NAO registra nada em log, §11.4 e a tabela do painel, e quem nao e painel
   // nao se anuncia como `painel:`. A grafia `nao_autorizado`, que nao existe em
   // §11.4, saiu daqui por isso.
   if (!isAdmin(request, env)) {
@@ -540,13 +540,13 @@ function chaveDeSessaoPresente(env: Env): boolean {
  * assistente, por `POST /setup/painel/codigos` com Bearer, e a tela de
  * Aparelhos, por `POST /painel/aparelhos` com `acao=gerar_codigos`, sessao e
  * step-up. Duas grafias do sorteio divergiriam no dia em que uma delas mudasse
- * o alfabeto, o tamanho ou a `versao_hash` — e a divergencia so apareceria no
+ * o alfabeto, o tamanho ou a `versao_hash`, e a divergencia so apareceria no
  * pior dia do projeto, com o papel na mao e o codigo recusado.
  *
  * Os statements comecam pelo `DELETE` do conjunto antigo, no MESMO lote: nao
  * existe instante com os dois conjuntos vivos. A linha de auditoria e
  * responsabilidade de quem chama, porque o `ator` e o que difere entre as duas
- * portas — `'assistente'` la, a passkey que assinou aqui.
+ * portas, `'assistente'` la, a passkey que assinou aqui.
  */
 export async function conjuntoNovoDeCodigos(
   env: Env,
@@ -585,7 +585,7 @@ export async function conjuntoNovoDeCodigos(
  *
  * Nao registra nada: o `console.warn('painel:', ...)` de `metodo_nao_permitido`
  * fica nos DOIS chamadores do painel, e nao aqui. `/setup/painel/codigos` usa a
- * mesma resposta e nao loga, porque ela e da familia `/setup/*` (Ruling 19) —
+ * mesma resposta e nao loga, porque ela e da familia `/setup/*` (Ruling 19),
  * um log dentro desta funcao daria prefixo de painel a uma rota que nao e.
  */
 function metodoNaoPermitido(permitidos: string): Response {

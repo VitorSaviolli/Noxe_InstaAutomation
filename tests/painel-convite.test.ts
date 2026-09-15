@@ -27,14 +27,14 @@ import {
 } from './fixtures/dubles'
 
 /**
- * CONV — convite de uso unico e registro da primeira passkey (§13.2, 12
+ * CONV, convite de uso unico e registro da primeira passkey (§13.2, 12
  * garantias), mais o Lema 1 de §10.6 e a garantia de que registrar NAO emite
  * sessao.
  *
  * `now` e sempre injetado: nenhum teste desta suite passa pelo roteador, e por
  * isso nenhum deles depende do relogio real.
  *
- * **O convite e montado aqui do zero, sem importar nada de `src/`** — e a
+ * **O convite e montado aqui do zero, sem importar nada de `src/`**, e a
  * independencia e o ponto. Se a producao passasse a assinar outro texto, um
  * ajudante compartilhado mudaria dos dois lados de uma vez e o teste
  * continuaria verde provando nada. E o mesmo raciocinio do metodo T2 que
@@ -214,7 +214,7 @@ async function registrarComAparelho(
 
 /**
  * D1 cujo `batch()` IGNORA o lote de verdade e forca, no D1 real por baixo,
- * uma violacao `NOT NULL` em `painel_credenciais.apelido` — para provar que
+ * uma violacao `NOT NULL` em `painel_credenciais.apelido`, para provar que
  * `ehConflitoDeChave` (registrar.ts) distingue essa classe da violacao de
  * UNIQUE/PK do passo 8, e nao trata as duas como o mesmo `credencial_invalida`
  * generico.
@@ -274,7 +274,7 @@ async function encherAsCredenciais(quantas: number): Promise<void> {
 
 // ---------------------------------------------------------------------------
 
-describe('CONV — o convite', () => {
+describe('CONV: o convite', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -327,7 +327,7 @@ describe('CONV — o convite', () => {
     // T2 da suite de WebAuthn: o `montarConvite` acima e uma segunda
     // implementacao escrita pelo mesmo autor, e duas implementacoes simetricas
     // erram juntas. Este token veio do arquivo que o DONO roda, e prova que o
-    // script e o Worker concordam byte a byte — se um dos dois mudar o texto
+    // script e o Worker concordam byte a byte, se um dos dois mudar o texto
     // assinado, o rotulo da subchave ou a ordem dos campos, este teste cai.
     const DO_ASSISTENTE =
       'cv1.zXItTInxQsUB_wtwck55dA.0.1788626246209.fY0QS8bGH8WNKHfidJIxGXexZXqIQpFr9WQtY5CUZdg'
@@ -382,7 +382,7 @@ describe('CONV — o convite', () => {
     const primeira = await registrarComConvite(token)
     expect(primeira.verificacao.status).toBe(200)
 
-    // O MESMO nonce, agora num convite `pre=q` — que continua valendo com
+    // O MESMO nonce, agora num convite `pre=q`, que continua valendo com
     // passkey cadastrada. O que morre e o CONSUMO, e nao a precondicao: sem
     // isso o teste provaria CONV-07 outra vez em vez de provar o uso unico.
     const reemitido = await montarConvite({ pre: 'q', nonce })
@@ -502,7 +502,7 @@ describe('CONV — o convite', () => {
 
   test('CONV-07: uma credencial de OUTRO endereco ja fecha o `pre=0`', async () => {
     // Ela nao serve mais para entrar (§10.14), mas prova que a instalacao ja
-    // teve dono — e e disso que a precondicao do convite comum fala.
+    // teve dono, e e disso que a precondicao do convite comum fala.
     await env.DB.prepare(
       `INSERT INTO painel_credenciais
          (credential_id, rp_id, usuario_handle, chave_publica_jwk, algoritmo, transportes,
@@ -597,7 +597,7 @@ describe('CONV — o convite', () => {
   })
 })
 
-describe('CONV — o codigo de recuperacao', () => {
+describe('CONV: o codigo de recuperacao', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -643,7 +643,7 @@ describe('CONV — o codigo de recuperacao', () => {
     expect(await contarCredenciais()).toBe(1)
 
     // Invalidacao em bloco (§10.11): o usado fica `usado_em`, e os outros cinco
-    // ficam `invalidado_em` — se um codigo foi usado por quem nao devia, os
+    // ficam `invalidado_em`, se um codigo foi usado por quem nao devia, os
     // outros estao na mesma lista vazada.
     const usados = await env.DB.prepare(
       "SELECT COUNT(*) AS n FROM painel_codigos WHERE tipo = 'recuperacao' AND usado_em IS NOT NULL",
@@ -747,7 +747,7 @@ describe('CONV — o codigo de recuperacao', () => {
 
     expect((await registrar('primeiro')).status).toBe(200)
     // Na segunda o codigo ja esta `usado_em`, e quem recusa e o `changes === 1`
-    // do consumo — e por isso que o uso unico e ATOMICO, e nao uma leitura.
+    // do consumo, e por isso que o uso unico e ATOMICO, e nao uma leitura.
     expect((await registrar('segundo')).status).toBe(401)
     expect(await contarCredenciais()).toBe(1)
   })
@@ -787,7 +787,7 @@ describe('CONV — o codigo de recuperacao', () => {
   })
 })
 
-describe('CONV — o que o registro NAO faz', () => {
+describe('CONV: o que o registro NAO faz', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -849,8 +849,8 @@ describe('CONV — o que o registro NAO faz', () => {
 
   test('um bilhete de OUTRO proposito nao autoriza registro', async () => {
     // Terceira defesa de §10.3: o proposito entra no texto assinado, na
-    // derivacao da chave e no nome do cookie. Um desafio de `entrar` — que
-    // qualquer anonimo consegue — nao pode virar autorizacao de cadastro.
+    // derivacao da chave e no nome do cookie. Um desafio de `entrar`, que
+    // qualquer anonimo consegue, nao pode virar autorizacao de cadastro.
     const doLogin = await emitirEnvelope(
       env,
       'entrar',
@@ -905,7 +905,7 @@ describe('CONV — o que o registro NAO faz', () => {
   })
 })
 
-describe('CONV — o modo sessao, e a ficha CSRF que §15.4 exige', () => {
+describe('CONV: o modo sessao, e a ficha CSRF que §15.4 exige', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -939,7 +939,7 @@ describe('CONV — o modo sessao, e a ficha CSRF que §15.4 exige', () => {
 
     // Trava de §15.4: cadastrar passkey nova e precisamente a operacao que um
     // atacante mais gostaria de executar em nome do dono, e por isso este POST
-    // — que corre com cookie de sessao — exige a ficha como qualquer outro.
+    // que corre com cookie de sessao, exige a ficha como qualquer outro.
     expect(resposta.status).toBe(403)
     expect(await resposta.json()).toEqual({
       erro: 'csrf_invalido',
@@ -969,7 +969,7 @@ describe('CONV — o modo sessao, e a ficha CSRF que §15.4 exige', () => {
     expect(resposta.status).toBe(403)
   })
 
-  test('com sessao e ficha validas, o step-up ainda barra — e a falha e FECHADA', async () => {
+  test('com sessao e ficha validas, o step-up ainda barra: e a falha e FECHADA', async () => {
     const sessao = await emitirSessao(env, AGORA)
 
     const resposta = await handleOpcoesDeRegistro(
@@ -1084,7 +1084,7 @@ describe('CONV — o modo sessao, e a ficha CSRF que §15.4 exige', () => {
   })
 })
 
-describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4', () => {
+describe('CONV: os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -1115,7 +1115,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
       erro: 'falha_interna',
       mensagem: 'Algo deu errado. Tente de novo.',
     })
-    // Nunca `detalhe`, `stack` nem mensagem de excecao no corpo — e no log, o
+    // Nunca `detalhe`, `stack` nem mensagem de excecao no corpo, e no log, o
     // mesmo codigo canonico que o corpo carrega, e nao outro.
     expect(registrado.linhas.join('\n')).toContain('falha_interna')
     expect(registrado.linhas.join('\n')).not.toContain('indisponivel')
@@ -1124,7 +1124,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
 
   test('§10.5 passo 8: `credential_id` repetido e recusa GENERICA, e nao `503`', async () => {
     // O `INSERT` vai sem `ON CONFLICT`, e o tombo do lote E a verificacao do
-    // passo 8. Sem ler essa excecao ela virava `503` — com o convite ja
+    // passo 8. Sem ler essa excecao ela virava `503`, com o convite ja
     // queimado, porque o consumo do nonce sai sozinho e ANTES do lote.
     const aparelho = await AutenticadorFalso.criar()
 
@@ -1170,7 +1170,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
     // Robustez e observabilidade, nao um bug ao vivo (nenhum caminho tipado
     // hoje deixa uma das dez colunas `NOT NULL` de `painel_credenciais`
     // chegar nula neste INSERT): se o regex de `ehConflitoDeChave` casasse
-    // QUALQUER `constraint failed`/`SQLITE_CONSTRAINT` — como casava antes —,
+    // QUALQUER `constraint failed`/`SQLITE_CONSTRAINT`, como casava antes,
     // este "e se" sairia como `401 credencial_invalida`, a mesma recusa
     // generica do passo 8, escondendo um defeito NOSSO atras da mesma frase de
     // "assinatura invalida". A tabela de §11.4 nao admite isso: excecao nao
@@ -1294,7 +1294,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
     )
     expect(opcoes.status).toBe(200)
 
-    // O desafio que o atacante escolheu — assinado por um autenticador honesto,
+    // O desafio que o atacante escolheu, assinado por um autenticador honesto,
     // e diferente do que o bilhete carrega.
     const escolhido = paraBase64Url(crypto.getRandomValues(new Uint8Array(32)))
     expect(escolhido).not.toBe(await desafioDe(opcoes))
@@ -1334,7 +1334,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
 
   test('§10.5 passo 10: o apelido e SANEADO, e nunca motivo de recusa', async () => {
     // "Saneado", e nao "recusado": um apelido longo ou esquisito digitado num
-    // celular nao pode custar a cerimonia de biometria do dono — no limite,
+    // celular nao pode custar a cerimonia de biometria do dono, no limite,
     // trancaria quem instala para fora do proprio painel.
     const { token } = await montarConvite()
     const comLixo = `  Celular\u0000 do\u200b João${'!'.repeat(80)}  `
@@ -1346,7 +1346,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
 
     const linha = await linhaGravada()
     // Sem caracteres de controle nem de formatacao, cortado em 40, sem espaco
-    // nas pontas — e o texto util sobreviveu.
+    // nas pontas, e o texto util sobreviveu.
     expect(linha?.apelido).toBe(`Celular do João${'!'.repeat(25)}`)
     expect(linha?.apelido).toHaveLength(TAMANHO_DO_APELIDO)
     expect(linha?.apelido).not.toMatch(/[\p{Cc}\p{Cf}]/u)
@@ -1417,7 +1417,7 @@ describe('CONV — os passos 8, 9 e 10 de §10.5, e o codigo de erro de §11.4',
   })
 })
 
-describe('CONV — a escada de §11.3 e a pagina do convite', () => {
+describe('CONV: a escada de §11.3 e a pagina do convite', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -1441,7 +1441,7 @@ describe('CONV — a escada de §11.3 e a pagina do convite', () => {
     // A ordem da escada e artefato de especificacao, e `router.ts` a copia:
     // la o portao de sanidade roda antes do `switch` de caminhos. Se o metodo
     // fosse conferido primeiro AQUI, a mesma requisicao teria duas respostas
-    // conforme quem chamasse o handler — 405 pelo handler, 503 pelo roteador.
+    // conforme quem chamasse o handler, 405 pelo handler, 503 pelo roteador.
     const desligado = comAmbiente({ PANEL_RP_ID: '' })
 
     for (const metodo of ['OPTIONS', 'GET', 'PUT']) {
@@ -1492,7 +1492,7 @@ describe('CONV — a escada de §11.3 e a pagina do convite', () => {
     expect((await handleOpcoesDeRegistro(hostil, env, AGORA)).status).toBe(403)
 
     // O fallback existe para nao trancar o dono num navegador que nao mande
-    // `Origin` — deixou de ser pendencia de projeto e virou este teste.
+    // `Origin`, deixou de ser pendencia de projeto e virou este teste.
     const comFetchSite = new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' },
@@ -1589,7 +1589,7 @@ describe('CONV — a escada de §11.3 e a pagina do convite', () => {
     // `Allow` existe justamente para nao mentir: `GET` sozinho omitia o `HEAD`
     // que a linha acima acabou de provar que o handler atende.
     expect(recusado.headers.get('allow')).toBe('GET, HEAD')
-    // E o corpo e HTML, como o `content-type` promete — com a frase canonica
+    // E o corpo e HTML, como o `content-type` promete, com a frase canonica
     // de §11.4 para `metodo_nao_permitido`, e nao um texto solto.
     expect(recusado.headers.get('content-type')).toBe('text/html; charset=utf-8')
     expect(await recusado.text()).toContain('<h1>M&eacute;todo n&atilde;o permitido.</h1>')

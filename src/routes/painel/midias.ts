@@ -5,10 +5,10 @@
  * Elas dividem tres coisas, e cada uma seria um defeito se fosse escrita duas
  * vezes:
  *
- *   1. a **listagem** da Meta, com a paginacao de §12.5 — quatro paginas por
+ *   1. a **listagem** da Meta, com a paginacao de §12.5, quatro paginas por
  *      toque, parada por `paging.next` e nao por contagem, e o filtro de Reels
  *      feito no Worker;
- *   2. o **estado efetivo** de um Reel — a global com a sobreposicao por cima —,
+ *   2. o **estado efetivo** de um Reel, a global com a sobreposicao por cima,
  *      que e o `antes`/`depois` que o funil registra na auditoria (§9.9);
  *   3. o **cartao** de um Reel, que aparece na lista e no topo da tela do Reel.
  *
@@ -17,7 +17,7 @@
  * de proposito. Ela vive no `<img>` da resposta e morre com ela.
  *
  * **`media_id` e TEXT em todo o caminho** (Ruling 90). Nada aqui chama
- * `Number()` sobre um id, e nenhum id atravessa `JSON.parse` sem aspas — o
+ * `Number()` sobre um id, e nenhum id atravessa `JSON.parse` sem aspas, o
  * caminho perigoso que a migration nao cobre e justamente o JSON, onde um id de
  * 18 digitos sem aspas volta como `number` corrompido, em silencio.
  */
@@ -41,7 +41,7 @@ import { type EstadoDeComportamento, estadoDaConfig } from './formulario'
  *
  * Quatro, e o teto e de SUBREQUESTS: cada pagina e uma chamada. O laco tambem
  * para antes disso quando ja juntou Reels suficientes ou quando `paging.next`
- * some — e essa segunda parada e a unica que significa "acabou".
+ * some, e essa segunda parada e a unica que significa "acabou".
  */
 export const PAGINAS_POR_TOQUE = 4
 
@@ -51,7 +51,7 @@ export const REELS_POR_TOQUE = 10
 /**
  * Abaixo disto a tela explica em vez de parecer quebrada (§12.5).
  *
- * "Estas ultimas publicacoes nao sao Reels — toque de novo para continuar
+ * "Estas ultimas publicacoes nao sao Reels, toque de novo para continuar
  * procurando." Quem posta muita foto pode ter tres Reels em vinte e cinco
  * publicacoes, e uma lista que volta quase vazia sem explicacao parece defeito.
  */
@@ -127,7 +127,7 @@ function postadoEm(timestamp: string | undefined): number | null {
  *
  * `null` em duas situacoes, e as duas sao a mesma decisao: **o id manda**. Sem
  * `id` string, ou com um id que nao tem a forma de `media_id`, a linha nao
- * entra — inventar um id seria casar a configuracao com o Reel errado, que e o
+ * entra, inventar um id seria casar a configuracao com o Reel errado, que e o
  * dano que a migration `0002` descreve nome por nome.
  */
 export function comoReel(item: MediaListItem): ReelDaListagem | null {
@@ -203,7 +203,7 @@ export async function buscarPagina(
  * §12.1 regra 5 e `[C]`-dura: "sem auto-refresh, sem polling, **sem buscar
  * lista a cada render**. Atualizar e sempre um botao explicito." Ate esta
  * rodada todo `GET /painel/reels` gastava ate quatro chamadas a Meta, e o botao
- * que a spec nomeia nao existia em tela nenhuma — duas frases renderizadas
+ * que a spec nomeia nao existia em tela nenhuma, duas frases renderizadas
  * mandavam toca-lo.
  */
 export const CACHE_DA_LISTAGEM_MS = 10 * 60 * 1000
@@ -225,8 +225,8 @@ let guardada: ListagemGuardada | null = null
 /**
  * Esquece a listagem guardada.
  *
- * Chamada pelo botao Atualizar — que e o que §12.5 chama de "o botao explicito"
- * — e pelo `beforeEach` das suites, do mesmo jeito que `invalidarCacheDeConfig`.
+ * Chamada pelo botao Atualizar, que e o que §12.5 chama de "o botao explicito"
+ * e pelo `beforeEach` das suites, do mesmo jeito que `invalidarCacheDeConfig`.
  */
 export function esquecerAListagem(): void {
   guardada = null
@@ -237,7 +237,7 @@ export function esquecerAListagem(): void {
  *
  * **A falha da Meta TAMBEM e guardada**, e a escolha e deliberada: uma falha
  * custa a mesma cota que um acerto, e re-buscar a cada render seria exatamente
- * o "buscar lista a cada render" que §12.1 regra 5 proibe — com a instalacao
+ * o "buscar lista a cada render" que §12.1 regra 5 proibe, com a instalacao
  * pagando mais justamente quando a Meta esta ruim. A tela nao fica presa: ela
  * diz de quando e a lista e oferece o botao Atualizar, que ignora o cache.
  */
@@ -270,7 +270,7 @@ function reelsDaPagina(pagina: MediaListResponse): ReelDaListagem[] {
  * O cursor da proxima pagina, ou `null` quando acabou.
  *
  * `paging.next` e quem diz que acabou; `paging.cursors.after` e o valor que a
- * proxima chamada usa. Sem `next`, nao ha proxima — mesmo que `after` venha.
+ * proxima chamada usa. Sem `next`, nao ha proxima, mesmo que `after` venha.
  */
 function cursorSeguinte(pagina: MediaListResponse): string | null {
   if (pagina.paging?.next === undefined) return null
@@ -288,8 +288,8 @@ function cursorSeguinte(pagina: MediaListResponse): string | null {
  * (Ruling 91): §9.9 pede o "estado COMPLETO da entidade afetada", e a entidade
  * afetada aqui e o comportamento daquele Reel, nao a linha da tabela.
  *
- * A mesclagem e a MESMA de `resolveConfigForMedia` — `{ ...global, ...patch }`
- * —, e por isso ela mora ao lado da leitura e nao numa segunda grafia: uma
+ * A mesclagem e a MESMA de `resolveConfigForMedia`, `{ ...global...patch }`
+ *, e por isso ela mora ao lado da leitura e nao numa segunda grafia: uma
  * mesclagem propria da tela mostraria ao dono um valor que o webhook nao usa.
  */
 export function estadoEfetivo(
@@ -367,12 +367,12 @@ export interface MidiaSalva {
 /**
  * As linhas de `painel_midias` que o LOTE da configuracao ja trouxe (§12.10).
  *
- * As duas telas de Reels liam `painel_midias` por conta propria — o quarto
+ * As duas telas de Reels liam `painel_midias` por conta propria, o quarto
  * subrequest que a tabela de §12.10 nao orca. `configDaTela` agora pede as
  * linhas inteiras dentro do `db.batch()` que a configuracao ja fazia, e um
  * `batch` vale UM subrequest: a mesma resposta, de graca.
  *
- * `null` chega quando a leitura da configuracao falhou — e ai a tela cai na
+ * `null` chega quando a leitura da configuracao falhou, e ai a tela cai na
  * tarja de `parado_por_erro`, com lista vazia, em vez do `500` que a consulta
  * separada produzia (ela chamava `lerTodas`, que lanca).
  */

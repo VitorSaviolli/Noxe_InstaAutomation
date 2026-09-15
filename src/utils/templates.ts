@@ -2,15 +2,15 @@
  * Substituicao de placeholders nas mensagens.
  *
  * Os valores vem de dados do Instagram (username) e da config (link), entao
- * passam por sanitizacao antes de entrar no texto. Nao e escape de HTML — a
- * mensagem e texto puro no Direct — e sim defesa contra caracteres de
+ * passam por sanitizacao antes de entrar no texto. Nao e escape de HTML, a
+ * mensagem e texto puro no Direct, e sim defesa contra caracteres de
  * controle e valores absurdamente longos que quebrariam o payload da API.
  */
 
 /**
  * Caracteres de controle (Cc) e de formatacao invisivel (Cf).
  * Cf inclui zero-width joiner e marcas de direcao, usadas para disfarcar
- * texto — nao tem lugar num username nem numa URL.
+ * texto, nao tem lugar num username nem numa URL.
  */
 const CONTROL_CHARS = /[\p{Cc}\p{Cf}]/gu
 
@@ -33,7 +33,7 @@ export interface TemplateValues {
 /**
  * Troca {username} e {link} no template.
  *
- * Placeholders desconhecidos ficam intactos — e melhor entregar a mensagem
+ * Placeholders desconhecidos ficam intactos, e melhor entregar a mensagem
  * com um `{foo}` visivel do que engolir silenciosamente um erro de config.
  */
 export function renderTemplate(template: string, values: TemplateValues): string {

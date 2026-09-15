@@ -2,7 +2,7 @@
  * Paginas publicas exigidas pela Meta na configuracao do app:
  * politica de privacidade e instrucoes de exclusao de dados.
  *
- * Sao HTML estatico servido pelo proprio Worker — sem dependencia externa,
+ * Sao HTML estatico servido pelo proprio Worker, sem dependencia externa,
  * sem custo e sempre no ar junto com a aplicacao.
  *
  * ================== LEIA ANTES DE PUBLICAR ==================
@@ -32,7 +32,7 @@ const NOME_RESPONSAVEL = '[NOME_DO_RESPONSAVEL]'
  * Diferente das duas constantes acima, estes valores NAO mudam quando alguem
  * clona o projeto: eles dizem quem escreveu o software, nao quem opera esta
  * instalacao. Quem responde pelos dados de quem comenta e o dono da conta do
- * Instagram — e e isso que aparece no corpo da politica de privacidade.
+ * Instagram, e e isso que aparece no corpo da politica de privacidade.
  */
 const AUTOR = 'Vitor S. Gonsalez'
 const EMPRESA = 'Noxelora'
@@ -83,8 +83,8 @@ const AVISO_CONTATO_PENDENTE = `<p class="aviso">
 <strong>Os dados de contato ainda não foram preenchidos.</strong><br>
 Quem instalou esta automação ainda não informou o responsável nem um e-mail
 nesta página. Para tratar de qualquer assunto sobre os seus dados, procure
-diretamente o dono da conta do Instagram que utiliza esta automação — por
-exemplo, por mensagem direta no perfil onde você viu a publicação — e peça o
+diretamente o dono da conta do Instagram que utiliza esta automação, por
+exemplo, por mensagem direta no perfil onde você viu a publicação, e peça o
 contato do responsável.</p>`
 
 /** Bloco "Contato", igual nas duas paginas. */
@@ -100,7 +100,7 @@ function blocoContato(): string {
 function paragrafoPedidoDeRemocao(): string {
   if (!isContatoConfigurado()) {
     return `<p>Para solicitar a remoção, procure o dono da conta do Instagram que utiliza
-esta automação — por mensagem direta no perfil onde você comentou — e informe o link do
+esta automação, por mensagem direta no perfil onde você comentou, e informe o link do
 comentário. A exclusão é feita em até 30 dias.</p>`
   }
 
@@ -160,11 +160,11 @@ ${corpo}
 <p><strong>Software sem fins lucrativos.</strong> Este projeto não rouba e não coleta
 informações de ninguém. Tudo o que ele guarda fica no banco de dados da própria pessoa
 que o instalou, e nada é enviado ao autor do código nem a terceiros.</p>
-<p>Desenvolvido por <strong>${escapeHtml(AUTOR)}</strong> — ${escapeHtml(EMPRESA)}.</p>
+<p>Desenvolvido por <strong>${escapeHtml(AUTOR)}</strong>, ${escapeHtml(EMPRESA)}.</p>
 <p>Se o projeto deu certo para você, não esqueça de dar uma força com a sua
 <strong>estrela no GitHub</strong>. É totalmente de graça e ajuda outras pessoas a
 encontrarem o projeto: <a href="${escapeHtml(REPOSITORIO)}">${escapeHtml(REPOSITORIO)}</a></p>
-<p>Quer fazer uma doação? PIX: <strong>${escapeHtml(PIX)}</strong> — isso ajuda a
+<p>Quer fazer uma doação? PIX: <strong>${escapeHtml(PIX)}</strong>, isso ajuda a
 manter projetos como este 100% gratuitos.</p>
 </footer>
 </body>
@@ -188,12 +188,12 @@ uma conta profissional do Instagram, usando exclusivamente a API oficial da Meta
 
 <h2>Quais dados são tratados</h2>
 <ul>
-  <li><strong>Identificador do comentário</strong> — para não responder duas vezes ao mesmo comentário.</li>
-  <li><strong>Identificador da publicação</strong> — para saber qual automação aplicar.</li>
-  <li><strong>Identificador do autor do comentário, em forma de hash irreversível</strong> —
+  <li><strong>Identificador do comentário</strong>, para não responder duas vezes ao mesmo comentário.</li>
+  <li><strong>Identificador da publicação</strong>, para saber qual automação aplicar.</li>
+  <li><strong>Identificador do autor do comentário, em forma de hash irreversível</strong>,
       usado apenas para limitar quantas vezes a mesma pessoa aciona a automação
       num intervalo. O identificador original não é armazenado.</li>
-  <li><strong>Token de acesso da conta</strong> — armazenado de forma criptografada.</li>
+  <li><strong>Token de acesso da conta</strong>, armazenado de forma criptografada.</li>
 </ul>
 
 <h2>O que NÃO é armazenado</h2>
@@ -201,23 +201,23 @@ uma conta profissional do Instagram, usando exclusivamente a API oficial da Meta
   <li>O texto do comentário.</li>
   <li>O nome de usuário de quem comentou.</li>
   <li>Qualquer conteúdo de mensagem privada.</li>
-  <li>Senhas — a aplicação nunca solicita senha do Instagram.</li>
+  <li>Senhas, a aplicação nunca solicita senha do Instagram.</li>
 </ul>
 
 <h2>O painel administrativo</h2>
 <ul>
-  <li><strong>O histórico das suas próprias mudanças</strong> — quando você altera a
+  <li><strong>O histórico das suas próprias mudanças</strong>, quando você altera a
       configuração pelo painel, o registro dessa alteração fica guardado no
       <em>seu</em> banco de dados, na sua conta da Cloudflare. Ele existe para
       você poder ver o que mudou e voltar atrás.</li>
-  <li><strong>O nome de usuário na tela "O que aconteceu"</strong> — essa tela abre
+  <li><strong>O nome de usuário na tela "O que aconteceu"</strong>, essa tela abre
       <em>sem</em> consultar o Instagram. Somente <strong>quando você pede</strong>, tocando no
       botão que busca os nomes, o painel pergunta ao Instagram, naquele momento, o
       @ de quem comentou nos comentários listados. Esse nome é usado apenas para
       desenhar a página e <strong>não é guardado</strong>: ele não vai para o banco
       de dados, não vai para os registros, e desaparece quando a página termina de
       carregar.</li>
-  <li><strong>Metadados de requisição registrados pela Cloudflare</strong> — a Cloudflare,
+  <li><strong>Metadados de requisição registrados pela Cloudflare</strong>, a Cloudflare,
       que hospeda esta aplicação, registra dados técnicos de cada acesso (como
       endereço IP e identificador da requisição). Isso acontece na infraestrutura
       dela, fora do controle deste código, e a retenção é definida pela

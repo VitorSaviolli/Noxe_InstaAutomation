@@ -1,11 +1,11 @@
 # O terceiro perfil de cabecalhos de §11.5: o dos TRES assets.
 #
-# Os outros dois perfis — pagina do Worker e API JSON — moram em codigo, em
+# Os outros dois perfis, pagina do Worker e API JSON, moram em codigo, em
 # `src/routes/painel/html.ts`, porque quem os aplica e o Worker. Este nao pode
 # morar la: quem serve `/painel/painel.css`, `/painel/painel.js` e
 # `/painel/parar` e o CDN, e o Worker nem e invocado (`assets` sem
 # `run_worker_first`, §11.2). Sem este arquivo os tres saem sem CSP e sem
-# `nosniff` — inclusive a pagina da parada de emergencia.
+# `nosniff`, inclusive a pagina da parada de emergencia.
 #
 # `_headers` NAO e servido como asset: e metadado que a Cloudflare le no
 # deploy. Os tres arquivos de `public/` continuam sendo tres.
@@ -26,7 +26,7 @@
 
 # `no-cache` quer dizer "revalide sempre", e nao "nao guarde": a revalidacao de
 # asset e gratuita e elimina a classe de bug "JS velho no cache depois do
-# deploy" — que, num painel que le digital, apareceria como login que nao
+# deploy", que, num painel que le digital, apareceria como login que nao
 # funciona sem ninguem entender por que. `max-age` longo aqui trocaria uma
 # economia que nao precisamos por essa classe de bug.
 #

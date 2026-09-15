@@ -9,12 +9,12 @@
  * **Lema 1 de §10.6 mora neste arquivo.** `INSERT INTO painel_credenciais`
  * aparece em EXATAMENTE um lugar de `src/`, e e o `statementDeInsercao` daqui.
  * Um teste de `tests/painel-convite.test.ts` varre `src/` e fica vermelho se a
- * string aparecer num segundo arquivo — sem ele, o lema envelheceria mal: o
+ * string aparecer num segundo arquivo, sem ele, o lema envelheceria mal: o
  * teorema de §10.6 vale porque so existe UM caminho de insercao, e um segundo
  * caminho escrito de boa fe amanha nao acionaria nenhum alarme.
  *
  * A chave publica e guardada em JWK, em texto: ela e PUBLICA, e cifra-la seria
- * teatro. O que nunca entra aqui e o `credential_id` em log ou em tela — para
+ * teatro. O que nunca entra aqui e o `credential_id` em log ou em tela, para
  * esses dois destinos existe `prefixoDeCredencial()` (§10.13).
  */
 
@@ -50,7 +50,7 @@ export interface CredencialConhecida {
 /**
  * O que o login carrega numa consulta so: o dono da instalacao e a credencial.
  *
- * `credencial: null` significa "este `credential_id` nao existe" — e nao um
+ * `credencial: null` significa "este `credential_id` nao existe", e nao um
  * erro. Quem responde igual para credencial desconhecida e para assinatura
  * invalida e a rota, e e o que fecha o oraculo de enumeracao de §11.4.
  */
@@ -89,7 +89,7 @@ export class PainelCredenciaisRepository {
    * endereco antigo prova que a instalacao ja teve um dono, mesmo que ela nao
    * sirva mais para entrar (§10.14). Filtrar pelo `rp_id` aqui faria um
    * convite de primeira instalacao voltar a funcionar so porque o endereco do
-   * painel mudou — exatamente o instante em que ele nao pode funcionar.
+   * painel mudou, exatamente o instante em que ele nao pode funcionar.
    *
    * O teto de 10 por `rp_id` mantem esta lista pequena por construcao.
    */
@@ -111,7 +111,7 @@ export class PainelCredenciaisRepository {
   /**
    * Quantas credenciais existem neste `rp_id`. UMA leitura barata.
    *
-   * Existe para o passo 9 de §10.5 — o teto de 10 conferido na hora de gravar,
+   * Existe para o passo 9 de §10.5, o teto de 10 conferido na hora de gravar,
    * e nao so na hora de gerar as options. A conferencia dupla nao e desperdicio:
    * entre uma requisicao e outra o dono pode ter cadastrado por outro caminho,
    * e o teto que so vale na primeira metade da cerimonia nao e teto.
@@ -126,7 +126,7 @@ export class PainelCredenciaisRepository {
   }
 
   /**
-   * Le — ou cria, uma unica vez na vida da instalacao — o `usuario_handle`.
+   * Le, ou cria, uma unica vez na vida da instalacao, o `usuario_handle`.
    *
    * **Por que `painel_estado` mora neste arquivo e nao num repositorio proprio.**
    * §7.7 lista SEIS `painel-*-repository.ts`, e `estado.ts` esta entre os nomes
@@ -135,7 +135,7 @@ export class PainelCredenciaisRepository {
    * separado. Um setimo repositorio para uma coluna seria contrato novo por
    * nada.
    *
-   * O caminho comum — toda instalacao que ja registrou alguma vez — custa UMA
+   * O caminho comum, toda instalacao que ja registrou alguma vez, custa UMA
    * leitura e ZERO escrita. So a primeirissima chamada da vida grava, e o
    * `ON CONFLICT DO NOTHING` e o que faz duas chamadas simultaneas chegarem ao
    * MESMO handle em vez de criarem dois: o D1 e SQLite com escritor unico, a
@@ -171,8 +171,8 @@ export class PainelCredenciaisRepository {
    * A credencial daquele `credential_id` E o dono da instalacao, em **UMA**
    * leitura (§10.7, passos 4 e 5).
    *
-   * As duas coisas vem juntas porque §9.10 fixa o custo do login — bem-sucedido
-   * ou fracassado — em **1 leitura**. Duas consultas dariam a mesma resposta
+   * As duas coisas vem juntas porque §9.10 fixa o custo do login, bem-sucedido
+   * ou fracassado, em **1 leitura**. Duas consultas dariam a mesma resposta
    * pelo dobro do preco numa rota nao autenticada, que e exatamente onde o
    * preco vira alavanca de quem esta martelando.
    *
@@ -180,13 +180,13 @@ export class PainelCredenciaisRepository {
    * VOLTA mesmo quando o `credential_id` nao existe, e e isso que permite
    * comparar o `userHandle` que o autenticador mandou sem uma segunda ida ao
    * banco. Credencial desconhecida chega aqui como `credencial: null`, e quem
-   * decide o que fazer com isso e `verificarAssertion` — que percorre um
+   * decide o que fazer com isso e `verificarAssertion`, que percorre um
    * `verify` inteiro com uma chave descartavel para nao se denunciar pelo
    * relogio (§11.4).
    *
    * `chave_publica_jwk` e JSON gravado por nos, mas e lido de volta dentro de
    * um `try`: uma linha corrompida no D1 nao pode virar excecao no login, ela
-   * vira credencial desconhecida — falha fechada.
+   * vira credencial desconhecida, falha fechada.
    */
   async buscarParaLogin(credentialId: string): Promise<LeituraDeLogin | null> {
     const linha = await this.db
@@ -222,7 +222,7 @@ export class PainelCredenciaisRepository {
    * passo 12).
    *
    * Statement, e nao gravacao: ele viaja no MESMO lote da sessao e da
-   * auditoria. `backup_eligible` NAO entra — a elegibilidade e definida no
+   * auditoria. `backup_eligible` NAO entra, a elegibilidade e definida no
    * registro e nao muda durante a vida da credencial; o que muda e o estado.
    */
   statementDeUsoNoLogin(uso: {
@@ -249,7 +249,7 @@ export class PainelCredenciaisRepository {
    * oferecer (§8.8).
    *
    * Sem `ON CONFLICT`: um `credential_id` repetido e conflito de chave
-   * primaria, o lote inteiro falha e nada e gravado — que e precisamente o que
+   * primaria, o lote inteiro falha e nada e gravado, que e precisamente o que
    * o passo 8 de §10.5 manda fazer. `ON CONFLICT DO NOTHING` aqui deixaria a
    * linha de auditoria sobreviver a uma insercao que nao aconteceu, e o
    * historico passaria a mentir.
@@ -290,7 +290,7 @@ export class PainelCredenciaisRepository {
    * **`chave_publica_jwk` NAO vem, e a ausencia e decisao.** Ela nao tem uso
    * nenhum na tela, e a coluna mais gorda da tabela viajando para um HTML e
    * exatamente o tipo de dado que acaba impresso num log de depuracao. O
-   * `credential_id` vem porque a remocao precisa dele no corpo do POST — e a
+   * `credential_id` vem porque a remocao precisa dele no corpo do POST, e a
    * TELA nunca o escreve inteiro (§10.13), so o prefixo de 8 hex.
    */
   async listarParaATela(): Promise<LinhaDeAparelho[]> {
@@ -335,12 +335,12 @@ export class PainelCredenciaisRepository {
    * A subconsulta e avaliada dentro do mesmo `DELETE`, e o D1 e SQLite com
    * escritor unico: nao existe intervalo em que duas remocoes concorrentes leiam
    * "duas" e apaguem as duas. Conferir a contagem antes, em JavaScript, seria a
-   * corrida classica — duas abas abertas apagariam a ultima passkey e trancariam
+   * corrida classica, duas abas abertas apagariam a ultima passkey e trancariam
    * o dono para fora do proprio painel, que e o unico estado do qual so um codigo
    * de recuperacao tira.
    *
    * `meta.changes === 0` significa "nao removeu", e quem traduz isso para a
-   * frase "cadastre outro aparelho antes" e a rota — o repositorio nao conhece
+   * frase "cadastre outro aparelho antes" e a rota, o repositorio nao conhece
    * frase de tela.
    *
    * **A contagem considera so o `rp_id` do parametro** (§10.13, §10.14):
@@ -349,21 +349,21 @@ export class PainelCredenciaisRepository {
    * credencial morta segurar a remocao de uma viva.
    *
    * **O `rp_id` entra na CONTAGEM, e nunca no casamento da linha a apagar.** A
-   * grafia anterior era a de §10.13 ao pe da letra — `AND rp_id = ?` junto com
-   * a subconsulta —, e essa forma so descreve o caso comum: com o `rp_id` de
+   * grafia anterior era a de §10.13 ao pe da letra, `AND rp_id = ?` junto com
+   * a subconsulta, e essa forma so descreve o caso comum: com o `rp_id` de
    * hoje nos dois lugares, uma credencial de endereco ANTIGO nunca satisfaz o
    * `WHERE` e o `DELETE` altera zero linhas. A rota traduzia isso para
-   * `409 ultima_passkey` — "Cadastre outra passkey antes de remover esta" — com
+   * `409 ultima_passkey`, "Cadastre outra passkey antes de remover esta", com
    * passkeys de sobra na tabela, e como os passos seguintes do lote sao presos
    * a mudanca, nao sobrava nem linha de auditoria nem revogacao das sessoes: a
    * revogacao sumia sem rastro. A tela, enquanto isso, desenhava o botao e
    * escrevia "pode ser removido sem medo". O celular perdido no endereco antigo
-   * ficava no banco para sempre — e voltaria a entrar se o painel um dia
+   * ficava no banco para sempre, e voltaria a entrar se o painel um dia
    * voltasse aquele endereco.
    *
    * A forma de agora diz a regra inteira em UMA instrucao, que e o que a
-   * atomicidade exige: ou a linha nao e do endereco de hoje — e ai sai livre,
-   * inclusive a ultima delas —, ou ela e, e ai a contagem do endereco de hoje
+   * atomicidade exige: ou a linha nao e do endereco de hoje, e ai sai livre,
+   * inclusive a ultima delas, ou ela e, e ai a contagem do endereco de hoje
    * precisa ser maior que 1. Os dois `?` de `rpId` sao o MESMO valor de
    * proposito (`env.PANEL_RP_ID`, nunca um `rp_id` vindo da requisicao): quem
    * apagar a diferenca entre "o endereco de hoje" e "o endereco da linha"
@@ -386,7 +386,7 @@ export class PainelCredenciaisRepository {
    * Sem `WHERE`: a rota administrativa existe para o caso em que nao ha mais
    * como entrar, e um filtro por `rp_id` deixaria de fora justamente as
    * credenciais do endereco antigo, que sao as que sobram quando o painel
-   * mudou de endereco. Ela **nao** toca `account_tokens` — a conexao com o
+   * mudou de endereco. Ela **nao** toca `account_tokens`, a conexao com o
    * Instagram nao e acesso ao painel, e derruba-la junto faria uma rota de
    * recuperacao de acesso desligar a automacao (regressao escrita em §13.2).
    */
@@ -402,7 +402,7 @@ export class PainelCredenciaisRepository {
  * passo 6). Elas existem aqui por um motivo de PRODUTO e nao de protocolo: sao
  * a diferenca entre "esta salvo na conta do celular, se voce trocar de aparelho
  * continua entrando" e "existe so neste aparelho, se ele quebrar este acesso se
- * perde" (§3) — a informacao que mais importa na tela inteira.
+ * perde" (§3), a informacao que mais importa na tela inteira.
  */
 export interface LinhaDeAparelho {
   credentialId: string
@@ -419,7 +419,7 @@ export interface LinhaDeAparelho {
  * A metade direita do `LEFT JOIN` vira `CredencialGuardada`, ou `null`.
  *
  * Uma coluna `NULL` em qualquer campo obrigatorio significa que o `ON` nao
- * casou — nao existe linha de credencial com campo obrigatorio nulo, porque o
+ * casou, nao existe linha de credencial com campo obrigatorio nulo, porque o
  * schema nao permite. O `JSON.parse` num `try` e a segunda metade: uma linha
  * corrompida vira credencial desconhecida, e nunca uma excecao no login.
  */

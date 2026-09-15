@@ -2,13 +2,13 @@
  * O vocabulario do FORMULARIO do painel: o que a tela escreve e o funil le.
  *
  * Ele nasceu dentro de `gravar.ts` e saiu na etapa do step-up, quando aquele
- * arquivo passou de 843 linhas — 43 acima do teto de 800 deste repositorio.
+ * arquivo passou de 843 linhas, 43 acima do teto de 800 deste repositorio.
  * A separacao nao e so de tamanho: sao duas perguntas diferentes, e tres telas
  * ja importavam a segunda sem precisar da primeira.
  *
- *   `gravar.ts`      — "como o painel grava": a ordem de §11.3, a trava
+ *   `gravar.ts`     , "como o painel grava": a ordem de §11.3, a trava
  *                      otimista, a classificacao de risco e o lote atomico
- *   este arquivo     — "que forma tem o corpo daquele formulario": o estado de
+ *   este arquivo    , "que forma tem o corpo daquele formulario": o estado de
  *                      comportamento, os nomes de campo, e o par leitor /
  *                      codificador de cada valor
  *
@@ -61,7 +61,7 @@ export type PatchDeEstado = Partial<EstadoDeComportamento>
  * Os campos de comportamento, em ordem lexicografica, uma vez so.
  *
  * A lista vem das CHAVES de `NOME_DO_CAMPO`, que e um `Record<CampoDaConfig,
- * string>` — ou seja, o TypeScript ja garante que ela esta completa. Uma
+ * string>`, ou seja, o TypeScript ja garante que ela esta completa. Uma
  * segunda lista literal aqui seria a que ficaria para tras.
  *
  * A ordem lexicografica nao e enfeite: e ela que torna `antes` e `depois` dois
@@ -77,14 +77,14 @@ export const CAMPOS_DE_COMPORTAMENTO: readonly CampoDaConfig[] = (
  *
  * §9.9 diz o que o botao "Voltar a esta versao" atravessa, e a lista e fechada:
  * "o mesmo validador, o **mesmo step-up** e a allowlist de hoje", com UMA recusa
- * sancionada — se a allowlist encolheu. A lista de campos por ROTA (Ruling 70)
+ * sancionada, se a allowlist encolheu. A lista de campos por ROTA (Ruling 70)
  * seria um quarto portao que a spec nao nomeia, recusando por um motivo que ela
  * nao sanciona: uma vez que o link tivesse mudado, toda linha de historico
  * anterior aquela mudanca ficava irrestauravel, **inclusive as que eram sobre
  * palavra-gatilho**.
  *
- * Entao a restauracao e uma **operacao declarada** — `acao=restaurar`, como
- * `acao=ligar|desligar` de §7.1 —, e o escopo dela e a uniao gravavel inteira.
+ * Entao a restauracao e uma **operacao declarada**, `acao=restaurar`, como
+ * `acao=ligar|desligar` de §7.1, e o escopo dela e a uniao gravavel inteira.
  * A protecao continua sendo onde §9.9 a poe: mesmo validador, mesmo step-up
  * preso ao conteudo, allowlist de hoje. Para campo protegido a defesa e a tela
  * de conferencia mais o `op_hash`, que mostram o valor literal antes do gesto;
@@ -93,7 +93,7 @@ export const CAMPOS_DE_COMPORTAMENTO: readonly CampoDaConfig[] = (
  *
  * **Esta lista tem de ser exatamente a UNIAO das listas das quatro rotas de
  * gravacao**, e um metateste afirma isso (META-10, Ruling 72). Sem ele, a
- * garantia do Ruling 68 — `mediaScope` nao e gravavel nesta etapa — dependeria
+ * garantia do Ruling 68, `mediaScope` nao e gravavel nesta etapa, dependeria
  * de as quatro listas a omitirem, e so uma delas estava sob teste.
  */
 export const CAMPOS_DA_RESTAURACAO: readonly CampoDaConfig[] = [
@@ -104,7 +104,7 @@ export const CAMPOS_DA_RESTAURACAO: readonly CampoDaConfig[] = [
   'normalizeAccents',
   'ignorePunctuation',
   'processOnlyReels',
-  // A Etapa 12 trouxe a tela dona de `mediaScope` — `/painel/reels` —, e com
+  // A Etapa 12 trouxe a tela dona de `mediaScope`, `/painel/reels`, e com
   // ela o campo entrou na uniao gravavel (Ruling 68). Ele NAO e
   // `allowedMediaIds`: a lista de ids continua derivada das linhas ativas de
   // `painel_midias` (§9.4), e o gravavel e o escopo.
@@ -140,7 +140,7 @@ export function estadoDaConfig(config: AutomationConfig): EstadoDeComportamento 
  * Aquela versao guardada volta INTEIRA pelo botao? (Ruling 74, R-6)
  *
  * Ela volta quando nao difere de hoje em nenhum campo que ninguem grava. Se
- * diferir, o botao **nao sai** — e a linha diz por que —, porque um botao que
+ * diferir, o botao **nao sai**, e a linha diz por que, porque um botao que
  * restaura pela metade e o mesmo tipo de promessa quebrada que §12.4 recusa.
  */
 export function restauracaoPossivel(
@@ -163,7 +163,7 @@ export const CONFIRMADO = 'sim'
 /**
  * Os dois valores de `matchMode` NO FORMULARIO.
  *
- * `exact` e `contains` sao as palavras do BANCO, e §12.1 as proibe na tela —
+ * `exact` e `contains` sao as palavras do BANCO, e §12.1 as proibe na tela,
  * proibicao que alcanca o atributo `value`, porque ele esta no HTML que o
  * metateste das palavras proibidas varre. E exatamente a mesma razao de os
  * booleanos viajarem como `sim`/`nao` em vez de `true`/`false`.
@@ -171,7 +171,7 @@ export const CONFIRMADO = 'sim'
  * A conferencia deixou de ser teorica quando `matchMode` virou campo editavel
  * (Ruling 65): antes dele, a unica ocorrencia de `exact` no HTML vinha dos
  * campos escondidos do botao "Voltar a esta versao", e so aparecia quando havia
- * historico — uma armadilha que o metateste nao alcancava.
+ * historico, uma armadilha que o metateste nao alcancava.
  *
  * O par leitor/codificador e um so, como o de `sim`/`nao`: `lerModo` le e
  * `valorDeFormulario` escreve, os dois a partir desta tabela.
@@ -185,9 +185,9 @@ export const MODO_NO_FORMULARIO = {
  * Os campos do corpo que NAO sao configuracao.
  *
  * A ficha do passo 7 (`CAMPO_DA_FICHA`, de `guardas.ts`, onde ela e conferida),
- * a versao do passo 9, a confirmacao de §10.12 — que vale para TODA rota, e nao
+ * a versao do passo 9, a confirmacao de §10.12, que vale para TODA rota, e nao
  * so para `/painel/chave`, porque religar por um formulario de restauracao e
- * religar do mesmo jeito — e a digital do passo 8. Cada rota acrescenta os seus:
+ * religar do mesmo jeito, e a digital do passo 8. Cada rota acrescenta os seus:
  * `/painel/chave` acrescenta `acao`.
  *
  * `digital` esta aqui por duas razoes que se somam: sem ela o funil recusaria o
@@ -216,7 +216,7 @@ export function lerVersao(campos: URLSearchParams): number | null {
  * `enabled` chega ao funil por DOIS veiculos nomeados: `POST /painel/chave`, que
  * o declara em `CAMPOS_DA_CHAVE`, e `acao=restaurar`, cujo escopo e a uniao
  * gravavel inteira (Ruling 74). O botao "Voltar a esta versao" reenvia o estado
- * anterior inteiro, `enabled` incluso — conferir so no handler da chave o
+ * anterior inteiro, `enabled` incluso, conferir so no handler da chave o
  * deixaria desfazer a parada de emergencia com um clique, sem confirmacao e sem
  * a data na tela.
  *
@@ -237,7 +237,7 @@ export function religa(antes: EstadoDeComportamento, depois: EstadoDeComportamen
  * aviso apareçam no botao que vai pedir a digital, e para saber se vai pedir e
  * preciso saber o que muda. Uma segunda comparacao na tela poderia dizer
  * "protegido" onde o funil dissesse "livre", e a divergencia apareceria como
- * surpresa biometrica — exatamente o que §12.3 proibe.
+ * surpresa biometrica, exatamente o que §12.3 proibe.
  *
  * Listas comparam item a item: `triggerKeywords` e um array, e `!==` sobre dois
  * arrays iguais diria "mudou" em toda gravacao.
@@ -294,7 +294,7 @@ function lerCampo(campo: CampoDaConfig, bruto: string): PatchDeEstado | null {
     default:
       // Os tres campos de texto e de link chegam CRUS: quem os julga e o
       // validador unico, que ja mede tamanho, placeholder e dominio. Um
-      // `trim()` aqui seria um segundo validador, e o pior tipo — o que
+      // `trim()` aqui seria um segundo validador, e o pior tipo, o que
       // conserta.
       return { [campo]: bruto }
   }
@@ -318,7 +318,7 @@ function lerSimOuNao(bruto: string): boolean | null {
  * As horas do intervalo por pessoa.
  *
  * A faixa e conferida aqui APENAS para nao deixar `NaN` nem `Infinity`
- * chegarem ao banco — o julgamento de produto continua em `validarConfig`, que
+ * chegarem ao banco, o julgamento de produto continua em `validarConfig`, que
  * e quem devolve a frase. Sem o teto, `"1e400"` viraria `Infinity` e
  * `.bind(Infinity)` derrubaria a consulta do intervalo la no webhook.
  */
@@ -333,7 +333,7 @@ function lerHoras(bruto: string): number | null {
  *
  * Linha em branco NAO e um item vazio: e o Enter que a pessoa deu antes de
  * escrever a proxima. Descartar a linha vazia e ler o formato da caixa de
- * texto, e nao consertar um valor — um item que fica vazio DEPOIS da
+ * texto, e nao consertar um valor, um item que fica vazio DEPOIS da
  * normalizacao (so pontuacao, so emoji) continua chegando inteiro ao
  * validador, que o recusa com `gatilho_vazio`.
  */
@@ -375,7 +375,7 @@ export function valorDeFormulario(campo: CampoDaConfig, estado: EstadoDeComporta
  *
  * O texto vem do D1, que e entrada NAO confiavel (uma linha pode ter entrado
  * por `wrangler d1 execute`). Devolve `null` a qualquer estranheza, e a tela
- * simplesmente nao oferece o botao daquela linha — nunca um botao que posta um
+ * simplesmente nao oferece o botao daquela linha, nunca um botao que posta um
  * corpo meio montado.
  */
 export function lerEstadoGuardado(bruto: string): EstadoDeComportamento | null {
@@ -390,7 +390,7 @@ export function lerEstadoGuardado(bruto: string): EstadoDeComportamento | null {
   const objeto = cru as Record<string, unknown>
 
   // **Todos os campos, e a exigencia e por campo AUSENTE, nunca por campo a
-  // mais.** Faltando um, o formulario sairia sem ele — e campo ausente
+  // mais.** Faltando um, o formulario sairia sem ele, e campo ausente
   // significa "nao mexe nisso" na gravacao, entao a restauracao ficaria pela
   // metade sem ninguem perceber. Chave desconhecida, ao contrario, e descartada
   // em silencio: e leitura de dado guardado, e ali a regra e a oposta a da
@@ -425,7 +425,7 @@ function ehCampoDeComportamento(nome: string): nome is CampoDaConfig {
  *
  * Campo DESCONHECIDO, ao contrario, e recusa: na entrada vinda de humano,
  * estranheza e erro de digitacao ou cliente adulterado (§11.3, passo 6). Na
- * leitura do banco a regra e a oposta — coluna desconhecida e descartada em
+ * leitura do banco a regra e a oposta, coluna desconhecida e descartada em
  * silencio, para compatibilidade com versoes futuras.
  */
 export function lerPatchDoCorpo(

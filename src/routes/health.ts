@@ -34,8 +34,8 @@ export type EstadoPublicoDoPainel = 'desativado' | 'sem_acesso' | 'pronto'
  * POR QUE `sem_passkey` NAO PODE SER PUBLICO: o convite comum funciona
  * exatamente enquanto nao existe nenhuma credencial, e some no instante em que
  * a primeira passkey nasce. Publicar `sem_passkey` numa rota anonima entrega,
- * por polling de graca, o instante preciso em que um convite interceptado — ou
- * fotografado num tutorial — ainda vale. O valor mesclado `sem_acesso` nao
+ * por polling de graca, o instante preciso em que um convite interceptado, ou
+ * fotografado num tutorial, ainda vale. O valor mesclado `sem_acesso` nao
  * separa os dois estados, e essa fusao E a protecao.
  *
  * `sem_codigo_parada` acompanha pelo mesmo motivo: junto com `sem_passkey` ele
@@ -55,7 +55,7 @@ export function comoPublico(estado: EstadoDoPainel): EstadoPublicoDoPainel {
  * O pedido traz o `SETUP_ADMIN_TOKEN` correto?
  *
  * Delega ao `isAdmin` de `oauth.ts`, que e o comparador UNICO das rotas
- * administrativas — o mesmo que `/setup/authorize`, `/setup/subscribe`,
+ * administrativas, o mesmo que `/setup/authorize`, `/setup/subscribe`,
  * `/setup/painel/codigos` e `/setup/painel/zerar` usam. A primeira versao desta
  * funcao repetia a comparacao aqui, e uma segunda copia de verificacao de
  * credencial e exatamente o lugar onde uma correcao de seguranca chega em um
@@ -72,7 +72,7 @@ export async function handleHealth(env: Env, now: number, request?: Request): Pr
 
   // O detalhado so e calculado quando alguem tem direito de ve-lo. Para o
   // anonimo os tres `pronto_*` colapsam em `pronto`, entao a leitura da
-  // configuracao — a unica consulta a mais dos tres — nao precisa acontecer.
+  // configuracao, a unica consulta a mais dos tres, nao precisa acontecer.
   const comoDono = pediuComoDono(request, env)
   const estado = await estadoDoPainel(env, now, comoDono)
 
@@ -85,7 +85,7 @@ export async function handleHealth(env: Env, now: number, request?: Request): Pr
       contaAutorizada: temToken,
     },
     // EXATAMENTE um campo novo, e ele mora na RAIZ, irmao de `status` e
-    // `webhook` — nunca dentro de `configurado`. E este caminho, `corpo.painel`,
+    // `webhook`, nunca dentro de `configurado`. E este caminho, `corpo.painel`,
     // que o teste "nenhum outro campo apareceu" percorre.
     painel: comoDono ? estado : comoPublico(estado),
   })
@@ -105,11 +105,11 @@ async function estadoDoPainel(env: Env, now: number, detalhado: boolean): Promis
   // decide o 503 de toda rota do painel (§10.2), em vez de reescreve-lo aqui.
   //
   // **A primeira versao reescreveu, e mentia.** Ela conferia comprimento ZERO de
-  // dois bindings; `painelHabilitado` exige TRES pisos — chave de sessao >= 32,
+  // dois bindings; `painelHabilitado` exige TRES pisos, chave de sessao >= 32,
   // admin token >= 20, `rp_id` nao vazio. Entre os dois havia uma faixa inteira
   // de configuracao (uma chave de 31 caracteres, um caractere perdido no
   // copiar-e-colar) em que TODA tela respondia `503 painel_desativado` e esta
-  // rota respondia `pronto` — e o assistente, lendo daqui, mandava o dono ficar
+  // rota respondia `pronto`, e o assistente, lendo daqui, mandava o dono ficar
   // tranquilo. §11.9 abre dizendo que NAO existe `/painel/diagnostico`: este
   // campo e o unico diagnostico do subsistema, e ele mentia exatamente no caso
   // de ma configuracao que existe para nomear.
@@ -123,7 +123,7 @@ async function estadoDoPainel(env: Env, now: number, detalhado: boolean): Promis
 
   // Uma consulta que falhou nao pode virar `pronto`. O caso real e a migration
   // ainda nao aplicada: as tabelas do painel nao existem, ninguem consegue
-  // entrar, e `sem_passkey` e exatamente a frase verdadeira — "ligado, mas
+  // entrar, e `sem_passkey` e exatamente a frase verdadeira, "ligado, mas
   // nenhuma credencial utilizavel".
   if (acesso === null) return 'sem_passkey'
 
@@ -148,7 +148,7 @@ async function estadoDoPainel(env: Env, now: number, detalhado: boolean): Promis
  * Duas consultas aqui dobrariam o custo de cada batida.
  *
  * Separada da leitura do token de proposito: se as tabelas do painel nao
- * existirem — migration nao aplicada —, o erro fica contido nesta funcao e
+ * existirem, migration nao aplicada, o erro fica contido nesta funcao e
  * `contaAutorizada` continua respondendo a verdade sobre a conta.
  */
 async function lerAcessoDoPainel(
@@ -176,7 +176,7 @@ async function lerAcessoDoPainel(
  *
  * `expires_at > ?` pelo mesmo motivo de `contaConectada` no painel: a linha
  * sobrevive ao token. Sem essa metade, `contaAutorizada: true` respondia
- * "autorizada" a um monitor externo dois meses depois de a conta ter morrido —
+ * "autorizada" a um monitor externo dois meses depois de a conta ter morrido,
  * e o campo existe justamente para que alguem de fora perceba antes do dono.
  *
  * O `now` vem por parametro: o `fetch` do Worker ja tem o instante da

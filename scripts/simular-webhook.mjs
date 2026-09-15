@@ -64,7 +64,7 @@ function abortarSemDestino() {
  * Descobre o endereco publico do SEU Worker.
  *
  * Ordem: variavel de ambiente WORKER_PUBLIC_URL, depois a mesma chave no .env.
- * Se as duas estiverem vazias, o script para — nunca cai num endereco padrao.
+ * Se as duas estiverem vazias, o script para, nunca cai num endereco padrao.
  */
 function resolverUrlPublica() {
   const bruta = process.env.WORKER_PUBLIC_URL ?? lerDoEnv('WORKER_PUBLIC_URL') ?? ''
@@ -74,7 +74,7 @@ function resolverUrlPublica() {
 
   if (!url.startsWith('https://') && !url.startsWith('http://')) {
     console.error(`WORKER_PUBLIC_URL invalido: "${url}"`)
-    console.error('O endereco precisa comecar com https:// — cole a URL completa.')
+    console.error('O endereco precisa comecar com https://, cole a URL completa.')
     process.exit(1)
   }
 
@@ -133,7 +133,7 @@ const resposta = await fetch(`${base}${CAMINHO_WEBHOOK}`, {
 })
 
 const corpo = await resposta.text()
-console.log(`HTTP ${resposta.status} — ${corpo}`)
+console.log(`HTTP ${resposta.status}, ${corpo}`)
 console.log('')
 
 if (resposta.status === 200) {

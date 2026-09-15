@@ -2,6 +2,7 @@ import { timingSafeEqual } from '../security/constant-time'
 import { isValidSignature } from '../security/webhook-signature'
 import type { Env } from '../types/env'
 import type { CommentEvent } from '../types/meta'
+import { lerCorpoCapado } from './painel/guardas'
 
 /** Corpo maior que isso e descartado antes de qualquer parsing. */
 const MAX_BODY_BYTES = 512 * 1024
@@ -10,7 +11,7 @@ const MAX_BODY_BYTES = 512 * 1024
  * Handshake de verificacao do webhook.
  *
  * A Meta chama este GET quando voce clica em "Verificar e salvar" no painel.
- * A resposta precisa ser 200 com o hub.challenge CRU no corpo — texto puro,
+ * A resposta precisa ser 200 com o hub.challenge CRU no corpo, texto puro,
  * sem JSON e sem aspas. Qualquer outra coisa e a Meta recusa a configuracao.
  */
 export function handleWebhookVerification(url: URL, env: Env): Response {
@@ -51,13 +52,13 @@ export type WebhookParse =
  * CRU (re-serializar mudaria os bytes e invalidaria o HMAC).
  */
 export async function readWebhookRequest(request: Request, env: Env): Promise<WebhookParse> {
-  const declaredLength = Number.parseInt(request.headers.get('content-length') ?? '0', 10)
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
-    return { ok: false, status: 413, reason: 'payload_muito_grande' }
-  }
-
-  const rawBody = await request.text()
-  if (rawBody.length > MAX_BODY_BYTES) {
+  // Aqui havia `request.text()` seguido de uma conferencia de tamanho: sem
+  // `content-length` (POST `chunked`), o corpo inteiro entrava na memoria do
+  // isolate ANTES do teto e antes da assinatura, de qualquer um, porque esta
+  // rota e publica. `lerCorpoCapado` corta durante a leitura. Ele nao guarda
+  // estado nem toca o D1, entao usa-lo aqui nao traz nada do painel junto.
+  const rawBody = await lerCorpoCapado(request, MAX_BODY_BYTES)
+  if (rawBody === null) {
     return { ok: false, status: 413, reason: 'payload_muito_grande' }
   }
 
@@ -84,7 +85,7 @@ function readObject(source: unknown, key: string): unknown {
 /**
  * Extrai eventos de comentario de forma defensiva.
  *
- * Qualquer entrada malformada e simplesmente ignorada — um payload
+ * Qualquer entrada malformada e simplesmente ignorada, um payload
  * inesperado nunca deve derrubar o Worker nem impedir que os OUTROS
  * eventos do mesmo lote sejam processados.
  */

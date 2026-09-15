@@ -1,18 +1,18 @@
 /**
- * `GET /painel` — a tela de Inicio, e o panorama que "O que aconteceu" reusa.
+ * `GET /painel`, a tela de Inicio, e o panorama que "O que aconteceu" reusa.
  *
  * Inicio cabe numa frase (§3): **"esta funcionando?"**. Ela responde com um
- * estado grande — em cor, icone E palavra, nunca so cor — e com a lista de
+ * estado grande, em cor, icone E palavra, nunca so cor, e com a lista de
  * pendencias, cada uma com o caminho que a resolve.
  *
  * **O estado ambar e a razao de a tela existir.** Hoje a automacao recusa
- * disparar por seguranca — link de fabrica, nenhuma palavra, nenhum Reel
- * marcado, conta desconectada — e nao conta a ninguem. §12.1 regra 3 diz
+ * disparar por seguranca, link de fabrica, nenhuma palavra, nenhum Reel
+ * marcado, conta desconectada, e nao conta a ninguem. §12.1 regra 3 diz
  * "nada some em silencio", e esta e a tela que torna isso visivel.
  *
  * **Custo: 3 subrequests ao D1** (§12.10): a linha de sessao, que o roteador
- * ja fez, o `db.batch()` da configuracao — um lote inteiro vale UM subrequest
- * — e `perguntasDoInicio`, que responde DUAS coisas numa instrucao so: a conta
+ * ja fez, o `db.batch()` da configuracao, um lote inteiro vale UM subrequest
+ * e `perguntasDoInicio`, que responde DUAS coisas numa instrucao so: a conta
  * do Instagram e quantos codigos de recuperacao ainda valem. Sao 4 no estado
  * DESLIGADA, e so nele: a data da ultima parada por codigo, que §10.12 exige na
  * confirmacao de religar. `ignorarCache: true` porque mostrar ao dono um valor
@@ -21,7 +21,7 @@
  * **O aviso bloqueante de §10.11 abre esta tela**, e ele nasceu aqui pelo lugar
  * onde §10.11 o pediu: "o **painel** abre com aviso bloqueante". A faixa
  * vermelha de "zero codigos" so existia em `/painel/aparelhos`, que e a unica
- * tela sem item na barra de baixo — depois de uma recuperacao o dono ficava
+ * tela sem item na barra de baixo, depois de uma recuperacao o dono ficava
  * sem rede de seguranca e sem nada que ele visse dizendo isso.
  *
  * Este arquivo tambem hospeda `POST /painel/chave`, a chave liga/desliga de
@@ -69,7 +69,7 @@ export interface EstadoNaTela {
   readonly classe: string
 }
 
-/** Uma coisa que falta, e o caminho que a resolve — quando ele ja existe. */
+/** Uma coisa que falta, e o caminho que a resolve, quando ele ja existe. */
 export interface Pendencia {
   readonly texto: string
   readonly acao: { readonly rotulo: string; readonly para: string } | null
@@ -97,13 +97,13 @@ export interface Panorama {
  * troca a senha, cai num checkpoint ou fica sem renovar por dois meses tem a
  * linha intacta e nada sendo entregue. As seis telas do painel afirmavam
  * "Conectada. A automacao consegue falar com o Instagram para enviar" a quem
- * nao tinha mais conta nenhuma — e §12.1 regra 3 proibe exatamente isso.
+ * nao tinha mais conta nenhuma, e §12.1 regra 3 proibe exatamente isso.
  * `shouldRefresh` era o UNICO lugar do projeto que olhava `expires_at`, e ele
  * DESISTE quando o prazo passa (`if (now >= expiresAt) return false`): nao
  * havia nem renovacao, nem aviso, nem tela dizendo a verdade.
  *
  * O `now` vem por parametro, e nao de `Date.now()`: e a mesma regra dos
- * repositorios — quem compara relogio no painel sao as rotas, que ja recebem
+ * repositorios, quem compara relogio no painel sao as rotas, que ja recebem
  * o instante da requisicao.
  *
  * A falha e tratada como "nao conectada", e a direcao e a segura: dizer
@@ -112,7 +112,7 @@ export interface Panorama {
  *
  * **O `catch` NAO e silencioso, e o `console.warn` e o que o torna honesto.**
  * Sem ele, um D1 fora do ar virava a frase "A conta do Instagram nao esta
- * conectada", afirmada ao dono como FATO, sem rastro em lugar nenhum — e o
+ * conectada", afirmada ao dono como FATO, sem rastro em lugar nenhum, e o
  * dono passaria a tarde reconectando uma conta que nunca desconectou. §12.7 e
  * literal: detalhe tecnico vai para o `console`, nunca para a tela. Uma linha
  * so, no formato de `despachar`, para nao amplificar log.
@@ -138,8 +138,8 @@ export async function contaConectada(db: D1Database, now: number): Promise<boole
 /**
  * O predicado de "a conta ainda fala com o Instagram", numa grafia so.
  *
- * Ele vive em duas consultas — a de `contaConectada`, que as outras cinco telas
- * chamam, e a do Inicio, que pergunta as duas coisas de uma vez — e duas
+ * Ele vive em duas consultas, a de `contaConectada`, que as outras cinco telas
+ * chamam, e a do Inicio, que pergunta as duas coisas de uma vez, e duas
  * grafias divergiriam no dia em que uma delas ganhasse um `AND`. Uma tela
  * dizendo "conectada" e a outra "nao esta" na mesma instalacao e pior que as
  * duas erradas juntas.
@@ -152,7 +152,7 @@ const CONTA_VIVA = 'id = 1 AND expires_at > ?'
  * As duas colunas, e nao so `invalidado_em`: o consumo marca `usado_em` no
  * codigo usado e `invalidado_em` em todos os outros, no mesmo lote. Contar so
  * `invalidado_em IS NULL` faria a tela achar que ha um codigo valendo
- * justamente depois de uma recuperacao — o codigo ja queimado.
+ * justamente depois de uma recuperacao, o codigo ja queimado.
  */
 const CODIGO_UTILIZAVEL = "tipo = 'recuperacao' AND usado_em IS NULL AND invalidado_em IS NULL"
 
@@ -169,7 +169,7 @@ export interface PerguntasDoInicio {
 }
 
 /**
- * As duas perguntas do Inicio, num **unico** `SELECT` — e um unico subrequest.
+ * As duas perguntas do Inicio, num **unico** `SELECT`, e um unico subrequest.
  *
  * §12.10 orca **3 subrequests** para esta tela (a linha da sessao, o lote da
  * configuracao e esta pergunta), e TELA-20 trava o numero. O aviso de §10.11
@@ -178,7 +178,7 @@ export interface PerguntasDoInicio {
  * premissa da conta de TELA-20. Duas subconsultas escalares dentro da MESMA
  * instrucao respondem as duas perguntas pelo preco de uma.
  *
- * A falha vira "nao conectada" e "nao deu para saber" — as duas na direcao
+ * A falha vira "nao conectada" e "nao deu para saber", as duas na direcao
  * segura de §12.1 regra 3, e cada uma para o seu lado: afirmar "conectada" sem
  * saber esconde uma automacao muda, e afirmar "sem codigos" sem saber acende um
  * alarme falso na tela que mais precisa ser levada a serio.
@@ -241,7 +241,7 @@ function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Penden
     // "a tela de escolher os Reels chega junto com a proxima parte do painel", e
     // a tela chegou: mandar a pessoa esperar por uma tela pronta e a mesma
     // familia de defeito dos Rulings 75 e 82. Com ela existindo, a pendencia
-    // ganha o botao que a resolve — que e o que §3 pede de toda pendencia cujo
+    // ganha o botao que a resolve, que e o que §3 pede de toda pendencia cujo
     // caminho ja exista.
     lista.push({
       texto:
@@ -265,7 +265,7 @@ function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Penden
  * A frase do estado cinza de parada por erro, que **nomeia o campo** (§12.6).
  *
  * Nomear e o ponto: "algum ajuste esta errado" manda a pessoa procurar em
- * quatro telas. E a tela nunca inventa um substituto para o valor recusado —
+ * quatro telas. E a tela nunca inventa um substituto para o valor recusado,
  * erro nunca alarga, e erro nunca inventa um valor que o dono nao viu.
  */
 function explicacaoDaParada(crus: readonly string[]): string {
@@ -292,7 +292,7 @@ function estadoDe(snapshot: SnapshotConfig, pendencias: readonly Pendencia[]): E
       titulo: 'Parada por segurança',
       // Os avisos CRUS, e nao os ja traduzidos: `traduzirAviso` le o prefixo
       // `<campo>:` do achado, e traduzir duas vezes perderia o campo e
-      // devolveria a frase generica — que e justamente a que §12.6 proibe.
+      // devolveria a frase generica, que e justamente a que §12.6 proibe.
       explicacao: `${explicacaoDaParada(snapshot.avisos)} ${RECUSA_SEM_VALOR.configIlegivel}`,
       classe: 'estado-desligada',
     }
@@ -315,7 +315,7 @@ function estadoDe(snapshot: SnapshotConfig, pendencias: readonly Pendencia[]): E
       icone: '▲',
       titulo: 'Ligada, mas nada vai ser enviado',
       explicacao:
-        'A automação está ligada e, mesmo assim, recusa enviar — por segurança. Resolva o que está listado abaixo e ela volta a responder.',
+        'A automação está ligada e, mesmo assim, recusa enviar, por segurança. Resolva o que está listado abaixo e ela volta a responder.',
       classe: 'estado-atencao',
     }
   }
@@ -350,7 +350,7 @@ export function panorama(snapshot: SnapshotConfig, conta: boolean): Panorama {
   }
 }
 
-/** O bloco do estado grande. Icone, palavra e cor — os tres juntos (§3). */
+/** O bloco do estado grande. Icone, palavra e cor, os tres juntos (§3). */
 export function blocoDeEstado(panorama: Panorama): HtmlSeguro {
   return html`<section class="bloco-estado ${panorama.estado.classe}">
 <h2 class="titulo-estado"><span aria-hidden="true">${panorama.estado.icone}</span> ${
@@ -390,15 +390,15 @@ export function blocoDeAvisos(panorama: Panorama): HtmlSeguro {
  * O aviso bloqueante de §10.11: **"gere um novo conjunto de codigos agora"**.
  *
  * **Por que ele mora no Inicio.** A faixa vermelha existia so em
- * `/painel/aparelhos`, que e — por decisao declarada no cabecalho daquele
- * arquivo — a UNICA tela sem item na barra de baixo: o acesso a ela e um `<li>`
+ * `/painel/aparelhos`, que e, por decisao declarada no cabecalho daquele
+ * arquivo, a UNICA tela sem item na barra de baixo: o acesso a ela e um `<li>`
  * no fim desta pagina. Depois de uma recuperacao, §10.11 invalida em bloco
  * todos os outros codigos, e o dono ficava com ZERO codigo utilizavel sem que
  * nada que ele visse dissesse isso. O desfecho e o trancamento que os seis
  * codigos existem para impedir: o proximo aparelho que quebrar deixa o painel
  * sem aparelho E sem codigo, e a unica saida vira `POST /setup/painel/zerar` na
- * maquina que publicou o projeto. §10.11 e literal — "**o painel** abre com
- * aviso bloqueante" —, e o painel abre aqui.
+ * maquina que publicou o projeto. §10.11 e literal, "**o painel** abre com
+ * aviso bloqueante", e o painel abre aqui.
  *
  * **`null` nao acende o aviso.** Quando a consulta falhou nao ha resposta, e
  * §12.1 regra 3 proibe afirmar o que nao se sabe: uma faixa vermelha que
@@ -428,7 +428,7 @@ vez para o painel passar a mandar.</p>`
  * Os tres sinais de §12.3, num lugar so: cadeado, palavra e a classe da borda.
  *
  * §12.3 pede os tres **sempre juntos, nunca so cor**. As tres telas que tem
- * campo protegido — Mensagem, Palavras e Ajustes — chamavam a mesma marcacao
+ * campo protegido, Mensagem, Palavras e Ajustes, chamavam a mesma marcacao
  * escrita a mao, e a terceira copia ja tinha nascido com a quebra de linha em
  * outro lugar. Uma funcao, tres chamadas.
  *
@@ -465,7 +465,7 @@ export function molduraCom(
  *
  * **`comAsInativas` tambem mora aqui, e ele e o conserto do orcamento de
  * §12.10.** As duas telas de Reels precisam das linhas que o lote da
- * configuracao filtra (`ativo = 1`) e pagavam uma consulta PROPRIA por elas — o
+ * configuracao filtra (`ativo = 1`) e pagavam uma consulta PROPRIA por elas, o
  * quarto subrequest que a tabela de §12.10 nao orca. Pedindo no MESMO lote, a
  * pergunta custa zero: um `batch` vale um subrequest. As outras cinco telas
  * carregam algumas linhas a mais na memoria e nao pagam nada por isso; separar
@@ -485,7 +485,7 @@ export async function configDaTela(env: Env, now: number): Promise<SnapshotConfi
  *
  * **O valor da query string NUNCA e escrito na pagina.** A frase vem da tabela
  * fechada do dicionario; um `?ok=` desconhecido nao mostra faixa nenhuma. E a
- * consulta a uma lista fechada — e nao o escape — que impede a query string de
+ * consulta a uma lista fechada, e nao o escape, que impede a query string de
  * virar conteudo, e ela vale mesmo se alguem um dia trocar o `html` por outra
  * coisa nesta linha.
  */
@@ -502,7 +502,7 @@ export function blocoDeConfirmacao(request: Request): HtmlSeguro {
  * A ficha e o passo 7 da escada; a `versao` e a trava otimista do passo 9
  * (§8.8). Escritos num lugar so porque um formulario sem `versao` gravaria por
  * cima de uma mudanca feita em outra aba, e um formulario sem ficha seria
- * recusado — o primeiro erro e silencioso, e e o que este helper mata.
+ * recusado, o primeiro erro e silencioso, e e o que este helper mata.
  */
 export function camposDoFormulario(ficha: string, versao: number): HtmlSeguro {
   return html`<input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
@@ -527,12 +527,12 @@ export async function fichaDaTela(entrada: EntradaDaRota): Promise<string> {
  *
  * **Desligar e UM toque**, e a ausencia de confirmacao e a decisao de §10.10:
  * desligar e a direcao segura, e a parada de emergencia depende de desligar ser
- * barato. **Religar pede um gesto a mais** — a caixa de confirmacao — e mostra a
+ * barato. **Religar pede um gesto a mais**, a caixa de confirmacao, e mostra a
  * data da ultima parada por codigo, que e o que §10.12 exige: "religar exige
  * sessao e confirmacao explicita, com a data vinda de `parado_por_codigo_em`".
  *
  * Nem um nem outro pede a digital, e isso tambem e §10.10: religar nao muda
- * nenhum valor, so devolve a chave ao estado anterior — que o dono ja autorizou
+ * nenhum valor, so devolve a chave ao estado anterior, que o dono ja autorizou
  * quando gravou aqueles campos. Exigir biometria aqui puniria justamente quem
  * acabou de usar o freio.
  *
@@ -627,7 +627,7 @@ recupera&ccedil;&atilde;o</a></li>
 }
 
 // ---------------------------------------------------------------------------
-// POST /painel/chave — a chave liga/desliga
+// POST /painel/chave, a chave liga/desliga
 // ---------------------------------------------------------------------------
 
 /**
@@ -645,13 +645,13 @@ const DESLIGAR = 'desligar'
 /**
  * `POST /painel/chave` com `acao=ligar|desligar` (§7.1).
  *
- * A rota nao tem tela propria — e por isso o `303` dela aponta para
+ * A rota nao tem tela propria, e por isso o `303` dela aponta para
  * `/painel?ok=<codigo>`, que e a tela que a acao mudou. Toda a ordem de §11.3
  * mora em `gravarConfiguracao`; aqui so acontece a traducao de `acao` para o
  * campo `enabled`, que e o vocabulario que §7.1 escreveu para esta rota.
  *
  * **A caixa de confirmacao de §10.12 e exigida pelo FUNIL**, e nao por esta
- * rota: `enabled` chega la por DOIS veiculos — esta rota, que o declara em
+ * rota: `enabled` chega la por DOIS veiculos, esta rota, que o declara em
  * `CAMPOS_DA_CHAVE`, e `acao=restaurar` de `/painel/ajustes`, cujo escopo e a
  * uniao gravavel inteira (Ruling 74). Uma conferencia so aqui deixava o botao
  * "Voltar a esta versao" desfazer a parada de emergencia com um clique, porque
@@ -673,7 +673,7 @@ export async function handleChave(entrada: EntradaDaRota): Promise<Response> {
     para: ROTA_INICIO.caminho,
     confirmacao: acao === LIGAR ? 'ligada' : 'desligada',
     campos: CAMPOS_DA_CHAVE,
-    // So `acao` — a confirmacao de §10.12 e estrutural de TODA rota, e quem a
+    // So `acao`, a confirmacao de §10.12 e estrutural de TODA rota, e quem a
     // exige e o funil, na transicao `desligada -> ligada`. Conferi-la aqui
     // deixava o OUTRO veiculo de `enabled`, o `acao=restaurar` de
     // `/painel/ajustes`, desfazer a parada de emergencia sem confirmacao

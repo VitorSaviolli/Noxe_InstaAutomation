@@ -5,12 +5,12 @@
  * Google/Android e a maioria das chaves de seguranca; **RS256 (-257)** cobre o
  * Windows Hello com TPM, que e o unico caminho RS256 que o dono vai encontrar.
  * Ed25519 (-8) fica de fora por decisao registrada. Qualquer outro `alg` e
- * RECUSADO — nao existe ramo "aceita e torce".
+ * RECUSADO, nao existe ramo "aceita e torce".
  *
  * A conversao acontece **no registro** e a chave e importada ali mesmo: se ela
  * nao importa, a credencial nunca entra no banco (§10.5, passo 7). O que fica
  * gravado e o JWK em `painel_credenciais.chave_publica_jwk`, e e dele que o
- * login parte — o login nunca decodifica CBOR (§10.5).
+ * login parte, o login nunca decodifica CBOR (§10.5).
  */
 import { bytesToBase64Url } from '../../security/base64url'
 import { bytesDoMapa, decodificarCbor, inteiroDoMapa, tamanhoDoMapa } from './cbor'
@@ -32,7 +32,7 @@ const KTY_RSA = 3
 /** `crv` COSE: 1 = P-256. */
 const CRV_P256 = 1
 
-/** Rotulos COSE. Inteiros, nunca texto — e o que a RFC 8152 manda. */
+/** Rotulos COSE. Inteiros, nunca texto, e o que a RFC 8152 manda. */
 const ROTULO_KTY = 1
 const ROTULO_ALG = 3
 const ROTULO_EC_CRV = -1
@@ -52,7 +52,7 @@ const MODULO_RSA_MINIMO = 256
  *
  * Sem ele o unico limite seria o `BYTES_MAXIMOS` do CBOR, e caberia um modulo
  * de ~16 mil bits. Quem tivesse convite valido poderia registrar essa chave e
- * fazer TODO login seguinte pagar um `verify` desproporcional — CPU faturada e
+ * fazer TODO login seguinte pagar um `verify` desproporcional, CPU faturada e
  * limitada por invocacao no Worker. O TPM do Windows Hello produz 2048 bits,
  * entao 4096 ja e o dobro do que qualquer autenticador real manda.
  */
@@ -166,7 +166,7 @@ export function parametrosDeVerificacao(alg: AlgoritmoSuportado): SubtleCryptoSi
 /**
  * Importa o JWK para verificacao. Devolve `null` em vez de lancar.
  *
- * O `importKey` lanca para chave malformada, e a chave chega do banco — que
+ * O `importKey` lanca para chave malformada, e a chave chega do banco, que
  * gravou o que um autenticador mandou. Uma excecao aqui viraria `500` num login
  * que deveria responder "credencial invalida".
  */

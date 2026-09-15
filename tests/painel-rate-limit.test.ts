@@ -26,12 +26,12 @@ import {
 } from './fixtures/dubles'
 
 /**
- * RL — rate limit (§13.2, 10 garantias).
+ * RL, rate limit (§13.2, 10 garantias).
  *
  * O limitador e uma camada de defesa **opcional**, e a propriedade que esta
  * suite existe para provar e negativa: **nada do desenho depende dela para
  * estar correto** (§7.4). Por isso o ambiente de teste segue SEM os tres
- * bindings, de proposito — a ausencia e a prova.
+ * bindings, de proposito, a ausencia e a prova.
  *
  * Tres camadas, nenhuma tocando a rede (§13.4): o **algoritmo** com `agora`
  * injetado; a **rota** com o duble (429, corpo generico e zero consultas); e o
@@ -39,7 +39,7 @@ import {
  * quando o binding estoura, e que cada familia fala com o binding dela.
  *
  * `now` e sempre injetado, e `invalidarBaldesDeReserva()` roda no `beforeEach`
- * global de `tests/setup.ts` — sem isso um teste deixaria o balde cheio para o
+ * global de `tests/setup.ts`, sem isso um teste deixaria o balde cheio para o
  * seguinte, porque `AGORA` e o mesmo instante em todos eles.
  */
 
@@ -49,7 +49,7 @@ const ADMIN = 'admin-token-de-teste'
 const IP = '203.0.113.7'
 const OUTRO_IP = '198.51.100.9'
 
-/** Teto de cada familia, copiado de §7.4 — a fonte, e nao o codigo. */
+/** Teto de cada familia, copiado de §7.4, a fonte, e nao o codigo. */
 const TETO_DO_LOGIN = 10
 const TETO_DO_CODIGO = 30
 const TETO_DA_PARADA = 30
@@ -129,7 +129,7 @@ function todasPassam(vezes: number): boolean[] {
   return Array.from({ length: vezes }, () => true)
 }
 
-describe('RL — o algoritmo, com `agora` injetado', () => {
+describe('RL: o algoritmo, com `agora` injetado', () => {
   test('RL-01: a decima primeira tentativa em 60 s e recusada com 429', async () => {
     const request = pedidoDoPainel(IP)
 
@@ -182,7 +182,7 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     const semIp = pedidoDoPainel(null)
 
     // E o primeiro caminho que um atacante tentaria: omitir o cabecalho para
-    // sair do balde. Ele sai do balde por IP e cai no global — nunca livre.
+    // sair do balde. Ele sai do balde por IP e cai no global, nunca livre.
     expect(await tentar(TETO_DO_LOGIN, semIp, 'login')).toEqual(todasPassam(TETO_DO_LOGIN))
     expect((await limitar(semIp, env, 'login', AGORA)).permitido).toBe(false)
 
@@ -212,7 +212,7 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     // O unico teste que exercita `podar()` e o `TETO_DE_BALDES`. Ele existe
     // porque a poda e um limite de MEMORIA que, feito por ordem de insercao,
     // vira um limitador que se apaga sob demanda: o balde do atacante e o mais
-    // antigo por construcao — ele estourou o teto ANTES de comecar a encher —
+    // antigo por construcao, ele estourou o teto ANTES de comecar a encher,
     // e sairia primeiro. `TETO_DE_BALDES - 1` chaves saem de graca de um `/64`
     // de IPv6, entao o enchimento nao e hipotese, e o preco de zerar o proprio
     // contador. Instancia propria, e nao a de modulo, para nao deixar dez mil
@@ -223,7 +223,7 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     for (let i = 0; i < TETO_DO_LOGIN; i++) await limitador.permitir(atacante, AGORA)
     expect((await limitador.permitir(atacante, AGORA)).permitido).toBe(false)
 
-    // Ele enche o isolate ate passar do teto — e continua tentando enquanto
+    // Ele enche o isolate ate passar do teto, e continua tentando enquanto
     // enche, que e o que um atacante faz. E o toque a cada tentativa que o
     // poe no FIM da fila de despejo.
     let liberouDurante = false
@@ -255,9 +255,9 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
     expect((await limitar(request, env, 'login', AGORA)).permitido).toBe(false)
   })
 
-  test('RL-08: com o binding cadastrado, zerar devolve so a reserva — o contador que manda continua cheio', async () => {
+  test('RL-08: com o binding cadastrado, zerar devolve so a reserva: o contador que manda continua cheio', async () => {
     // A metade ausente de RL-08, afirmada em vez de silenciada. Na configuracao
-    // RECOMENDADA — os tres bindings cadastrados — quem decide e o contador da
+    // RECOMENDADA, os tres bindings cadastrados, quem decide e o contador da
     // Cloudflare, e ele nao expoe como zerar um balde `[C]`. Entao um login
     // bem-sucedido NAO devolve ao dono as tentativas que o binding ja contou.
     const binding = new BindingDeLimiteFalso(TETO_DO_LOGIN)
@@ -314,7 +314,7 @@ describe('RL — o algoritmo, com `agora` injetado', () => {
   })
 })
 
-describe('RL — o adaptador do binding', () => {
+describe('RL: o adaptador do binding', () => {
   test('RL-10: os tres bindings sao distintos e cada familia fala com o seu', async () => {
     const login = new BindingDeLimiteFalso()
     const codigo = new BindingDeLimiteFalso()
@@ -415,10 +415,10 @@ describe('RL — o adaptador do binding', () => {
     }
 
     expect(quebrado.chamadas).toBe(TETO_DO_LOGIN + 1)
-    // A falha aparece no log com o codigo do projeto, e a chave — que carrega
-    // um IP — nao vai junto. O codigo e `limitador_indisponivel` e nao o
+    // A falha aparece no log com o codigo do projeto, e a chave, que carrega
+    // um IP, nao vai junto. O codigo e `limitador_indisponivel` e nao o
     // `indisponivel` de §11.4: aquele e o do 503, e esta rota nao respondeu
-    // 503 — ela caiu na reserva e seguiu.
+    // 503, ela caiu na reserva e seguiu.
     expect(
       console.linhas.every((linha) => linha.startsWith('painel: limitador_indisponivel')),
     ).toBe(true)
@@ -428,7 +428,7 @@ describe('RL — o adaptador do binding', () => {
   test('RL-06: a queda do binding vira UMA linha de log por invocacao, e nao uma por chamada', async () => {
     const quebrado = new BindingDeLimiteQuebrado()
     const ambiente = comLimitadores({ PANEL_LIMITER_LOGIN: comoBindingDeLimite(quebrado) })
-    // O limitador da invocacao, construido UMA vez — como a escada de §11.3 o
+    // O limitador da invocacao, construido UMA vez, como a escada de §11.3 o
     // constroi por requisicao. Consultar o mesmo limitador tres vezes nao pode
     // render tres linhas iguais: numa queda do binding sob rajada, o volume do
     // log e pago pelo dono e nao acrescenta informacao nenhuma.
@@ -444,7 +444,7 @@ describe('RL — o adaptador do binding', () => {
       console.parar()
     }
 
-    // As tres chamadas chegaram mesmo ao binding — nao houve atalho.
+    // As tres chamadas chegaram mesmo ao binding, nao houve atalho.
     expect(quebrado.chamadas).toBe(3)
     expect(console.linhas).toHaveLength(1)
   })
@@ -476,7 +476,7 @@ describe('RL — o adaptador do binding', () => {
   })
 })
 
-describe('RL — a rota, com o duble injetado', () => {
+describe('RL: a rota, com o duble injetado', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -529,14 +529,14 @@ describe('RL — a rota, com o duble injetado', () => {
     }).toEqual({ prepares: 0, escritas: 0, batches: 0 })
   })
 
-  test('RL-01: o limitador vem ANTES da normalizacao — codigo malformado tambem para em 429', async () => {
+  test('RL-01: o limitador vem ANTES da normalizacao: codigo malformado tambem para em 429', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const recusa = new LimitadorFalso({ permitido: false, esperarSegundos: 60 })
 
     // `nao-e-um-codigo` nao tem o formato de §10.11, entao a normalizacao o
     // devolve como `null` e a rota responderia `403 codigo_incorreto`. Este
     // teste fixa a ORDEM do bloco do limitador na escada: descer o bloco para
-    // depois da normalizacao troca este 429 por um 403 — e a rota passaria a
+    // depois da normalizacao troca este 429 por um 403, e a rota passaria a
     // gastar a normalizacao de todo lixo que um bot mandar antes de olhar o
     // balde.
     const resposta = await handleParada(
@@ -564,14 +564,14 @@ describe('RL — a rota, com o duble injetado', () => {
   })
 })
 
-describe('RL — o webhook e a camada ausente', () => {
+describe('RL: o webhook e a camada ausente', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
 
   test('RL-07: o limitador do painel nao se aplica ao webhook', async () => {
     // Aplicar limite la faria a Meta receber 429, desistir da entrega e, no
-    // limite, cancelar a inscricao — o preco de proteger o que ja e protegido
+    // limite, cancelar a inscricao, o preco de proteger o que ja e protegido
     // pela assinatura do corpo.
     const RAJADA = TETO_DA_PARADA + TETO_DO_LOGIN + 10
     const respostas: number[] = []

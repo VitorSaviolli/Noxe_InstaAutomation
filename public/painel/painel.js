@@ -1,6 +1,6 @@
 /*
  * O `painel.js`. Sem framework, sem roteador, sem modelo de estado, sem cache
- * proprio e **sem `innerHTML`** — a CSP tem `require-trusted-types-for
+ * proprio e **sem `innerHTML`**, a CSP tem `require-trusted-types-for
  * 'script'`, entao um `innerHTML` aqui seria erro de RUNTIME, e nao de revisao.
  *
  * §12.8 lista cinco trabalhos para este arquivo. Nesta etapa existem os tres
@@ -12,15 +12,15 @@
  *   2. Levar a AUTORIZACAO do cadastro ate `/painel/api/registrar/opcoes`, nas
  *      tres formas de §10.4: o token do convite lido do FRAGMENTO
  *      (`location.hash`, limpando a barra com `history.replaceState`), o codigo
- *      de recuperacao que o servidor devolveu num campo escondido, e — na tela
- *      de Aparelhos — a digital do step-up de `adicionar_passkey`. Sao tres
+ *      de recuperacao que o servidor devolveu num campo escondido, e, na tela
+ *      de Aparelhos, a digital do step-up de `adicionar_passkey`. Sao tres
  *      origens do mesmo trabalho, e nao tres trabalhos: o que muda e de onde a
  *      autorizacao vem, e nunca o que este arquivo faz com ela.
  *   3. O passo 3 de §10.10: pedir as options do step-up, ler a digital e por a
  *      assertion serializada num campo escondido **do mesmo formulario**, que e
  *      entao submetido para a rota de escrita normal.
  *
- * Os outros dois — miniatura que falhou e marcar em lote — chegam com as telas
+ * Os outros dois, miniatura que falhou e marcar em lote, chegam com as telas
  * que os usam. Codigo sem tela e codigo sem teste.
  *
  * A UNICA navegacao que este arquivo faz e a do `para` que o servidor devolve,
@@ -115,7 +115,7 @@
    * o login e o step-up.
    *
    * Duas copias divergiriam no dia em que uma delas ganhasse um campo, e o
-   * defeito apareceria como `credencial_invalida` sem explicacao — que e
+   * defeito apareceria como `credencial_invalida` sem explicacao, que e
    * exatamente a resposta que a fronteira da assertion da para tudo (§10.3).
    */
   function assertionSerializada(credencial) {
@@ -148,7 +148,7 @@
   /**
    * O passo 2 e o 3 de §10.10: pede o envelope daquela mudanca e le a digital.
    *
-   * Devolve a assertion SERIALIZADA, ou `null` quando o Worker recusou — nesse
+   * Devolve a assertion SERIALIZADA, ou `null` quando o Worker recusou, nesse
    * caso a frase ja foi mostrada e quem chamou nao tem mais nada a fazer.
    *
    * A mudanca canonica e insumo, e vem sempre do SERVIDOR (do `data-mudanca`
@@ -207,7 +207,7 @@
    * Le `#c=<convite>` e LIMPA a barra de enderecos.
    *
    * O fragmento nao e enviado ao servidor, nao entra em log de proxy nem em
-   * `Referer` — e por isso que o token de uso unico viaja ali e nunca na query
+   * `Referer`, e por isso que o token de uso unico viaja ali e nunca na query
    * string. `history.replaceState` tira o token da barra para que ele nao
    * sobreviva num print de tela nem no historico do navegador.
    */
@@ -223,8 +223,8 @@
   /**
    * A cerimonia de cadastro (§10.4, §10.5).
    *
-   * `pedido` e a AUTORIZACAO — `{tipo:'convite', convite}`,
-   * `{tipo:'recuperacao', codigo}` ou `{tipo:'sessao', digital}` — e ela e a
+   * `pedido` e a AUTORIZACAO, `{tipo:'convite', convite}`,
+   * `{tipo:'recuperacao', codigo}` ou `{tipo:'sessao', digital}`, e ela e a
    * unica coisa que muda entre as tres telas que cadastram aparelho. `ficha` so
    * viaja no modo `sessao`, que e o unico com sessao viva de onde deriva-la
    * (§10.9, camada 3).
@@ -292,7 +292,7 @@
    * **Sao dois gestos de biometria, e a tela avisa antes**: o primeiro autoriza
    * (`{acao:'adicionar_passkey'}`, preso ao `op_hash` daquela operacao), o
    * segundo cria a chave nova. Sem o primeiro, cadastrar um aparelho seria a
-   * unica operacao do painel que um painel invadido faria sozinho — e ela e
+   * unica operacao do painel que um painel invadido faria sozinho, e ela e
    * justamente a que da acesso permanente.
    */
   var MUDANCA_DE_ADICIONAR = { acao: 'adicionar_passkey' }
@@ -314,13 +314,13 @@
    *
    * O passo 3 de §10.10 e literal: a assertion serializada vai num campo
    * escondido **do mesmo formulario**, e o formulario e submetido para a rota de
-   * escrita normal. Nao existe `/painel/api/stepup/verificar` — a verificacao
+   * escrita normal. Nao existe `/painel/api/stepup/verificar`, a verificacao
    * acontece dentro da gravacao, e por isso nao ha uma segunda resposta a ler
    * nem um destino a escolher aqui.
    *
    * A mudanca canonica vem do atributo `data-mudanca`, que o SERVIDOR escreveu:
    * ela e insumo desta funcao, e nao do POST. Montar o objeto aqui, a partir dos
-   * campos do formulario, seria uma segunda grafia dos leitores do funil — e a
+   * campos do formulario, seria uma segunda grafia dos leitores do funil, e a
    * primeira vez que as duas divergissem o dono apertaria a digital e receberia
    * uma recusa sem entender por que.
    *

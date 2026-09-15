@@ -213,7 +213,7 @@ footer {
   color: var(--texto-fraco);
 }
 
-/* Alvo de toque de 44px tambem no link de parar — e o freio (§12.1). */
+/* Alvo de toque de 44px tambem no link de parar, e o freio (§12.1). */
 .parar {
   display: inline-flex;
   align-items: center;

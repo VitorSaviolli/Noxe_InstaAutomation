@@ -10,7 +10,7 @@
  *   node scripts/configurar.mjs 3    # vai direto para a etapa 3
  *
  * O QUE ESTE ASSISTENTE FAZ, E O QUE O PAINEL FAZ:
- * este script cuida do que exige a SUA maquina — gerar segredos, cadastra-los
+ * este script cuida do que exige a SUA maquina, gerar segredos, cadastra-los
  * na Cloudflare, fazer o primeiro login OAuth e conferir o deploy. O painel
  * administrativo, que roda no seu Worker, cuida do dia a dia: palavra-gatilho,
  * textos, link, quais Reels respondem, e o historico do que aconteceu.
@@ -24,7 +24,7 @@
  *   2. Mudar o texto do Direct ou o link exige um SEGUNDO gesto de biometria,
  *      preso AO CONTEUDO daquela mudanca: aprovar uma coisa nao aprova outra.
  *   3. O link so pode apontar para os dominios do ALLOWED_LINK_DOMAINS, e essa
- *      lista mora no wrangler.jsonc — mudar exige o repositorio e a credencial
+ *      lista mora no wrangler.jsonc, mudar exige o repositorio e a credencial
  *      de deploy, que e o que um painel invadido nao tem.
  *   4. O codigo de parada desliga tudo SEM sessao e SEM passkey, de qualquer
  *      aparelho, inclusive com a cota do Worker estourada.
@@ -173,7 +173,7 @@ function descreverFalhaDeRede(falha) {
 /**
  * Consulta `/health`.
  *
- * Com `token`, manda `Authorization: Bearer` — e ai o campo `painel` vem com os
+ * Com `token`, manda `Authorization: Bearer`, e ai o campo `painel` vem com os
  * SEIS valores em vez dos tres publicos. O assistente e o unico lugar que ja
  * tem esse token (foi ele quem o cadastrou), e e por isso que ele consegue
  * dizer em portugues o que fazer, em vez de so "sem acesso".
@@ -252,7 +252,7 @@ function gerarSegredos() {
  * Monta o conteudo do .dev.vars.
  *
  * O META_APP_SECRET e preservado porque vem da Meta e o assistente nao sabe
- * gera-lo. As chaves geradas sao trocadas de proposito — e o que a etapa 1 faz.
+ * gera-lo. As chaves geradas sao trocadas de proposito, e o que a etapa 1 faz.
  *
  * A lista abaixo e a AUTORIDADE deste arquivo: toda chave gerada precisa
  * aparecer aqui, senao ela some de quem ja a tinha. Foi o que acontecia com a
@@ -928,7 +928,7 @@ const RECADO_DO_PAINEL = {
   sem_codigo_parada: {
     diagnostico: 'Voce ainda nao tem botao de panico. Gere os codigos.',
     passos: [
-      'O codigo de parada desliga a automacao SEM precisar entrar no painel —',
+      'O codigo de parada desliga a automacao SEM precisar entrar no painel -',
       'e o que salva o dia se voce perder o celular com a passkey.',
       'Gere os codigos pelo painel, na tela de Aparelhos, ou pelo assistente.',
       'Anote no papel. Eles aparecem UMA vez so.',
@@ -954,7 +954,7 @@ const RECADO_DO_PAINEL = {
     passos: [
       'Abra o painel para ver QUAL campo. A tela nomeia o campo e diz o que',
       'esperava encontrar.',
-      'Enquanto isso a automacao nao responde ninguem — parar e sempre menos',
+      'Enquanto isso a automacao nao responde ninguem, parar e sempre menos',
       'perigoso do que enviar um link que voce nao conferiu.',
     ],
   },
@@ -966,7 +966,7 @@ const RECADO_PUBLICO = {
   sem_acesso: {
     diagnostico: 'O painel esta ligado, mas ainda falta alguma coisa para usa-lo.',
     passos: [
-      'Sem o SETUP_ADMIN_TOKEN o /health nao diz O QUE falta — e isso e de',
+      'Sem o SETUP_ADMIN_TOKEN o /health nao diz O QUE falta, e isso e de',
       'proposito: a resposta publica nao pode entregar o instante em que um',
       'convite ainda funciona.',
       'Rode esta opcao de novo informando o token para ver o recado exato.',
@@ -1064,7 +1064,7 @@ const OPCOES = [
  *
  * Fica na saida de proposito: quem chegou ate aqui ja usou a ferramenta, e e
  * nesse momento que o pedido de estrela faz sentido. Nada e enviado para lugar
- * nenhum — e so texto na tela.
+ * nenhum, e so texto na tela.
  */
 function mostrarCreditos() {
   titulo('Ate logo')

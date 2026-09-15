@@ -5,7 +5,7 @@
  * motivos, e nenhum deles e emitir sessao: o modo `sessao` do registro de
  * passkey le a linha para saber QUEM esta pedindo, e o codigo de recuperacao
  * apaga TODAS as linhas no mesmo lote em que e consumido (§10.11). Quem
- * EMITE sessao e o login, e isso e a etapa seguinte — `POST
+ * EMITE sessao e o login, e isso e a etapa seguinte, `POST
  * /painel/api/registrar/verificar` nao emite sessao nenhuma (§15.3, decisao 5).
  *
  * O cookie carrega um identificador aleatorio; aqui fica so o SHA-256 dele
@@ -19,7 +19,7 @@
  * Mora ao lado da coluna que ele conta. O numero e o unico teto que o painel
  * aplica a uma rota JA autenticada: quem esta martelando step-up dentro de uma
  * sessao valida ou e o dono errando, ou e um painel invadido tentando adivinhar
- * — e nos dois casos derrubar a sessao e a direcao segura.
+ * e nos dois casos derrubar a sessao e a direcao segura.
  */
 export const FALHAS_DE_STEPUP_ATE_APAGAR = 10
 
@@ -88,12 +88,12 @@ export class PainelSessoesRepository {
    * O UNICO `INSERT INTO painel_sessoes` do projeto.
    *
    * Devolve um statement, e nao grava: a sessao nasce no MESMO `db.batch()` da
-   * atualizacao da credencial e da linha de auditoria do login (§9.10 — 3
+   * atualizacao da credencial e da linha de auditoria do login (§9.10, 3
    * escritas, um lote). "Grava a sessao e depois tenta logar" nao pode ser
    * escrito por engano se a API nao oferecer (§8.8).
    *
    * Sem `ON CONFLICT`: o `sid` sao 32 bytes sorteados a cada emissao, entao um
-   * `sid_hash` repetido nao e colisao — e defeito no sorteio, e o lote inteiro
+   * `sid_hash` repetido nao e colisao, e defeito no sorteio, e o lote inteiro
    * tem de falhar em vez de sobrescrever a sessao de outra pessoa.
    */
   statementDeCriacao(linha: LinhaDeSessao): D1PreparedStatement {
@@ -122,7 +122,7 @@ export class PainelSessoesRepository {
    * §10.8 lista dois momentos de rotacao, e este e o segundo: a sessao muda de
    * "conseguiu ler" para "acabou de autorizar". Como ela acontece na MESMA
    * requisicao que grava e responde `303`, o cookie novo chega junto com o
-   * redirect — nao existe a corrida de rede movel em que o cookie novo se perde.
+   * redirect, nao existe a corrida de rede movel em que o cookie novo se perde.
    *
    * **`WHERE sid_hash = ?` com o hash ANTIGO**, e nao um `INSERT`: a sessao e a
    * mesma linha, com o mesmo `expira_em`, o mesmo `criada_em` e o mesmo
@@ -136,14 +136,14 @@ export class PainelSessoesRepository {
    * martelando consegue nunca alcancar.
    *
    * Statement, e nao gravacao: a rotacao entra no MESMO `db.batch()` da
-   * configuracao e da auditoria — sem log, sem mudanca, e sem sessao rotacionada
+   * configuracao e da auditoria, sem log, sem mudanca, e sem sessao rotacionada
    * por uma gravacao que nao aconteceu.
    *
    * **`presoAMudanca` e OPCAO, e nao o padrao, pelo mesmo motivo do irmao dele
    * em `painel-auditoria-repository.ts`:** ela so esta certa quando este
    * statement vem logo depois de uma escrita que ele audita, dentro do mesmo
    * lote. Fora dessa posicao, `changes()` responde sobre outra escrita qualquer.
-   * Ser opcao — e nao um `AND` escondido no SQL — e o que faz a restricao
+   * Ser opcao, e nao um `AND` escondido no SQL, e o que faz a restricao
    * aparecer em TODO call site, e nao so neste docblock.
    *
    * O que ela impede: a trava otimista de §8.8 pode fazer o `UPDATE` da
@@ -151,7 +151,7 @@ export class PainelSessoesRepository {
    * linha de auditoria ja se defende pelo mesmo `changes()`; sem esta condicao a
    * rotacao aconteceria assim mesmo, o `sid` no banco mudaria, a rota
    * responderia `versao_desatualizada` **sem** mandar o cookie novo, e o dono
-   * seria deslogado por uma gravacao que nunca aconteceu — o pior desfecho
+   * seria deslogado por uma gravacao que nunca aconteceu, o pior desfecho
    * possivel para quem acabou de encostar o dedo no leitor.
    *
    * A cadeia: `UPDATE` da config altera N linhas; o `INSERT` da auditoria roda
@@ -189,7 +189,7 @@ export class PainelSessoesRepository {
    *
    * **Grava, e nao devolve statement**, e essa e a UNICA escrita do painel que
    * sai sozinha: ela nao acompanha mudanca nenhuma. §8.8 exige a linha de
-   * auditoria ao lado de toda MUDANCA — e um "esta sessao continua sendo
+   * auditoria ao lado de toda MUDANCA, e um "esta sessao continua sendo
    * usada" nao e mudanca de estado do produto: nao existe acao para ele na
    * lista fechada de §9.9, e uma linha de auditoria a cada 15 min de uso
    * afogaria as 500 linhas de retencao com ruido.
@@ -233,19 +233,19 @@ export class PainelSessoesRepository {
    *
    * "Remover uma passkey apaga as sessoes dela" e a metade que faz da remocao
    * uma revogacao de verdade: sem ela, o aparelho removido continuaria dentro do
-   * painel ate o prazo ocioso de 2 h vencer — e duas horas de acesso depois de
+   * painel ate o prazo ocioso de 2 h vencer, e duas horas de acesso depois de
    * uma revogacao explicita e a diferenca entre "removi" e "vou remover".
    *
    * Vai no MESMO lote do `DELETE` da credencial, e `presoAMudanca` e o que
    * impede o pior desfecho desse lote: a regra da ultima passkey mora DENTRO do
    * `DELETE` da credencial (§10.13), entao ela pode alterar zero linhas sem o
-   * `db.batch()` rejeitar nada — e sem esta condicao as sessoes daquele aparelho
+   * `db.batch()` rejeitar nada, e sem esta condicao as sessoes daquele aparelho
    * morreriam mesmo com a remocao recusada. O dono seria deslogado por uma
    * remocao que nunca aconteceu, na tela que existe para ele nao se trancar
    * para fora.
    *
    * `changes()` vale a contagem do statement IMEDIATAMENTE anterior, entao a
-   * ordem do lote e parte da garantia — ver o comentario da cadeia em
+   * ordem do lote e parte da garantia, ver o comentario da cadeia em
    * `aparelhos.ts`, que e quem monta este lote.
    */
   statementDeApagarDaCredencial(

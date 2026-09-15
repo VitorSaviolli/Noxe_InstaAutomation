@@ -44,7 +44,7 @@ const ALFABETO_BASE64URL = /^[A-Za-z0-9_-]*$/
  * 3. **bits residuais diferentes de zero.** O `atob` implementa o
  *    *forgiving-base64* do WHATWG e IGNORA os bits sobrando do ultimo grupo:
  *    `atob('AQ')` e `atob('AR')` devolvem o MESMO byte. Sem a reconferencia
- *    abaixo, dois textos representariam o mesmo conteudo — e uma etapa
+ *    abaixo, dois textos representariam o mesmo conteudo, e uma etapa
  *    seguinte que compare textos (codigo de recuperacao, `credential_id`)
  *    herdaria um jeito de escrever o mesmo segredo de duas formas.
  *
@@ -72,6 +72,6 @@ export function decodeBase64Url(texto: string): Uint8Array | null {
   // Trava de SES-10. A recodificacao e o que TORNA a canonicidade verdadeira,
   // em vez de prometida: se o texto nao for o unico que representa estes
   // bytes, some. Tirar esta linha "por desempenho" derruba o teste da grafia
-  // unica, e nao o do circulo fechado — o round trip continuaria passando.
+  // unica, e nao o do circulo fechado, o round trip continuaria passando.
   return bytesToBase64Url(bytes) === texto ? bytes : null
 }

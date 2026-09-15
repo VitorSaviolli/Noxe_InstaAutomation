@@ -1,19 +1,19 @@
 /**
- * `GET, POST /painel/ajustes` — os ajustes finos.
+ * `GET, POST /painel/ajustes`, os ajustes finos.
  *
  * A tela cabe numa frase: **onde, com que frequencia e por quais canais a
  * automacao responde**. Sao os ajustes que mudam o ALCANCE da automacao, e por
  * isso ela termina com a regra escrita de §12.3, que e a promessa que o painel
  * inteiro faz sobre quando a digital vai ser pedida.
  *
- * **O que esta tela GRAVA hoje**: as tres chaves de comparacao — maiusculas,
- * acentos, pontuacao — e o intervalo por pessoa, **so para cima**. Diminuir o
+ * **O que esta tela GRAVA hoje**: as tres chaves de comparacao, maiusculas,
+ * acentos, pontuacao, e o intervalo por pessoa, **so para cima**. Diminuir o
  * intervalo alarga o alcance, e alargar exige step-up (§10.10): enquanto o
  * verificador nao existe, o funil RECUSA a mudanca com `403`, nunca a aceita em
  * silencio. O modo de comparacao, o tipo de publicacao e os dois canais
  * continuam em leitura pela mesma razao.
  *
- * **Custo: 4 subrequests ao D1** no `GET` — a linha de sessao, o lote da
+ * **Custo: 4 subrequests ao D1** no `GET`, a linha de sessao, o lote da
  * configuracao, a pergunta sobre a conta e o historico. §12.10 orca 2 para esta
  * tela e a Task 10 ja subiu para 3 por causa da barra do topo; o quarto e o
  * bloco de historico, que a Etapa 10 exige em letras. O numero fica travado num
@@ -74,12 +74,12 @@ const MUDANCAS_NO_HISTORICO = 5
  *
  * Exatamente os controles que ela emite: as tres chaves de comparacao, o tipo de
  * publicacao e o intervalo por pessoa. Nada de `enabled`, `triggerKeywords` nem
- * `matchMode` — cada um deles tem a sua tela, e META-10 confere que a uniao das
+ * `matchMode`, cada um deles tem a sua tela, e META-10 confere que a uniao das
  * quatro listas cobre o conjunto gravavel sem sobra.
  *
  * O botao "Voltar a esta versao" NAO usa esta lista: ele declara a operacao
  * `acao=restaurar`, cujo escopo e a uniao inteira (Ruling 74). §9.9 nomeia o que
- * a restauracao atravessa — mesmo validador, mesmo step-up, allowlist de hoje —
+ * a restauracao atravessa, mesmo validador, mesmo step-up, allowlist de hoje,
  * e a lista por rota seria um quarto portao que a spec nao sanciona.
  */
 export const CAMPOS_DE_AJUSTES: readonly CampoDaConfig[] = [
@@ -133,7 +133,7 @@ ${
   config.privateReplyEnabled || config.publicReplyEnabled
     ? null
     : html`<p class="faixa faixa-aviso" role="status">Com os dois desligados, a
-automa&ccedil;&atilde;o n&atilde;o envia nada &mdash; nem no Direct, nem embaixo do Reel.</p>`
+automa&ccedil;&atilde;o n&atilde;o envia nada, nem no Direct, nem embaixo do Reel.</p>`
 }
 </section>`
 }
@@ -169,7 +169,7 @@ function escolhaDeChave(
  * **A segunda opcao leva cadeado, a primeira nao** (§12.3): `processOnlyReels`
  * indo para `false` amplia o raio para qualquer publicacao, e §10.10 lista isso
  * como alargamento. Voltar para "so nos Reels" estreita, e estreitar nunca pede
- * a digital — que e a promessa escrita no rodape desta mesma tela.
+ * a digital, que e a promessa escrita no rodape desta mesma tela.
  *
  * As duas frases vem de `FRASE_DO_AJUSTE`, o mesmo par que a linha de leitura
  * usava: nao nasce aqui uma segunda traducao do campo.
@@ -192,7 +192,7 @@ function escolhaDoTipoDePublicacao(config: AutomationConfig): HtmlSeguro {
  * O formulario dos ajustes que esta etapa grava.
  *
  * O intervalo entra como numero, e o rotulo diz qual e a direcao que nao pede a
- * digital — a mesma regra que o rodape da tela escreve por extenso (§12.3).
+ * digital, a mesma regra que o rodape da tela escreve por extenso (§12.3).
  * Diminuir continua possivel de digitar: quem recusa e o funil, com a frase da
  * tabela de erros, e e assim que a promessa fica honesta em vez de escondida
  * atras de um campo desabilitado que ninguem explica.
@@ -248,7 +248,7 @@ function nomesDosCampos(cru: string): string {
  *
  * O botao **reenvia o `antes` pela rota normal de gravacao** (§9.9, Ruling 55):
  * mesmo validador, mesma allowlist de HOJE, mesma classificacao de risco. Nao
- * existe rota de restauracao, e a ausencia e a garantia — uma segunda porta
+ * existe rota de restauracao, e a ausencia e a garantia, uma segunda porta
  * seria uma segunda chance de esquecer uma das travas. A consequencia aceita e
  * que uma versao antiga cujo `antes` toque campo protegido e recusada hoje, e
  * passa a funcionar quando o step-up existir, sem mudar este botao.
@@ -266,7 +266,7 @@ function linhaDoHistorico(
 
   // **O botao so sai quando a versao volta INTEIRA** (R-6). `mediaScope` e os
   // dois interruptores de canal nao sao gravaveis por rota nenhuma nesta etapa,
-  // entao uma versao que difira em qualquer um deles voltaria pela metade — e um
+  // entao uma versao que difira em qualquer um deles voltaria pela metade, e um
   // botao que promete recuperacao e recupera parte dela e a mesma promessa
   // quebrada que §12.4 recusa. Sem botao, e a linha diz por que.
   const inteira = estado !== null && restauracaoPossivel(estado, hoje)
@@ -283,9 +283,7 @@ function linhaDoHistorico(
         )
 
   return html`<li>
-<p><strong>${dataEmPortugues(mudanca.ocorridoEm)}</strong> &mdash; ${nomesDosCampos(
-    mudanca.campos,
-  )}</p>
+<p><strong>${dataEmPortugues(mudanca.ocorridoEm)}</strong>, ${nomesDosCampos(mudanca.campos)}</p>
 ${
   estado === null
     ? html`<p>N&atilde;o conseguimos ler o que estava salvo nesta vers&atilde;o, ent&atilde;o
@@ -329,7 +327,7 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
     // Duas operacoes, uma rota (§7.1: nenhuma rota nova, e o identificador de uma
     // escrita vai no corpo do POST). O formulario de ajustes escreve os
     // controles desta tela; o botao "Voltar a esta versao" declara
-    // `acao=restaurar` e escreve a uniao gravavel — que e o escopo que §9.9 da a
+    // `acao=restaurar` e escreve a uniao gravavel, que e o escopo que §9.9 da a
     // restauracao (Ruling 74). A protecao dela nao muda: mesmo validador, mesmo
     // step-up preso ao conteudo, allowlist de hoje, e a tela de conferencia
     // mostrando literalmente cada campo que muda.
@@ -338,10 +336,10 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
     // 6, trata campo que nao casa como erro de digitacao ou cliente adulterado,
     // e `/painel/chave` ja recusava com `acao_desconhecida`. Aqui, ate esta
     // linha, um `acao=restaurr` caia no `!==` e virava uma gravacao COMUM de
-    // Ajustes — a operacao pedida sumia, e o que sobrava era um formulario com
+    // Ajustes, a operacao pedida sumia, e o que sobrava era um formulario com
     // outro escopo, gravado sem que ninguem tivesse pedido isso. As duas rotas
     // convergem. A diferenca que fica e de forma, e ela vem de §7.1: em
-    // `/painel/chave` a operacao e OBRIGATORIA, e aqui e opcional — o formulario
+    // `/painel/chave` a operacao e OBRIGATORIA, e aqui e opcional, o formulario
     // comum de Ajustes nao declara nenhuma.
     const acao =
       entrada.corpo.familia === 'formulario' ? entrada.corpo.campos.get(CAMPO_DA_ACAO) : null

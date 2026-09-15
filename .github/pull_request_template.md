@@ -9,7 +9,7 @@ Se resolve uma issue, escreva "Resolve #123".
 ## Checklist
 
 - [ ] `npm run check` passou na minha máquina (lint + typecheck + testes)
-- [ ] Escrevi testes cobrindo o novo comportamento — inclusive o caso em que ele **não** deve disparar
+- [ ] Escrevi testes cobrindo o novo comportamento, inclusive o caso em que ele **não** deve disparar
 - [ ] Nenhum segredo entrou no diff (token, `META_APP_SECRET`, `SETUP_ADMIN_TOKEN`, `TOKEN_ENCRYPTION_KEY`, `META_WEBHOOK_VERIFY_TOKEN`, conteúdo de `.dev.vars` ou `.env`)
 - [ ] Atualizei a documentação, se o comportamento visível para quem usa mudou
 - [ ] Segui o padrão de commit do projeto (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`)

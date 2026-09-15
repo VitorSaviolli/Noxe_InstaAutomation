@@ -51,7 +51,7 @@ const STATUS_QUE_ACIONARAM: readonly CommentStatus[] = [
  *
  * Um comentario esperando o cron e um Direct PROMETIDO: se ele nao contasse, o
  * autor reagendado numa invocacao nao seria barrado na proxima e receberia dois
- * Directs. O caminho inline (`isUserInCooldown`) NAO usa esta lista — incluir
+ * Directs. O caminho inline (`isUserInCooldown`) NAO usa esta lista, incluir
  * `retry_pending` la mudaria o comportamento que esta etapa existe para
  * congelar. O portao do reagendamento e, de proposito, o mais estrito dos dois.
  */
@@ -83,7 +83,7 @@ export interface DeferredComment {
  * INSERT do reagendamento, com os dois portoes embutidos. (§16.1)
  *
  * `ON CONFLICT DO NOTHING` cobre o dedup por `comment_id`; o `WHERE NOT EXISTS`
- * cobre o cooldown do autor. Os dois de graca, dentro da mesma escrita — o
+ * cobre o cooldown do autor. Os dois de graca, dentro da mesma escrita, o
  * caminho normal paga uma consulta por cada.
  */
 const SQL_REAGENDAR = `INSERT INTO processed_comments
@@ -129,7 +129,7 @@ export class CommentsRepository {
   /**
    * Enfileira o excedente do lote para a varredura do cron. (§16.1)
    *
-   * Um unico `db.batch()` — transacao implicita e UM subrequest — grava o
+   * Um unico `db.batch()`, transacao implicita e UM subrequest, grava o
    * excedente inteiro. Cada INSERT carrega dentro de si os dois portoes que o
    * caminho normal pagaria com uma consulta cada: o `ON CONFLICT DO NOTHING`
    * cobre o dedup e o `WHERE NOT EXISTS` cobre o cooldown do autor, contando
@@ -249,7 +249,7 @@ export class CommentsRepository {
   /**
    * True se o usuario ja acionou a automacao dentro da janela de cooldown.
    *
-   * Conta apenas acionamentos que chegaram a enviar algo — `ignored` e
+   * Conta apenas acionamentos que chegaram a enviar algo, `ignored` e
    * `failed` nao devem bloquear uma tentativa legitima seguinte.
    */
   async isUserInCooldown(commenterHash: string, since: number): Promise<boolean> {

@@ -34,13 +34,13 @@ export function isAdmin(request: Request, env: Env): boolean {
 
   // **Segredo vazio nunca autentica ninguem.** `timingSafeEqual` compara o
   // tamanho primeiro, entao com `SETUP_ADMIN_TOKEN` valendo string vazia um
-  // `Authorization: Bearer ` sem nada depois casaria — zero bytes contra zero
-  // bytes — e abriria as QUATRO rotas que dependem desta funcao, entre elas a
+  // `Authorization: Bearer ` sem nada depois casaria, zero bytes contra zero
+  // bytes, e abriria as QUATRO rotas que dependem desta funcao, entre elas a
   // destrutiva `/setup/painel/zerar`, que apaga o acesso ao painel inteiro.
   //
   // Ausente, o binding chega `undefined`, e ai o encoder o transforma no texto
   // "undefined" (9 bytes), que ja nao casa com vazio. O buraco e so o do valor
-  // vazio de verdade — um `wrangler secret put` que recebeu Enter sem nada —,
+  // vazio de verdade, um `wrangler secret put` que recebeu Enter sem nada,
   // e e barato demais para ficar em aberto.
   const esperado = env.SETUP_ADMIN_TOKEN ?? ''
   if (esperado.length === 0) return false
@@ -55,11 +55,11 @@ function redirectUri(url: URL): string {
 
 /**
  * Inicia o fluxo: gera o state assinado e manda para a tela de consentimento.
- * Protegida pelo SETUP_ADMIN_TOKEN — so o dono conecta a conta.
+ * Protegida pelo SETUP_ADMIN_TOKEN, so o dono conecta a conta.
  *
  * A rota FICA como esta, sem depreciacao e sem mudanca de contrato: o primeiro
  * OAuth acontece antes de existir passkey, e o assistente a chama por caminho e
- * metodo fixos. A UNICA mudanca que §11.8 pede e a linha abaixo — ate a etapa do
+ * metodo fixos. A UNICA mudanca que §11.8 pede e a linha abaixo, ate a etapa do
  * roteador do painel, o `switch` nao conferia metodo nenhum aqui, e um `PUT` com
  * Bearer valido gerava um `state` assinado. `Allow: GET` porque e assim que o
  * assistente sempre chamou.
@@ -151,7 +151,7 @@ export async function handleOAuthCallback(env: Env, url: URL, now: number): Prom
       [
         'Conta conectada com sucesso.',
         `Conta: ${conta.username ?? conta.userId}`,
-        `Inscricao no webhook (nivel conta): ${inscrito ? 'ok' : 'FALHOU — refaca pelo /setup/subscribe'}`,
+        `Inscricao no webhook (nivel conta): ${inscrito ? 'ok' : 'FALHOU, refaca pelo /setup/subscribe'}`,
         '',
         'Lembre de configurar tambem o NIVEL APP no painel da Meta:',
         'Callback URL e Verify Token em Webhooks, campo "comments".',

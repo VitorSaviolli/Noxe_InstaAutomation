@@ -4,7 +4,7 @@
  * **Por que pelo `default:`, e nunca por um `startsWith` avaliado antes dele.**
  * Com o painel no `default:`, NENHUM caminho do painel pode ser avaliado antes
  * de `case WEBHOOK_PATH`. Um erro de digitacao futuro numa rota do painel deixa
- * de ser uma falha de seguranca capaz de engolir o webhook — cuja assinatura e
+ * de ser uma falha de seguranca capaz de engolir o webhook, cuja assinatura e
  * calculada sobre o corpo cru e nao sobrevive a qualquer codigo que leia o
  * corpo antes. Ordem lexica vira garantia estrutural, e o 404 de hoje e
  * preservado por construcao: `/painelzinho` nao casa, `/painel` sem barra casa.
@@ -13,7 +13,7 @@
  * variavel, em nenhuma rota, para sempre (§7.1): identificador que precisa de
  * URL propria vai na query string, identificador de uma escrita vai no corpo do
  * POST. Um `switch` de strings exatas nao tem como casar o que nao esta escrito
- * nele — e e por isso que ele e o despacho, e nao uma tabela de expressoes.
+ * nele, e e por isso que ele e o despacho, e nao uma tabela de expressoes.
  *
  * **`/painel/parada` e `/painel/parar` nao passam por aqui.** Elas tem `case`
  * proprio em `src/index.ts`, ANTES do `default:`, e por um motivo que e uma
@@ -114,9 +114,9 @@ interface OpcoesDoDespacho {
    * A familia do limitador desta rota, quando ela tem uma (§7.4).
    *
    * NAO e campo da tabela de rotas, e a ausencia e decisao: o mapeamento nao e
-   * um por rota. `/painel/api/registrar/opcoes` escolhe a familia pelo CORPO —
+   * um por rota. `/painel/api/registrar/opcoes` escolhe a familia pelo CORPO,
    * `login` no modo convite, `codigo` no modo recuperacao, nenhuma no modo
-   * sessao —, entao um campo booleano ou um nome fixo na tabela estaria certo
+   * sessao, entao um campo booleano ou um nome fixo na tabela estaria certo
    * para algumas linhas e errado para outras. Um campo errado em parte das
    * linhas e pior que nenhum campo.
    */
@@ -126,7 +126,7 @@ interface OpcoesDoDespacho {
 }
 
 /**
- * A porta do painel. Devolve `null` quando o caminho nao e do painel — e e esse
+ * A porta do painel. Devolve `null` quando o caminho nao e do painel, e e esse
  * `null` que preserva o `404 Not Found` de hoje para todo o resto do Worker.
  */
 export async function routePainel(
@@ -191,7 +191,7 @@ export async function routePainel(
 
     // A entrada por codigo de recuperacao (§10.11). A familia e `codigo`, e ela
     // vale para os DOIS metodos desta linha: a tabela mapeia rota, e nao metodo,
-    // e o GET custa 0 consulta — cobrar o balde dele nao tira nada de ninguem.
+    // e o GET custa 0 consulta, cobrar o balde dele nao tira nada de ninguem.
     case ROTA_ENTRAR_CODIGO.caminho:
       return despachar(request, env, now, ROTA_ENTRAR_CODIGO, handleEntrarPorCodigo, {
         limite: 'codigo',
@@ -209,15 +209,15 @@ export async function routePainel(
 
     // O passo 2 de §10.10. Sem familia de limitador: ela corre com sessao viva
     // e ficha CSRF, e quem martela step-up dentro de uma sessao valida ja tem o
-    // teto de `falhas_stepup` — que apaga a sessao na decima e e mais duro que
+    // teto de `falhas_stepup`, que apaga a sessao na decima e e mais duro que
     // qualquer balde por IP.
     case ROTA_OPCOES_DE_STEPUP.caminho:
       return despachar(request, env, now, ROTA_OPCOES_DE_STEPUP, handleOpcoesDeStepUp)
 
     // As tres rotas do registro vieram do `switch` de `src/index.ts` (§11.1).
     // Elas NAO passam por `despachar`: a Task 8 as entregou com a escada de
-    // §11.3 dentro delas — metodo, portao de sanidade, origem, `content-type` e
-    // teto de corpo em `portaDaApi` —, e `portaDaApi` consome o
+    // §11.3 dentro delas, metodo, portao de sanidade, origem, `content-type` e
+    // teto de corpo em `portaDaApi`, e `portaDaApi` consome o
     // `ReadableStream` do corpo. Um `despachar` por cima leria o corpo primeiro
     // e o handler receberia vazio. A tabela declara as tres com `sessao: false`
     // e `csrf: false` porque e isso que o ROTEADOR exige delas; as tres
@@ -237,7 +237,7 @@ export async function routePainel(
 }
 
 /**
- * O contexto de erro de um caminho que NAO tem linha na tabela — o `404` e o
+ * O contexto de erro de um caminho que NAO tem linha na tabela, o `404` e o
  * `503` do portao.
  *
  * A familia vem do prefixo e nao da tabela, porque a tabela nao tem essa linha:
@@ -263,10 +263,10 @@ function contextoDeCaminho(request: Request, caminho: string): ContextoDoErro {
  *   6. cookie presente e HMAC valido                              (0 D1)
  *   7. ficha CSRF, em todo POST autenticado                       (0 D1)
  *   8. step-up, quando a rota exige                               (0 D1)
- *   9. **so agora: D1** — a linha viva da sessao
+ *   9. **so agora: D1**, a linha viva da sessao
  *
  * **Ate o passo 8, inclusive, nenhuma consulta ao D1 acontece.** Lixo em
- * cookie, cookie forjado, corpo enorme, origem errada — tudo recusado sem tocar
+ * cookie, cookie forjado, corpo enorme, origem errada, tudo recusado sem tocar
  * no banco, que e a cota compartilhada com o webhook.
  *
  * **Nao ha `sleep` em lugar nenhum**, e a ausencia e decisao (§11.3): um atraso
@@ -308,7 +308,7 @@ async function escada(
   opcoes: OpcoesDoDespacho,
 ): Promise<Response> {
   // Passo 1. `HEAD` e tratado como `GET`; `OPTIONS` cai aqui de proposito e
-  // NUNCA em CORS — nenhuma rota do painel emite `Access-Control-*` (§10.9,
+  // NUNCA em CORS, nenhuma rota do painel emite `Access-Control-*` (§10.9,
   // camada 5).
   const metodo = request.method === 'HEAD' ? 'GET' : request.method
   if (!(rota.metodos as readonly string[]).includes(metodo)) {
@@ -339,18 +339,18 @@ async function escada(
   // **O passo 8 de verdade NAO mora aqui**, e a ausencia e o desenho de §10.10:
   // "a verificacao acontece **dentro** da rota de escrita". Quem confere o
   // step-up e `exigirStepUp()` (em `stepup.ts`), chamado pelo funil de gravacao
-  // — o unico lugar que sabe transformar o corpo daquela rota na mudanca
+  // o unico lugar que sabe transformar o corpo daquela rota na mudanca
   // canonica e RECALCULAR o `op_hash`. O roteador nao sabe, e um verificador
   // aqui seria uma segunda grafia da trava sem a metade que a torna uma trava.
   //
   // Este ramo continua existindo, e continua FALHANDO FECHADO: nenhuma rota
-  // declara `stepUp: true` — a de `/painel/mensagem` e sempre protegida pelo
-  // CONTEUDO (§11.3 passo 8: "a rota **ou** o conteudo") —, e uma linha futura
+  // declara `stepUp: true`, a de `/painel/mensagem` e sempre protegida pelo
+  // CONTEUDO (§11.3 passo 8: "a rota **ou** o conteudo"), e uma linha futura
   // que declare `true` tranca a rota em vez de abri-la em silencio.
   //
   // **Por que aqui e nao depois do portao de sessao.** Enquanto ele mora depois
   // do `if (!rota.sessao)`, a trava vale so no ramo autenticado: uma linha com
-  // `stepUp: true` e `sessao: false` passava direto para o handler — que e
+  // `stepUp: true` e `sessao: false` passava direto para o handler, que e
   // exatamente a abertura silenciosa que este ramo existe para impedir. O
   // metateste META-02 fecha a outra metade, proibindo a combinacao na tabela.
   if (rota.stepUp) return erro('step_up_necessario', contexto)
@@ -363,7 +363,7 @@ async function escada(
   const porta = await exigirSessao(request, env, now, contexto)
   if ('recusa' in porta) return porta.recusa
 
-  // Passo 7: todo POST autenticado. `GET` nao exige ficha — ele nao muda estado,
+  // Passo 7: todo POST autenticado. `GET` nao exige ficha, ele nao muda estado,
   // e exigir ficha num link tornaria o proprio link impossivel de escrever.
   if (rota.csrf && metodo === 'POST') {
     const recusaDeFicha = await exigirCsrf(request, env, porta.sidHash, corpo, contexto)

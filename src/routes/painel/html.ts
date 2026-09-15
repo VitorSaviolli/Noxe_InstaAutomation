@@ -4,7 +4,7 @@
  * de §11.5.
  *
  * **Escapar e o padrao, e nao a lembranca.** Toda interpolacao passa por
- * `escapeHtml` a menos que alguem escreva `cru(...)` — uma palavra curta, facil
+ * `escapeHtml` a menos que alguem escreva `cru(...)`, uma palavra curta, facil
  * de procurar e cuja unica ocorrencia legitima e um trecho que ja nasceu desta
  * mesma tag. A checagem 19 de §13.5 varre o repositorio por `cru(` e falha
  * quando ele aparece fora da lista autorizada: a garantia mora la porque ela e
@@ -24,7 +24,7 @@ import { escapeHtml } from '../legal'
  * A marca que separa "texto ja seguro" de "texto que veio de fora".
  *
  * `Symbol` e nao uma propriedade booleana comum de proposito: um objeto vindo
- * de `JSON.parse` — isto e, do corpo de uma requisicao — nunca carrega um
+ * de `JSON.parse`, isto e, do corpo de uma requisicao, nunca carrega um
  * simbolo, entao nao existe corpo capaz de se declarar seguro sozinho.
  */
 const MARCA_DE_SEGURO = Symbol('painel/html-seguro')
@@ -47,7 +47,7 @@ function ehSeguro(valor: unknown): valor is HtmlSeguro {
  * A porta de fuga, e a UNICA.
  *
  * Marca um texto como ja seguro. Existe para o caso em que o HTML e montado
- * fora da tag — hoje nada precisa disso na producao — e para que a garantia de
+ * fora da tag, hoje nada precisa disso na producao, e para que a garantia de
  * §13.5 tenha uma palavra unica a procurar. Chamar `cru()` com valor que veio
  * de fora e o unico jeito de furar o escape do painel inteiro.
  */
@@ -78,7 +78,7 @@ function interpolar(valor: unknown): string {
  * html`<ul>${linhas.map(linhaDeAparelho)}</ul>`  // lista de HtmlSeguro
  * ```
  *
- * Devolve `HtmlSeguro` — e nao `string` — para que `html` dentro de `html`
+ * Devolve `HtmlSeguro`, e nao `string`, para que `html` dentro de `html`
  * funcione sem escapar duas vezes. Uma tag que devolvesse `string` obrigaria
  * `cru()` em toda composicao, e `cru()` espalhado e exatamente o que a
  * checagem 19 existe para impedir.
@@ -96,7 +96,7 @@ export function html(partes: TemplateStringsArray, ...valores: readonly unknown[
 // ---------------------------------------------------------------------------
 
 /**
- * Os dois perfis em codigo. O terceiro — o dos tres assets — vai em
+ * Os dois perfis em codigo. O terceiro, o dos tres assets, vai em
  * `public/_headers`, fora do Worker (§11.5).
  */
 export type PerfilDeCabecalho = 'pagina' | 'api'
@@ -141,7 +141,7 @@ const HSTS = 'max-age=31536000; includeSubDomains'
 /**
  * Os cabecalhos comuns aos dois perfis.
  *
- * `Vary: Cookie` vai em TODA resposta do Worker, sem excecao por rota — mesmo
+ * `Vary: Cookie` vai em TODA resposta do Worker, sem excecao por rota, mesmo
  * numa rota que nao le cookie. Uma regra sem excecao vale mais que a economia
  * de um cabecalho, porque e a excecao que alguem copia para a rota errada.
  *
@@ -164,13 +164,13 @@ function comuns(): Record<string, string> {
 /**
  * Os cabecalhos daquele perfil (§11.5).
  *
- * Este e o dono UNICO do conjunto. `cabecalhosDePagina()` — que morava em
- * `parada.ts` enquanto este arquivo nao existia — foi apagada: duas grafias do
+ * Este e o dono UNICO do conjunto. `cabecalhosDePagina()`, que morava em
+ * `parada.ts` enquanto este arquivo nao existia, foi apagada: duas grafias do
  * mesmo conjunto divergem na primeira vez que uma delas ganha uma diretiva, e
  * a que ficar para tras e a que serve a pagina de emergencia.
  *
  * Nao ha `content-type` no perfil `api`: quem monta a resposta e
- * `Response.json`, que carimba `application/json` sozinho — e um `content-type`
+ * `Response.json`, que carimba `application/json` sozinho, e um `content-type`
  * escrito aqui apagaria o dele.
  */
 export function cabecalhos(perfil: PerfilDeCabecalho): Record<string, string> {

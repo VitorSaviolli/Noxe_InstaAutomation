@@ -1,4 +1,4 @@
-# Configuração da Cloudflare — do zero ao deploy
+# Configuração da Cloudflare: do zero ao deploy
 
 Este guia leva você do computador limpo até o Worker publicado e funcionando.
 Cada passo tem o comando exato. Se você nunca mexeu com Cloudflare nem com o
@@ -13,9 +13,9 @@ O projeto é uma automação de comentários do Instagram rodando em
 
 São **dois** guias, e a ordem entre eles importa:
 
-1. **`SETUP_CLOUDFLARE.md` — este aqui, primeiro.** Você instala o necessário,
+1. **`SETUP_CLOUDFLARE.md`: este aqui, primeiro.** Você instala o necessário,
    baixa o código, cria o banco, cadastra os segredos e publica o Worker.
-2. **`SETUP_META.md` — depois.** Você cria o app no painel da Meta e conecta a
+2. **`SETUP_META.md`: depois.** Você cria o app no painel da Meta e conecta a
    sua conta profissional do Instagram.
 
 **Por que nessa ordem:** a URL pública do seu Worker (aquele endereço que
@@ -27,21 +27,21 @@ endereço para colar.
 **O que você precisa ter em mãos antes de começar este documento:**
 
 - Um computador com internet e permissão para instalar programas.
-- Uma conta na Cloudflare — o plano gratuito basta e não pede cartão. Se ainda
+- Uma conta na Cloudflare: o plano gratuito basta e não pede cartão. Se ainda
   não tem, cria no passo 1.3.
 - Cerca de 40 minutos sem pressa.
 
 **O que você ainda NÃO precisa:** nada do painel da Meta. Dos cinco segredos do
 projeto, quatro você gera na sua própria máquina (passo 6) e só um
-(`META_APP_SECRET`) vem da Meta — ele é cadastrado no fim, já dentro do
+(`META_APP_SECRET`) vem da Meta: ele é cadastrado no fim, já dentro do
 `SETUP_META.md`. Ou seja: você percorre este documento inteiro de ida, sem
 precisar voltar.
 
 | Item | Valor |
 |---|---|
 | Nome do Worker | `noxe-insta-automation` |
-| URL pública | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev` — **exemplo**; a sua ainda não existe e só nasce no passo 8 |
-| Banco D1 | `noxe-insta-automation` — **você cria** no passo 4 |
+| URL pública | `https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev`, **exemplo**; a sua ainda não existe e só nasce no passo 8 |
+| Banco D1 | `noxe-insta-automation`: **você cria** no passo 4 |
 | Arquivo de configuração | `wrangler.jsonc` (**não** é `wrangler.toml`) |
 | Versão da Graph API | `v25.0` (variável `META_API_VERSION` no `wrangler.jsonc`) |
 
@@ -60,7 +60,7 @@ npm run configurar
 É um assistente que conduz a configuração inteira pelo terminal: gera os
 segredos, cadastra na Cloudflare e leva o processo adiante, sem você precisar
 copiar e colar valores secretos na mão. Ele evita os dois tropeços mais comuns
-deste guia — errar um comando de terminal e perder o prazo de 10 minutos do
+deste guia: errar um comando de terminal e perder o prazo de 10 minutos do
 login do Instagram (explicado no item 9.4).
 
 O passo a passo manual continua todo aqui, para você entender o que está
@@ -77,7 +77,7 @@ São três: o Node.js, o git e uma conta na Cloudflare.
 
 O Node.js é o programa que executa os comandos deste projeto. Baixe em
 <https://nodejs.org>, escolhendo a versão marcada como **LTS**. Instale com as
-opções padrão e **abra um terminal novo depois** — um terminal já aberto não
+opções padrão e **abra um terminal novo depois**, um terminal já aberto não
 enxerga programas instalados depois dele.
 
 No Windows, "terminal" pode ser o **PowerShell** (procure por *PowerShell* no
@@ -108,7 +108,7 @@ git --version
 ### 1.3 Criar a conta na Cloudflare
 
 Crie em <https://dash.cloudflare.com/sign-up>. O **plano gratuito é suficiente**
-para tudo que este projeto faz — Workers, banco D1, cron e logs. Confirme o
+para tudo que este projeto faz: Workers, banco D1, cron e logs. Confirme o
 e-mail antes de seguir.
 
 > O `wrangler` (o programa de linha de comando da Cloudflare) **não** precisa ser
@@ -130,7 +130,7 @@ npm install
 
 O endereço acima é o do repositório oficial. Se você estiver baixando de um
 fork, troque pelo endereço que aparece no botão verde **Code** daquela página no
-GitHub — copie de lá para não errar.
+GitHub: copie de lá para não errar.
 
 O que cada comando faz:
 
@@ -155,14 +155,14 @@ npx wrangler login
 ```
 
 O que acontece: o comando abre o seu navegador numa página da Cloudflare
-pedindo autorização. Você clica em **Allow**, volta para o terminal, e pronto —
+pedindo autorização. Você clica em **Allow**, volta para o terminal, e pronto,
 está autenticado. O token fica guardado na sua máquina.
 
 **Você NÃO precisa criar API Token para uso local.** Esse login pelo navegador
 é suficiente para tudo que este guia faz: criar banco, rodar migrations,
 cadastrar segredos, dar deploy, ver logs.
 
-O **API Token só serve para CI/CD** — ou seja, quando um servidor de build
+O **API Token só serve para CI/CD**: ou seja, quando um servidor de build
 (GitHub Actions, por exemplo) precisa dar deploy sozinho, sem ninguém para
 clicar em "Allow" no navegador. Se esse for o seu caso um dia, aí sim você gera
 um token no painel da Cloudflare e coloca como variável de ambiente
@@ -213,13 +213,13 @@ por cima do texto `COLE_AQUI_O_ID_DO_SEU_BANCO_D1`. Deve ficar assim:
 ```
 
 Atenção ao formato: a saída do `wrangler` vem em estilo TOML (com `=`), mas
-nosso arquivo é **JSONC** (com `:` e aspas). Não copie o bloco inteiro — copie
+nosso arquivo é **JSONC** (com `:` e aspas). Não copie o bloco inteiro, copie
 só o valor e cole no lugar certo do JSON que já existe. Salve o arquivo.
 
 > O `wrangler.jsonc` tem **dois** valores para você preencher: o
 > `database_id`, agora, e o `META_APP_ID` (hoje com o texto
 > `COLE_AQUI_O_ID_DO_SEU_APP_META`), que só existe depois de criar o app no
-> painel da Meta — isso é feito no `SETUP_META.md`, etapa 6. Deixe esse segundo
+> painel da Meta: isso é feito no `SETUP_META.md`, etapa 6. Deixe esse segundo
 > para lá.
 
 Se algum dia você precisar redescobrir o `database_id` de um banco que já criou:
@@ -248,13 +248,13 @@ npm run db:migrate:remote
 
 Rode os dois. O local serve para você testar na sua máquina; o remoto é o que o
 Worker publicado vai usar de verdade. Aplicar a migration duas vezes não é
-problema — o Wrangler controla quais já foram aplicadas.
+problema: o Wrangler controla quais já foram aplicadas.
 
 ---
 
 ## 6. Cadastrar os 5 segredos
 
-São **cinco** segredos. Eles não ficam no `wrangler.jsonc` nem no Git — vão
+São **cinco** segredos. Eles não ficam no `wrangler.jsonc` nem no Git, vão
 direto para o cofre da Cloudflare pelo comando `wrangler secret put`.
 
 | Segredo | Para que serve | De onde vem |
@@ -267,7 +267,7 @@ direto para o cofre da Cloudflare pelo comando `wrangler secret put`.
 
 Repare na última coluna: **quatro você gera agora, na sua máquina**. Só o
 `META_APP_SECRET` vem do painel da Meta, e por isso ele é o último da fila
-(item 6.6) — não trave aqui esperando por ele.
+(item 6.6): não trave aqui esperando por ele.
 
 ### 6.1 Gerar os quatro valores aleatórios
 
@@ -286,8 +286,8 @@ De propósito, ele **não grava nada em arquivo nenhum**. Copie a saída para o 
 gerenciador de senhas **antes de fechar o terminal**.
 
 > **Existe um caminho ainda mais curto:** `npm run configurar` conduz a
-> configuração inteira — gera os segredos, cadastra na Cloudflare e segue com o
-> resto do processo — sem você precisar copiar e colar valor secreto na mão. Se
+> configuração inteira: gera os segredos, cadastra na Cloudflare e segue com o
+> resto do processo: sem você precisar copiar e colar valor secreto na mão. Se
 > preferir esse caminho, rode ele e use os itens abaixo apenas como referência do
 > que está acontecendo por baixo.
 
@@ -297,7 +297,7 @@ gerenciador de senhas **antes de fechar o terminal**.
 openssl rand -base64 32
 ```
 
-No Windows, o `openssl` só costuma existir dentro do **Git Bash** — no
+No Windows, o `openssl` só costuma existir dentro do **Git Bash**, no
 PowerShell ele normalmente não está instalado. É exatamente por isso que o
 `npm run gerar:segredos` é o caminho principal aqui: ele funciona igual no
 Windows, no Mac e no Linux.
@@ -311,7 +311,7 @@ npx wrangler secret put META_WEBHOOK_VERIFY_TOKEN
 ```
 
 O comando pergunta o valor; cole e dê Enter. O terminal **não mostra** o que
-você colou — isso é proposital, não é travamento.
+você colou: isso é proposital, não é travamento.
 
 **Guarde esse valor.** Você vai precisar colar exatamente o mesmo texto no
 painel da Meta, no campo "Verificar token" do webhook (`SETUP_META.md`,
@@ -325,7 +325,7 @@ npx wrangler secret put TOKEN_ENCRYPTION_KEY
 ```
 
 > Se um dia você trocar essa chave, os tokens já gravados no D1 **não poderão
-> mais ser decifrados** — vai ser preciso refazer o OAuth do zero.
+> mais ser decifrados**: vai ser preciso refazer o OAuth do zero.
 
 ### 6.4 `SETUP_ADMIN_TOKEN`
 
@@ -342,7 +342,7 @@ conta.
 > proteger só o OAuth: agora é também a chave que **assina os convites de
 > registro** (`npm run gerar:convite`) e a credencial que **gera os códigos de
 > recuperação e de parada**. Em uma frase: **quem tem este token cadastra uma
-> passkey no seu painel** — e quem cadastra uma passkey entra.
+> passkey no seu painel**: e quem cadastra uma passkey entra.
 >
 > É por isso que a chave de sessão (`PANEL_SESSION_KEY`, logo abaixo) é um
 > segredo **separado**: assim, rotacionar este token não derruba os seus
@@ -357,7 +357,7 @@ npx wrangler secret put PANEL_SESSION_KEY
 
 É a raiz das quatro subchaves do painel administrativo (sessão, desafio, CSRF e
 códigos). **Enquanto ela não estiver cadastrada, o painel responde 503 e é como
-se não existisse** — o Worker publica normalmente, o webhook funciona, e só o
+se não existisse**: o Worker publica normalmente, o webhook funciona, e só o
 painel fica fora do ar. Se você publicou e o painel não abre, é quase sempre
 isto.
 
@@ -367,13 +367,13 @@ convite não pode entregar a chave das sessões. Mínimo de 32 caracteres.
 
 > ⚠️ Trocar esta chave **desconecta todos os aparelhos** e invalida os códigos
 > de recuperação e os de parada de emergência. As passkeys já cadastradas não
-> são afetadas — você entra de novo com a mesma passkey.
+> são afetadas: você entra de novo com a mesma passkey.
 
-### 6.6 `META_APP_SECRET` — o único que não é você quem gera
+### 6.6 `META_APP_SECRET`: o único que não é você quem gera
 
 Este vem do painel da Meta: é a **chave secreta do app do Instagram**. Se você
 ainda não criou o app (o normal, se está seguindo a ordem recomendada), **pule
-este item por enquanto**. Você volta aqui — ou melhor, faz isso direto — na
+este item por enquanto**. Você volta aqui: ou melhor, faz isso direto, na
 etapa 6 do `SETUP_META.md`, quando o valor existir.
 
 Quando tiver o valor em mãos:
@@ -412,7 +412,7 @@ distribuídos em 25 arquivos dentro da pasta `tests/`.
 npm test
 ```
 
-> **Vai aparecer aviso sobre segredo faltando — e isso é esperado.** Num projeto
+> **Vai aparecer aviso sobre segredo faltando, e isso é esperado.** Num projeto
 > recém-baixado, o ambiente de testes avisa que alguns segredos ainda não estão
 > definidos na sua máquina. Os testes **não** usam os seus segredos de verdade:
 > o arquivo `vitest.config.ts` injeta valores fictícios, criados só para o teste.
@@ -438,7 +438,7 @@ npm run test:watch
 
 ---
 
-## 8. Deploy — é aqui que a sua URL nasce
+## 8. Deploy: é aqui que a sua URL nasce
 
 ```bash
 npm run deploy
@@ -452,7 +452,7 @@ https://noxe-insta-automation.SEU-SUBDOMINIO.workers.dev
 
 O `SEU-SUBDOMINIO` é a parte pessoal do endereço: você escolhe na primeira vez
 que usa Workers, ou a Cloudflare sugere uma a partir da sua conta. **Anote essa
-URL agora** — ela é a peça que faltava para começar o `SETUP_META.md`.
+URL agora**: ela é a peça que faltava para começar o `SETUP_META.md`.
 
 Se você perder o endereço, ele reaparece a cada `npm run deploy` e também está
 no painel da Cloudflare, em **Workers & Pages > noxe-insta-automation**. Ela é
@@ -475,14 +475,14 @@ curl https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/health
 A resposta é um JSON curto com `"status": "ok"`, a rota do webhook e um bloco
 `configurado` dizendo se o `META_APP_ID` já está preenchido e se alguma conta já
 foi autorizada. Neste momento é normal que `appId` esteja `false` e
-`contaAutorizada` também — isso é resolvido no `SETUP_META.md`.
+`contaAutorizada` também: isso é resolvido no `SETUP_META.md`.
 
 ---
 
 ## 9. A URL pública: webhook e callback do OAuth
 
 Esta seção é a **referência técnica** do que a Meta vai precisar da sua URL. O
-passo a passo com as telas do painel está no `SETUP_META.md` — vá para lá
+passo a passo com as telas do painel está no `SETUP_META.md`, vá para lá
 depois de ler, e siga de lá até o fim sem precisar voltar para cá.
 
 A sua URL pública tem este formato:
@@ -503,13 +503,13 @@ Cloudflare em **Workers & Pages > noxe-insta-automation**.
 | GET | `/data-deletion` | Instruções de exclusão de dados (a Meta exige) |
 | GET | `/webhooks/instagram` | Handshake do webhook (`hub.mode`, `hub.verify_token`, `hub.challenge`) |
 | POST | `/webhooks/instagram` | Recebe os eventos; valida `X-Hub-Signature-256`, responde 200 rápido e processa em `waitUntil` |
-| GET | `/setup/authorize` | Inicia o OAuth — protegida por `Authorization: Bearer SETUP_ADMIN_TOKEN` |
-| GET | `/oauth/callback` | Recebe o retorno do OAuth — protegida pelo `state` assinado |
-| POST | `/setup/subscribe` | Inscreve a conta no webhook — protegida por Bearer |
+| GET | `/setup/authorize` | Inicia o OAuth: protegida por `Authorization: Bearer SETUP_ADMIN_TOKEN` |
+| GET | `/oauth/callback` | Recebe o retorno do OAuth, protegida pelo `state` assinado |
+| POST | `/setup/subscribe` | Inscreve a conta no webhook, protegida por Bearer |
 
 ### 9.2 Os três lugares onde a sua URL é colada no painel da Meta
 
-Todos são preenchidos **à mão**, no painel — não existe API para essa parte. O
+Todos são preenchidos **à mão**, no painel: não existe API para essa parte. O
 passo a passo com as telas está no `SETUP_META.md` (etapas 4, 9 e 10); a tabela
 abaixo é só para você já saber o que vem pela frente.
 
@@ -520,7 +520,7 @@ abaixo é só para você já saber o que vem pela frente.
 | Instagram Login > **URL da política de privacidade** e **exclusão de dados** | `.../privacy-policy` e `.../data-deletion` |
 
 No campo **Verificar token** do webhook vai o mesmo valor que você cadastrou
-como `META_WEBHOOK_VERIFY_TOKEN` no item 6.2 — não é a URL.
+como `META_WEBHOOK_VERIFY_TOKEN` no item 6.2: não é a URL.
 
 Depois de salvo o webhook, ainda é preciso **assinar o campo `comments`** na
 lista de campos. É o erro mais comum: salvar a URL e esquecer de assinar.
@@ -529,8 +529,8 @@ lista de campos. É o erro mais comum: salvar a URL e esquecer de assinar.
 
 O `redirect_uri` que o Worker envia é montado a partir do endereço em que ele
 está rodando, e a Meta compara com o que está cadastrado **letra por letra**.
-Qualquer diferença — uma barra sobrando no fim, `http` no lugar de `https`, um
-`www` a mais — faz a Meta recusar o redirecionamento com erro de URI inválida.
+Qualquer diferença: uma barra sobrando no fim, `http` no lugar de `https`, um
+`www` a mais: faz a Meta recusar o redirecionamento com erro de URI inválida.
 
 Copie e cole; não digite.
 
@@ -538,7 +538,7 @@ Copie e cole; não digite.
 
 > **Este passo pertence ao `SETUP_META.md`, etapa 8**, e só funciona depois que
 > o app da Meta estiver configurado. Os comandos ficam registrados aqui porque é
-> para cá que você volta no dia em que precisar **refazer** a autorização — por
+> para cá que você volta no dia em que precisar **refazer** a autorização, por
 > exemplo, se o token de 60 dias expirar.
 
 > ⏱️ **Você tem 10 minutos.** A URL de consentimento devolvida por esta rota
@@ -582,7 +582,7 @@ curl -i \
 > num arquivo cujo caminho você vê com `(Get-PSReadlineOption).HistorySavePath`;
 > no Git Bash, no `~/.bash_history`. Qualquer pessoa com acesso à sua máquina lê
 > depois. O `npm run configurar` faz essa mesma chamada **sem** expor o token no
-> histórico — é o caminho recomendado. Se usar o comando na mão, apague a linha
+> histórico: é o caminho recomendado. Se usar o comando na mão, apague a linha
 > do arquivo de histórico quando terminar.
 
 A resposta traz a URL de consentimento do Instagram (campo `authorizationUrl`).
@@ -609,15 +609,15 @@ curl -i -X POST \
   https://SEU-WORKER.SEU-SUBDOMINIO.workers.dev/setup/subscribe
 ```
 
-### 9.5 Os dois níveis de webhook — os dois são obrigatórios
+### 9.5 Os dois níveis de webhook: os dois são obrigatórios
 
 Essa é a parte que mais confunde. São **duas inscrições diferentes**:
 
-- **(a) Nível APP** — no painel da Meta, em *Casos de uso > Personalizar >
+- **(a) Nível APP**: no painel da Meta, em *Casos de uso > Personalizar >
   Webhooks*: Callback URL + Verify Token + assinar o campo `comments`.
   **Manual, não tem API.** É o que a tabela do item 9.2 resume, e o
   `SETUP_META.md` detalha nas etapas 9 e 11a.
-- **(b) Nível CONTA** — `POST /me/subscribed_apps` na Graph API. É feito
+- **(b) Nível CONTA**: `POST /me/subscribed_apps` na Graph API. É feito
   **automaticamente** pelo `/oauth/callback`, ou manualmente pelo
   `POST /setup/subscribe`.
 
@@ -633,7 +633,7 @@ O fluxo pede exatamente estes escopos:
 - `instagram_business_manage_messages`
 
 Os nomes antigos, sem o prefixo `instagram_`, foram **descontinuados em
-27/01/2025**. E não peça `instagram_business_content_publish` — este projeto não
+27/01/2025**. E não peça `instagram_business_content_publish`, este projeto não
 publica mídia.
 
 ### 9.7 Nível de acesso: você provavelmente não precisa de App Review
@@ -651,7 +651,7 @@ fim.** Lá você cria o app da Meta, pega o `META_APP_ID` (que vai no
 `wrangler.jsonc`) e o `META_APP_SECRET` (que vai por `wrangler secret put`),
 cadastra a URL nos três campos do painel e conecta a sua conta.
 
-As seções que sobram aqui embaixo (10 a 12) são de **operação do dia a dia** —
+As seções que sobram aqui embaixo (10 a 12) são de **operação do dia a dia**,
 rodar localmente, ver logs, conferir o cron. Você lê quando precisar; não são
 pré-requisito para o `SETUP_META.md`.
 
@@ -674,7 +674,7 @@ Copy-Item .dev.vars.example .dev.vars
 cp .dev.vars.example .dev.vars
 ```
 
-Abra o `.dev.vars` e preencha os quatro valores — os mesmos nomes do passo 6:
+Abra o `.dev.vars` e preencha os quatro valores, os mesmos nomes do passo 6:
 `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `TOKEN_ENCRYPTION_KEY`,
 `SETUP_ADMIN_TOKEN`. Para desenvolvimento, pode usar valores aleatórios de
 teste; só o `META_APP_SECRET` precisa ser o real se você for testar assinatura
@@ -719,7 +719,7 @@ post automatizado, por exemplo). Os logs aparecem ao vivo.
 O projeto foi escrito para **não registrar nenhum segredo em log**, e a coleta é
 mínima: **não guardamos o texto do comentário nem o username**; o IGSID do autor
 é armazenado apenas como **SHA-256**. Então não espere ver o conteúdo do
-comentário no log — isso é intencional.
+comentário no log: isso é intencional.
 
 ---
 
@@ -731,7 +731,7 @@ declarado no `wrangler.jsonc` e é atendido pelo handler `scheduled` do
 
 **Conferir se está configurado e ativo:**
 
-1. Abra o `wrangler.jsonc` e veja a seção de triggers/crons — é ali que a
+1. Abra o `wrangler.jsonc` e veja a seção de triggers/crons, é ali que a
    expressão de agendamento está definida.
 2. No painel da Cloudflare, vá em **Workers & Pages > noxe-insta-automation >
    Settings > Trigger Events** (ou *Cron Triggers*). O agendamento aparece
@@ -740,13 +740,13 @@ declarado no `wrangler.jsonc` e é atendido pelo handler `scheduled` do
 3. Depois que ele rodar, a execução aparece no `npm run tail` como um evento
    `scheduled` (deixe o tail aberto no horário do disparo).
 
-**Por que isso importa — os prazos dos tokens:**
+**Por que isso importa: os prazos dos tokens:**
 
 - Token curto: **1 hora**.
 - Token longo: **60 dias** (5184000s).
 - O refresh exige um token com **no mínimo 24h de idade** e que **ainda não
   tenha expirado**.
-- Se passarem os **60 dias** sem renovar, **não existe refresh** — a única saída
+- Se passarem os **60 dias** sem renovar, **não existe refresh**, a única saída
   é refazer o OAuth do zero (seção 9.4).
 
 Ou seja: se o cron não estiver rodando, um dia a automação simplesmente para.
@@ -794,7 +794,7 @@ scripts/                       gerar-segredos.mjs, simular-webhook.mjs
 tests/                         822 testes em 25 arquivos
 ```
 
-### Hosts da Meta — cada etapa usa um host diferente
+### Hosts da Meta: cada etapa usa um host diferente
 
 Isso costuma gerar erro de configuração, então vale memorizar:
 
@@ -804,15 +804,15 @@ Isso costuma gerar erro de configuração, então vale memorizar:
 | Troca do code por token | `POST https://api.instagram.com/oauth/access_token` (**único** uso desse host) |
 | Todo o resto | `https://graph.instagram.com` |
 
-`graph.facebook.com` **não é usado** neste projeto — ele pertence ao fluxo com
+`graph.facebook.com` **não é usado** neste projeto, ele pertence ao fluxo com
 Facebook Login, que é outro caminho.
 
 ### Endpoints usados
 
 | Ação | Chamada |
 |---|---|
-| Resposta pública | `POST https://graph.instagram.com/v25.0/{comment-id}/replies` — body `{"message":"..."}` |
-| Direct | `POST https://graph.instagram.com/v25.0/{ig-user-id}/messages` — body `{"recipient":{"comment_id":"..."},"message":{"text":"..."}}` |
+| Resposta pública | `POST https://graph.instagram.com/v25.0/{comment-id}/replies`, body `{"message":"..."}` |
+| Direct | `POST https://graph.instagram.com/v25.0/{ig-user-id}/messages`, body `{"recipient":{"comment_id":"..."},"message":{"text":"..."}}` |
 | Dados da conta | `GET https://graph.instagram.com/v25.0/me?fields=user_id,username` (o campo correto é `user_id`, **não** `id`) |
 | Token longo | `GET https://graph.instagram.com/access_token?grant_type=ig_exchange_token` (**sem** versão no path) |
 | Refresh | `GET https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token` (**sem** versão no path) |
@@ -862,7 +862,7 @@ Resolva antes de considerar a automação pronta:
    etapa 6 do `SETUP_META.md`.
 3. **`destinationUrl` em `src/config.ts`** vem como
    `[COLOQUE_O_SEU_LINK_AQUI]`. É o link que a automação envia por Direct. Sem
-   isso, a mensagem sai com o texto de exemplo no lugar do link — o projeto
+   isso, a mensagem sai com o texto de exemplo no lugar do link, o projeto
    inclusive detecta esse caso e avisa.
 4. **`CONTATO_EMAIL` e `NOME_RESPONSAVEL` em `src/routes/legal.ts`** também são
    textos de exemplo. Essas páginas (`/privacy-policy` e `/data-deletion`) são
@@ -870,7 +870,7 @@ Resolva antes de considerar a automação pronta:
 
 E uma conferência, que não é um arquivo mas trava tudo quando está errada:
 verifique se o **"ID do app do Instagram"** e a **"Chave secreta do app do
-Instagram"** — os que aparecem na tela **Casos de uso > Personalizar** — são os
+Instagram"**: os que aparecem na tela **Casos de uso > Personalizar**, são os
 mesmos valores que você colocou em `META_APP_ID` e `META_APP_SECRET`. No fluxo
 de Instagram Login são **esses** que valem, e não os de **Configurações >
 Básico**.
@@ -882,5 +882,5 @@ Básico**.
 Este guia cobre apenas o que foi verificado no projeto e na documentação
 oficial. Se você precisar de um endpoint, permissão, limite ou tela do painel
 que não aparece acima, **consulte a documentação oficial da Meta e da
-Cloudflare** em vez de supor — a Meta muda nomes de permissão e de tela com
+Cloudflare** em vez de supor: a Meta muda nomes de permissão e de tela com
 frequência, e chutar aqui custa horas de depuração.

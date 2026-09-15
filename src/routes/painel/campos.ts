@@ -4,12 +4,12 @@
  *
  * Ele saiu de `guardas.ts` quando aquele arquivo chegou a 783 das 800 linhas do
  * teto deste repositorio, e a etapa seguinte mexe justamente nas constantes
- * `CAMPO_DA_*` — extrair depois seria extrair no meio de outra mudanca, que e
+ * `CAMPO_DA_*`, extrair depois seria extrair no meio de outra mudanca, que e
  * quando um `git diff` deixa de dizer o que aconteceu.
  *
  * **A separacao nao e so de tamanho, e o corte tem uma regra:** `guardas.ts` e
- * onde a escada de §11.3 DECIDE — quem passa pelo limitador, pela origem, pelo
- * portao de sessao e pela ficha —, e este arquivo e so o vocabulario que essas
+ * onde a escada de §11.3 DECIDE, quem passa pelo limitador, pela origem, pelo
+ * portao de sessao e pela ficha, e este arquivo e so o vocabulario que essas
  * decisoes leem e que as telas escrevem. Nada aqui recusa nada; nada aqui
  * conhece `Env`, `Response` ou a tabela de erros. E por isso que o funil de
  * gravacao, a tela de conferencia e a pagina de recusa podem importar os nomes
@@ -46,7 +46,7 @@ export const COOKIE_DE_STEPUP = '__Host-painel_stepup'
  * sombrear o cookie do painel com um cookie de dominio pai) e `SameSite=Strict`
  * (camada 1 das cinco de §10.9: um POST cross-site nem chega autenticado).
  *
- * `Path=/painel` seria INVALIDO — o prefixo `__Host-` exige `Path=/`.
+ * `Path=/painel` seria INVALIDO, o prefixo `__Host-` exige `Path=/`.
  *
  * Escrito num lugar so, e nos tres cookies: uma segunda grafia perderia um dos
  * quatro atributos exatamente uma vez, e essa vez seria a que ninguem viu.
@@ -69,11 +69,11 @@ export const CAMPO_DA_FICHA = 'csrf'
  * tratar como campo desconhecido. Moram AQUI, e nao no funil de gravacao, porque
  * a tela que os emite, o funil que os le e a pagina de recusa que os reemite sao
  * tres arquivos, e um deles teria de importar do outro so por causa de uma
- * string — que e o ciclo que este projeto nao tem.
+ * string, que e o ciclo que este projeto nao tem.
  *
  * `versao` e a trava otimista de §8.8. `confirmar` e o gesto explicito que
  * §10.12 exige para religar a automacao. `digital` e onde o passo 3 de §10.10
- * poe a assertion serializada — **no mesmo formulario** da mudanca, para que a
+ * poe a assertion serializada, **no mesmo formulario** da mudanca, para que a
  * autorizacao e o conteudo que ela cobre cheguem na MESMA requisicao e nao
  * exista autorizacao pendurada esperando uma segunda.
  *
@@ -93,7 +93,7 @@ export const CAMPO_DA_DIGITAL = 'digital'
  *
  * Ele mora aqui pela mesma razao que os outros quatro: a tela que o emite, o
  * handler que o le e a lista de estruturais que o deixa passar pelo passo 6 sao
- * tres lugares, e ate esta linha eram SETE grafias soltas da mesma string —
+ * tres lugares, e ate esta linha eram SETE grafias soltas da mesma string,
  * duas delas dentro de HTML, onde nenhum compilador olha.
  *
  * **So o NOME sobe; os valores ficam com as rotas donas.** `ligar`, `desligar` e

@@ -43,7 +43,7 @@ import {
 } from './fixtures/dubles'
 
 /**
- * STOP — a parada de emergencia (§13.2, 14 garantias).
+ * STOP, a parada de emergencia (§13.2, 14 garantias).
  *
  * Esta suite congela a rota que §10.12 chama de "a ultima que precisa
  * funcionar": ela desliga a automacao sem sessao, sem `rpId` e sem WebAuthn,
@@ -139,7 +139,7 @@ async function linhasDeAuditoria() {
 /**
  * D1 que estoura em toda consulta preparada.
  *
- * Classe local injetada por parametro, como todo duble deste projeto — nada de
+ * Classe local injetada por parametro, como todo duble deste projeto, nada de
  * mock de modulo. Prova a TERCEIRA resposta de §10.12.
  */
 class D1ForaDoAr {
@@ -194,7 +194,7 @@ class CorpoEmPedacos {
  *
  * A duplicacao e o teste, pelo mesmo motivo das tres paginas: importar a
  * constante de `parada.ts` provaria apenas que o arquivo e igual a ele mesmo.
- * `form-action 'self'` e a linha que mais importa — a pagina do formulario e
+ * `form-action 'self'` e a linha que mais importa, a pagina do formulario e
  * onde a pessoa digita o codigo, e e ela que impede um `action` reescrito de
  * postar o codigo para fora. A etapa 9 move isto para `html.ts`; este mapa e o
  * que torna aquele refactor visivel.
@@ -250,7 +250,7 @@ function comentarioQueAciona(): CommentEvent {
   }
 }
 
-describe('STOP — a parada de emergencia', () => {
+describe('STOP: a parada de emergencia', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -288,7 +288,7 @@ describe('STOP — a parada de emergencia', () => {
     })
   })
 
-  test('STOP-01: a parada grava em UM lote so — o segundo batch() nao existe', async () => {
+  test('STOP-01: a parada grava em UM lote so: o segundo batch() nao existe', async () => {
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada } = await gerarCodigos()
 
@@ -296,7 +296,7 @@ describe('STOP — a parada de emergencia', () => {
     // lote" de "dois lotes que gravam a mesma coisa" quando alguem olha so o
     // estado final. Este duble separa: o segundo `db.batch()` estoura. Quebrar
     // §8.8 no sentido "grava a config, DEPOIS tenta logar" deixa de passar
-    // verde — a resposta vira a terceira frase em vez de "Pronto".
+    // verde, a resposta vira a terceira frase em vez de "Pronto".
     const banco = new D1SegundoBatchQuebrado(env.DB)
     const resposta = await handleParada(
       postDaParada(comOCodigo(parada)),
@@ -404,7 +404,7 @@ describe('STOP — a parada de emergencia', () => {
     let resposta: Response
     try {
       resposta = await handleParada(
-        // Bem formado — 16 caracteres do alfabeto —, so que nao e o codigo.
+        // Bem formado, 16 caracteres do alfabeto, so que nao e o codigo.
         postDaParada(comOCodigo('0000000000000000')),
         { ...env, DB: comoD1(contador) },
         AGORA,
@@ -417,7 +417,7 @@ describe('STOP — a parada de emergencia', () => {
     expect(await resposta.text()).toBe(PAGINA_CODIGO_INCORRETO)
 
     // O NOME deste teste promete `codigo_incorreto`, entao o teste confere o
-    // codigo que foi registrado — e nao so o status. `credencial_invalida` NAO
+    // codigo que foi registrado, e nao so o status. `credencial_invalida` NAO
     // se aplica a esta rota (§10.12, ultimo paragrafo), e §11.4 se declara a
     // unica tabela: uma grafia de fora dela nao pode passar verde aqui.
     expect(registrado.linhas).toEqual([`painel: POST ${CAMINHO_DA_PARADA} 403 codigo_incorreto`])
@@ -426,7 +426,7 @@ describe('STOP — a parada de emergencia', () => {
     expect(contador.batches).toBe(0)
     expect((await linhaDeConfig())?.enabled).toBe(1)
     // Auditoria inclusive: fracasso de requisicao NAO autenticada nao vira
-    // linha no D1 — gravar tentativa de estranho seria escrita provocada por
+    // linha no D1, gravar tentativa de estranho seria escrita provocada por
     // estranho, na mesma cota do webhook (§9.9). A unica linha que existe e a
     // do `codigos_gerados` acima; a tentativa recusada nao acrescentou nenhuma.
     expect(await linhasDeAuditoria()).toHaveLength(1)
@@ -562,7 +562,7 @@ describe('STOP — a parada de emergencia', () => {
     // A leitura de `lerEstadoDaAutomacao` e uma decisao fora do banco: cinco
     // requisicoes simultaneas leem `enabled = 1` as cinco e mandam cinco
     // `UPDATE`. Sem o `WHERE painel_config.enabled = 1` do `DO UPDATE`, a
-    // versao pulava de 1 para 6 — e a versao e o carimbo que §8.8 usa como
+    // versao pulava de 1 para 6, e a versao e o carimbo que §8.8 usa como
     // chave do log de auditoria e como trava otimista da tela.
     const respostas = await Promise.all(
       Array.from({ length: 5 }, () => handleParada(postDaParada(comOCodigo(parada)), env, AGORA)),
@@ -591,8 +591,8 @@ describe('STOP — a parada de emergencia', () => {
     // O nome antigo prometia "nao serve para logar, ler nem editar", e o corpo
     // so prova a metade "editar" (mais a ausencia de cookie). As outras duas so
     // ganham significado quando as rotas de sessao existirem: e com a etapa 9
-    // que este teste ganha a metade "logar" — tentar `POST /painel/sessao` com
-    // o codigo de parada — e a metade "ler" — tentar `GET /painel` com ele.
+    // que este teste ganha a metade "logar", tentar `POST /painel/sessao` com
+    // o codigo de parada, e a metade "ler", tentar `GET /painel` com ele.
     // Nome que promete mais do que o corpo prova e pior que teste ausente.
     await gravarConfig(env.DB, { enabled: 1 })
     const { parada, recuperacao } = await gerarCodigos()
@@ -613,7 +613,7 @@ describe('STOP — a parada de emergencia', () => {
     const parou = await handleParada(postDaParada(comOCodigo(parada)), env, AGORA)
     expect(parou.headers.get('set-cookie')).toBeNull()
 
-    // A unica coisa que ele mudou no banco foi `enabled` — nenhum outro campo.
+    // A unica coisa que ele mudou no banco foi `enabled`, nenhum outro campo.
     const linha = await env.DB.prepare('SELECT * FROM painel_config WHERE id = 1').first<
       Record<string, unknown>
     >()
@@ -644,7 +644,7 @@ describe('STOP — a parada de emergencia', () => {
     expect(recusada.status).toBe(403)
     expect((await linhaDeConfig())?.enabled).toBe(1)
 
-    // E o que ele recebeu foram DOIS hashes em hex — nunca o codigo digitado.
+    // E o que ele recebeu foram DOIS hashes em hex, nunca o codigo digitado.
     expect(sempreNao.comparacoes).toHaveLength(1)
     for (const [esperado, doBanco] of sempreNao.comparacoes) {
       expect(esperado).toMatch(/^[0-9a-f]{64}$/)
@@ -788,7 +788,7 @@ describe('STOP — a parada de emergencia', () => {
 
     // A metade que a etapa do roteador tornou verdade (§13.2, §11.1): sem
     // `PANEL_RP_ID` o portao de sanidade fecha o painel inteiro em **503**, e
-    // nao em 404 nem em 500. `/painel/` — um caminho do painel sem rota — cai
+    // nao em 404 nem em 500. `/painel/`, um caminho do painel sem rota, cai
     // no MESMO 503, porque o portao vem antes do `switch`.
     for (const caminho of ['/painel', '/painel/']) {
       const doPainel = createExecutionContext()
@@ -815,7 +815,7 @@ describe('STOP — a parada de emergencia', () => {
       AGORA,
     )
 
-    // Sem a raiz de `k_codigos` nao ha como comparar codigo nenhum — e ai sim
+    // Sem a raiz de `k_codigos` nao ha como comparar codigo nenhum, e ai sim
     // ela devolve o 503, sem lancar `TypeError` (§11.1).
     expect(resposta.status).toBe(503)
     expect(await resposta.text()).toBe(PAGINA_INDISPONIVEL)
@@ -823,7 +823,7 @@ describe('STOP — a parada de emergencia', () => {
   })
 })
 
-describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
+describe('STOP: o corpo de 1 KB e os outros portoes gratuitos', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -850,7 +850,7 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
     expect(resposta.status).toBe(413)
     expect(contador.prepares).toBe(0)
     expect((await linhaDeConfig())?.enabled).toBe(1)
-    // O status vem de §11.4 e a frase de §10.12 — e o codigo registrado tem
+    // O status vem de §11.4 e a frase de §10.12, e o codigo registrado tem
     // que ser o da tabela, nao um sinonimo qualquer.
     expect(registrado.linhas).toEqual([`painel: POST ${CAMINHO_DA_PARADA} 413 corpo_grande_demais`])
   })
@@ -862,7 +862,7 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
     // Um POST `chunked` nao tem `content-length`: o portao barato nao vale, e
     // e este o caminho em que "capado em 1 KB" precisa ser teto de verdade. O
     // contador de pedacos e a prova de que o corte acontece DURANTE a leitura
-    // — com `arrayBuffer()` o corpo inteiro (10 KB) seria bufferizado na
+    // com `arrayBuffer()` o corpo inteiro (10 KB) seria bufferizado na
     // memoria do isolate primeiro, e os 40 pedacos sairiam todos.
     const corpo = new CorpoEmPedacos(40, 256)
     const contador = new D1Contador(env.DB)
@@ -887,7 +887,7 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
     await gravarConfig(env.DB, { enabled: 1 })
     await gerarCodigos()
 
-    // 3G que cai no meio do POST — o celular com sinal ruim e exatamente o
+    // 3G que cai no meio do POST, o celular com sinal ruim e exatamente o
     // cenario que §10.12 nomeia. A leitura do corpo tem que morar dentro do
     // `try`: fora dele isto virava `500 Internal Server Error`, e o dono ficava
     // sem saber se a automacao parou.
@@ -958,7 +958,7 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
 
   test('STOP: o content-type e comparado sem caixa, como manda a RFC 9110', async () => {
     // Media type e case-INSENSITIVE. Recusar `Application/...` mostraria "Esse
-    // codigo nao confere" para um codigo que confere — a mentira que o
+    // codigo nao confere" para um codigo que confere, a mentira que o
     // argumento (c) de §10.12 existe para impedir.
     for (const grafia of [
       'application/x-www-form-urlencoded',
@@ -1074,7 +1074,7 @@ describe('STOP — o corpo de 1 KB e os outros portoes gratuitos', () => {
   })
 })
 
-describe('CODIGO — geracao, formato e normalizacao', () => {
+describe('CODIGO: geracao, formato e normalizacao', () => {
   test('CODIGO: o alfabeto Crockford nao tem I, L, O nem U', () => {
     expect(ALFABETO_DOS_CODIGOS).toHaveLength(32)
     expect(new Set(ALFABETO_DOS_CODIGOS).size).toBe(32)
@@ -1105,7 +1105,7 @@ describe('CODIGO — geracao, formato e normalizacao', () => {
 
     // Formatado com hifens, em minusculas, com espaco sobrando.
     expect(normalizarCodigo(' 01234-56789-abcde-fghjk ', 'recuperacao')).toBe(original)
-    // I e L viraram 1, O virou 0 — as confusoes que o alfabeto ja previu.
+    // I e L viraram 1, O virou 0, as confusoes que o alfabeto ja previu.
     expect(normalizarCodigo('OI23456789ABCDEFGHJK', 'recuperacao')).toBe('0123456789ABCDEFGHJK')
     expect(normalizarCodigo('Ol23456789ABCDEFGHJK', 'recuperacao')).toBe('0123456789ABCDEFGHJK')
   })
@@ -1129,7 +1129,7 @@ describe('CODIGO — geracao, formato e normalizacao', () => {
   })
 })
 
-describe('CODIGO — POST /setup/painel/codigos', () => {
+describe('CODIGO: POST /setup/painel/codigos', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -1244,7 +1244,7 @@ describe('CODIGO — POST /setup/painel/codigos', () => {
   })
 })
 
-describe('AUDITORIA — a poda de 500 linhas no cron', () => {
+describe('AUDITORIA: a poda de 500 linhas no cron', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -1273,7 +1273,7 @@ describe('AUDITORIA — a poda de 500 linhas no cron', () => {
     const apagadas = await new PainelAuditoriaRepository(comoD1(contador)).podar()
 
     expect(apagadas).toBe(0)
-    // Uma leitura, zero escritas — e nenhum `COUNT(*)` em lugar nenhum (§8.9).
+    // Uma leitura, zero escritas, e nenhum `COUNT(*)` em lugar nenhum (§8.9).
     expect({ prepares: contador.prepares, escritas: contador.escritas }).toEqual({
       prepares: 1,
       escritas: 0,
@@ -1313,7 +1313,7 @@ describe('AUDITORIA — a poda de 500 linhas no cron', () => {
     expect(contador.escritas).toBe(1)
 
     // §11.7: argumentos separados, SEM template string com dado variavel
-    // dentro. O numero de linhas e inofensivo — o que a regra impede e o
+    // dentro. O numero de linhas e inofensivo, o que a regra impede e o
     // precedente de existir um `console` do painel que interpola valor.
     expect(registrado.linhas.filter((linha) => linha.startsWith('painel:'))).toEqual([
       'painel: auditoria_podada 3',
@@ -1332,7 +1332,7 @@ describe('AUDITORIA — a poda de 500 linhas no cron', () => {
   }
 })
 
-describe('STOP — o fork que ainda esta com o link de fabrica entre colchetes', () => {
+describe('STOP: o fork que ainda esta com o link de fabrica entre colchetes', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -1379,7 +1379,7 @@ describe('STOP — o fork que ainda esta com o link de fabrica entre colchetes',
 
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
-    // O COMPORTAMENTO e o mesmo dos dois lados — a automacao para —, mas o
+    // O COMPORTAMENTO e o mesmo dos dois lados, a automacao para, mas o
     // ROTULO que a tela vai mostrar e `parado_por_erro`, e nao `banco` com
     // `enabled: 0`: o validador unico roda tambem na LEITURA, e
     // `new URL('[COLE_SEU_LINK]')` estoura antes de qualquer outra coisa.

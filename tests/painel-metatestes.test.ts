@@ -34,7 +34,7 @@ import { pedir, responder } from './fixtures/dubles'
 import esteArquivo from './painel-metatestes.test.ts?raw'
 
 /**
- * META — metatestes.
+ * META, metatestes.
  *
  * Nao testam uma funcionalidade: testam que o proprio conjunto de testes
  * continua cobrindo o que promete.
@@ -56,7 +56,7 @@ import esteArquivo from './painel-metatestes.test.ts?raw'
  * META-15: as rotas que gravam CONFIGURACAO sao exatamente as declaradas aqui.
  *
  * META-06 estava reservado desde a Task 10 com a nota "chega com a etapa do
- * step-up" — chegou, e chegou como a spec o descreve: uma tabela, nao um
+ * step-up", chegou, e chegou como a spec o descreve: uma tabela, nao um
  * caminho HTTP. META-11 leva o numero seguinte livre porque META-10 ja estava
  * ocupado quando o Ruling 72 batizou o metateste da uniao.
  *
@@ -69,7 +69,7 @@ import esteArquivo from './painel-metatestes.test.ts?raw'
  * META-13 e META-14 chegaram na etapa 12c, e sao de uma familia diferente das
  * doze anteriores: elas nao medem `src/`, medem `tests/`. §13.2 lista os nove
  * metatestes que guardam o CODIGO; estes dois guardam o proprio conjunto de
- * testes contra o defeito que a etapa 12b encontrou nele — um teste que oferece
+ * testes contra o defeito que a etapa 12b encontrou nele, um teste que oferece
  * a cerimonia de step-up para uma gravacao que aquele ambiente jamais aceitaria.
  */
 
@@ -198,7 +198,7 @@ const COLUNAS_ESPERADAS: Record<string, readonly string[]> = {
 
 /**
  * Toda tabela do painel comeca com este prefixo (§7.3), e e por ele que o
- * metateste as descobre — nunca por uma lista escrita a mao, que envelhece em
+ * metateste as descobre, nunca por uma lista escrita a mao, que envelhece em
  * silencio na primeira tabela que alguem esquecer de acrescentar.
  */
 const PREFIXO_DO_PAINEL = /^painel_/
@@ -219,7 +219,7 @@ async function colunasDe(tabela: string): Promise<string[]> {
   return (resultado.results ?? []).map((coluna) => coluna.name).sort()
 }
 
-describe('META — tabelas', () => {
+describe('META: tabelas', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
   })
@@ -330,13 +330,13 @@ describe('META — tabelas', () => {
 })
 
 /**
- * Todo binding que o `wrangler.jsonc` declara — `vars`, segredos, D1, KV, R2,
+ * Todo binding que o `wrangler.jsonc` declara, `vars`, segredos, D1, KV, R2,
  * Durable Objects, filas, servicos e o que vier depois.
  *
  * A lista NAO e escrita aqui: ela e derivada do proprio `wrangler.jsonc` pelo
  * `vitest.config.ts` e entregue por binding, porque o teste roda dentro do
  * workerd e la nao ha sistema de arquivos. Uma lista escrita a mao envelhece
- * em silencio — foi exatamente o que aconteceu quando o `vitest.config.ts`
+ * em silencio, foi exatamente o que aconteceu quando o `vitest.config.ts`
  * passou a ler o arquivo campo a campo: as `vars` continuaram herdadas e todo
  * o resto parou de derivar, sem nenhum teste ficar vermelho.
  *
@@ -350,7 +350,7 @@ describe('META — tabelas', () => {
  * Nada do desenho pode depender deles para estar correto; se um dia entrarem
  * nos bindings de teste, a suite passaria a provar menos do que promete. Sao
  * tambem a unica subtracao permitida do conjunto declarado no `wrangler.jsonc`
- * — a excecao declarada, e nao um esquecimento.
+ * a excecao declarada, e nao um esquecimento.
  */
 const LIMITADORES_QUE_FICAM_DE_FORA: readonly string[] = [
   'PANEL_LIMITER_LOGIN',
@@ -365,7 +365,7 @@ function bindingsEsperados(): string[] {
   )
 }
 
-describe('META — bindings', () => {
+describe('META: bindings', () => {
   test('META-04: todo binding do wrangler.jsonc existe no ambiente de teste', () => {
     const ambiente = env as unknown as Record<string, unknown>
     const esperados = bindingsEsperados()
@@ -382,8 +382,8 @@ describe('META — bindings', () => {
 
   test('META-04: o conjunto declarado cobre var, segredo e binding de recurso', () => {
     // As tres formas que o `wrangler.jsonc` usa para nomear o que chega ao
-    // `env`. Se a derivacao parasse de ler uma delas — foi o que aconteceu com
-    // tudo o que nao e `var` —, o teste acima passaria cobrindo menos.
+    // `env`. Se a derivacao parasse de ler uma delas, foi o que aconteceu com
+    // tudo o que nao e `var`, o teste acima passaria cobrindo menos.
     const declarados = env.TEST_BINDINGS_DO_WRANGLER
 
     expect(declarados).toContain('ALLOWED_LINK_DOMAINS') // vars
@@ -393,7 +393,7 @@ describe('META — bindings', () => {
   })
 
   test('META-04: com os bindings de teste o portao de sanidade abre', () => {
-    // Prova que os valores ficticios respeitam os pisos de §10.2 — 32
+    // Prova que os valores ficticios respeitam os pisos de §10.2, 32
     // caracteres na chave de sessao, 20 no admin token, endereco preenchido.
     expect(painelHabilitado(env)).toEqual({ ok: true })
   })
@@ -423,12 +423,12 @@ describe('META — bindings', () => {
 })
 
 // ---------------------------------------------------------------------------
-// META — as rotas do painel
+// META, as rotas do painel
 // ---------------------------------------------------------------------------
 
 /**
  * As rotas que NAO exigem sessao. Escrita AQUI, e copiada de §13.2 palavra por
- * palavra — e a allowlist do metateste, e o ponto dela e obrigar quem
+ * palavra, e a allowlist do metateste, e o ponto dela e obrigar quem
  * acrescentar uma rota nova a vir editar este arquivo para pular o portao.
  *
  * `/painel/entrar/codigo` e `/painel/parada` estao na lista da spec e ainda nao
@@ -458,7 +458,7 @@ const POSTS_AUTENTICADOS_SEM_FICHA: readonly string[] = []
 /** Caractere de segmento variavel em qualquer notacao de roteador conhecida. */
 const SEGMENTO_VARIAVEL = /[:{}*?[\]]|\/\.\.?(?:\/|$)/
 
-describe('META — rotas', () => {
+describe('META: rotas', () => {
   test('META-01: toda rota registrada exige sessao, salvo a allowlist escrita no teste', () => {
     const semSessaoENaoListadas = ROTAS.filter(
       (rota) => !rota.sessao && !ROTAS_SEM_SESSAO.includes(rota.caminho),
@@ -467,7 +467,7 @@ describe('META — rotas', () => {
     expect(semSessaoENaoListadas.map((rota) => rota.caminho)).toEqual([])
 
     // Contrapositivo, sem o qual a afirmacao acima passaria com uma tabela em
-    // que TODA rota esta na allowlist — que e uma tabela sem portao nenhum.
+    // que TODA rota esta na allowlist, que e uma tabela sem portao nenhum.
     expect(ROTAS.filter((rota) => rota.sessao).length).toBeGreaterThan(0)
   })
 
@@ -496,7 +496,7 @@ describe('META — rotas', () => {
   test('META-10: rota de PAGINA so com GET declara `csrf: false` e `escreve: false`', () => {
     // Os dois campos sao DECLARATIVOS: nada no roteador confere se eles batem
     // com o que o handler faz. Um `escreve: true` errado e pior que inofensivo
-    // — ele REMOVE a rota do laco de "toda rota com `escreve: false` executa
+    // ele REMOVE a rota do laco de "toda rota com `escreve: false` executa
     // zero escritas no D1". Um rotulo errado desligaria uma garantia em vez de
     // derrubar um teste, que e a forma mais silenciosa de perder cobertura.
     //
@@ -549,7 +549,7 @@ describe('META — rotas', () => {
   })
 })
 
-describe('META — o painel entra pelo default:', () => {
+describe('META: o painel entra pelo default:', () => {
   test('META-07: /painelzinho continua caindo no 404 do Worker, e nao no painel', async () => {
     const resposta = await responder(pedir('/painelzinho'), env)
 
@@ -574,7 +574,7 @@ describe('META — o painel entra pelo default:', () => {
 
     expect(resposta.status).toBe(404)
     // A `mensagem` de `rota_desconhecida` na tabela de §11.4, e nao o corpo
-    // `Not Found` do `default:` — e o painel que atendeu, e ele atendeu pela
+    // `Not Found` do `default:`, e o painel que atendeu, e ele atendeu pela
     // tabela canonica. O CODIGO fica no `console.warn` e nunca no corpo.
     expect(corpo).toContain('Página não encontrada.')
     expect(corpo).not.toContain('rota_desconhecida')
@@ -583,7 +583,7 @@ describe('META — o painel entra pelo default:', () => {
 })
 
 // ---------------------------------------------------------------------------
-// META — a classificacao de risco e o escopo de escrita por rota
+// META, a classificacao de risco e o escopo de escrita por rota
 // ---------------------------------------------------------------------------
 
 /**
@@ -628,20 +628,20 @@ interface CasoDeRisco {
  * exercida atraves de `POST /painel/ajustes`, que naquele momento escrevia todo
  * campo de comportamento. Quando o Ruling 73 moveu a recusa de escopo para antes
  * da cerimonia e o Ruling 74 encolheu a lista daquela rota, seis das sete
- * entradas passaram a ser recusadas por ESCOPO — `400 dados_invalidos` — e o
+ * entradas passaram a ser recusadas por ESCOPO, `400 dados_invalidos`, e o
  * teste que dizia medir a classificacao passou a medir outra coisa. Uma tabela
  * afirmada sobre a funcao nao tem esse jeito de esvaziar sem ninguem ver.
  *
  * E e o unico lugar honesto para `mediaScope` ate a Task 13: a tela dona dele
  * nao existe (Ruling 68), entao por rota nao ha como afirmar nem a metade
- * positiva (que nao grava) nem a negativa — o `403` que a suite media vinha do
+ * positiva (que nao grava) nem a negativa, o `403` que a suite media vinha do
  * escopo, e nao do risco.
  *
  * As quatro linhas de ALARGAMENTO sao as quatro que §10.10 enumera, palavra por
  * palavra: `matchMode` para `contains`, cooldown ABAIXO do atual, `mediaScope`
  * para `todas`, `processOnlyReels` para `false`. Os tres sempre-protegidos
- * pedem nas duas direcoes. Todo o resto — `enabled` inclusive, e a ausencia
- * dele e decisao escrita de §10.10 — nao pede em direcao nenhuma.
+ * pedem nas duas direcoes. Todo o resto, `enabled` inclusive, e a ausencia
+ * dele e decisao escrita de §10.10, nao pede em direcao nenhuma.
  */
 const TABELA_DE_RISCO: readonly CasoDeRisco[] = [
   // Os quatro alargamentos nomeados por §10.10, e a volta de cada um.
@@ -832,7 +832,7 @@ const ESCOPO_POR_ROTA: readonly {
  * **A lista encolheu na Etapa 12, e a mudanca e a tarefa inteira do lado do
  * metateste** (Ruling 68): `mediaScope` saiu porque `/painel/reels` nasceu como
  * a tela dona dele. Sobraram os dois interruptores de canal, que esperam um
- * formulario que os emita — §3 os poe em "Ajustes finos", tela que ja os mostra
+ * formulario que os emita, §3 os poe em "Ajustes finos", tela que ja os mostra
  * em leitura, e nenhuma etapa de §14 nomeia o interruptor.
  *
  * Escrito AQUI, e nao derivado do codigo: uma lista derivada concordaria com
@@ -841,7 +841,7 @@ const ESCOPO_POR_ROTA: readonly {
  */
 const FORA_DO_GRAVAVEL: readonly CampoDaConfig[] = ['publicReplyEnabled', 'privateReplyEnabled']
 
-describe('META — a classificacao de risco e o escopo por rota', () => {
+describe('META: a classificacao de risco e o escopo por rota', () => {
   test('META-06: a tabela de §10.10 inteira, afirmada no classificador', () => {
     for (const caso of TABELA_DE_RISCO) {
       const antes: EstadoDeComportamento = { ...ESTADO_BASE, ...caso.antes }
@@ -886,7 +886,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // existia em comentario. `jsonCanonico` monta o objeto assinado como
     // `{ ...campos, acao }`, com a operacao POR ULTIMO: um campo de
     // configuracao chamado `acao` seria sobrescrito e sumiria do hash EM
-    // SILENCIO — o autenticador assinaria um objeto que nao contem o valor que
+    // SILENCIO, o autenticador assinaria um objeto que nao contem o valor que
     // a tela mostrou, e §10.10 diz que a amarracao ao conteudo e a coisa toda.
     // Nenhum campo se chama assim hoje, e o mesmo `src/config.ts` que faz um
     // campo novo entrar sozinho em `CAMPOS_DE_COMPORTAMENTO` e o que faria este
@@ -898,7 +898,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
 
   test('META-06: um lote misto tranca inteiro, e o classificador nomeia so o protegido', () => {
     // §10.10 e o Ruling 66: se QUALQUER campo do lote exige, o lote inteiro
-    // exige. Quem decide isso e o funil, olhando se a lista voltou vazia — e
+    // exige. Quem decide isso e o funil, olhando se a lista voltou vazia, e
     // por isso ela nao pode vir vazia quando so um dos dois e protegido.
     const antes: EstadoDeComportamento = { ...ESTADO_BASE, matchMode: 'exact' }
     const depois: EstadoDeComportamento = {
@@ -935,7 +935,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     expect([...CAMPOS_FORA_DA_RESTAURACAO].sort()).toEqual([...FORA_DO_GRAVAVEL].sort())
     expect(uniao.length + FORA_DO_GRAVAVEL.length).toBe(CAMPOS_DE_COMPORTAMENTO.length)
 
-    // Contrapositivo: nenhuma das listas pode estar vazia — listas vazias
+    // Contrapositivo: nenhuma das listas pode estar vazia, listas vazias
     // fariam a uniao vazia bater com uma restauracao vazia.
     for (const rota of ESCOPO_POR_ROTA) {
       expect({ [rota.caminho]: rota.campos.length }).not.toEqual({ [rota.caminho]: 0 })
@@ -946,7 +946,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // A recusa de escopo e a unica coisa que a pessoa le quando o painel diz
     // "nao": ela precisa dizer ONDE se muda aquilo, ou admitir que nao da para
     // mudar em lugar nenhum. Sao TRES situacoes, e ate o Ruling 82 havia duas
-    // frases para elas — `publicReplyEnabled` e `privateReplyEnabled` caiam na
+    // frases para elas, `publicReplyEnabled` e `privateReplyEnabled` caiam na
     // frase que promete "a tela que cuida dele chega em uma proxima parte", e
     // essa tela ja existe: §3 os poe em "Ajustes finos", que ja os MOSTRA. O que
     // falta neles e o interruptor, e nenhuma etapa de §14 o nomeia.
@@ -956,13 +956,13 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // que entre na uniao sem entrar no mapa cai aqui, e nao numa tela de recusa.
     // **A clausula que DISCRIMINA e afirmada literal** (Ruling 89). A primeira
     // grafia media as tres frases por regex com `.*` e `.+` no meio das
-    // palavras, entao uma reescrita que mantivesse so a FORMA — trocar "e
-    // mudado" por "e alterado", trocar o fim de "so para leitura" — passava, e o
+    // palavras, entao uma reescrita que mantivesse so a FORMA, trocar "e
+    // mudado" por "e alterado", trocar o fim de "so para leitura", passava, e o
     // metateste continuaria verde afirmando uma promessa que ninguem faz mais.
     //
     // O que fica literal e so o pedaco que CARREGA a promessa: a frase do
     // caminho promete que existe outro lugar onde mexer, e a do so-leitura
-    // promete o contrario, que ali nao da. O nome da tela continua livre — ele
+    // promete o contrario, que ali nao da. O nome da tela continua livre, ele
     // e o que muda por campo, e congela-lo seria congelar o portugues inteiro,
     // que nao e o que este teste existe para guardar.
     const CAMINHO_ABRE = 'Este ajuste é mudado '
@@ -983,7 +983,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     }
 
     // Os dois que uma tela ja mostra sem deixar mudar. Eles NAO podem cair na
-    // frase do caminho — prometeria um botao que nao existe — nem na do "ainda
+    // frase do caminho, prometeria um botao que nao existe, nem na do "ainda
     // nao da", que manda esperar por uma tela pronta.
     for (const campo of ['publicReplyEnabled', 'privateReplyEnabled'] as const) {
       const frase = motivoDeCampoForaDaTela(campo)
@@ -993,10 +993,10 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
 
     // **O campo que a promessa antiga cobria era `mediaScope`, e a Etapa 12 a
     // quitou.** Ate ela, "a tela que cuida dele chega em uma proxima parte" era
-    // verdade — a Etapa 12 de §14 era o futuro. Agora `/painel/reels` existe, e
+    // verdade, a Etapa 12 de §14 era o futuro. Agora `/painel/reels` existe, e
     // a mesma frase passou a MENTIR: ela mandaria a pessoa esperar por uma tela
     // que ja esta pronta e a um toque de distancia. Mesma familia dos Rulings 75
-    // e 82, e o conserto e o mesmo — o campo mudou de mapa, e a frase que sobra
+    // e 82, e o conserto e o mesmo, o campo mudou de mapa, e a frase que sobra
     // e a do CAMINHO.
     expect(motivoDeCampoForaDaTela('mediaScope')).not.toBe(RECUSA_SEM_VALOR.naoGravavel)
     expect(ehCaminho(motivoDeCampoForaDaTela('mediaScope'))).toBe(true)
@@ -1005,7 +1005,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // frases, sem sobra e sem um campo em duas. `ainda_nao` cai a ZERO nesta
     // etapa, e a queda e a garantia: enquanto ela era 1, havia um campo que o
     // painel mandava esperar. Ela volta a ser diferente de zero no dia em que
-    // `AutomationConfig` ganhar um campo que nenhuma tela mostra — e ai o
+    // `AutomationConfig` ganhar um campo que nenhuma tela mostra, e ai o
     // laco de `CAMPOS_DA_RESTAURACAO` acima e quem cobra o mapa.
     const porFrase = CAMPOS_DE_COMPORTAMENTO.map((campo) => {
       const frase = motivoDeCampoForaDaTela(campo)
@@ -1024,7 +1024,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
 
   test('META-15: as rotas que gravam configuracao sao exatamente as declaradas aqui', () => {
     // **O nome mudou na Etapa 12, e a mudanca e um conserto de batismo.** Ate
-    // ela existiam DOIS testes chamados META-11 — heranca do Ruling 72, que
+    // ela existiam DOIS testes chamados META-11, heranca do Ruling 72, que
     // batizou o segundo com o numero do primeiro. Dois testes com o mesmo nome
     // fazem qualquer documento que os cite apontar para o errado, e o custo
     // aparece no dia em que alguem for procurar "o META-11" e achar o outro.
@@ -1034,7 +1034,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // Sem isto, a uniao acima seria a uniao das rotas que ALGUEM LEMBROU de
     // listar. A Etapa 12 acrescentou `/painel/reels` e `/painel/reel` a tabela
     // de rotas, e este teste e quem obrigou as duas a vir declarar o escopo
-    // delas — que e exatamente o momento em que se quer ser obrigado a olhar.
+    // delas, que e exatamente o momento em que se quer ser obrigado a olhar.
     //
     // **O predicado pergunta `gravaConfig`, e nao `escreve`** (Ruling 84). A
     // primeira grafia media a coisa errada: `rotas.ts` define `escreve` como
@@ -1042,7 +1042,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // `/painel/aparelhos` e `/painel/sair` como POST, e as duas vao gravar no D1
     // sem gravar CONFIGURACAO; quando a Task 13 as registrar, este teste
     // exigiria que elas aparecessem em `ESCOPO_POR_ROTA`, e o contrapositivo do
-    // teste acima — nenhuma lista de rota pode estar vazia — tornaria isso
+    // teste acima, nenhuma lista de rota pode estar vazia, tornaria isso
     // insatisfazivel. O nome do teste passou a medir o que ele promete.
     const gravadorasDeConfig = ROTAS.filter((rota) => rota.gravaConfig)
 
@@ -1069,7 +1069,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     //
     // Tudo acima parte de `gravaConfig`, e `gravaConfig` e DECLARACAO, nao
     // medicao: uma rota que chamasse `gravarConfiguracao` com
-    // `gravaConfig: false` saia do laco e escapava do metateste da uniao —
+    // `gravaConfig: false` saia do laco e escapava do metateste da uniao,
     // exatamente a omissao silenciosa que este teste existe para impedir. A
     // Etapa 12 foi a primeira que podia explorar o furo, entao e ela quem o
     // fecha.
@@ -1077,7 +1077,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // A guarda barata, e sem ler fonte nenhuma: **toda rota de pagina com
     // `escreve: true` e `POST` tem de declarar `gravaConfig: true`, ou estar
     // nesta lista curta e NOMEADA**. Ela nao prova que a rota nao chama o funil
-    // — prova que ninguem consegue acrescentar uma rota de escrita de pagina
+    // prova que ninguem consegue acrescentar uma rota de escrita de pagina
     // sem passar por aqui, que e o portao que faltava. E ela erra para o lado de
     // EXIGIR: uma rota nova que grave outra coisa tem de ser escrita nesta lista
     // por quem a criou, com o nome dela a vista de quem revisa.
@@ -1085,7 +1085,7 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
     // §7.1 declara as duas excecoes de hoje como POST, e as Tasks 14 e 15 as
     // registram: `/painel/aparelhos` grava passkey e `/painel/sair` apaga
     // sessao. Nenhuma das duas tem campo de configuracao para declarar, e o
-    // contrapositivo do teste acima — nenhuma lista de rota pode estar vazia —
+    // contrapositivo do teste acima, nenhuma lista de rota pode estar vazia,
     // tornaria insatisfazivel exigir escopo delas.
     const SEM_CONFIGURACAO: readonly string[] = ['/painel/aparelhos', '/painel/sair']
 
@@ -1114,11 +1114,11 @@ describe('META — a classificacao de risco e o escopo por rota', () => {
 /**
  * A marca que META-13 procura: a acao de auditoria, com as aspas dela.
  *
- * A guarda le as fontes de `tests/` como TEXTO, e este arquivo e UMA DELAS —
+ * A guarda le as fontes de `tests/` como TEXTO, e este arquivo e UMA DELAS,
  * de proposito, porque uma guarda cega para si mesma e o buraco mais facil de
  * nao notar. Isso impoe uma regra a este arquivo: as suites sinteticas de
  * META-13 e META-14 montam a marca a partir desta constante em vez de escrever
- * a acao dentro do bloco. Nao e estilo — um bloco daqui que a escrevesse
+ * a acao dentro do bloco. Nao e estilo, um bloco daqui que a escrevesse
  * inteira, ao lado de um nome de campo protegido, satisfaria o predicado e
  * apareceria em `desprotegidos`, porque este arquivo nao declara allowlist
  * nenhuma. Quer dizer: a regra e AFIRMADA pela propria varredura, e nao
@@ -1134,14 +1134,14 @@ const LINHA_SO_DE_COMENTARIO = /^\s*(?:\/\/|\/\*|\*)/
 
 /** `ALLOWED_LINK_DOMAINS` recebendo texto vazio: lista vazia recusa tudo. */
 const ALLOWLIST_VAZIA = /ALLOWED_LINK_DOMAINS:\s*(?:''|""|``)/
-/** So espaco entre as aspas — o valor que `vitest.config.ts` entrega. */
+/** So espaco entre as aspas, o valor que `vitest.config.ts` entrega. */
 const VALOR_VAZIO = /^\s*(?:''|""|``)\s*$/
 /** `const NOME = { ...env, ALLOWED_LINK_DOMAINS: <alguma coisa> }`. */
 const DECLARACAO_DE_ALLOWLIST =
   /const\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*\{[^{}]*\.\.\.env[^{}]*ALLOWED_LINK_DOMAINS\s*:\s*([^,}]+)/g
-/** `opcoes.ambiente ?? NOME` — o ambiente que o helper de POST usa por padrao. */
+/** `opcoes.ambiente ?? NOME`, o ambiente que o helper de POST usa por padrao. */
 const AMBIENTE_PADRAO = /ambiente\s*\?\?\s*([A-Za-z_$][A-Za-z0-9_$]*)/g
-/** `{ ambiente: alguma-coisa }` — o bloco escolhendo o ambiente na mao. */
+/** `{ ambiente: alguma-coisa }`, o bloco escolhendo o ambiente na mao. */
 const AMBIENTE_ESCOLHIDO = /ambiente\s*:/
 /** A abertura de um bloco de teste, com a indentacao dela capturada. */
 const ABERTURA_DE_BLOCO = /^([ \t]*)(?:test|it)(?:\.[A-Za-z]+)?\(/
@@ -1153,11 +1153,11 @@ const IDENTIFICADOR = /[A-Za-z_$][A-Za-z0-9_$]*/g
  *
  * Nao e cosmetica: sem isto a guarda seria enganada pela PROSA. Tres testes de
  * `painel-stepup.test.ts` explicam em comentario por que NAO esperam a recusa
- * de step-up, e um analisador que casasse texto solto os acusaria — e uma
+ * de step-up, e um analisador que casasse texto solto os acusaria, e uma
  * guarda que grita onde nao ha defeito e desligada na terceira vez.
  *
  * **Por LINHA, e nao por token.** A primeira grafia era um tokenizador de
- * verdade — string, comentario de linha e comentario de bloco — e ela se
+ * verdade, string, comentario de linha e comentario de bloco, e ela se
  * perdia no primeiro regex literal
  * com aspas dentro: em `/(?:''|"")/` o `'` abre uma "string" que nunca fecha
  * onde deveria, e dali para a frente o arquivo inteiro e lido trocado. Este
@@ -1169,7 +1169,7 @@ const IDENTIFICADOR = /[A-Za-z_$][A-Za-z0-9_$]*/g
  * A regra por linha nao tem esse modo de falha: ela nunca dessincroniza,
  * porque cada linha e decidida sozinha. O preco esta dito: um comentario no
  * FIM de uma linha de codigo continua sendo lido como codigo. Isso so pode
- * gerar acusacao a mais, nunca a menos — e a guarda erra para o lado de
+ * gerar acusacao a mais, nunca a menos, e a guarda erra para o lado de
  * exigir, que e o lado seguro.
  *
  * As linhas ficam no lugar, vazias: sao elas que mantem o `^` de
@@ -1211,8 +1211,8 @@ function allowlistDoArquivo(codigo: string): AllowlistDoArquivo {
  * Fechar no `})` da mesma indentacao, e nao na abertura do teste seguinte, e o
  * que impede o ultimo bloco de um `describe` de engolir o codigo de modulo que
  * vem depois dele. Aqui isso nao e teoria: com a regra anterior, o ultimo teste
- * deste proprio arquivo absorvia as constantes do analisador — `MARCA_DE_RECUSA`
- * e `CAMPOS_DE_ENDERECO` — e aparecia como um bloco medido que ninguem escreveu.
+ * deste proprio arquivo absorvia as constantes do analisador, `MARCA_DE_RECUSA`
+ * e `CAMPOS_DE_ENDERECO`, e aparecia como um bloco medido que ninguem escreveu.
  * Um bloco inventado hoje passa; amanha ele vira alarme falso num teste que nao
  * tem nada a ver com step-up.
  */
@@ -1237,7 +1237,7 @@ function blocosDeTeste(codigo: string): string[] {
 interface BlocoMedido {
   /** A primeira linha do bloco, que carrega o titulo. */
   readonly titulo: string
-  /** O bloco declara — ou herda — um ambiente com allowlist configurada. */
+  /** O bloco declara, ou herda, um ambiente com allowlist configurada. */
   readonly protegido: boolean
 }
 
@@ -1316,20 +1316,20 @@ function suiteSintetica(comAllowlist: boolean): string {
   ].join('\n')
 }
 
-describe('META — a higiene do proprio conjunto de testes', () => {
+describe('META: a higiene do proprio conjunto de testes', () => {
   test('META-13: esperar a recusa de step-up num campo de endereco exige allowlist', () => {
     // O defeito silencioso que a etapa 12b desenterrou, virado guarda de
     // CLASSE. O `vitest.config.ts` entrega `ALLOWED_LINK_DOMAINS: ''`, e lista
     // vazia nao "passa tudo": ela recusa QUALQUER endereco (§9.8, LNK-12).
     // Enquanto o step-up respondia antes da validacao, tres testes de
-    // `painel-auditoria.test.ts` — AUD-08, GRAV-35 e GRAV-39 — ofereciam a
+    // `painel-auditoria.test.ts`, AUD-08, GRAV-35 e GRAV-39, ofereciam a
     // cerimonia para gravacoes que aquele ambiente jamais aceitaria: a
     // patologia do Ruling 73 DENTRO do teste que a mede. Os tres ja foram
     // consertados; o que faltava era impedir que o proximo nascesse igual.
     //
-    // **Por que a guarda le a FONTE.** A forma literal do pedido — "todo teste
+    // **Por que a guarda le a FONTE.** A forma literal do pedido, "todo teste
     // que POSTa esses campos esperando a recusa de step-up roda com allowlist"
-    // — fala de OUTROS arquivos de teste, e de dentro do workerd nao existe
+    // fala de OUTROS arquivos de teste, e de dentro do workerd nao existe
     // reflexao sobre o corpo de um teste alheio nem sobre o `env` que ele
     // passou por parametro: quando este arquivo roda, os outros ou ja rodaram
     // ou nem foram carregados, e nenhum `expect` de la fica visivel daqui. Ler
@@ -1339,12 +1339,12 @@ describe('META — a higiene do proprio conjunto de testes', () => {
     //
     // O que ela nao alcanca fica dito para nao ser descoberto tarde: um teste
     // que monte o ambiente por um caminho que nenhuma das duas vias reconhece
-    // — um helper importado de `tests/fixtures/`, por exemplo — cai como
+    // um helper importado de `tests/fixtures/`, por exemplo, cai como
     // desprotegido e obriga quem o escreveu a nomear a allowlist no bloco. E
     // uma guarda que erra para o lado de exigir, nunca para o de deixar passar.
     // O  do Vite OMITE o modulo que o chama. Sem a linha
     // seguinte, o unico arquivo de teste fora da guarda seria justamente
-    // aquele onde ela mora — e uma guarda cega para si mesma e o buraco mais
+    // aquele onde ela mora, e uma guarda cega para si mesma e o buraco mais
     // facil de nao notar. O `?raw` explicito o traz de volta para a varredura.
     const fontes: Record<string, string> = {
       ...(import.meta.glob('../tests/**/*.test.ts', {
@@ -1360,7 +1360,7 @@ describe('META — a higiene do proprio conjunto de testes', () => {
     // Contrapositivo da varredura: um glob quebrado devolveria lista vazia e
     // tudo abaixo passaria comparando nada com nada.
     expect(arquivos.length).toBeGreaterThan(20)
-    // E este arquivo esta DENTRO da varredura, uma vez so — e e isso que faz
+    // E este arquivo esta DENTRO da varredura, uma vez so, e e isso que faz
     // a guarda valer tambem para os blocos sinteticos que moram aqui embaixo.
     expect(arquivos.filter((nome) => nome.endsWith('painel-metatestes.test.ts')).length).toBe(1)
 
@@ -1374,7 +1374,7 @@ describe('META — a higiene do proprio conjunto de testes', () => {
 
     // Segundo contrapositivo, e o que importa mais: a guarda tem de estar
     // MEDINDO alguma coisa. Um predicado que nao casa nada ficaria verde para
-    // sempre — inclusive no dia em que o teste defeituoso chegasse.
+    // sempre, inclusive no dia em que o teste defeituoso chegasse.
     expect(medidos.length).toBeGreaterThanOrEqual(8)
 
     expect(desprotegidos).toEqual([])
@@ -1413,7 +1413,7 @@ describe('META — a higiene do proprio conjunto de testes', () => {
     // E o modo de falha que derrubou a primeira grafia, afirmado: um regex
     // literal com aspas dentro nao pode dessincronizar a varredura. Um
     // tokenizador ingenuo le o `'` de `(?:''|"")` como abertura de string e
-    // passa a ler TROCADO tudo o que vem depois — inclusive JSDoc, de onde ele
+    // passa a ler TROCADO tudo o que vem depois, inclusive JSDoc, de onde ele
     // tirava uma constante de allowlist que nao existe. Decidindo linha a
     // linha, as duas linhas abaixo chegam inteiras do outro lado.
     const comRegex = "const VAZIO = /^(?:''|\"\")$/\nconst LINK = 'https://exemplo.com/promocao'"

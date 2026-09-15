@@ -58,8 +58,8 @@ export function normalizeOptionsFrom(config: AutomationConfig): NormalizeOptions
 /**
  * Decide se um comentario aciona a automacao.
  *
- * `exact`    — o texto normalizado precisa ser igual a uma das keywords.
- * `contains` — basta que uma keyword apareca como SUBSTRING do texto.
+ * `exact`   , o texto normalizado precisa ser igual a uma das keywords.
+ * `contains`, basta que uma keyword apareca como SUBSTRING do texto.
  *
  * Retorna a keyword que casou (util para log e teste) ou null.
  */

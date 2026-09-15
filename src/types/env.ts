@@ -4,7 +4,7 @@
  * Valores de "vars" do wrangler.jsonc chegam como string. Segredos chegam
  * pelo Cloudflare Secrets (producao) ou pelo .dev.vars local.
  *
- * Configuracao de COMPORTAMENTO nao mora aqui — mora em src/config.ts.
+ * Configuracao de COMPORTAMENTO nao mora aqui, mora em src/config.ts.
  */
 export interface Env {
   /** Banco: dedup de comentarios, cooldown e token cifrado. */
@@ -20,7 +20,7 @@ export interface Env {
   /**
    * Host exato do painel administrativo, sem esquema e sem barra.
    *
-   * E o `rpId` do WebAuthn E a base da origem esperada — nao existe
+   * E o `rpId` do WebAuthn E a base da origem esperada, nao existe
    * `PANEL_ORIGIN`, para que origem e `rpId` nao possam divergir. Nasce VAZIO
    * no repositorio, porque cada instalacao tem o proprio endereco; vazio
    * significa painel em 503, que e o padrao seguro e nao um defeito.
@@ -34,7 +34,7 @@ export interface Env {
    *
    * E a trava que o painel NAO pode alterar: o bloco `vars` do wrangler.jsonc
    * e sobrescrito a cada publicacao, entao mudar esta lista exige o
-   * repositorio mais a credencial de deploy — as duas coisas que um painel
+   * repositorio mais a credencial de deploy, as duas coisas que um painel
    * invadido nao tem. Nasce VAZIA no repositorio, porque cada instalacao tem o
    * proprio dominio; vazia significa que o painel nao altera link nem texto do
    * Direct, e a entrega segue com o link que ja esta valendo.
@@ -55,7 +55,7 @@ export interface Env {
    *
    * NUNCA reutilizar aqui o SETUP_ADMIN_TOKEN nem o TOKEN_ENCRYPTION_KEY.
    * Rotacionar o admin token nao pode derrubar as sessoes, e vazar um convite
-   * — que e assinado com o admin token — nao pode entregar a chave das
+   * que e assinado com o admin token, nao pode entregar a chave das
    * sessoes. Ausente, o painel inteiro responde 503.
    */
   PANEL_SESSION_KEY: string
@@ -64,15 +64,15 @@ export interface Env {
   //
   // Os TRES sao OPCIONAIS, e o `?` aqui e a parte do contrato que importa:
   // ausentes os bindings, o painel funciona sem a camada e continua correto
-  // (§7.4). Um limitador de reserva — janela por isolate, dentro do proprio
-  // Worker — assume no lugar, e nada do desenho depende deles.
+  // (§7.4). Um limitador de reserva, janela por isolate, dentro do proprio
+  // Worker, assume no lugar, e nada do desenho depende deles.
   //
   // Sao tres e nao um porque na Cloudflare o `limit` e fixo por binding e o
   // `period` so aceita 10 ou 60: um binding sozinho nao consegue dar ao login
   // um teto diferente do da parada de emergencia.
   //
   // Excecao declarada ao checklist de propagacao: os tres NAO entram nos
-  // bindings do ambiente de teste, de proposito — a ausencia deles la e o que
+  // bindings do ambiente de teste, de proposito, a ausencia deles la e o que
   // prova que o painel funciona sem a camada.
   /** Entrar e registrar por convite. `{ limit: 10, period: 60 }`. */
   PANEL_LIMITER_LOGIN?: RateLimit

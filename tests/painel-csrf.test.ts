@@ -13,11 +13,11 @@ import { limparBanco } from './fixtures/banco'
 import { AGORA, comoD1, D1Contador, RAIZ } from './fixtures/dubles'
 
 /**
- * CSRF — as nove garantias de §13.2, mais as cinco camadas de §10.9.
+ * CSRF, as nove garantias de §13.2, mais as cinco camadas de §10.9.
  *
- * **Como esta suite exercita a escada.** Ela dirige `despachar` — a funcao de
+ * **Como esta suite exercita a escada.** Ela dirige `despachar`, a funcao de
  * producao que centraliza metodo, origem, corpo, limitador, sessao, ficha e
- * step-up — passando uma linha de rota declarada AQUI. A linha e um
+ * step-up, passando uma linha de rota declarada AQUI. A linha e um
  * `RotaDoPainel` como qualquer outra: mesmos campos, mesmo tipo, mesmo caminho
  * exato sob `/painel`. Isso e injecao de dependencia, e nao dublê: o codigo
  * exercitado e o mesmo que atende `/painel` em producao.
@@ -35,7 +35,7 @@ import { AGORA, comoD1, D1Contador, RAIZ } from './fixtures/dubles'
  * A rota de teste: POST autenticado com ficha, na familia de FORMULARIO.
  *
  * `escreve: true` porque ela representa a forma que a etapa das telas vai usar
- * — gravar e responder `303`. O handler abaixo nao grava nada; quem prova "nada
+ * gravar e responder `303`. O handler abaixo nao grava nada; quem prova "nada
  * gravado" e o contador de consultas.
  */
 const ROTA_DE_FORMULARIO: RotaDoPainel = {
@@ -115,7 +115,7 @@ function despacharFormulario(request: Request, espiao: HandlerEspiao, ambiente =
   return despachar(request, ambiente, AGORA, ROTA_DE_FORMULARIO, espiao.responder)
 }
 
-describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
+describe('CSRF: a ficha derivada da sessao (§10.9, camada 3)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
@@ -135,7 +135,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
     expect(resposta.status).toBe(403)
     expect(await resposta.text()).toContain('Requisição bloqueada por segurança.')
     // "Nada gravado" nas duas metades que importam: o handler nao rodou, e
-    // NENHUMA escrita saiu — a recusa acontece no passo 7, antes do passo 9.
+    // NENHUMA escrita saiu, a recusa acontece no passo 7, antes do passo 9.
     expect(espiao.chamadas).toBe(0)
     expect({ escritas: contador.escritas, prepares: contador.prepares }).toEqual({
       escritas: 0,
@@ -148,7 +148,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
     const alheia = await abrirSessao('credencial-b')
     const espiao = new HandlerEspiao()
 
-    // A ficha e valida — so que para outra sessao. Se ela nao dependesse do
+    // A ficha e valida, so que para outra sessao. Se ela nao dependesse do
     // `sid_hash`, seria uma constante do deploy e a camada 3 nao valeria nada.
     expect(alheia.ficha).not.toBe(minha.ficha)
 
@@ -209,7 +209,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
       espiao,
     )
 
-    // Ficha na URL vazaria em `Referer`, no historico e em log de proxy — e
+    // Ficha na URL vazaria em `Referer`, no historico e em log de proxy, e
     // passaria a valer num link que alguem clica.
     expect(resposta.status).toBe(403)
     expect(espiao.chamadas).toBe(0)
@@ -217,7 +217,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
 
   test('CSRF-07: a ficha na query string tambem nao vale nas rotas `/painel/api/*`', async () => {
     // A mesma proibicao, na outra familia. Sao dois lugares diferentes de onde
-    // a ficha pode ser lida — campo escondido e cabecalho — e a URL nao pode
+    // a ficha pode ser lida, campo escondido e cabecalho, e a URL nao pode
     // ser um terceiro em NENHUM dos dois.
     const sessao = await abrirSessao()
     const espiao = new HandlerEspiao()
@@ -314,7 +314,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
 
   test('passo 8: uma rota com `stepUp: true` FALHA FECHADA ate o verificador existir', async () => {
     // Nenhuma rota da tabela declara `stepUp: true` hoje, e a razao e que o
-    // verificador — `op_hash` recalculado no servidor — nasce com a etapa do
+    // verificador, `op_hash` recalculado no servidor, nasce com a etapa do
     // step-up. O ramo tem de recusar: uma autorizacao que nao da para verificar
     // nao pode ser concedida, e declarar `stepUp: true` cedo demais tem de
     // TRANCAR a rota, nunca abri-la em silencio.
@@ -353,7 +353,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
   test('passo 8: `stepUp: true` tranca a rota TAMBEM quando ela nao exige sessao', async () => {
     // O buraco que este teste fecha: enquanto a checagem de step-up morava
     // depois do curto-circuito `if (!rota.sessao)`, uma linha com
-    // `stepUp: true` e `sessao: false` passava direto para o handler — a
+    // `stepUp: true` e `sessao: false` passava direto para o handler, a
     // abertura em silencio que o ramo existe para impedir.
     const semSessaoComStepUp: RotaDoPainel = {
       caminho: '/painel/entrar',
@@ -393,7 +393,7 @@ describe('CSRF — a ficha derivada da sessao (§10.9, camada 3)', () => {
   })
 })
 
-describe('CSRF — origem obrigatoria e exata (§10.9, camada 2)', () => {
+describe('CSRF: origem obrigatoria e exata (§10.9, camada 2)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarBaldesDeReserva()
@@ -506,7 +506,7 @@ describe('CSRF — origem obrigatoria e exata (§10.9, camada 2)', () => {
   test('a origem NAO e exigida em GET: o link vindo de fora tem de abrir', async () => {
     // §10.8: abrir o painel por um link colado noutro app e navegacao
     // cross-site. O navegador nao manda o cookie, e o dono cai em
-    // `GET /painel/entrar` — que e o desenho. Exigir origem no `GET`
+    // `GET /painel/entrar`, que e o desenho. Exigir origem no `GET`
     // transformaria isso num `403` sem saida.
     const request = new Request(`${RAIZ}/painel/entrar`, {
       headers: { 'sec-fetch-site': 'cross-site', origin: 'https://web.whatsapp.com' },

@@ -224,13 +224,26 @@ describe('processComment (fluxo completo)', () => {
     expect(r.kind).toBe('retry')
   })
 
-  test('token expirado NAO e retentado', async () => {
-    const api = new ApiFalsa({ privateReply: { ok: false, erro: erro('TOKEN_INVALIDO', 401) } })
-    const r = await processComment(evento(), deps(api))
+  test.each([
+    ['TOKEN_INVALIDO', 401],
+    ['NAO_AUTORIZADO', 401],
+    ['PROIBIDO', 403],
+  ])(
+    'falha de CONTA (%s) vai para a fila, e nao para o `failed` terminal',
+    async (codigo, status) => {
+      // Antes virava `failed`: quem comentou enquanto o token estava morto nunca
+      // receberia o Direct, nem depois de o dono reconectar. O cron ja preservava
+      // esses registros; o primeiro envio era o unico caminho que os perdia.
+      const api = new ApiFalsa({ privateReply: { ok: false, erro: erro(codigo, status) } })
+      const r = await processComment(evento(), deps(api))
 
-    expect(r).toEqual({ kind: 'failed', errorCode: 'TOKEN_INVALIDO' })
-    expect((await repo.findByCommentId('comment-1'))?.status).toBe('failed')
-  })
+      expect(r.kind).toBe('retry')
+      const registro = await repo.findByCommentId('comment-1')
+      expect(registro?.status).toBe('retry_pending')
+      expect(registro?.last_error_code).toBe(codigo)
+      expect(api.chamadas).not.toContain('public')
+    },
+  )
 
   test('falha na resposta publica apos Direct enviado vira uncertain', async () => {
     const api = new ApiFalsa({ publicReply: { ok: false, erro: erro('HTTP_500') } })

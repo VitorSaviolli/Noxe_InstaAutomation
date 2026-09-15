@@ -25,14 +25,14 @@ import {
 
 /**
  * As tres travas que a rodada de revisao adversarial cobrou, e que compartilham
- * um assunto: **a sessao do painel — o que a mantem viva, o que a encerra e o
+ * um assunto: **a sessao do painel, o que a mantem viva, o que a encerra e o
  * que o dono ve quando a rede de seguranca dela acabou.**
  *
- *   SAI — `POST /painel/sair` ("sair deste aparelho"), que §7.1 e §10.8
+ *   SAI, `POST /painel/sair` ("sair deste aparelho"), que §7.1 e §10.8
  *         publicam e que o roteador respondia com `404`;
- *   VIS — a gravacao de `vista_em`/`ociosa_ate` que §10.8 orca e que nao
+ *   VIS, a gravacao de `vista_em`/`ociosa_ate` que §10.8 orca e que nao
  *         existia, entao a janela de 2 h nunca deslizava;
- *   COD — o aviso bloqueante de §10.11, que so existia na tela de Aparelhos —
+ *   COD, o aviso bloqueante de §10.11, que so existia na tela de Aparelhos,
  *         a unica tela sem item na barra de baixo.
  *
  * **Por que num arquivo proprio, e nao em `painel-sessao`/`painel-telas`.**
@@ -42,7 +42,7 @@ import {
  * assunto continua sendo o mesmo das suites de §13.1.
  */
 
-/** O `env` de teste com um pedaco trocado — o `DB` contador, nos lacos de custo. */
+/** O `env` de teste com um pedaco trocado, o `DB` contador, nos lacos de custo. */
 function ambienteCom(patch: Record<string, unknown>): Env {
   return { ...env, ...patch } as unknown as Env
 }
@@ -52,7 +52,7 @@ function ambienteCom(patch: Record<string, unknown>): Env {
  *
  * `db.batch()` recebe `D1PreparedStatement`, e um statement NAO devolve o SQL
  * que o gerou. Sem esta ponte, um contador de lotes so sabe QUANTOS lotes
- * houve — nunca o que foi DENTRO de cada um, que e a unica pergunta que separa
+ * houve, nunca o que foi DENTRO de cada um, que e a unica pergunta que separa
  * "um lote com as duas escritas" de "um lote e uma escrita solta".
  */
 const SQL_DO_STATEMENT = new WeakMap<object, string>()
@@ -64,7 +64,7 @@ const REAL_DO_STATEMENT = new WeakMap<object, D1PreparedStatement>()
  * Embrulha um statement carregando o SQL consigo.
  *
  * `bind()` devolve um statement NOVO, e e o statement JA vinculado que entra no
- * lote — por isso o embrulho tem de reembalar o resultado de `bind()`, senao o
+ * lote, por isso o embrulho tem de reembalar o resultado de `bind()`, senao o
  * SQL se perderia exatamente em quem usa `.bind()`, que e todo mundo.
  */
 function comSql(real: D1PreparedStatement, sql: string): D1PreparedStatement {
@@ -88,7 +88,7 @@ function comSql(real: D1PreparedStatement, sql: string): D1PreparedStatement {
   return embrulho
 }
 
-/** Statements que gravam — a mesma separacao que o `D1Contador` do fixture faz. */
+/** Statements que gravam, a mesma separacao que o `D1Contador` do fixture faz. */
 const ESCRITA = /^\s*(insert|update|delete|replace)/i
 
 /**
@@ -208,10 +208,10 @@ async function gravarCodigo(
 }
 
 // ---------------------------------------------------------------------------
-// VIS — a janela ociosa desliza, e a escrita e no maximo 1 a cada 15 min (§10.8)
+// VIS, a janela ociosa desliza, e a escrita e no maximo 1 a cada 15 min (§10.8)
 // ---------------------------------------------------------------------------
 
-describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
+describe('VIS: `vista_em` e `ociosa_ate` (§10.8)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -233,7 +233,7 @@ describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
 
     // O que o defeito causava: `ociosa_ate` era gravado UMA vez, no login, e
     // nunca mais. Quem trabalhasse sem parar era jogado para /painel/entrar
-    // exatamente 2 h depois de entrar, em plena atividade — e o prazo absoluto
+    // exatamente 2 h depois de entrar, em plena atividade, e o prazo absoluto
     // de 12 h de §10.8 era inalcancavel.
     expect(await linhaDaSessao(sidHash)).toEqual({
       vista_em: depois,
@@ -249,7 +249,7 @@ describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
     await despachar(pedir('/painel', cookie), env, primeira, ROTA_INICIO, handleInicio)
 
     // A segunda passa pelo contador: a afirmacao de §10.8 e sobre a ESCRITA,
-    // e nao sobre o valor final — um `UPDATE` que regrava o mesmo numero
+    // e nao sobre o valor final, um `UPDATE` que regrava o mesmo numero
     // custaria o mesmo e a linha continuaria parecendo certa.
     invalidarCacheDeConfig()
     const contador = new D1Contador(env.DB)
@@ -329,8 +329,8 @@ describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
   test('VIS-06: a escrita de `vista_em` falhando NAO derruba a tela', async () => {
     // **O defeito que este teste prende foi introduzido pela propria correcao de
     // §10.8.** `marcarVista` era um `await` pelado dentro da guarda COMUM. Num D1
-    // que aceita leitura e recusa escrita — a cota de 100.000 escritas/dia e a
-    // MESMA do webhook (§5.3), entao um Reel viral pode esgota-la — a primeira
+    // que aceita leitura e recusa escrita, a cota de 100.000 escritas/dia e a
+    // MESMA do webhook (§5.3), entao um Reel viral pode esgota-la, a primeira
     // visita depois de 15 min virava `500 falha_interna`; e como a escrita mora
     // na guarda, as SETE telas de leitura caiam juntas. Tirava do dono justamente
     // a tela onde ele iria olhar por que.
@@ -376,7 +376,7 @@ describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
     // banco nao tem.
     expect(await linhaDaSessao(sidHash)).toEqual(antes)
 
-    // E a falha nao passa calada — §11.7, argumentos separados.
+    // E a falha nao passa calada, §11.7, argumentos separados.
     const registrado = registro.linhas.join(' ')
     expect(registrado).toContain('indisponivel')
     expect(registrado).toContain('vista_nao_gravada')
@@ -404,10 +404,10 @@ describe('VIS — `vista_em` e `ociosa_ate` (§10.8)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// SAI — POST /painel/sair (§7.1, §10.8, §10.13)
+// SAI, POST /painel/sair (§7.1, §10.8, §10.13)
 // ---------------------------------------------------------------------------
 
-describe('SAI — `POST /painel/sair` (§10.8)', () => {
+describe('SAI: `POST /painel/sair` (§10.8)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -435,9 +435,9 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
     })
   })
 
-  test('SAI-02: o roteador despacha o caminho — ele nao cai mais no `default:`', async () => {
+  test('SAI-02: o roteador despacha o caminho: ele nao cai mais no `default:`', async () => {
     // O que o defeito causava: §7.1 e §10.8 publicam `POST /painel/sair`, e o
-    // `switch` nao tinha o `case` — quem seguisse o endereco publicado levava
+    // `switch` nao tinha o `case`, quem seguisse o endereco publicado levava
     // `404 rota_desconhecida`. Sem cookie a escada recusa no passo 6, com o
     // `303` de pagina; o que este teste afirma e que ela CHEGOU ao passo 6.
     const resposta = await responder(postDeSair({}, ''), env)
@@ -460,7 +460,7 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
 
     expect(resposta.status).toBe(303)
     // Com `?ok=`: a frase da faixa verde mora na lista fechada do dicionario, e
-    // a tela de entrar e quem a le — a sessao que a mostraria ja nao existe.
+    // a tela de entrar e quem a le, a sessao que a mostraria ja nao existe.
     expect(resposta.headers.get('location')).toBe('/painel/entrar?ok=saiu')
     expect(await linhaDaSessao(alvo.sidHash)).toBeNull()
     // A diferenca inteira entre "sair deste aparelho" e "sair de todos": o
@@ -469,7 +469,7 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
     expect(await quantasSessoes()).toBe(1)
   })
 
-  test('SAI-04: o cookie morre junto — `Max-Age=0` e `Clear-Site-Data` (§10.8)', async () => {
+  test('SAI-04: o cookie morre junto: `Max-Age=0` e `Clear-Site-Data` (§10.8)', async () => {
     const { cookie, sidHash } = await abrirSessao()
 
     const resposta = await despachar(
@@ -553,12 +553,12 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
     // MUTACAO QUE ESTE BLOCO MATA (medida): em `handleSair`, trocar o lote de
     // dois statements por `env.DB.batch([statementDeApagar(...)])` seguido de um
     // `await statementDeRegistro(...).run()` separado. Com a antiga assercao
-    // unica — `contador.batches === 1` — a suite ficava 17/17 VERDE: os dois
+    // unica, `contador.batches === 1`, a suite ficava 17/17 VERDE: os dois
     // mundos tem exatamente um lote e exatamente uma linha de auditoria no fim.
     // O que o nome deste teste promete e ATOMICIDADE, e atomicidade e uma
     // afirmacao sobre a COMPOSICAO do lote, nunca sobre a contagem dele. Se as
     // duas escritas podem acontecer separadas, existe um instante em que a
-    // sessao morreu e a auditoria nao registrou — e um D1 que caia entre as duas
+    // sessao morreu e a auditoria nao registrou, e um D1 que caia entre as duas
     // idas deixa o encerramento fora do historico para sempre (§8.8).
     expect(contador.lotes.length).toBe(1)
     // `?? []` so por causa de `noUncheckedIndexedAccess`: a linha de cima ja
@@ -572,8 +572,8 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
     // `WHERE changes() > 0` passaria a falar da contagem de outra coisa.
     expect(lote[1]).toMatch(/INSERT\s+INTO\s+painel_auditoria/i)
     // MUTACAO QUE ESTA LINHA MATA: trocar `{ presoAMudanca: true }` por `false`.
-    // Sem ela, um segundo `POST /painel/sair` de outra aba — cujo `DELETE`
-    // altera zero linhas — gravaria `sessao_encerrada` de novo, enchendo o
+    // Sem ela, um segundo `POST /painel/sair` de outra aba, cujo `DELETE`
+    // altera zero linhas, gravaria `sessao_encerrada` de novo, enchendo o
     // historico de encerramentos que nao aconteceram (§8.8, "sem mudanca, sem
     // log"). O `?ok=saiu` da tela de entrar continuaria identico nos dois casos.
     expect(lote[1]).toMatch(/WHERE\s+changes\(\)\s*>\s*0/i)
@@ -585,13 +585,13 @@ describe('SAI — `POST /painel/sair` (§10.8)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// COD — o aviso bloqueante de §10.11, na tela que o dono abre
+// COD, o aviso bloqueante de §10.11, na tela que o dono abre
 // ---------------------------------------------------------------------------
 
 /** O que o aviso bloqueante do Inicio diz, palavra por palavra. */
 const AVISO_SEM_CODIGOS = 'c&oacute;digo de recupera&ccedil;&atilde;o valendo.'
 
-describe('COD — o aviso de "zero codigos" no Inicio (§10.11)', () => {
+describe('COD: o aviso de "zero codigos" no Inicio (§10.11)', () => {
   beforeEach(async () => {
     await limparBanco(env.DB)
     invalidarCacheDeConfig()
@@ -618,7 +618,7 @@ describe('COD — o aviso de "zero codigos" no Inicio (§10.11)', () => {
 
     // O que o defeito causava: o dono entrava por codigo, cadastrava o aparelho
     // novo, e o Inicio abria exatamente como sempre. Semanas depois, com o
-    // aparelho novo quebrado, ele ficava sem aparelho E sem codigo — o
+    // aparelho novo quebrado, ele ficava sem aparelho E sem codigo, o
     // trancamento que os seis codigos existem para impedir.
     expect(corpo).toContain(AVISO_SEM_CODIGOS)
     // O aviso so vale se levar ao lugar que o resolve.
@@ -639,7 +639,7 @@ describe('COD — o aviso de "zero codigos" no Inicio (§10.11)', () => {
     )
 
     // O contrapositivo, sem o qual COD-01 passaria com uma faixa presa em
-    // "sempre" — um aviso que nunca some ensina a ignorar todos os outros.
+    // "sempre", um aviso que nunca some ensina a ignorar todos os outros.
     expect(await resposta.text()).not.toContain(AVISO_SEM_CODIGOS)
   })
 
@@ -656,7 +656,7 @@ describe('COD — o aviso de "zero codigos" no Inicio (§10.11)', () => {
     expect(await resposta.text()).toContain(AVISO_SEM_CODIGOS)
   })
 
-  test('COD-04: o aviso nao custa subrequest nenhum — o Inicio continua em 3', async () => {
+  test('COD-04: o aviso nao custa subrequest nenhum: o Inicio continua em 3', async () => {
     // §12.10 orca 3 para o Inicio, e TELA-20 trava o numero. A pergunta sobre
     // os codigos viaja DENTRO da mesma instrucao que ja perguntava pela conta:
     // um `SELECT` com duas subconsultas custa um subrequest, e dois `prepare`

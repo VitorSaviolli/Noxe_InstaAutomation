@@ -1,5 +1,5 @@
 /**
- * `GET /painel/atividade` — "O que aconteceu", com a lista e o @ ao vivo.
+ * `GET /painel/atividade`, "O que aconteceu", com a lista e o @ ao vivo.
  *
  * §3 quer tres coisas nesta tela: os tres estados grandes, as pendencias com
  * botao, e a lista dos ultimos comentarios atendidos com o @ de quem acionou
@@ -7,8 +7,8 @@
  * As tres estao aqui.
  *
  * **Armazenamento novo: nenhum.** O `username` nao vai para o D1, nao entra em
- * Cache API, nao entra em cache de isolate — nao existe uma variavel de modulo
- * neste arquivo — e nao vai para o `console` nem para `painel_auditoria`. Ele
+ * Cache API, nao entra em cache de isolate, nao existe uma variavel de modulo
+ * neste arquivo, e nao vai para o `console` nem para `painel_auditoria`. Ele
  * vive durante a montagem desta resposta e morre com ela. E isso que mantem o
  * cabecalho de `src/index.ts` verdadeiro **sem ressalva**, e e por isso que a
  * promessa e literal e testavel em vez de ser uma intencao.
@@ -22,14 +22,14 @@
  * **O aviso de §12.6 sobe SEMPRE, inclusive com a lista vazia.** Ele nao
  * descreve a lista: descreve o que o programa NAO guarda. Todo `skipped` de
  * `processComment` acontece antes do unico `INSERT` da tabela, e a decisao
- * tomada em §12.6 e nao passar a gravar linha para comentario ignorado — um
+ * tomada em §12.6 e nao passar a gravar linha para comentario ignorado, um
  * Reel que viraliza com 5.000 comentarios fora da regra passaria a custar 5.000
  * escritas por nada, no recurso que §5.2 protege. Sem essa frase, quem abre
  * esta tela conclui que a automacao deixou de responder alguem.
  *
  * **Os @ so saem com um toque, e o toque e o de §2.3.** A abertura simples
  * mostra a lista com a data e o resultado de cada linha e **zero** chamada a
- * Meta; o botao "Atualizar" e que gasta a cota — a mesma cota de 24 h que a
+ * Meta; o botao "Atualizar" e que gasta a cota, a mesma cota de 24 h que a
  * automacao usa para responder. Sem auto-refresh, sem polling, e teto de 20
  * linhas por pagina. Um @ carregado a cada render transformaria abrir a tela
  * num custo de envio.
@@ -38,9 +38,9 @@
  * §12.6 desenha o "Ver mais" como um POST com o cursor num campo escondido, e
  * aqui ele e um `GET` com o cursor na query string pela razao que a propria
  * tabela de rotas escreve: um POST nesta rota exigiria `csrf: true` e um
- * `escreve` que mentiria — ela nao grava nada. O cursor e a POSICAO da ultima
- * linha da pagina — o `created_at` dela **e** o `comment_id` dela, porque so o
- * instante nao e unico e sozinho ele pulava linha (veja `PosicaoDaPagina`) —,
+ * `escreve` que mentiria, ela nao grava nada. O cursor e a POSICAO da ultima
+ * linha da pagina, o `created_at` dela **e** o `comment_id` dela, porque so o
+ * instante nao e unico e sozinho ele pulava linha (veja `PosicaoDaPagina`),
  * nao e segredo e nao muda estado; `/painel/reel?midia=` ja e o precedente de
  * identificador em query string, e nenhum caminho ganha segmento variavel.
  */
@@ -76,7 +76,7 @@ import { telaDoPainel } from './tela'
  * Vinte, e o numero e de PROJETO e nao de plataforma: o teto duro seriam ~44
  * linhas. As 20 existem para deixar folga no orcamento de subrequests e para
  * respeitar a cota de 24 h da Meta, que e a MESMA que a automacao usa para
- * enviar — 20 aberturas num dia ja sao 400 chamadas subtraidas do orcamento de
+ * enviar, 20 aberturas num dia ja sao 400 chamadas subtraidas do orcamento de
  * envio (§12.6).
  */
 export const LINHAS_POR_PAGINA = 20
@@ -108,8 +108,8 @@ const MARGEM_DO_ORCAMENTO = 4
  *
  * A conta de §12.6, tal como ela esta escrita: 1 (sessao) + 2 (configuracao e
  * midias) + 1 (o token da conta) + 1 (a consulta a `processed_comments`). O
- * numero real e **menor** — a configuracao e as midias viajam num unico
- * `db.batch()`, e um lote vale UM subrequest —, e a diferenca fica de proposito:
+ * numero real e **menor**, a configuracao e as midias viajam num unico
+ * `db.batch()`, e um lote vale UM subrequest, e a diferenca fica de proposito:
  * um orcamento que se declarasse mais barato do que a spec o orca so poderia
  * errar para o lado do estouro.
  */
@@ -120,7 +120,7 @@ export const CONSULTAS_DA_TELA = 5
  *
  * **O orcamento e conferido ANTES de disparar**, e nao descoberto no meio: com
  * N linhas na pagina, o total fica em `consultasJaFeitas + disponivel`, que
- * nunca passa de 46. As linhas que sobrarem aparecem com "@ indisponivel" — a
+ * nunca passa de 46. As linhas que sobrarem aparecem com "@ indisponivel", a
  * lista nunca encolhe por causa do orcamento, porque uma linha que some e a
  * unica coisa que esta tela nao pode fazer (§12.6).
  *
@@ -142,18 +142,18 @@ export function orcamentoDeArrobas(consultasJaFeitas: number): number {
  *
  * **O `comment_id` nao esta aqui para identificar ninguem: ele e o desempate.**
  * §12.6 desenha o cursor como o `created_at` da ultima linha, e sozinho ele
- * PERDE LINHA — `created_at` nao e unico nem de longe. `src/index.ts` calcula
+ * PERDE LINHA, `created_at` nao e unico nem de longe. `src/index.ts` calcula
  * `const now = Date.now()` uma vez por invocacao e o passa a todo `claimComment`
  * do laco; `deferForRetry` liga o mesmo `now` ao `created_at` de todas as linhas
  * do mesmo `db.batch()`. Um Reel que viraliza grava dezenas de linhas com
  * `created_at` identico ao milissegundo. Com `WHERE created_at < ?`, toda linha
  * que empatasse com a ultima da pagina ficava estritamente FORA da pagina
- * seguinte, e sumia da tela para sempre — sem aviso, e sem que nada no banco
+ * seguinte, e sumia da tela para sempre, sem aviso, e sem que nada no banco
  * tivesse se perdido. Era o defeito que o cabecalho deste arquivo diz que esta
  * tela existe para nao ter.
  *
  * O par `(created_at, comment_id)` e unico porque `comment_id` e PRIMARY KEY, e
- * a comparacao lexicografica dele e a mesma que ordena — cursor estavel, sem
+ * a comparacao lexicografica dele e a mesma que ordena, cursor estavel, sem
  * `OFFSET`, sem pular e sem repetir.
  */
 export interface PosicaoDaPagina {
@@ -166,7 +166,7 @@ export interface PosicaoDaPagina {
  *
  * `Number.MAX_SAFE_INTEGER` e nao `now + 1` de proposito. O `created_at` e
  * escrito pelo Worker, e uma linha gravada por um isolate com o relogio um
- * segundo a frente sumiria da primeira pagina em silencio — e a linha que some
+ * segundo a frente sumiria da primeira pagina em silencio, e a linha que some
  * e exatamente o defeito que esta tela existe para nao ter.
  *
  * O desempate e a string vazia, que e menor que todo `comment_id`: o segundo
@@ -221,7 +221,7 @@ const FORMA_DO_DESEMPATE = /^[A-Za-z0-9_-]{1,64}$/
  * distancia de ele entrar num log de depuracao.
  *
  * **Sem indice, e a ausencia e decisao (§16.6).** Sem indice por `created_at` a
- * consulta varre a tabela — centenas de linhas por abertura numa conta pequena,
+ * consulta varre a tabela, centenas de linhas por abertura numa conta pequena,
  * irrelevante contra os 5.000.000 de linhas lidas por dia do plano. Um indice
  * novo em `processed_comments` encareceria **cada INSERT do caminho quente**,
  * levando o custo de ~3 para ~4 escritas por comentario atendido. Se um dia
@@ -233,10 +233,10 @@ const FORMA_DO_DESEMPATE = /^[A-Za-z0-9_-]{1,64}$/
  * `created_at` (veja `PosicaoDaPagina`), essa forma pulava em silencio todas as
  * linhas empatadas com a ultima da pagina. `ORDER BY created_at DESC, comment_id
  * DESC` com o `WHERE` composto e a mesma pagina, na mesma ordem, sem o buraco. A
- * tabela nao ganhou indice nenhum — a varredura continua sendo a de §16.6.
+ * tabela nao ganhou indice nenhum, a varredura continua sendo a de §16.6.
  *
  * O `LIMIT` e interpolado a partir da constante deste modulo, e nao ligado por
- * `?`, para que o texto do statement diga `LIMIT 20` — e o que permite afirmar o
+ * `?`, para que o texto do statement diga `LIMIT 20`, e o que permite afirmar o
  * teto olhando o SQL que passou, do mesmo jeito que `comoListaSql` faz em
  * `comments-repository.ts`. Nenhuma entrada externa alcanca esta string: as duas
  * metades do cursor vao LIGADAS por `?`.
@@ -278,7 +278,7 @@ interface LinhaCrua {
  * Uma pagina de linhas atendidas, da mais nova para a mais velha.
  *
  * A falha e tratada como pagina vazia com aviso, e nao como `500`: o resto da
- * tela — os tres estados grandes e as pendencias — continua respondendo a
+ * tela, os tres estados grandes e as pendencias, continua respondendo a
  * pergunta de §3 mesmo sem a lista, e derrubar a tela inteira por causa dela
  * seria trocar uma resposta parcial por nenhuma.
  */
@@ -322,7 +322,7 @@ async function lerLinhas(
  *
  * Tres desfechos, e os tres mantem a linha na tela. `apagado` e o unico que
  * ganha frase propria, porque e o unico com explicacao honesta: o comentario
- * sumiu, o perfil sumiu ou a pessoa bloqueou a conta — as tres se parecem do
+ * sumiu, o perfil sumiu ou a pessoa bloqueou a conta, as tres se parecem do
  * lado de ca e as tres significam a mesma coisa para quem le.
  */
 export type ArrobaDaLinha =
@@ -349,20 +349,20 @@ const TEMPO_MAXIMO_MS = 10_000
  *
  * **Pedimos `username`, e §12.6 escreve `username,timestamp`.** A tela nao
  * renderiza o `timestamp` do no: a data que ela mostra e o `created_at` da nossa
- * propria linha, que e o instante em que a automacao atendeu — e e ele que
+ * propria linha, que e o instante em que a automacao atendeu, e e ele que
  * continua na tela quando o @ nao vem. Pedir um campo que nao se renderiza seria
  * trazer para a memoria do isolate um dado de terceiro sem uso nenhum, e a
  * direcao desta tela inteira, de §2.3 em diante, e pedir menos.
  *
  * **O comentario apagado responde erro e a linha NAO some** (§12.6). A regra que
  * separa "apagado" de "nao deu para falar" e a mesma de `classify` em
- * `meta-api.ts` — `404`, ou `code 100` com `error_subcode 33` —, escrita aqui
+ * `meta-api.ts`, `404`, ou `code 100` com `error_subcode 33`, escrita aqui
  * porque aquela funcao nao e exportada. As duas grafias sao a mesma condicao, e
  * a daqui erra para o lado seguro: o que nao casar vira `falhou`, que mostra a
  * faixa em vez de afirmar que o comentario foi apagado.
  *
  * Nada nesta funcao escreve no `console`. Um `console.warn` com a resposta da
- * Meta publicaria o @ de um terceiro nos Workers Logs do dono — que e
+ * Meta publicaria o @ de um terceiro nos Workers Logs do dono, que e
  * exatamente a promessa de §2.3 quebrada pelo caminho mais banal.
  */
 async function buscarArrobaNaMeta(
@@ -384,7 +384,7 @@ async function buscarArrobaNaMeta(
     }
 
     const corpo = (await resposta.json()) as { username?: unknown }
-    // Sem `username` no corpo o no existe mas nao diz quem escreveu — para quem
+    // Sem `username` no corpo o no existe mas nao diz quem escreveu, para quem
     // le a tela isso e indistinguivel de perfil apagado, e prometer o contrario
     // seria inventar.
     if (typeof corpo.username !== 'string' || corpo.username === '') return { tipo: 'apagado' }
@@ -394,7 +394,7 @@ async function buscarArrobaNaMeta(
   }
 }
 
-/** `404`, ou `code 100` com `error_subcode 33` — a regra de `classify`. */
+/** `404`, ou `code 100` com `error_subcode 33`, a regra de `classify`. */
 async function ehObjetoInexistente(resposta: Response): Promise<boolean> {
   if (resposta.status === 404) return true
   try {
@@ -413,12 +413,12 @@ export const DEPENDENCIAS_DA_ATIVIDADE: DependenciasDaAtividade = {
 }
 
 /**
- * Por que os @ nao vieram — e as duas razoes NAO dizem a mesma coisa ao dono.
+ * Por que os @ nao vieram, e as duas razoes NAO dizem a mesma coisa ao dono.
  *
  * `meta_muda` e transitorio: a ligacao esta de pe, o Instagram e que nao
  * respondeu agora, e a automacao continua enviando com o que ja esta salvo (a
  * linha de §12.7 para `falha_meta`). `ligacao_caida` e o oposto: sem conta
- * ligada, ou com a validade vencida, **nada e enviado** — e escrever ali "a sua
+ * ligada, ou com a validade vencida, **nada e enviado**, e escrever ali "a sua
  * automacao continua funcionando normalmente" seria afirmar, na faixa, o
  * contrario do que a secao "A conta do Instagram" diz tres paragrafos acima, na
  * mesma pagina. §12.1 regra 3: a tela nao afirma o que nao e verdade.
@@ -439,7 +439,7 @@ interface BuscaDosArrobas {
  *
  * E uma FUNCAO, e nao uma constante de modulo, por uma razao que so parece
  * cosmetica: uma constante guardaria um `Map` vivo no escopo do modulo pela vida
- * inteira do isolate — a forma exata que um cache de @ tem. Este arquivo nao tem
+ * inteira do isolate, a forma exata que um cache de @ tem. Este arquivo nao tem
  * variavel de modulo nenhuma, e ATV-09b afirma isso lendo o proprio fonte,
  * porque um cache so de ESCRITA nao aparece em resposta HTTP nenhuma.
  */
@@ -452,15 +452,15 @@ function semBusca(): BuscaDosArrobas {
  * antes de a primeira chamada sair.
  *
  * **A falha geral nao quebra a tela** (§12.6): sem conta ligada, ou com a Graph
- * API muda, a lista sobe igual — com a data e o resultado de cada linha — e a
+ * API muda, a lista sobe igual, com a data e o resultado de cada linha, e a
  * faixa explica por que os @ nao vieram. Nunca sem a lista.
  *
  * **Com a ligacao vencida nao sai chamada nenhuma, e a economia e o ponto.**
  * `loadAccessToken` devolve `{token, igUserId, expiresAt}` sem olhar a validade
- * — ele so devolve `null` quando nao existe linha em `account_tokens`. Sem
+ * ele so devolve `null` quando nao existe linha em `account_tokens`. Sem
  * conferir o `expiresAt` aqui, esta tela disparava ate 20 chamadas com um Bearer
  * morto, sabendo que as 20 iam responder 401/190: 20 subrequests e 20 chamadas
- * subtraidas da cota de 24 h que a AUTOMACAO usa para enviar — a cota que o
+ * subtraidas da cota de 24 h que a AUTOMACAO usa para enviar, a cota que o
  * botao explicito de §2.3 e a constante `ARROBAS_POR_BLOCO` existem para
  * racionar. E, como nenhuma delas casa `ehObjetoInexistente`, as 20 viravam
  * `falhou` e a tela terminava afirmando normalidade. A Meta nao renova ligacao
@@ -516,7 +516,7 @@ async function buscarArrobas(
  * frase que DUAS telas escrevem. Nenhuma outra tela fala de @.
  */
 const SEM_ARROBA = {
-  apagado: '@ indisponível — o comentário foi apagado',
+  apagado: '@ indisponível, o comentário foi apagado',
   naoVeio: '@ indisponível',
   /** §12.6: a consequencia honesta, escrita na propria tela. */
   envelhece:
@@ -538,7 +538,7 @@ const MOTIVO_DA_FALHA: Record<string, string> = {
  * O motivo em portugues, ou `null` quando nao ha motivo que valha a pena dizer.
  *
  * Um codigo desconhecido devolve `null` e a tela mostra so "Não conseguimos
- * enviar" — nunca o codigo cru. §12.7 e literal: detalhe tecnico vai para o
+ * enviar", nunca o codigo cru. §12.7 e literal: detalhe tecnico vai para o
  * `console`, e o que a tela escreve sai de uma tabela fechada.
  */
 function motivoDaFalha(codigo: string | null): string | null {
@@ -555,8 +555,8 @@ function avisoDoQueNaoAparece(): HtmlSeguro {
   return html`<section>
 <h2>Sobre o que aparece aqui</h2>
 <p>Aqui aparecem os coment&aacute;rios que a automa&ccedil;&atilde;o <strong>atendeu</strong>.
-Coment&aacute;rios que ela ignorou &mdash; por n&atilde;o serem de um Reel da sua lista, por
-n&atilde;o terem nenhuma das suas palavras, ou porque a pessoa j&aacute; tinha recebido &mdash;
+Coment&aacute;rios que ela ignorou, por n&atilde;o serem de um Reel da sua lista, por
+n&atilde;o terem nenhuma das suas palavras, ou porque a pessoa j&aacute; tinha recebido,
 n&atilde;o deixam registro, e por isso n&atilde;o aparecem aqui.</p>
 </section>`
 }
@@ -580,7 +580,7 @@ function enderecoDaTela(opcoes: { posicao?: PosicaoDaPagina; comArrobas?: boolea
  *
  * Ele e um link, e nao um `<form>`, porque a rota e `GET` unico: um POST aqui
  * exigiria uma ficha e um `escreve` que mentiria sobre uma tela que so le. O
- * preco vai escrito ao lado — quem toca precisa saber que esta gastando a mesma
+ * preco vai escrito ao lado, quem toca precisa saber que esta gastando a mesma
  * cota que a automacao usa para enviar.
  */
 function botaoDosArrobas(busca: BuscaDosArrobas, posicao: PosicaoDaPagina | null): HtmlSeguro {
@@ -662,8 +662,8 @@ function resultadoDaLinha(linha: LinhaAtendida): string {
 /**
  * A lista, ou a frase de lista vazia.
  *
- * O `<li>` traz o @ como rotulo e o resultado como valor — as duas classes que o
- * painel ja tem — e a data por ultimo. Sem o toque em "Atualizar" o rotulo some
+ * O `<li>` traz o @ como rotulo e o resultado como valor, as duas classes que o
+ * painel ja tem, e a data por ultimo. Sem o toque em "Atualizar" o rotulo some
  * e a data sobe para o lugar dele: a linha continua dizendo o que aconteceu e
  * quando, que e o desfecho que §12.6 fixa para o caso em que o @ nao existe.
  */
@@ -697,15 +697,15 @@ ${arroba === '' ? null : html`<p class="rotulo">${arroba}</p>`}
 /**
  * "Ver mais": outra invocacao, com outro cursor e outro orcamento (§12.6).
  *
- * Ele aparece enquanto a pagina veio CHEIA. Com `LIMIT 20` fixo — que e o teto
- * que §13.2 afirma — nao ha como saber se existe uma vigesima primeira linha sem
+ * Ele aparece enquanto a pagina veio CHEIA. Com `LIMIT 20` fixo, que e o teto
+ * que §13.2 afirma, nao ha como saber se existe uma vigesima primeira linha sem
  * uma consulta a mais, e uma consulta por abertura para adiantar um "Ver mais"
  * que quase nunca some custaria mais do que a pagina vazia que ele pode abrir.
  *
  * O link **nao** carrega o pedido de @: cada pagina e um toque proprio, e um
  * "Ver mais" que ja viesse com os @ gastaria 20 chamadas a Meta por rolagem.
  *
- * A posicao leva o `comment_id` da ultima linha junto com o instante dela — sem
+ * A posicao leva o `comment_id` da ultima linha junto com o instante dela, sem
  * o desempate, um lote gravado no mesmo milissegundo perderia no "Ver mais"
  * todas as linhas empatadas com essa ultima. O id vai no LINK, e continua nao
  * indo para a lista: o que a tela mostra de cada linha e o @ e o resultado.
@@ -756,9 +756,9 @@ function cursorPedido(url: URL): { ok: true; posicao: PosicaoDaPagina | null } |
 /**
  * A tela.
  *
- * Custo em subrequests: **4 na abertura simples** — a sessao, o lote da
+ * Custo em subrequests: **4 na abertura simples**, a sessao, o lote da
  * configuracao e das midias, a pergunta sobre a conta e a consulta a
- * `processed_comments` — e **5 com o toque em "Atualizar"**, que acrescenta a
+ * `processed_comments`, e **5 com o toque em "Atualizar"**, que acrescenta a
  * leitura do token, mais uma chamada a Meta por linha. Com o teto de 20 linhas
  * o pior caso fica em 25 subrequests, metade do limite da plataforma.
  *

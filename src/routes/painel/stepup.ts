@@ -4,7 +4,7 @@
  * Nao ha janela, nao ha "modo privilegiado", nao ha `elevadoAte` e nao existe
  * `/painel/api/stepup/verificar` (§7.1, nomes deletados). A verificacao
  * acontece DENTRO da rota de escrita, na mesma requisicao que aplica a
- * mudanca — e e isso que torna impossivel haver uma autorizacao pendurada
+ * mudanca, e e isso que torna impossivel haver uma autorizacao pendurada
  * esperando uma segunda requisicao.
  *
  * **Por que nao uma janela de 5 minutos, que seria mais confortavel.** O
@@ -25,7 +25,7 @@
  *
  * **Duas mudancas de endereco, e as duas foram medidas antes de decididas.**
  *
- * 1. `exigirStepUp()` — o brief a listava em `guardas.ts`; com ela la, aquele
+ * 1. `exigirStepUp()`, o brief a listava em `guardas.ts`; com ela la, aquele
  *    arquivo ia a **884 linhas**, 84 acima do teto de 800 deste repositorio. O
  *    nome do cookie e o do campo escondido ficaram por la, ao lado dos irmaos
  *    deles; a cerimonia veio para o arquivo que ja e dono dela.
@@ -33,7 +33,7 @@
  *    `gravar.ts`, que chegaria a **923 linhas** com elas. Nao foram reescritas:
  *    `CAMPOS_SEMPRE_PROTEGIDOS`, `alargaOAlcance` e `camposProtegidos` estao
  *    aqui palavra por palavra como a etapa anterior os deixou, e continuam sendo
- *    chamados de UM lugar so em PRODUCAO — o funil, por `passarPeloStepUp`.
+ *    chamados de UM lugar so em PRODUCAO, o funil, por `passarPeloStepUp`.
  *    `camposProtegidos` e exportada desde o Ruling 77, para a tabela de §10.10
  *    ser afirmada sobre ela em vez de por rota; a exportacao nao cria um segundo
  *    chamador, cria um ponto de medicao. Ruling 63 continua valendo inteiro: nao
@@ -91,13 +91,13 @@ const codificador = new TextEncoder()
 /**
  * As quatro operacoes que uma mudanca canonica pode ter (§10.10).
  *
- * O objeto `mudanca` SEMPRE carrega `{ acao: "<operacao>", ... }` — assim duas
+ * O objeto `mudanca` SEMPRE carrega `{ acao: "<operacao>"... }`, assim duas
  * operacoes diferentes com o mesmo conteudo nao compartilham assinatura. Uma
  * mudanca de configuracao que por acaso tivesse a mesma forma de um
  * `remover_passkey` produziria o mesmo hash sem o campo `acao`, e um step-up
  * autorizaria a operacao errada.
  *
- * Tres delas — as de passkey e de codigos — sao vocabulario de §10.10 e ainda
+ * Tres delas, as de passkey e de codigos, sao vocabulario de §10.10 e ainda
  * nao tem rota de escrita que as consuma; a lista de operacoes que a CERIMONIA
  * aceita e menor, e mora em `OPERACOES_ACEITAS`.
  */
@@ -117,12 +117,12 @@ export type ValorCanonico = string | number | boolean | readonly string[]
  * A mudanca que o autenticador assina: a acao, o ALVO e os campos.
  *
  * **`alvo` entrou com o Ruling 96, que emendou o Ruling 90.** Aquele dizia "os
- * ids nao entram no `op_hash` — mantenha assim", e estava certo enquanto nao
+ * ids nao entram no `op_hash`, mantenha assim", e estava certo enquanto nao
  * havia escrita por midia. Com `POST /painel/reel` passou a haver uma que PODE
  * exigir step-up (desfazer uma sobreposicao que estreitava ALARGA, §10.10), e o
  * patch dela e **identico para qualquer Reel**: o `media_id` viajava so num
  * campo escondido que a tela de conferencia reemite e que ficava FORA da
- * assinatura. E a forma exata do Ruling 86 — trocar `midia` entre os dois POSTs
+ * assinatura. E a forma exata do Ruling 86, trocar `midia` entre os dois POSTs
  * mantinha o `oh` valido e mudava a entidade gravada, com o autenticador tendo
  * assinado "intervalo por pessoa: 48 -> 24" sem dizer de qual Reel.
  *
@@ -138,15 +138,15 @@ export interface MudancaCanonica {
 }
 
 /**
- * `json_canonico(mudanca)` — especificado em §10.10 e congelado em teste.
+ * `json_canonico(mudanca)`, especificado em §10.10 e congelado em teste.
  *
  * As regras, palavra por palavra: chaves ordenadas lexicograficamente **por
  * code point**, sem espaco entre tokens, numeros como inteiros, strings ja em
  * NFKC e sem `\p{Cc}\p{Cf}`.
  *
  * **A entrada nunca e o corpo cru.** Ela e o mapa de campos ja lido pelos
- * mesmos leitores nos dois caminhos — o formulario urlencoded e o JSON da
- * cerimonia —, e a limpeza de texto e a MESMA `limparTexto` de
+ * mesmos leitores nos dois caminhos, o formulario urlencoded e o JSON da
+ * cerimonia, e a limpeza de texto e a MESMA `limparTexto` de
  * `config-validation.ts`, e nao uma segunda. Sem essa especificacao o hash
  * recalculado divergiria e a trava viraria bug intermitente: o dono apertaria a
  * digital e receberia uma recusa sem entender por que.
@@ -161,7 +161,7 @@ export function jsonCanonico(mudanca: MudancaCanonica): string {
   // **O `alvo` so entra quando existe, e e isso que mantem os vetores
   // congelados de §13.2 intactos**: sem ele o JSON e byte a byte o de antes do
   // Ruling 96, e STEP-18, STEP-19 e STEP-21 continuam sendo os mesmos vetores
-  // escritos a mao. Ele vai DEPOIS do spread, como `acao` — nao existe campo de
+  // escritos a mao. Ele vai DEPOIS do spread, como `acao`, nao existe campo de
   // configuracao chamado `alvo`, e se um dia existir, quem manda e a entidade.
   if (mudanca.alvo !== undefined) tudo.alvo = mudanca.alvo
 
@@ -177,7 +177,7 @@ export function jsonCanonico(mudanca: MudancaCanonica): string {
  * Ordem por CODE POINT, e nao a ordem natural de `Array.prototype.sort`.
  *
  * O `sort()` sem comparador ordena por unidade de codigo UTF-16, e as duas
- * ordens divergem acima de U+FFFF. Nenhum nome de campo de hoje chega la — mas
+ * ordens divergem acima de U+FFFF. Nenhum nome de campo de hoje chega la, mas
  * `json_canonico` e uma especificacao, e uma especificacao que so vale para as
  * chaves de hoje e a que quebra no dia em que aparecer a de amanha.
  */
@@ -208,7 +208,7 @@ function normalizar(valor: ValorCanonico): ValorCanonico {
  * assinado dentro do envelope, e na rota de escrita, onde e RECALCULADO a
  * partir do corpo recebido. O teste dos vetores congelados prova a igualdade
  * entre os dois caminhos, porque a divergencia entre eles nao apareceria como
- * erro — apareceria como uma digital que nunca funciona.
+ * erro, apareceria como uma digital que nunca funciona.
  */
 export async function opHash(mudanca: MudancaCanonica): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', codificador.encode(jsonCanonico(mudanca)))
@@ -218,8 +218,8 @@ export async function opHash(mudanca: MudancaCanonica): Promise<string> {
 /**
  * A mudanca canonica de uma gravacao de configuracao.
  *
- * A entrada e o PEDACO DE ESTADO que o corpo carregou — ja lido campo a campo
- * pelo funil, com `sim`/`nao` virando booleano e `"48"` virando 48 —, e nao o
+ * A entrada e o PEDACO DE ESTADO que o corpo carregou, ja lido campo a campo
+ * pelo funil, com `sim`/`nao` virando booleano e `"48"` virando 48, e nao o
  * corpo. E o que faz o formulario urlencoded e o JSON da cerimonia chegarem ao
  * mesmo hash: os dois passam por aqui com o mesmo mapa.
  *
@@ -231,7 +231,7 @@ export async function opHash(mudanca: MudancaCanonica): Promise<string> {
  *
  * E "aplicando" e mais que "enviando" (Ruling 86): o que o HANDLER traduziu
  * entra aqui junto com o que o corpo carregou. Um campo que o handler produz
- * — `acao=ligar` virando `enabled: true` — e mostrado na tela de conferencia,
+ * `acao=ligar` virando `enabled: true`, e mostrado na tela de conferencia,
  * entao ele tem de ser coberto pela assinatura, senao trocar a operacao entre
  * os dois POSTs mudaria o efeito com o `oh` do envelope ainda valido.
  */
@@ -250,9 +250,9 @@ export function mudancaDeConfig(patch: PatchDeEstado, alvo?: string): MudancaCan
  * Ate a Etapa 12 era so `config`, porque so ela tinha rota de escrita capaz de
  * consumir o envelope: emitir envelope para uma operacao que ninguem sabe
  * verificar seria codigo sem tela (§13.1). A Etapa 13 deu consumidor as outras
- * tres — `adicionar_passkey` em `POST /painel/api/registrar/opcoes` no modo
+ * tres, `adicionar_passkey` em `POST /painel/api/registrar/opcoes` no modo
  * `sessao` (§10.4 passo 1, §10.13) e `remover_passkey` e `gerar_codigos` em
- * `POST /painel/aparelhos` —, e por isso elas entram AGORA e nao antes.
+ * `POST /painel/aparelhos`, e por isso elas entram AGORA e nao antes.
  *
  * A lista continua sendo a trava: uma quinta acao so passa a valer aqui depois
  * que existir a rota que recalcula o `op_hash` dela do proprio corpo recebido.
@@ -268,7 +268,7 @@ const OPERACOES_ACEITAS: readonly AcaoDeMudanca[] = [
  * O `Max-Age` do cookie de step-up, DERIVADO do prazo do envelope.
  *
  * Mesmo raciocinio do cookie de desafio do login: escrever `120` aqui seria a
- * segunda grafia de um numero so, e a falha seria silenciosa — o cookie
+ * segunda grafia de um numero so, e a falha seria silenciosa, o cookie
  * morreria antes do envelope e o step-up passaria a falhar sem nenhum teste
  * reclamar.
  */
@@ -277,7 +277,7 @@ const SEGUNDOS_DO_STEPUP = Math.floor(PRAZO_DE_ENVELOPE_MS.stepup / 1000)
 /**
  * A forma do corpo da cerimonia: `{ operacao, mudanca }` (§10.10, passo 2).
  *
- * `operacao` e **so roteamento** e precisa ser igual a `mudanca.acao` — as duas
+ * `operacao` e **so roteamento** e precisa ser igual a `mudanca.acao`, as duas
  * grafias existem porque o corpo veio de fora, e um corpo que dissesse
  * `operacao: "config"` com `acao: "remover_passkey"` estaria pedindo um
  * envelope com uma assinatura que nao e a da operacao anunciada.
@@ -345,7 +345,7 @@ function comoValorCanonico(valor: unknown): ValorCanonico | null {
  *
  * Sorteia 32 bytes, calcula o `op_hash` da mudanca recebida e assina um
  * envelope de proposito `stepup` que carrega os tres: o desafio, o `op_hash` e
- * o `sid_hash` da sessao. Os dois ultimos sao o desenho inteiro — sem o `sid`,
+ * o `sid_hash` da sessao. Os dois ultimos sao o desenho inteiro, sem o `sid`,
  * um envelope roubado serve em outra sessao; sem o `oh`, a autorizacao vira
  * "modo privilegiado por 120 s".
  *
@@ -358,8 +358,8 @@ function comoValorCanonico(valor: unknown): ValorCanonico | null {
 export async function handleOpcoesDeStepUp(entrada: EntradaDaRota): Promise<Response> {
   const { env, now, contexto, corpo, sessao } = entrada
 
-  // Os dois casos sao INALCANCAVEIS pela tabela de rotas — a linha declara
-  // `sessao: true` e a familia `/painel/api/*` —, e ainda assim cada um responde
+  // Os dois casos sao INALCANCAVEIS pela tabela de rotas, a linha declara
+  // `sessao: true` e a familia `/painel/api/*`, e ainda assim cada um responde
   // o codigo que §11.4 escreve para ele: sessao ausente nao e corpo invalido, e
   // a tabela canonica nao admite aproximacao.
   if (sessao === null) return erro('sessao_ausente', contexto)
@@ -416,7 +416,7 @@ export interface PedidoDeStepUp {
  *
  * `motivo` e um codigo curto de vocabulario fechado, em snake_case: ele vai
  * para o `console` e para `motivoInterno`, **nunca** para o corpo. A frase ao
- * cliente e sempre a mesma de §11.4 — separar os casos daria a um painel
+ * cliente e sempre a mesma de §11.4, separar os casos daria a um painel
  * invadido um oraculo para descobrir qual metade da trava ainda falta quebrar.
  */
 export type VereditoDeStepUp =
@@ -424,7 +424,7 @@ export type VereditoDeStepUp =
   | { readonly ok: false; readonly motivo: string }
 
 /**
- * O passo 4 de §10.10, na ordem dele — do que custa zero ao que custa uma
+ * O passo 4 de §10.10, na ordem dele, do que custa zero ao que custa uma
  * leitura:
  *
  *   1. o cookie existe                                              (0 D1)
@@ -433,11 +433,11 @@ export type VereditoDeStepUp =
  *   4. o `op_hash` do envelope e o que o servidor RECALCULOU        (0 D1)
  *   5. a forma da assertion                                         (0 D1)
  *   6. a credencial e o dono                                   (1 leitura)
- *   7. `verificarAssertion` — a lista inteira de §10.7, `UV` incluso (0 D1)
+ *   7. `verificarAssertion`, a lista inteira de §10.7, `UV` incluso (0 D1)
  *
  * Os passos 3 e 4 sao o desenho inteiro. Sem o 3, um envelope roubado serve em
  * outra sessao; sem o 4, um step-up feito para trocar uma palavra autoriza
- * trocar o link — que e exatamente o que a janela de 5 minutos permitiria a um
+ * trocar o link, que e exatamente o que a janela de 5 minutos permitiria a um
  * XSS, e o motivo de ela nao existir.
  *
  * **Uma verificacao, um lugar.** Ela nao mora tambem no roteador: o roteador
@@ -511,7 +511,7 @@ export interface PedidoDeConferencia {
   readonly excluir: readonly string[]
   readonly ficha: string
   readonly versao: number
-  /** O caminho do POST — a ROTA que recebeu o formulario. */
+  /** O caminho do POST, a ROTA que recebeu o formulario. */
   readonly paraOPost: string
   /** A mudanca canonica, que o `painel.js` manda para a cerimonia. */
   readonly mudanca: MudancaCanonica
@@ -520,11 +520,11 @@ export interface PedidoDeConferencia {
    *
    * §15.4 quer que a pessoa saiba, antes do gesto, que o toque cobre mais do que
    * o campo que ela editou. A primeira grafia disto era um booleano
-   * (`cobreATelaInteira`) e a frase dizia "os **tres** campos desta tela" —
+   * (`cobreATelaInteira`) e a frase dizia "os **tres** campos desta tela",
    * verdadeira em `/painel/mensagem` e **falsa** em `/painel/ajustes` com um
    * unico cooldown baixado, que e onde ela tambem aparecia. Contar e dizer o
    * numero e a unica versao que nao mente em tela nenhuma, e a frase so sai
-   * quando ha mais de uma mudanca — com uma so, nao ha o que avisar.
+   * quando ha mais de uma mudanca, com uma so, nao ha o que avisar.
    */
   readonly mudancasNoToque: number
 }
@@ -533,7 +533,7 @@ export interface PedidoDeConferencia {
  * A tela intermediaria de §12.2: o antes e o depois lado a lado, em portugues.
  *
  * Ela existe por dois motivos. Para a pessoa, e a ultima chance de ler o que vai
- * assinar — e §10.10 e literal: "se o humano nao leu o que assinou, a amarracao
+ * assinar, e §10.10 e literal: "se o humano nao leu o que assinou, a amarracao
  * ao conteudo nao vale nada". Para a arquitetura, e onde o rascunho vive **sem
  * ser gravado**: em campos escondidos, em texto comum, sem assinatura propria,
  * porque o `op_hash` dentro do cookie ja cobre o conteudo inteiro e o servidor o
@@ -544,7 +544,7 @@ export interface PedidoDeConferencia {
  *
  * A mudanca canonica viaja num atributo `data-`, e nao num campo escondido: ela
  * e insumo do `painel.js`, nao do POST. Num campo escondido ela voltaria no
- * corpo, e o funil a recusaria como campo desconhecido — ou, pior, alguem a
+ * corpo, e o funil a recusaria como campo desconhecido, ou, pior, alguem a
  * declararia estrutural e ela viraria um segundo lugar de onde a mudanca poderia
  * vir.
  */
@@ -571,12 +571,12 @@ ${
   // §10.10, literal: "a tela **tem que** mostrar o valor literal antes da
   // biometria. Se o humano nao leu o que assinou, a amarracao ao conteudo nao
   // vale nada." Ate o Ruling 96 a tela dizia "Intervalo por pessoa: 48 -> 24" e
-  // ficava nisso — a mudanca era a mesma para qualquer Reel, e o dono nao tinha
+  // ficava nisso, a mudanca era a mesma para qualquer Reel, e o dono nao tinha
   // como saber em qual delas encostava o dedo.
   //
   // O que a tela escreve e o proprio `media_id`, e nao a legenda: e ELE que
   // entra na assinatura, e mostrar um rotulo bonito ao lado de um hash sobre
-  // outro valor seria a mesma mentira em outra forma. O id nao e segredo — ele
+  // outro valor seria a mesma mentira em outra forma. O id nao e segredo, ele
   // aparece no permalink publico do Reel.
   pedido.mudanca.alvo === undefined
     ? null
@@ -602,7 +602,7 @@ data-mudanca="${jsonCanonico(pedido.mudanca)}">
 ${escondidos}
 <button type="submit">Confirmar com a digital</button>
 </form>
-<p><a href="${pedido.paraOPost}">Cancelar</a> &mdash; nada &eacute; salvo, e o que voc&ecirc;
+<p><a href="${pedido.paraOPost}">Cancelar</a>, nada &eacute; salvo, e o que voc&ecirc;
 escreveu continua na tela.</p>
 </section>`
 }
@@ -623,11 +623,11 @@ const CAMPOS_SEMPRE_PROTEGIDOS: readonly CampoDaConfig[] = [
  *
  * A enumeracao e fechada e vem da spec, palavra por palavra: `matchMode` para
  * `contains`, cooldown ABAIXO do atual, `mediaScope` para `'todas'`,
- * `processOnlyReels` para `false`. Tudo o mais e estreitar — e estreitar nunca
+ * `processOnlyReels` para `false`. Tudo o mais e estreitar, e estreitar nunca
  * pede a digital, que e a promessa escrita no rodape dos Ajustes (§12.3).
  *
  * **`enabled` nao esta aqui, e a ausencia e a decisao de §10.10**: religar a
- * automacao parece alargamento e nao e, porque nao muda nenhum valor — apenas
+ * automacao parece alargamento e nao e, porque nao muda nenhum valor, apenas
  * devolve a chave ao estado anterior, que o dono ja autorizou quando gravou
  * aqueles campos. Exigir biometria aqui puniria justamente quem acabou de usar
  * o freio de emergencia, e a parada de emergencia depende de desligar ser
@@ -653,8 +653,8 @@ function alargaOAlcance(
  * escopo para antes da cerimonia (Ruling 73) a esvaziou sem ninguem perceber:
  * seis das sete entradas passaram a ser recusadas por escopo, e a suite
  * continuou verde afirmando `403` que ja nao vinha daqui. Um teste sobre a
- * funcao e estritamente mais forte que a versao por HTTP — cobre `mediaScope`,
- * que nao tem rota dona ate a Task 13 — e imune a mudanca de escopo de rota.
+ * funcao e estritamente mais forte que a versao por HTTP, cobre `mediaScope`,
+ * que nao tem rota dona ate a Task 13, e imune a mudanca de escopo de rota.
  *
  * Continua sendo chamada de UM lugar so em producao: o funil, por
  * `passarPeloStepUp`, logo abaixo.
@@ -684,8 +684,8 @@ export interface PassagemDeStepUp {
    * A mudanca INTEIRA que este POST aplica, ja lida campo a campo: o patch do
    * corpo mais o que o handler traduziu. E dela que sai o `op_hash`.
    *
-   * **O funil monta UM objeto e o usa nos dois lugares** — o `depois` que a tela
-   * mostra e este —, porque separa-los era o defeito do Ruling 86: um campo
+   * **O funil monta UM objeto e o usa nos dois lugares**, o `depois` que a tela
+   * mostra e este, porque separa-los era o defeito do Ruling 86: um campo
    * produzido pelo handler aparecia na conferencia sem entrar na assinatura.
    */
   readonly patch: PatchDeEstado
@@ -698,7 +698,7 @@ export interface PassagemDeStepUp {
    * O `media_id` quando a gravacao e sobre UM Reel (Ruling 96).
    *
    * Ele entra na mudanca ASSINADA **e** e nomeado na tela de conferencia: as
-   * duas metades sao a mesma exigencia de §10.10 — "se o humano nao leu o que
+   * duas metades sao a mesma exigencia de §10.10, "se o humano nao leu o que
    * assinou, a amarracao ao conteudo nao vale nada".
    */
   readonly alvo?: string
@@ -721,7 +721,7 @@ export type ResultadoDaPassagem =
  *
  * Sem digital, a tela de conferencia; com digital valida e presa ao `op_hash`, a
  * passagem. §10.10 e explicito: se **qualquer** campo do lote exige step-up, o
- * lote inteiro exige, e gravacao parcial e impossivel — por isso quem classifica
+ * lote inteiro exige, e gravacao parcial e impossivel, por isso quem classifica
  * e quem verifica sao a mesma chamada, e nao duas que alguem possa desencontrar.
  *
  * **Os dois desfechos de recusa sao o MESMO `403 step_up_necessario` com a
@@ -730,7 +730,7 @@ export type ResultadoDaPassagem =
  * step-up **ausente ou invalido** tambem gera linha de auditoria". O que os
  * separa e uma coisa so, e ela nao aparece na resposta: a falha INVALIDA
  * incrementa `falhas_stepup`, e a AUSENTE nao. Ausente e o primeiro envio, o
- * caminho normal de quem apertou Salvar — se ele contasse, dez gravacoes
+ * caminho normal de quem apertou Salvar, se ele contasse, dez gravacoes
  * protegidas seguidas derrubariam a sessao de quem esta usando o painel certo.
  */
 export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<ResultadoDaPassagem> {
@@ -740,8 +740,8 @@ export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<Resu
   const protegidos = camposProtegidos(mudados, passagem.antes, passagem.depois)
   if (protegidos.length === 0) return { credentialId: null }
 
-  // A mudanca canonica sai do PEDACO DE ESTADO que este corpo carregou — o
-  // mesmo mapa que o JSON da cerimonia produz —, e o `op_hash` e recalculado
+  // A mudanca canonica sai do PEDACO DE ESTADO que este corpo carregou, o
+  // mesmo mapa que o JSON da cerimonia produz, e o `op_hash` e recalculado
   // AQUI, no servidor, a cada requisicao. Um hash vindo do cliente autorizaria
   // qualquer coisa.
   const mudanca = mudancaDeConfig(passagem.patch, passagem.alvo)
@@ -792,7 +792,7 @@ export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<Resu
   if (veredito.ok) return { credentialId: veredito.credentialId }
 
   // §10.10: falha de step-up incrementa `falhas_stepup`, e na DECIMA a sessao e
-  // apagada. A escrita entra no MESMO lote da linha de auditoria da recusa — a
+  // apagada. A escrita entra no MESMO lote da linha de auditoria da recusa, a
   // recusa ja custava uma escrita (Ruling 59), e esta nao acrescenta uma ida ao
   // banco nem sobrevive sem a linha que a explica.
   const sessoes = new PainelSessoesRepository(env.DB)

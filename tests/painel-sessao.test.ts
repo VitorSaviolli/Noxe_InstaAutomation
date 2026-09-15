@@ -17,16 +17,16 @@ import type { Env } from '../src/types/env'
 import { AGORA, RAIZ } from './fixtures/dubles'
 
 /**
- * SES — a sessao assinada, o envelope de proposito e as subchaves do painel.
+ * SES, a sessao assinada, o envelope de proposito e as subchaves do painel.
  *
  * Esta suite nao tem HTTP de proposito: aqui mora a primitiva sobre a qual todo
  * o resto se apoia. As garantias SES que dependem de uma `Response`
- * — **SES-06** (o cookie sai com os quatro atributos) e **SES-07** (o cookie
- * nao aparece no corpo nem em outro cabecalho) — ficaram verdes na etapa do
+ * **SES-06** (o cookie sai com os quatro atributos) e **SES-07** (o cookie
+ * nao aparece no corpo nem em outro cabecalho), ficaram verdes na etapa do
  * roteador, onde a rota que EMITE sessao nasceu: elas moram em
  * `tests/painel-rotas.test.ts`, no bloco do login. As que dependem da linha em
  * `painel_sessoes` (SES-08, SES-09, SES-12 e SES-13) chegam com as etapas que
- * as usam — afirmar aqui que "apagar a linha invalida a sessao" seria fingir
+ * as usam, afirmar aqui que "apagar a linha invalida a sessao" seria fingir
  * cobertura que nao existe (§13.1).
  *
  * O portao de sanidade de §10.2 e a origem de §7.4 tambem sao conferidos
@@ -41,7 +41,7 @@ const OUTRA_CHAVE_RAIZ = 'outra-chave-de-sessao-do-painel-ficticia'
 /**
  * O `env` de teste com campos trocados.
  *
- * `undefined` e o que um binding NAO cadastrado entrega no Workers — nunca
+ * `undefined` e o que um binding NAO cadastrado entrega no Workers, nunca
  * string vazia. E por isso que o portao de sanidade comeca pelo `typeof`.
  */
 function envCom(mudanca: Record<string, unknown>): Env {
@@ -61,7 +61,7 @@ function trocarParte(valor: string, indice: number, nova: string): string {
  * A lista tem, de proposito, entradas das DUAS aridades: 4 partes (a da
  * sessao) e 5 partes (a do envelope). Assim cada verificador recebe tanto
  * lixo que morre na contagem de partes quanto lixo que passa dela e chega a
- * guarda de versao e ao HMAC — uma bateria que so exercita a aridade nao
+ * guarda de versao e ao HMAC, uma bateria que so exercita a aridade nao
  * prova que o resto nao lanca.
  */
 const LIXO = [
@@ -87,7 +87,7 @@ const LIXO = [
   'v1.stepup.###.1700000000000.BBBB',
 ]
 
-describe('SES — o envelope assinado carrega proposito, claims e prazo', () => {
+describe('SES: o envelope assinado carrega proposito, claims e prazo', () => {
   test('SES-04: envelope de proposito errado nao autoriza step-up', async () => {
     const deRegistro = await emitirEnvelope(env, 'registrar', { c: 'desafio-de-teste' }, AGORA)
 
@@ -117,7 +117,7 @@ describe('SES — o envelope assinado carrega proposito, claims e prazo', () => 
     expect(new Set(chaves).size).toBe(3)
   })
 
-  test('SES-04: o prazo vem do proposito — registrar 300 s, entrar e stepup 120 s', async () => {
+  test('SES-04: o prazo vem do proposito: registrar 300 s, entrar e stepup 120 s', async () => {
     expect(PRAZO_DE_ENVELOPE_MS).toEqual({
       entrar: 120_000,
       registrar: 300_000,
@@ -222,7 +222,7 @@ describe('SES — o envelope assinado carrega proposito, claims e prazo', () => 
   })
 })
 
-describe('SES — a sessao assinada', () => {
+describe('SES: a sessao assinada', () => {
   test('SES-01: sessao expirada e recusada, e o prazo absoluto e de 12 h', async () => {
     const { valor, expiraEm } = await emitirSessao(env, AGORA)
 
@@ -339,7 +339,7 @@ describe('SES — a sessao assinada', () => {
   })
 })
 
-describe('SES — as quatro subchaves de §10.1', () => {
+describe('SES: as quatro subchaves de §10.1', () => {
   test('SES-02: as quatro subchaves diferem entre si e da raiz', async () => {
     const rotulos = ['sessao', 'desafio', 'csrf', 'codigos'] as const
     const derivadas = await Promise.all(
@@ -362,7 +362,7 @@ describe('SES — as quatro subchaves de §10.1', () => {
   })
 })
 
-describe('SES — base64url', () => {
+describe('SES: base64url', () => {
   test('SES-10: decodeBase64Url devolve null, e nunca lanca, fora do alfabeto', () => {
     // O `=` do padding, o `+` e o `/` do base64 padrao nao entram: o codificador
     // deste projeto nunca os emite, e aceitar duas grafias do mesmo valor daria
@@ -410,7 +410,7 @@ describe('SES — base64url', () => {
   })
 })
 
-describe('SES — o portao de sanidade de §10.2 e a origem de §7.4', () => {
+describe('SES: o portao de sanidade de §10.2 e a origem de §7.4', () => {
   test('§10.2: binding ausente chega como undefined e nao lanca TypeError', () => {
     expect(painelHabilitado(envCom({ PANEL_SESSION_KEY: undefined }))).toEqual({
       ok: false,

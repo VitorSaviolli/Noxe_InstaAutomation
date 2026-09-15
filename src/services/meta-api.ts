@@ -49,7 +49,7 @@ export const ITENS_POR_PAGINA_DE_MIDIAS = 25
  * `thumbnail_url` entra porque a tela precisa da miniatura, e sai da memoria
  * quando a resposta e montada: ele NUNCA vai para o D1 (§12.5). `caption` e
  * `media_product_type` entram para a tela nao precisar de uma chamada extra
- * por item — a proibicao de §12.5 que mais custa se for esquecida.
+ * por item, a proibicao de §12.5 que mais custa se for esquecida.
  */
 const CAMPOS_DA_LISTAGEM =
   'id,media_type,media_product_type,caption,permalink,thumbnail_url,timestamp'
@@ -97,6 +97,26 @@ export function isRetryable(shortCode: string): boolean {
     shortCode === 'HTTP_503' ||
     shortCode === 'HTTP_504'
   )
+}
+
+/**
+ * Falhas que sao da CONTA, e nao daquele comentario.
+ *
+ * A diferenca decide o que se escreve no banco. `isRetryable` responde "vale
+ * outra tentativa AGORA?", e para estes tres a resposta e nao, o que levava
+ * a marcar `failed`, que e TERMINAL. Com o token morto, cada comentario do
+ * periodo virava `failed` por um problema que nao era dele: quem digitou a
+ * palavra-gatilho nunca receberia o Direct, nem depois de o dono reconectar.
+ *
+ * Sao os mesmos codigos que `classify` produz para 190, 401 e 403, token
+ * revogado por troca de senha, checkpoint ou conta restringida. Todos passam
+ * quando o dono reconecta, e nenhum melhora por insistir. Mora aqui, ao lado de
+ * `isRetryable`, porque o caminho inline e o cron precisam da MESMA lista.
+ */
+const FALHAS_DE_CONTA: readonly string[] = ['TOKEN_INVALIDO', 'NAO_AUTORIZADO', 'PROIBIDO']
+
+export function ehFalhaDeConta(shortCode: string): boolean {
+  return FALHAS_DE_CONTA.includes(shortCode)
 }
 
 async function parseError(response: Response): Promise<ApiError> {
@@ -185,7 +205,7 @@ export class MetaApiClient {
    * body: {"recipient":{"comment_id":"..."},"message":{"text":"..."}}
    *
    * ATENCAO: a Meta permite UMA unica private reply por comentario. Uma
-   * segunda chamada falha — e por isso que o claim no D1 acontece ANTES.
+   * segunda chamada falha, e por isso que o claim no D1 acontece ANTES.
    */
   async sendPrivateReply(
     igUserId: string,

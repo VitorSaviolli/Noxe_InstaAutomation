@@ -72,18 +72,18 @@ import {
 } from './fixtures/vetores-webauthn'
 
 /**
- * WA — verificacao WebAuthn (§13.2, 29 garantias).
+ * WA, verificacao WebAuthn (§13.2, 29 garantias).
  *
  * Metodo T2 (§13.3): **duas fontes independentes**. O `AutenticadorFalso` de
- * `tests/fixtures/autenticador.ts` gera a variacao — dezenas de cerimonias,
- * cada uma com exatamente uma coisa diferente — e os vetores congelados de
+ * `tests/fixtures/autenticador.ts` gera a variacao, dezenas de cerimonias,
+ * cada uma com exatamente uma coisa diferente, e os vetores congelados de
  * `tests/fixtures/vetores-webauthn.ts` provam que essa variacao corresponde ao
  * mundo real. Uma fonte so nao basta: o autenticador sozinho daria testes
  * SIMETRICOS, e os vetores sozinhos dariam cobertura pobre.
  *
  * **Estado do Step 5 desta tarefa: BLOCKED.** Nenhum vetor de hardware foi
  * capturado ainda. Os testes que dependem deles estao aqui, escritos, como
- * `test.todo` que NOMEIA o vetor que falta — a promessa vira alarme em vez de
+ * `test.todo` que NOMEIA o vetor que falta, a promessa vira alarme em vez de
  * bilhete esquecido. Ver o cabecalho de `vetores-webauthn.ts`.
  *
  * Uma garantia ainda fica em `test.todo` por outro motivo, escrito no lugar
@@ -93,7 +93,7 @@ import {
  * nesse mesmo estado ate a Etapa 7 criar a familia `/painel/api/*`.
  *
  * `now` e sempre injetado (`AGORA`), sem fake timers. Nenhum teste desta suite
- * toca o D1 — salvo os de WA-25 e WA-29, que provam o contrario disso em duas
+ * toca o D1, salvo os de WA-25 e WA-29, que provam o contrario disso em duas
  * rotas.
  */
 
@@ -112,7 +112,7 @@ const DONO = bytesToBase64Url(new Uint8Array(32).fill(7))
  * A composicao que a rota fara: envelope primeiro, verificacao depois.
  *
  * Escrita aqui porque as garantias do desafio (WA-03 e WA-04) sao sobre essa
- * COMPOSICAO — o desafio so chega ao verificador atraves do envelope assinado,
+ * COMPOSICAO, o desafio so chega ao verificador atraves do envelope assinado,
  * e e o envelope quem confere prazo e proposito. Um teste que passasse o
  * desafio direto ao verificador nao provaria nada sobre prazo nenhum.
  */
@@ -178,10 +178,10 @@ function motivoDe(resultado: { ok: boolean; motivo?: string }): string {
 }
 
 // ---------------------------------------------------------------------------
-// WA-01 e WA-02 — os dois algoritmos aceitos
+// WA-01 e WA-02, os dois algoritmos aceitos
 // ---------------------------------------------------------------------------
 
-describe('WA — as duas cerimonias felizes', () => {
+describe('WA: as duas cerimonias felizes', () => {
   test('WA-01: assertion ES256 valida e aceita', async () => {
     const autenticador = await AutenticadorFalso.criar('ES256')
     const { desafio, envelope } = await bilhete('entrar')
@@ -223,7 +223,7 @@ describe('WA — as duas cerimonias felizes', () => {
 
     // Quem envia escolhe o `id` do corpo. Se o servidor gravasse a chave sob
     // ESSE identificador, o banco guardaria a chave publica do dono sob um
-    // nome escolhido por outra pessoa — e o login por aquele nome passaria a
+    // nome escolhido por outra pessoa, e o login por aquele nome passaria a
     // ser verificado contra a chave errada.
     const resultado = await verificarRegistro({
       resposta: await autenticador.registrar(registro(desafio), {
@@ -243,7 +243,7 @@ describe('WA — as duas cerimonias felizes', () => {
 
     // `x` e `y` de 32 bytes cada, `kty`, `alg` e `crv` corretos: o mapa COSE
     // passa por `cose.ts` inteiro. O que recusa isto e o `importKey` chamado
-    // AGORA, no registro (§10.5, passo 7) — se a chave nao importa, a
+    // AGORA, no registro (§10.5, passo 7), se a chave nao importa, a
     // credencial nunca vira linha. Adiar a importacao para o login gravaria
     // uma passkey que nunca mais consegue entrar.
     const foraDaCurva = codificarCbor(
@@ -266,7 +266,7 @@ describe('WA — as duas cerimonias felizes', () => {
     expect(motivoDe(resultado)).toBe('chave_nao_importa')
   })
 
-  test('WA-02: attestation RS256 valida e aceita — o caminho do Windows Hello', async () => {
+  test('WA-02: attestation RS256 valida e aceita: o caminho do Windows Hello', async () => {
     const autenticador = await AutenticadorFalso.criar('RS256')
     const { desafio } = await bilhete('registrar')
 
@@ -307,10 +307,10 @@ describe('WA — as duas cerimonias felizes', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-03 a WA-05 — o desafio
+// WA-03 a WA-05, o desafio
 // ---------------------------------------------------------------------------
 
-describe('WA — o desafio vem do envelope assinado, e so dele', () => {
+describe('WA: o desafio vem do envelope assinado, e so dele', () => {
   test('WA-03: desafio expirado e recusado', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
@@ -388,10 +388,10 @@ describe('WA — o desafio vem do envelope assinado, e so dele', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-06 — o tipo da cerimonia
+// WA-06, o tipo da cerimonia
 // ---------------------------------------------------------------------------
 
-describe('WA — o tipo da cerimonia e literal', () => {
+describe('WA: o tipo da cerimonia e literal', () => {
   test('WA-06: webauthn.create e recusado no login', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
@@ -427,10 +427,10 @@ describe('WA — o tipo da cerimonia e literal', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-07 e WA-08 — a origem
+// WA-07 e WA-08, a origem
 // ---------------------------------------------------------------------------
 
-describe('WA — a origem e comparada por string inteira', () => {
+describe('WA: a origem e comparada por string inteira', () => {
   test('WA-07: origem ...workers.dev.evil.com e recusada', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
@@ -497,10 +497,10 @@ describe('WA — a origem e comparada por string inteira', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-09 a WA-12 — o `rpIdHash` e as flags
+// WA-09 a WA-12, o `rpIdHash` e as flags
 // ---------------------------------------------------------------------------
 
-describe('WA — rpIdHash, UP e UV', () => {
+describe('WA: rpIdHash, UP e UV', () => {
   test('WA-09: rpIdHash de outro RP e recusado', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
@@ -561,8 +561,8 @@ describe('WA — rpIdHash, UP e UV', () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
 
-    // A unica diferenca para a cerimonia feliz e o bit UV. Tudo o mais — tipo,
-    // desafio, origem, rpIdHash e assinatura — esta correto.
+    // A unica diferenca para a cerimonia feliz e o bit UV. Tudo o mais, tipo,
+    // desafio, origem, rpIdHash e assinatura, esta correto.
     const resposta = await autenticador.autenticar(semUv(login(desafio)), DONO)
     const resultado = await verificarComEnvelope({
       proposito: 'entrar',
@@ -639,7 +639,7 @@ describe('WA — rpIdHash, UP e UV', () => {
   test('OPCOES: `excluir` nao vazio vira excludeCredentials no formato do navegador', () => {
     // Ate agora `excluir` so era exercitado vazio, entao o formato de cada
     // entrada nunca foi travado. Quem filtra por `rp_id` atual e o chamador da
-    // Etapa 7 — aqui so se prova a forma, que e o que o navegador le.
+    // Etapa 7, aqui so se prova a forma, que e o que o navegador le.
     const opcoes = opcoesDeRegistro({
       rpId: RP_ID,
       usuarioHandle: DONO,
@@ -656,10 +656,10 @@ describe('WA — rpIdHash, UP e UV', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-13 e WA-14 — a assinatura
+// WA-13 e WA-14, a assinatura
 // ---------------------------------------------------------------------------
 
-describe('WA — a assinatura cobre authData || SHA-256(clientDataJSON)', () => {
+describe('WA: a assinatura cobre authData || SHA-256(clientDataJSON)', () => {
   test('WA-13: assinatura de outra chave e recusada', async () => {
     const dono = await AutenticadorFalso.criar()
     const estranho = await AutenticadorFalso.criar()
@@ -745,10 +745,10 @@ describe('WA — a assinatura cobre authData || SHA-256(clientDataJSON)', () => 
 })
 
 // ---------------------------------------------------------------------------
-// WA-15 a WA-17 — DER
+// WA-15 a WA-17, DER
 // ---------------------------------------------------------------------------
 
-describe('WA — DER, a armadilha numero um', () => {
+describe('WA: DER, a armadilha numero um', () => {
   test('WA-15: DER com r de 33 bytes (padding 0x00) verifica', async () => {
     const autenticador = await AutenticadorFalso.criar('ES256')
     const { desafio, envelope } = await bilhete('entrar')
@@ -775,10 +775,10 @@ describe('WA — DER, a armadilha numero um', () => {
   })
 
   test.todo(
-    `WA-16: DER com r de 31 bytes verifica — ${faltaOVetor('loginEs256DerRCurto')}. ` +
+    `WA-16: DER com r de 31 bytes verifica, ${faltaOVetor('loginEs256DerRCurto')}. ` +
       'Um r curto aparece em ~1/256 assinaturas: o laco do AutenticadorFalso precisaria ' +
       'de ~1500 voltas, e §13.3 decidiu que ele vem do hardware. O conversor puro ja e ' +
-      'exercitado com r de 31 bytes em "DER — o conversor puro"; o que falta e a ponta a ponta.',
+      'exercitado com r de 31 bytes em "DER, o conversor puro"; o que falta e a ponta a ponta.',
   )
 
   test('WA-17: assinatura crua de 64 bytes e recusada', async () => {
@@ -797,13 +797,13 @@ describe('WA — DER, a armadilha numero um', () => {
     })
 
     // Nao fixamos o MOTIVO: uma assinatura crua pode, muito raramente, ate
-    // parecer um DER bem formado — mas os inteiros lidos seriam outros e a
+    // parecer um DER bem formado, mas os inteiros lidos seriam outros e a
     // verificacao cairia mesmo assim. O que a garantia afirma e a RECUSA.
     expect(resultado.ok).toBe(false)
   })
 })
 
-describe('DER — o conversor puro (§10.7, passo 9)', () => {
+describe('DER: o conversor puro (§10.7, passo 9)', () => {
   test('DER: r de 33 bytes com padding 0x00 vira 32 bytes alinhados', () => {
     const r = new Uint8Array(32).fill(0xaa)
     const s = new Uint8Array(32).fill(0xbb)
@@ -864,15 +864,15 @@ describe('DER — o conversor puro (§10.7, passo 9)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-18, WA-19 e WA-26 — a credencial
+// WA-18, WA-19 e WA-26, a credencial
 // ---------------------------------------------------------------------------
 
-describe('WA — a credencial guardada', () => {
+describe('WA: a credencial guardada', () => {
   test('WA-18: credencial de rp_id antigo e ignorada, com um motivo compreensivel', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
 
-    // A cerimonia e do endereco ATUAL — o autenticador nao teria como saber do
+    // A cerimonia e do endereco ATUAL, o autenticador nao teria como saber do
     // endereco antigo. O que esta velho e a LINHA do banco (§10.14).
     const resultado = await verificarComEnvelope({
       proposito: 'entrar',
@@ -917,7 +917,7 @@ describe('WA — a credencial guardada', () => {
   })
 
   test('WA-19: as tres recusas de credencial pagam o MESMO verify', async () => {
-    // Nao se mede relogio num teste — daria flake. Mede-se o TRABALHO: se as
+    // Nao se mede relogio num teste, daria flake. Mede-se o TRABALHO: se as
     // tres recusas passam pelo mesmo numero de `crypto.subtle.verify` que uma
     // credencial boa, nenhuma delas se denuncia pelo tempo. Um `return`
     // antecipado em qualquer uma faria a contagem cair para 0 aqui.
@@ -990,10 +990,10 @@ describe('WA — a credencial guardada', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-20 a WA-22 — signCount e as flags de backup
+// WA-20 a WA-22, signCount e as flags de backup
 // ---------------------------------------------------------------------------
 
-describe('WA — signCount e as flags BE/BS', () => {
+describe('WA: signCount e as flags BE/BS', () => {
   test('WA-20: signCount que regride avisa mas NAO recusa', async () => {
     const autenticador = await AutenticadorFalso.criar()
     const { desafio, envelope } = await bilhete('entrar')
@@ -1017,7 +1017,7 @@ describe('WA — signCount e as flags BE/BS', () => {
       expect(resultado.assertion.signCountRegrediu).toBe(true)
     }
 
-    // Avisou — e o aviso NAO carrega o `credential_id` inteiro (§10.13).
+    // Avisou, e o aviso NAO carrega o `credential_id` inteiro (§10.13).
     expect(registrado.linhas.length).toBe(1)
     expect(registrado.linhas[0]).toContain('sign_count_regrediu')
     expect(registrado.linhas[0]).toContain(await prefixoDeCredencial(autenticador.credentialId))
@@ -1108,10 +1108,10 @@ describe('WA — signCount e as flags BE/BS', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-23 e WA-24 — attestation e COSE
+// WA-23 e WA-24, attestation e COSE
 // ---------------------------------------------------------------------------
 
-describe('WA — o attestationObject e a chave COSE', () => {
+describe('WA: o attestationObject e a chave COSE', () => {
   test('WA-23: fmt diferente de none e recusado', async () => {
     const autenticador = await AutenticadorFalso.criar()
 
@@ -1136,7 +1136,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
 
     // §10.5, passo 5: `fmt === "none"` E `attStmt` mapa VAZIO. Um statement
     // dentro de um formato que nao tem statement e conteudo que ninguem
-    // examinou — e a spec manda recusar, nao ignorar.
+    // examinou, e a spec manda recusar, nao ignorar.
     const resultado = await verificarRegistro({
       resposta: await autenticador.registrar(registro(desafio), { attStmtComConteudo: true }),
       rpId: RP_ID,
@@ -1162,7 +1162,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
       desafioEsperado: abaixo.desafio,
     })
     // O `id` do corpo nao casa com o do authData, entao a recusa aqui e a de
-    // WA-01 — o que prova que o teto de 1023 NAO foi o que barrou.
+    // WA-01, o que prova que o teto de 1023 NAO foi o que barrou.
     expect(motivoDe(aceito)).toBe('campo_ausente')
 
     // ...e um byte acima, nao. §10.5, passo 6.
@@ -1216,7 +1216,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
     const autenticador = await AutenticadorFalso.criar()
 
     // O painel nao pede extensao nenhuma. Aceitar um bloco CBOR extra depois
-    // da chave publica seria aceitar conteudo que ninguem examinou — e, no
+    // da chave publica seria aceitar conteudo que ninguem examinou, e, no
     // registro, o bloco fica exatamente onde a chave COSE deveria terminar.
     const doRegistro = await bilhete('registrar')
     const registrado = await verificarRegistro({
@@ -1260,7 +1260,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
     // Sem teto, o unico limite seria o `BYTES_MAXIMOS` do CBOR e caberia um
     // modulo de ~16 mil bits. Quem tivesse convite valido poderia registrar
     // essa chave e fazer todo login seguinte pagar um `verify`
-    // desproporcional — CPU faturada e limitada por invocacao no Worker.
+    // desproporcional, CPU faturada e limitada por invocacao no Worker.
     const rsaCom = (bytesDoModulo: number): Uint8Array =>
       codificarCbor(
         cbMapa([
@@ -1271,7 +1271,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
         ]),
       )
 
-    // 2048 bits passa; 4096 bits, o teto, tambem — o TPM do Windows Hello
+    // 2048 bits passa; 4096 bits, o teto, tambem, o TPM do Windows Hello
     // entrega 2048, entao nenhum autenticador real esbarra aqui.
     expect(coseParaJwk(rsaCom(256)).ok).toBe(true)
     expect(coseParaJwk(rsaCom(512)).ok).toBe(true)
@@ -1343,7 +1343,7 @@ describe('WA — o attestationObject e a chave COSE', () => {
   })
 })
 
-describe('CBOR — o decodificador de producao (§10.5)', () => {
+describe('CBOR: o decodificador de producao (§10.5)', () => {
   test('CBOR: o codificador do teste e o decodificador de producao concordam', () => {
     const original = cbMapa([
       [cbTexto('fmt'), cbTexto('none')],
@@ -1363,7 +1363,7 @@ describe('CBOR — o decodificador de producao (§10.5)', () => {
 
   test('CBOR: argumento em forma nao-minima e recusado', () => {
     // `05` e a grafia canonica do valor 5. `18 05` diz a mesma coisa gastando um
-    // byte a mais, e grafia dupla e por onde entra confusao de forma canonica —
+    // byte a mais, e grafia dupla e por onde entra confusao de forma canonica,
     // a mesma razao pela qual o comprimento indefinido nao entra. Hoje nada no
     // painel compara ou hasheia os bytes crus do CBOR; a trava fecha a porta
     // antes de existir um caminho que passe por ela.
@@ -1450,14 +1450,14 @@ describe('CBOR — o decodificador de producao (§10.5)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// WA-25, WA-27, WA-28 e WA-29 — os tetos de corpo e a limitacao conhecida
+// WA-25, WA-27, WA-28 e WA-29, os tetos de corpo e a limitacao conhecida
 // ---------------------------------------------------------------------------
 
-describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
+describe('WA: os tetos de corpo e a limitacao conhecida do desafio', () => {
   test('WA-25: corpo de /painel/api/* acima de 8 KB e recusado antes do parse', async () => {
     // A familia `/painel/api/*` nasceu na Etapa 7, e esta garantia esperava por
     // ela: o teto pequeno e o que protege os 10 ms de CPU do parser CBOR, entao
-    // ele precisa cortar ANTES de qualquer parse — e nao depois de aceitar
+    // ele precisa cortar ANTES de qualquer parse, e nao depois de aceitar
     // tudo (§11.3, passo 4).
     const contador = new D1Contador(env.DB)
 
@@ -1476,10 +1476,10 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
   })
 
   test('WA-25: corpo em `ReadableStream`, sem `content-length`, tambem e recusado', async () => {
-    // O teto de §11.3 passo 4 tem DUAS metades — "`content-length` conferido
+    // O teto de §11.3 passo 4 tem DUAS metades, "`content-length` conferido
     // **e** relido na leitura." Neste runtime (`@cloudflare/vitest-pool-workers`)
     // o cabecalho NAO nasce sozinho: um `Request` construido com corpo STRING ou
-    // `ReadableStream` chega com `content-length` igual a `null`, sempre — entao
+    // `ReadableStream` chega com `content-length` igual a `null`, sempre, entao
     // o teste ACIMA (a string gigante) tambem passa so pela segunda metade,
     // nunca pela primeira. "Um corpo montado de string sempre chega com
     // content-length" e exatamente a premissa falsa que este comentario tinha
@@ -1487,7 +1487,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
     // A MAO, e o teste seguinte, "WA-25: content-length mentiroso...".
     //
     // Este teste aqui prende a SEGUNDA metade para a familia de 8 KB, com o
-    // corpo chegando em pedacos DE VERDADE — um `pull()` por vez, do jeito que
+    // corpo chegando em pedacos DE VERDADE, um `pull()` por vez, do jeito que
     // um POST `chunked` de conexao lenta chegaria, e nao uma string unica que o
     // runtime pode entregar num `read()` so. `prepares === 0` e a afirmacao que
     // importa: nada chega ao D1.
@@ -1511,7 +1511,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
       headers: { 'content-type': 'application/json', origin: RAIZ },
       body: corpo,
       // Exigido pelo fetch quando o corpo e um stream. Sem ele o Request nem
-      // e construido — e e por isso que nenhum teste tinha chegado aqui.
+      // e construido, e e por isso que nenhum teste tinha chegado aqui.
       duplex: 'half',
     } as RequestInit & { duplex: 'half' })
 
@@ -1529,7 +1529,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
   })
 
   test('WA-25: content-length mentiroso acima de 8 KB e recusado antes de qualquer leitura', async () => {
-    // A PRIMEIRA metade de verdade do teto de §11.3 passo 4 — o precheck do
+    // A PRIMEIRA metade de verdade do teto de §11.3 passo 4, o precheck do
     // `content-length` DECLARADO, que nao existe sozinho neste runtime (ver os
     // dois testes acima): para provar que ele funciona por conta propria, o
     // cabecalho precisa ser SETADO A MAO, do jeito que
@@ -1539,7 +1539,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
     // A forma mais afiada: um `content-length` MENTIROSO, acima do teto, sobre
     // um corpo REAL pequeno. Se a segunda metade (o corte dentro do stream)
     // fosse a unica coisa rodando, um corpo pequeno passaria batido e a rota
-    // devolveria outra coisa que nao `413` — e e exatamente essa diferenca que
+    // devolveria outra coisa que nao `413`, e e exatamente essa diferenca que
     // prova que o portao de CIMA disparou sozinho, sem ler nenhum byte.
     const contador = new D1Contador(env.DB)
     const pedido = new Request(`${RAIZ}${CAMINHO_DAS_OPCOES}`, {
@@ -1562,7 +1562,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
   })
 
   test.todo(
-    'WA-28: corpo de formulario acima de 32 KB e recusado — as rotas de formulario do ' +
+    'WA-28: corpo de formulario acima de 32 KB e recusado, as rotas de formulario do ' +
       'painel nascem nas Etapas 9 a 11 (Tasks 10 a 12). Mesmo motivo de WA-25.',
   )
 
@@ -1623,7 +1623,7 @@ describe('WA — os tetos de corpo e a limitacao conhecida do desafio', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Os vetores congelados — a outra metade do metodo T2
+// Os vetores congelados, a outra metade do metodo T2
 // ---------------------------------------------------------------------------
 
 /**
@@ -1647,7 +1647,7 @@ const NOMES_EM_TODO = [
  * O que CADA vetor prova, alem de simplesmente ser aceito ou recusado.
  *
  * Sem isto, `loginEs256DerRCurto` passaria pelo laco geral sem ninguem conferir
- * o `r` de 31 bytes — e WA-16 continuaria nao provada mesmo com o vetor ja no
+ * o `r` de 31 bytes, e WA-16 continuaria nao provada mesmo com o vetor ja no
  * repositorio, que e o pior dos mundos: cobertura aparente.
  */
 function conferirOQueOVetorProva(
@@ -1679,7 +1679,7 @@ function conferirOQueOVetorProva(
   }
 }
 
-describe('WA — os vetores congelados de hardware real (§13.3)', () => {
+describe('WA: os vetores congelados de hardware real (§13.3)', () => {
   test('VETORES: o registro dos seis nomes existe e diz quais faltam', () => {
     // Este teste fica VERDE com o conjunto vazio de proposito: ele nao afirma
     // que os vetores existem, afirma que o registro deles esta escrito e sabe
@@ -1691,7 +1691,7 @@ describe('WA — os vetores congelados de hardware real (§13.3)', () => {
   test('VETORES: cada vetor presente e conferido contra os proprios rpId, origem e desafio', async () => {
     // Enquanto o conjunto estiver vazio, o laco nao roda e o teste so afirma o
     // contrapositivo. Quando o primeiro vetor chegar, ele passa a ser
-    // verificado aqui automaticamente — sem ninguem precisar lembrar de voltar.
+    // verificado aqui automaticamente, sem ninguem precisar lembrar de voltar.
     for (const nome of vetoresPresentes()) {
       const doRegistro = vetorDeRegistro(nome)
       if (doRegistro !== null) {
@@ -1746,7 +1746,7 @@ describe('WA — os vetores congelados de hardware real (§13.3)', () => {
 
   test('VETORES: nenhum vetor presente pode ter saido do AutenticadorFalso', () => {
     // O laco acima aceita QUALQUER vetor presente. Sozinho, ele ficaria verde
-    // com vetores fabricados — e "os vetores de hardware sao aceitos" passaria a
+    // com vetores fabricados, e "os vetores de hardware sao aceitos" passaria a
     // dizer apenas que o autenticador de software concorda consigo mesmo,
     // destruindo a independencia que o metodo T2 existe para garantir (§13.3, e
     // o ruling 4 do plano). Este teste e a trava.
@@ -1777,34 +1777,34 @@ describe('WA — os vetores congelados de hardware real (§13.3)', () => {
   })
 
   test.todo(
-    `VETORES: ${faltaOVetor('registroEs256Android')} — attestation ES256 de hardware. ` +
+    `VETORES: ${faltaOVetor('registroEs256Android')}, attestation ES256 de hardware. ` +
       'O dono NAO tem Android: este vetor vira de Windows Hello em modo ES256 ou de iPhone, ' +
       'e a procedencia real fica no campo `procedencia` do vetor.',
   )
 
   test.todo(
-    `VETORES: ${faltaOVetor('registroRs256WindowsHello')} — attestation RS256 de TPM. ` +
+    `VETORES: ${faltaOVetor('registroRs256WindowsHello')}, attestation RS256 de TPM. ` +
       'E o unico caminho RS256 do mundo real, e o que prova que o ramo RSA de cose.ts nao ' +
       'esta apenas concordando com o AutenticadorFalso.',
   )
 
   test.todo(
-    `VETORES: ${faltaOVetor('loginEs256Icloud')} — assertion com signCount sempre 0 e ` +
+    `VETORES: ${faltaOVetor('loginEs256Icloud')}, assertion com signCount sempre 0 e ` +
       'BE = 1, BS = 1. E o vetor que prova, com hardware, que WA-21 e WA-22 valem.',
   )
 
   test.todo(
-    `VETORES: ${faltaOVetor('loginEs256DerRAlto')} — assertion cujo r em DER tem 33 bytes. ` +
+    `VETORES: ${faltaOVetor('loginEs256DerRAlto')}, assertion cujo r em DER tem 33 bytes. ` +
       'Reforca WA-15, que hoje esta provada so pelo laco do AutenticadorFalso.',
   )
 
   test.todo(
-    `VETORES: ${faltaOVetor('loginEs256DerRCurto')} — assertion cujo r em DER tem 31 bytes. ` +
+    `VETORES: ${faltaOVetor('loginEs256DerRCurto')}, assertion cujo r em DER tem 31 bytes. ` +
       'E o unico vetor que NAO tem substituto em software: WA-16 depende dele.',
   )
 
   test.todo(
-    `VETORES: ${faltaOVetor('loginSemUv')} — vetor NEGATIVO, com UV = 0. ` +
+    `VETORES: ${faltaOVetor('loginSemUv')}, vetor NEGATIVO, com UV = 0. ` +
       'Provavel BLOCKED permanente: o dono nao tem chave USB, e Windows Hello e iCloud ' +
       'sempre confirmam identidade. Se ele nunca chegar, UV = 0 continua provado em ' +
       'software por WA-11 e WA-12, e a ausencia fica registrada em vetores-webauthn.ts.',
@@ -1815,7 +1815,7 @@ describe('WA — os vetores congelados de hardware real (§13.3)', () => {
 // O que sustenta o resto: base64url e o registro de motivos
 // ---------------------------------------------------------------------------
 
-describe('WA — as duas pontas do metodo T2 concordam no basico', () => {
+describe('WA: as duas pontas do metodo T2 concordam no basico', () => {
   test('T2: o base64url do teste e o de producao produzem o mesmo texto', () => {
     for (let tamanho = 0; tamanho <= 40; tamanho++) {
       const bytes = crypto.getRandomValues(new Uint8Array(tamanho))

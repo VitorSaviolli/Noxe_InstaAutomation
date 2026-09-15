@@ -40,7 +40,7 @@ export interface PainelConfigRecord {
  * Uma linha de `painel_midias`.
  *
  * Toda coluna de sobreposicao e NULL-avel, e `NULL` significa CHAVE AUSENTE
- * no patch — nunca `undefined` (§9.3). A conversao mora no parser do
+ * no patch, nunca `undefined` (§9.3). A conversao mora no parser do
  * `config-store.ts`.
  */
 export interface PainelMidiaRecord {
@@ -75,7 +75,7 @@ export interface LeituraDeConfig {
   /** As linhas ATIVAS, que sao as unicas que o webhook resolve (§9.4). */
   midias: PainelMidiaRecord[]
   /**
-   * As linhas INTEIRAS — ativas e inativas —, ou `null` quando quem leu nao
+   * As linhas INTEIRAS, ativas e inativas, ou `null` quando quem leu nao
    * pediu por elas.
    *
    * `null` nao e "nao ha linhas": e "esta leitura nao perguntou". O caminho
@@ -101,7 +101,7 @@ export interface EstadoDaAutomacao {
  *
  * Sao as colunas que o dono decide: de `enabled` a `user_cooldown_hours`.
  * Ficam de fora `versao`, `parado_por_codigo_em`, `criado_em` e
- * `atualizado_em`, que sao carimbo e nao ajuste — a mesma fronteira que §9.9
+ * `atualizado_em`, que sao carimbo e nao ajuste, a mesma fronteira que §9.9
  * usa para dizer o que entra em `antes`/`depois`.
  *
  * A conversao de `AutomationConfig` para estas colunas e produto e mora em
@@ -133,7 +133,7 @@ export interface LinhaGravavel {
  *
  * E um `Omit` de `LinhaGravavel`, e nao uma segunda lista com as mesmas treze
  * linhas: uma coluna nova de comportamento tem de aparecer nos DOIS escritores
- * da mesma linha — a parada e a gravacao do painel — e duas listas divergiriam
+ * da mesma linha, a parada e a gravacao do painel, e duas listas divergiriam
  * na primeira vez que alguem lembrasse de uma so.
  */
 export type LinhaDeFabrica = Omit<LinhaGravavel, 'enabled'>
@@ -152,20 +152,20 @@ export class PainelConfigRepository {
    * Le a config global e as midias ativas num unico `db.batch()`.
    *
    * Um `batch` vale UM subrequest, e o caminho quente carrega isto uma vez
-   * por lote (§9.5) — nunca por comentario. As duas consultas viajam juntas
+   * por lote (§9.5), nunca por comentario. As duas consultas viajam juntas
    * tambem para que a linha global e as midias venham do MESMO instante: ler
    * em duas idas abriria a janela de um snapshot meio velho e meio novo.
    *
    * As midias vem ordenadas por `media_id` para que a ordem de `overrides` e
-   * de `allowedMediaIds` seja estavel entre invocacoes — o `.find()` de
+   * de `allowedMediaIds` seja estavel entre invocacoes, o `.find()` de
    * `resolveConfigForMedia` ja e deterministico porque `media_id` e PRIMARY
    * KEY, e a ordenacao mantem o log e a tela previsiveis.
    *
    * **`comAsInativas` e a variante do PAINEL, e ela custa zero subrequest.**
    * As duas telas de Reels precisam das linhas que o filtro `ativo = 1`
-   * descarta — o Reel apagado que §12.5 manda nao sumir da lista, o selo de
+   * descarta, o Reel apagado que §12.5 manda nao sumir da lista, o selo de
    * regras proprias num Reel desmarcado, a lista "salvo por voce" quando a Meta
-   * nao responde — e ate a rodada 1 elas pagavam uma consulta PROPRIA por isso,
+   * nao responde, e ate a rodada 1 elas pagavam uma consulta PROPRIA por isso,
    * o quarto subrequest que §12.10 nao orcava. Aqui a mesma pergunta viaja no
    * lote que ja existe: um `batch` vale UM subrequest, entao a variante nao
    * custa nada e as duas telas voltam aos 3 da tabela.
@@ -190,7 +190,7 @@ export class PainelConfigRepository {
     ])
 
     // Um `batch` que reporte falha SEM rejeitar entregaria dois resultados
-    // vazios, e vazio aqui significa "linha ausente" — ou seja, a fabrica
+    // vazios, e vazio aqui significa "linha ausente", ou seja, a fabrica
     // LIGADA. Seria o unico ponto do modulo em que um erro ALARGA em vez de
     // parar. Lancar aqui devolve o caso para a falha segura do `config-store`,
     // que o transforma em `parado_por_erro`. (CFG-14, CFG-18)
@@ -212,7 +212,7 @@ export class PainelConfigRepository {
   /**
    * A leitura barata da parada de emergencia: UMA consulta, duas colunas.
    *
-   * `ler()` custaria duas — a linha global e as midias — e a parada nao olha
+   * `ler()` custaria duas, a linha global e as midias, e a parada nao olha
    * midia nenhuma. `versao` vem junto porque a linha de auditoria guarda a
    * versao RESULTANTE (§8.8) e perguntar por ela depois seria uma segunda
    * consulta na rota que §9.10 fixa em duas leituras.
@@ -231,8 +231,8 @@ export class PainelConfigRepository {
    *
    * Consulta PROPRIA, e nao uma coluna a mais em `lerEstadoDaAutomacao`: aquela
    * e a leitura barata da rota de parada, que §9.10 orca em duas leituras e que
-   * nao tem nenhum uso para esta data. Aqui a pergunta e outra — "desde quando
-   * esta desligada?" — e ela so e feita quando a automacao esta DESLIGADA, que
+   * nao tem nenhum uso para esta data. Aqui a pergunta e outra, "desde quando
+   * esta desligada?", e ela so e feita quando a automacao esta DESLIGADA, que
    * e o unico estado em que a tela oferece religar.
    *
    * `null` significa duas coisas que a tela trata igual: nunca houve parada por
@@ -248,7 +248,7 @@ export class PainelConfigRepository {
   }
 
   /**
-   * O `UPDATE` da parada de emergencia — ou o `INSERT` que materializa a linha.
+   * O `UPDATE` da parada de emergencia, ou o `INSERT` que materializa a linha.
    *
    * Um unico statement porque §8.3 exige que a parada funcione **mesmo quando
    * a linha ainda nao existe**: um fork que nunca abriu o painel tem a
@@ -256,7 +256,7 @@ export class PainelConfigRepository {
    * depender de a pessoa ter salvado alguma vez.
    *
    * No ramo `INSERT` a linha nasce da fabrica com `versao = 1`; no ramo
-   * `UPDATE` a versao anda +1 — e esse incremento e recurso, nao efeito
+   * `UPDATE` a versao anda +1, e esse incremento e recurso, nao efeito
    * colateral: quem estava com o formulario aberto e obrigado a recarregar e
    * ver que a automacao foi parada (§8.8).
    *
@@ -264,7 +264,7 @@ export class PainelConfigRepository {
    * RAJADA de contar errado. A rota ja evita a segunda parada lendo o estado
    * antes (STOP-08), mas essa leitura e uma decisao fora do banco: cinco POSTs
    * simultaneos com o codigo certo leem `enabled = 1` os cinco e mandam cinco
-   * `UPDATE`, e a versao pularia de 1 para 6 — quebrando o carimbo de "versao
+   * `UPDATE`, e a versao pularia de 1 para 6, quebrando o carimbo de "versao
    * resultante" de §8.8, que e a chave do log de auditoria. Com a clausula, so
    * o primeiro muda a linha; os outros quatro sao no-op de zero linha alterada.
    * A direcao continua segura nos dois casos (o resultado e `enabled = 0`), e
@@ -312,12 +312,12 @@ export class PainelConfigRepository {
   }
 
   /**
-   * O `UPDATE` da gravacao pelo painel, com a trava otimista de §8.8 — ou o
+   * O `UPDATE` da gravacao pelo painel, com a trava otimista de §8.8, ou o
    * `INSERT` que materializa a linha na PRIMEIRA vez que o dono salva.
    *
    * **A trava e a clausula `WHERE painel_config.versao = ?`.** A tela envia a
-   * versao que carregou; se a linha ja andou — outra aba, ou a parada de
-   * emergencia, que tambem incrementa a versao —, o `DO UPDATE` nao casa,
+   * versao que carregou; se a linha ja andou, outra aba, ou a parada de
+   * emergencia, que tambem incrementa a versao, o `DO UPDATE` nao casa,
    * `meta.changes` volta `0` e quem chamou responde `409`. O efeito colateral e
    * recurso, e nao acidente: quem estava com o formulario aberto e obrigado a
    * recarregar e ver, em letras grandes, que a automacao foi parada (§8.8).
@@ -325,7 +325,7 @@ export class PainelConfigRepository {
    * **`versaoEsperada = 0` e o unico valor legitimo para o ramo `INSERT`**:
    * `carregarConfigEfetiva` devolve `versao: 0` exatamente quando a linha nao
    * existe (`origem: 'arquivo'`). Um `INSERT` com `VALUES` nao aceita `WHERE`,
-   * entao essa metade NAO e travada pelo SQL — quem chama confere a versao lida
+   * entao essa metade NAO e travada pelo SQL, quem chama confere a versao lida
    * contra a enviada antes de montar o lote, e o teste GRAV-08 e onde isso fica
    * preso.
    *

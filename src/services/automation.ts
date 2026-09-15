@@ -4,7 +4,12 @@ import type { CommentEvent } from '../types/meta'
 import { sha256Hex } from '../utils/hash'
 import { matchKeyword, normalizeOptionsFrom } from '../utils/normalize'
 import { renderTemplate } from '../utils/templates'
-import { isRetryable, type MetaApiClient, PRIVATE_REPLY_WINDOW_MS } from './meta-api'
+import {
+  ehFalhaDeConta,
+  isRetryable,
+  type MetaApiClient,
+  PRIVATE_REPLY_WINDOW_MS,
+} from './meta-api'
 
 /**
  * Orquestracao de um comentario.
@@ -15,7 +20,7 @@ import { isRetryable, type MetaApiClient, PRIVATE_REPLY_WINDOW_MS } from './meta
  * O claim vem primeiro porque a Meta permite UMA unica private reply por
  * comentario; sem o claim atomico, um webhook reentregue tentaria mandar a
  * segunda e falharia. O Direct vem antes da resposta publica porque a
- * resposta publica anuncia que o Direct foi enviado — publicar primeiro
+ * resposta publica anuncia que o Direct foi enviado, publicar primeiro
  * significaria mentir para quem comentou quando o envio falha.
  */
 
@@ -111,7 +116,7 @@ export function evaluateComment(
 /**
  * Confirma o Reel com o que veio no proprio webhook, sem tocar a rede.
  *
- * `null` significa "o webhook nao informou" — quem chama decide se paga uma
+ * `null` significa "o webhook nao informou", quem chama decide se paga uma
  * consulta a Meta para saber ou se desiste. Separado de `isReel` porque o
  * reagendamento do excedente do lote (§16.1) so pode usar o caminho gratuito.
  */
@@ -124,7 +129,7 @@ export function isReelFromEvent(event: CommentEvent): boolean | null {
  * Confirma que a midia e um Reel.
  *
  * O webhook as vezes traz `media_product_type`; quando nao traz, consultamos
- * a API. Em caso de duvida (falha da consulta) NAO processamos — e melhor
+ * a API. Em caso de duvida (falha da consulta) NAO processamos, e melhor
  * perder um acionamento do que responder na publicacao errada.
  */
 async function isReel(event: CommentEvent, api: MetaApiClient): Promise<boolean> {
@@ -207,6 +212,17 @@ async function deliver(event: CommentEvent, deps: ProcessDeps): Promise<ProcessO
 
       const registro = await repo.findByCommentId(event.commentId)
       const tentativas = registro?.attempt_count ?? 0
+
+      // A conta parou (token revogado, checkpoint): nao e falha DESTE
+      // comentario, e `failed` e terminal. Vai para a fila do cron, que ja sabe
+      // deixar o registro intacto enquanto a conta estiver parada e entrega
+      // quando o dono reconectar. Gasta uma tentativa, uma vez so: o cron nao
+      // escreve nada em falha de conta.
+      if (ehFalhaDeConta(shortCode) && tentativas < MAX_ATTEMPTS) {
+        const nextRetryAt = computeNextRetry(tentativas, now)
+        await repo.scheduleRetry(event.commentId, nextRetryAt, shortCode, now)
+        return { kind: 'retry', errorCode: shortCode, nextRetryAt }
+      }
 
       if (isRetryable(shortCode) && tentativas < MAX_ATTEMPTS) {
         const nextRetryAt = computeNextRetry(tentativas, now)

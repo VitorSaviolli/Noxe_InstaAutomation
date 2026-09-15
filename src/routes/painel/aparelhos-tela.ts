@@ -2,18 +2,18 @@
  * A TELA de aparelhos e o vocabulario do formulario dela.
  *
  * **O corte e por responsabilidade, e o teto de 800 linhas foi so o gatilho.**
- * `aparelhos.ts` chegou a 867 linhas — 67 acima do teto — e a divisao natural
+ * `aparelhos.ts` chegou a 867 linhas, 67 acima do teto, e a divisao natural
  * ja estava desenhada: aquele arquivo responde "o que cada acao FAZ" (o
  * step-up, os lotes, a regra da ultima, a rota do assistente) e este responde
  * "como a tela se PARECE". E o mesmo corte que `reels.ts` e `reels-lista.ts`
  * fizeram na Etapa 12.
  *
  * **A dependencia e de mao unica**: `aparelhos.ts` importa daqui, e este
- * arquivo nao importa de la. E por isso que o VOCABULARIO do formulario —
- * `CAMPO_DO_APARELHO` e os tres valores de `acao` — mora aqui e nao la: quem
+ * arquivo nao importa de la. E por isso que o VOCABULARIO do formulario,
+ * `CAMPO_DO_APARELHO` e os tres valores de `acao`, mora aqui e nao la: quem
  * DESENHA os `<input>` e a tela, e um `import` de volta fecharia um ciclo. O
  * nome canonico da operacao (`remover_passkey`, o que entra no `op_hash`) fica
- * com `aparelhos.ts`, que e quem monta a mudanca assinada — sao dois espacos de
+ * com `aparelhos.ts`, que e quem monta a mudanca assinada, sao dois espacos de
  * nomes, e cada um mora com o seu dono.
  *
  * **Nada de `<style>`, `onclick=` nem `<script>` inline** (§11.5), como em toda
@@ -38,7 +38,7 @@ import { jsonCanonico, type MudancaCanonica } from './stepup'
  * O nome do campo escondido que carrega o aparelho a remover.
  *
  * Ele e o `alvo` da mudanca canonica, e nao um campo de configuracao: por isso
- * o nome fica AQUI, com a rota dona dele, e nao em `campos.ts` — aquele arquivo
+ * o nome fica AQUI, com a rota dona dele, e nao em `campos.ts`, aquele arquivo
  * guarda o vocabulario que atravessa varias telas (§7.2), e este atravessa uma
  * so. Mesma regra que `CAMPO_DO_REEL` segue em `reel.ts`.
  */
@@ -49,13 +49,13 @@ export const CAMPO_DO_APARELHO = 'aparelho'
  * `campos.ts`; os valores ficam com a rota dona** (§7.2).
  *
  * **`remover` e nao `remover_passkey`, e a diferenca nao e estetica.** A
- * proibicao de §12.1 alcanca o atributo `value` do HTML — e o metateste do
+ * proibicao de §12.1 alcanca o atributo `value` do HTML, e o metateste do
  * glossario varre o `<body>` inteiro, atributos inclusive. "passkey" esta na
  * lista de palavras que a tela nunca escreve, e um `value="remover_passkey"`
  * a escreveria na tela mais importante do painel. E a mesma razao pela qual
  * `matchMode` viaja como `so_isso`/`no_meio` no formulario das palavras.
  *
- * O nome CANONICO da operacao continua `remover_passkey` — ele e o `acao` da
+ * O nome CANONICO da operacao continua `remover_passkey`, ele e o `acao` da
  * mudanca de §10.10, entra no `op_hash` e nao pode mudar. Sao dois espacos de
  * nomes: o do formulario, que a pessoa le, e o da cerimonia, que o autenticador
  * assina. `ACAO_CANONICA` abaixo e a ponte entre eles, escrita em um lugar so.
@@ -68,7 +68,7 @@ export const ACAO_GERAR_CODIGOS = 'gerar_codigos'
  * Os campos que a tela de conferencia NAO reemite no segundo POST.
  *
  * `csrf` e reemitido com o valor de agora e `digital` nasce vazio para receber
- * a assertion — os dois sao escritos pela propria tela, entao ecoar os que
+ * a assertion, os dois sao escritos pela propria tela, entao ecoar os que
  * chegaram seria emiti-los duas vezes. Nao ha `versao` nem `confirmar` aqui:
  * esta rota nao grava configuracao, entao nao tem trava otimista, e nao tem
  * gesto de religar para carregar por engano (§10.12).
@@ -88,7 +88,7 @@ export async function telaDeAparelhos(
 ): Promise<Response> {
   const { env } = entrada
 
-  // A consulta e a uma lista FECHADA de codigos, e e ela — e nao o escape — que
+  // A consulta e a uma lista FECHADA de codigos, e e ela, e nao o escape, que
   // impede a query string de virar conteudo da pagina (§7.1).
   const confirmacao = fraseDeConfirmacao(new URL(entrada.request.url).searchParams.get('ok'))
 
@@ -121,7 +121,7 @@ ${estado.aviso ?? null}
 <p class="aviso-do-endereco"><strong>Estes aparelhos est&atilde;o presos ao endere&ccedil;o
 ${env.PANEL_RP_ID}.</strong> Se um dia o painel mudar de endere&ccedil;o, todos v&atilde;o precisar
 ser cadastrados de novo, usando um c&oacute;digo de recupera&ccedil;&atilde;o. N&atilde;o &eacute;
-poss&iacute;vel transferir &mdash; &eacute; assim que a digital protege voc&ecirc; de um site falso
+poss&iacute;vel transferir, &eacute; assim que a digital protege voc&ecirc; de um site falso
 com outro endere&ccedil;o.</p>
 
 <h2>Os aparelhos que conseguem entrar</h2>
@@ -188,7 +188,7 @@ async function cartaoDoAparelho(
   }</p>
 <p class="${salvoNaConta ? 'salvo' : 'so-aqui'}">${
     salvoNaConta
-      ? html`<span aria-hidden="true">&#10003;</span> Est&aacute; salvo na conta do celular &mdash;
+      ? html`<span aria-hidden="true">&#10003;</span> Est&aacute; salvo na conta do celular,
 se voc&ecirc; trocar de aparelho, continua entrando.`
       : html`<span aria-hidden="true">&#9650;</span> Existe s&oacute; neste aparelho. Se ele quebrar
 ou for formatado, este acesso se perde.`
@@ -215,8 +215,8 @@ ${ehOAtual ? avisoDoAparelhoDeAgora() : null}
 /**
  * O aviso obrigatorio de §10.13, escrito em UM lugar so.
  *
- * Ele aparece em dois lugares — no cartao da lista e na tela de conferencia da
- * remocao — e a frase e literal na spec. Duas grafias envelheceriam separadas, e
+ * Ele aparece em dois lugares, no cartao da lista e na tela de conferencia da
+ * remocao, e a frase e literal na spec. Duas grafias envelheceriam separadas, e
  * a que envelhecesse seria justamente a da tela de conferencia: aquela e a
  * ultima coisa que o dono le antes de encostar o dedo.
  */
@@ -231,7 +231,7 @@ outro aparelho ou com um c&oacute;digo de recupera&ccedil;&atilde;o.</p>`
  *
  * §10.10 e categorica: "a tela **tem que** mostrar o valor literal antes da
  * biometria; se o humano nao leu o que assinou, a amarracao ao conteudo nao vale
- * nada". Em `remover_passkey` o valor literal E o aparelho — e ate esta funcao
+ * nada". Em `remover_passkey` o valor literal E o aparelho, e ate esta funcao
  * existir a tela de conferencia mostrava apenas campos escondidos, um botao e a
  * frase "confira o aparelho abaixo", com nada abaixo. O dono encostava o dedo
  * sem nenhuma forma de saber se o alvo era o celular velho ou o aparelho em que
@@ -257,7 +257,7 @@ export async function resumoDoAparelho(
   const linha = linhas.find((atual) => atual.credentialId === alvo)
 
   // Alvo que nao esta mais na lista: outra aba removeu, ou o campo veio
-  // adulterado. Dizer isso e melhor do que desenhar um aparelho inventado — e a
+  // adulterado. Dizer isso e melhor do que desenhar um aparelho inventado, e a
   // remocao vai falhar de qualquer jeito, depois da digital.
   if (linha === undefined) {
     return html`<p class="conferir-aparelho">Este aparelho <strong>n&atilde;o est&aacute; mais na
@@ -288,7 +288,7 @@ ${linha.credentialId === sessao.credentialId ? avisoDoAparelhoDeAgora() : null}
  *
  * O formulario e o MESMO `id="registrar"` da pagina do convite, e o
  * `data-tipo="sessao"` e o que diz ao `painel.js` de onde a autorizacao vem:
- * la, do token no fragmento; aqui, de dois gestos de biometria seguidos — um
+ * la, do token no fragmento; aqui, de dois gestos de biometria seguidos, um
  * para confirmar que e voce, outro para criar a chave nova.
  *
  * No teto de dez o formulario nao aparece, e no lugar dele vai a frase que
@@ -327,11 +327,11 @@ c&oacute;digo de recupera&ccedil;&atilde;o e a p&aacute;gina de parada de emerg&
  * `invalidado_em IS NULL`, e deixa `usado_em` de fora **de proposito**: o codigo
  * de PARADA nao e de uso unico (§10.12), e o de recuperacao confere o uso unico
  * na hora de consumir. Mas o consumo de §10.11 marca `usado_em` no codigo usado
- * e `invalidado_em` em TODOS OS OUTROS — entao, depois de uma recuperacao,
+ * e `invalidado_em` em TODOS OS OUTROS, entao, depois de uma recuperacao,
  * "vivos" devolve exatamente um hash: o do codigo ja queimado. A tela escrevia
  * "voce ainda tem 1 codigos que nunca foram usados", em verde, com ZERO codigos
  * utilizaveis, e a faixa vermelha de `quantosValem === 0` nunca disparava. O
- * dono so descobria na proxima perda de aparelho — trancado fora do painel, com
+ * dono so descobria na proxima perda de aparelho, trancado fora do painel, com
  * saida so por `/setup/painel/zerar` na maquina do deploy.
  *
  * **Um `COUNT`, e nao a lista.** A tela so usava o `.length`: trazer os HMAC dos
@@ -373,7 +373,7 @@ depois.</p>
 }
 
 /**
- * O `<form id="confirmar">` desta rota — o passo 1 de §10.10 sem campo de
+ * O `<form id="confirmar">` desta rota, o passo 1 de §10.10 sem campo de
  * configuracao nenhum para mostrar.
  *
  * A mudanca canonica viaja no atributo `data-mudanca`, e nao num campo
@@ -403,6 +403,6 @@ data-mudanca="${jsonCanonico(mudanca)}">
 ${escondidos}
 <button type="submit">Confirmar com a digital</button>
 </form>
-<p><a href="${ROTA_APARELHOS.caminho}">Cancelar</a> &mdash; nada muda.</p>
+<p><a href="${ROTA_APARELHOS.caminho}">Cancelar</a>, nada muda.</p>
 </section>`
 }

@@ -1,8 +1,8 @@
 /**
  * O funil UNICO de gravacao da configuracao do painel (§7.1, §11.3, §8.8).
  *
- * Tres rotas gravam a mesma linha — `POST /painel/chave`, `POST
- * /painel/palavras` e `POST /painel/ajustes` — e este arquivo e o unico lugar
+ * Tres rotas gravam a mesma linha, `POST /painel/chave`, `POST
+ * /painel/palavras` e `POST /painel/ajustes`, e este arquivo e o unico lugar
  * onde a ordem obrigatoria de §11.3 acontece. Uma copia por tela seriam tres
  * grafias da trava otimista, tres grafias da classificacao de risco e tres
  * chances de esquecer a linha de auditoria; a que esquecesse seria a que
@@ -15,10 +15,10 @@
  *
  * A ordem, do passo 5 ao 10 de §11.3 (os passos 0 a 4 sao de `despachar`):
  *
- *   5. corpo lido como `URLSearchParams` — pelo roteador, uma vez so
+ *   5. corpo lido como `URLSearchParams`, pelo roteador, uma vez so
  *   6. **campo desconhecido: recusar** (entrada de humano, estranheza e erro)
  *   7. validacao campo a campo, com a allowlist de HOJE
- *   8. step-up — UMA chamada a `passarPeloStepUp` (`stepup.ts`), que classifica
+ *   8. step-up, UMA chamada a `passarPeloStepUp` (`stepup.ts`), que classifica
  *      o lote por §10.10 e, quando ele exige, exerce a cerimonia inteira
  *   9. trava otimista por `versao` e gravacao em lote com a auditoria
  *  10. `303` para `GET <tela>?ok=<codigo>`
@@ -85,7 +85,7 @@ import { passarPeloStepUp } from './stepup'
  *
  * **O ramo do dominio e alcancavel pela rota desde a etapa do step-up**, e essa
  * e uma das garantias STEP: o link e os dois textos sao gravaveis com a digital.
- * A validacao roda ANTES da cerimonia (§9.7, passos 7 e 8) — entao um link fora
+ * A validacao roda ANTES da cerimonia (§9.7, passos 7 e 8), entao um link fora
  * da allowlist e barrado **sem que a digital chegue a ser pedida**, e nao depois
  * de ela ter sido conferida com sucesso. A funcao continua
  * exportada e testada direto porque ela e a traducao achado -> codigo, e um
@@ -113,7 +113,7 @@ export interface PedidoDeGravacao {
    *
    * Uma coisa so, e e importante que seja uma so (Ruling 80): eles atravessam o
    * passo 6 de §11.3 sem virar patch nem `campo_desconhecido`. Isto **nao** diz
-   * nada sobre o segundo POST — a tela de conferencia reemite tudo o que nao
+   * nada sobre o segundo POST, a tela de conferencia reemite tudo o que nao
    * seja estrutural de TODA rota, `acao` inclusive, porque o botao que declarou
    * a operacao precisa declara-la de novo depois da digital.
    */
@@ -124,7 +124,7 @@ export interface PedidoDeGravacao {
    * **Nao existe uma lista global de "campos gravaveis", e a ausencia dela e a
    * decisao.** `gravarConfiguracao` e agnostica de rota: sem esta lista,
    * qualquer formulario do painel podia escrever qualquer campo, e a celula de
-   * §7.1 que diz "step-up **sempre** no POST" de `/painel/mensagem` era falsa —
+   * §7.1 que diz "step-up **sempre** no POST" de `/painel/mensagem` era falsa,
    * bastava mandar `triggerKeywords` para aquela rota e gravar sem digital
    * nenhuma.
    *
@@ -133,33 +133,33 @@ export interface PedidoDeGravacao {
    *
    * E ela vale mais do que arrumacao. §15.4 manda a tela da mensagem dizer,
    * ANTES do gesto, que aquele toque cobre a tela inteira. Um formulario de
-   * `/painel/palavras` que carregasse `destinationUrl` passaria pelo step-up —
-   * o lote inteiro exige, §10.10 — e gravaria o link sob uma frase que prometia
+   * `/painel/palavras` que carregasse `destinationUrl` passaria pelo step-up,
+   * o lote inteiro exige, §10.10, e gravaria o link sob uma frase que prometia
    * cobrir outra coisa. A lista por rota e o que impede.
    *
    * Ela mora ao lado do FORMULARIO de cada tela, como `estruturais`: quem emite
    * os campos e quem os declara.
    *
    * **A RESTAURACAO nao e uma tela, e por isso nao e defendida por aqui**
-   * (Ruling 74, que emendou o 70). §9.9 diz o que ela atravessa — "o mesmo
-   * validador, o MESMO step-up e a allowlist de hoje" — e nomeia UMA recusa
+   * (Ruling 74, que emendou o 70). §9.9 diz o que ela atravessa, "o mesmo
+   * validador, o MESMO step-up e a allowlist de hoje", e nomeia UMA recusa
    * sancionada, "se a allowlist encolheu". A lista por rota era um quarto portao
    * que a spec nao sanciona, e com ele toda linha de historico anterior a uma
    * troca de link ficava irrestauravel. Entao `acao=restaurar` e uma OPERACAO
    * declarada cujo escopo e a uniao gravavel inteira, e a defesa dela e outra:
    * a tela de conferencia mostrando literalmente cada campo que muda, mais o
    * `op_hash` recalculado no servidor sobre esse conteudo. Para campo NAO
-   * protegido nao ha privilegio a ganhar — a mesma sessao escreve os mesmos
+   * protegido nao ha privilegio a ganhar, a mesma sessao escreve os mesmos
    * campos pela tela dona deles.
    */
   readonly campos: readonly CampoDaConfig[]
   /**
-   * A mudanca que o proprio handler traduziu — `acao=ligar` vira `enabled`.
+   * A mudanca que o proprio handler traduziu, `acao=ligar` vira `enabled`.
    *
    * **Ela entra na mudanca ASSINADA, e nao so no estado `depois`** (Ruling 86).
    * Ate esta linha o `op_hash` saia so do patch do CORPO, entao um campo
    * produzido aqui era MOSTRADO na tela de conferencia e nao era coberto pela
-   * assinatura — o inverso exato da garantia de §10.10, que existe para que o
+   * assinatura, o inverso exato da garantia de §10.10, que existe para que o
    * autenticador assine *aquela* mudanca.
    *
    * O caminho de ataque e concreto desde o Ruling 80, que fez `acao` sobreviver
@@ -172,9 +172,9 @@ export interface PedidoDeGravacao {
    * A parte da gravacao que mora em `painel_midias` (Ruling 91).
    *
    * **Isto e uma EXTENSAO do funil, e a alternativa recusada era um segundo
-   * funil.** As quatro garantias caras da branch — trava otimista, lote atomico
+   * funil.** As quatro garantias caras da branch, trava otimista, lote atomico
    * com a linha de auditoria, step-up preso ao conteudo e "sem log, sem
-   * mudanca" — valem para uma escrita por midia palavra por palavra, e a
+   * mudanca", valem para uma escrita por midia palavra por palavra, e a
    * migration `0002` ja diz por que: `painel_config.versao` e "contador
    * monotonico de TODA a configuracao (global + midias)", e `painel_auditoria`
    * ja tem a coluna `alvo` dimensionada para um `media_id`. Escrever direto no
@@ -182,7 +182,7 @@ export interface PedidoDeGravacao {
    *
    * O que NAO cabia no funil de hoje era uma coisa so: `antes`/`depois` sao o
    * estado de comportamento da linha GLOBAL. A extensao resolve isso deixando a
-   * tela dizer qual entidade esta mudando — e, para um Reel, o `antes` passa a
+   * tela dizer qual entidade esta mudando, e, para um Reel, o `antes` passa a
    * ser a config EFETIVA daquele Reel: a global com a sobreposicao por cima.
    * Com ela no lugar de `antes`, a classificacao de risco, a tela de
    * conferencia, o `op_hash` e o JSON da auditoria continuam sendo os mesmos,
@@ -193,8 +193,8 @@ export interface PedidoDeGravacao {
    * entidade afetada" que a spec pede, e nao e. §9.9 e literal sobre o que uma
    * linha de midia registra: "`media_id`, `ativo` e as colunas de
    * sobreposicao". Um `antes` MESCLADO nao distingue "este Reel tem
-   * sobreposicao de 24 h" de "este Reel herda 24 h da geral" — as duas produzem
-   * o mesmo JSON —, e a diferenca e o que decide se desfazer a sobreposicao
+   * sobreposicao de 24 h" de "este Reel herda 24 h da geral", as duas produzem
+   * o mesmo JSON, e a diferenca e o que decide se desfazer a sobreposicao
    * muda alguma coisa. A perda e IRREVERSIVEL: o `depois` de ontem nao pode ser
    * desmesclado amanha.
    *
@@ -202,11 +202,11 @@ export interface PedidoDeGravacao {
    * classificacao de risco de §10.10, a tela de conferencia e o `op_hash`
    * continuam com UMA grafia, porque as tres falam de `EstadoDeComportamento`.
    * Registrar as colunas cruas exigiria uma segunda forma de `antes`/`depois` e
-   * uma segunda classificacao — que e o Ruling 63 outra vez.
+   * uma segunda classificacao, que e o Ruling 63 outra vez.
    *
    * A saida limpa existe e nao e desta rodada: um par de colunas proprias em
    * `painel_auditoria` para a sobreposicao crua, ao lado do efetivo. Fica
-   * registrado aqui, e no relatorio, como divergencia conhecida — e nao como
+   * registrado aqui, e no relatorio, como divergencia conhecida, e nao como
    * cumprimento.
    */
   readonly midias?: ParteDeMidias
@@ -218,7 +218,7 @@ export interface ParteDeMidias {
    * O `alvo` da linha de auditoria.
    *
    * Um `media_id` quando a gravacao e sobre UM Reel; `null` quando ela e sobre
-   * o CONJUNTO — marcar e desmarcar nao tem um alvo, tem um conjunto novo.
+   * o CONJUNTO, marcar e desmarcar nao tem um alvo, tem um conjunto novo.
    */
   readonly alvo: string | null
   /**
@@ -286,16 +286,16 @@ export async function gravarConfiguracao(
 
   // **O estado GLOBAL e o estado da ENTIDADE sao dois** (Ruling 91). Nas
   // quatro rotas anteriores eles coincidem, e e por isso que ate aqui havia um
-  // so. Numa gravacao por midia, `antes` e a config EFETIVA daquele Reel — a
+  // so. Numa gravacao por midia, `antes` e a config EFETIVA daquele Reel, a
   // global com a sobreposicao por cima, que e o "estado completo da entidade
-  // afetada" que §9.9 manda registrar —, e `estadoGlobal` continua sendo o que
+  // afetada" que §9.9 manda registrar, e `estadoGlobal` continua sendo o que
   // a linha de `painel_config` guarda: ela nao muda, so a `versao` anda.
   const estadoGlobal = estadoDaConfig(snapshot.global)
   const { antes, daLinhaGlobal } = entidadeDaGravacao(pedido, estadoGlobal)
   const recusa = new RecusaAuditada(env, now, contexto, snapshot, ator)
 
   // A configuracao salva nao pode ser lida, e o snapshot em vigor e a FABRICA
-  // desligada — nao a linha do dono. Gravar aqui escreveria valores de fabrica
+  // desligada, nao a linha do dono. Gravar aqui escreveria valores de fabrica
   // por cima do que o dono salvou, que e exatamente o "inventar um substituto
   // para o valor recusado" que §12.6 proibe na tela e §9.2 proibe no validador.
   // A tela ja nomeia o campo a consertar.
@@ -313,7 +313,7 @@ export async function gravarConfiguracao(
    * O rascunho que a pessoa acabou de enviar, pronto para voltar na tela.
    *
    * `paraOPost` e o caminho da ROTA, e nao `pedido.para`: em `/painel/chave` o
-   * `303` aponta para `/painel`, que e `GET` e so `GET` (§7.1) — o botao de
+   * `303` aponta para `/painel`, que e `GET` e so `GET` (§7.1), o botao de
    * recuperacao morreria em `405` justamente na rota que desliga a automacao.
    *
    * `excluir` sao os estruturais, `confirmar` incluso: carregar o gesto de
@@ -330,7 +330,7 @@ export async function gravarConfiguracao(
 
   // §8.8: a pagina do `409` traz a mensagem E o formulario preenchido com o que
   // a pessoa digitou. Sem ele, quem escreveu vinte palavras-gatilho num celular
-  // as perde por causa de uma aba aberta em outro aparelho — e a proxima coisa
+  // as perde por causa de uma aba aberta em outro aparelho, e a proxima coisa
   // que essa pessoa aprende e a nao confiar no botao Salvar. E o unico lugar em
   // que reenviar FUNCIONA: a trava era de concorrencia, e o rascunho volta com a
   // versao de agora.
@@ -339,7 +339,7 @@ export async function gravarConfiguracao(
   }
 
   // A mudanca que ESTE POST aplica: o que o corpo carregou mais o que o handler
-  // traduziu. **UM objeto, e ele alimenta os dois** — o estado `depois` que a
+  // traduziu. **UM objeto, e ele alimenta os dois**, o estado `depois` que a
   // tela de conferencia mostra e a mudanca canonica que o `op_hash` assina
   // (Ruling 86). Duas expressoes separadas eram o defeito: a tela mostrava o
   // campo do handler e a assinatura nao o cobria.
@@ -359,14 +359,14 @@ export async function gravarConfiguracao(
 
   // **A recusa de ESCOPO vem ANTES da cerimonia** (Ruling 73). O escopo de uma
   // rota e estatico e conhecido antes de qualquer gesto: pedir a digital para
-  // uma operacao que nao podia dar certo — `403` com a tela de conferencia
-  // mostrando o link literal, e `400` depois do toque — ensina o dono que
+  // uma operacao que nao podia dar certo, `403` com a tela de conferencia
+  // mostrando o link literal, e `400` depois do toque, ensina o dono que
   // digital as vezes nao faz nada, e isso corroi a unica trava que depende de
   // ele prestar atencao.
   //
   // Isto NAO afrouxa o tudo-ou-nada do Ruling 66: aquele e sobre a
-  // CLASSIFICACAO — se qualquer campo do lote exige step-up, o lote inteiro
-  // exige —, e recusar o lote inteiro mais cedo continua sendo tudo-ou-nada.
+  // CLASSIFICACAO, se qualquer campo do lote exige step-up, o lote inteiro
+  // exige, e recusar o lote inteiro mais cedo continua sendo tudo-ou-nada.
   const recusaDeEscopo = await recusarForaDoEscopo(recusa, mudados, pedido.campos, rascunho)
   if (recusaDeEscopo !== null) return recusaDeEscopo
 
@@ -377,7 +377,7 @@ export async function gravarConfiguracao(
   // inteira (Ruling 74). Conferir so no handler da chave deixaria a restauracao
   // desfazer a parada de emergencia com um clique. A frase antiga dizia
   // "qualquer formulario do painel pode carrega-lo", e ela so era verdadeira
-  // quando toda rota escrevia todo campo — Rulings 79 e 83.
+  // quando toda rota escrevia todo campo, Rulings 79 e 83.
   //
   // **Ela roda ANTES da cerimonia, pela razao do Ruling 73.** Ate esta linha
   // rodava depois, e a combinacao existia: restaurar uma versao que religa E
@@ -392,7 +392,7 @@ export async function gravarConfiguracao(
   // deixa de ser um gesto (§10.12). Por isso ele e estrutural de TODA rota.
   //
   // **So na linha GLOBAL** (Ruling 91): §10.12 e sobre a chave da automacao, e
-  // `enabled` numa linha de midia so pode ser `0` ou ausente — tirar a pausa de
+  // `enabled` numa linha de midia so pode ser `0` ou ausente, tirar a pausa de
   // um Reel devolve aquele Reel a regra geral, que continua sendo a que o dono
   // ja autorizou. Exigir a caixa de confirmacao ali pediria o gesto da parada de
   // emergencia para desfazer uma pausa de um Reel so.
@@ -408,17 +408,17 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     })
   }
 
-  // Passo 7, com a allowlist de HOJE — inclusive na restauracao (§9.9).
+  // Passo 7, com a allowlist de HOJE, inclusive na restauracao (§9.9).
   //
   // **Ele vem ANTES da cerimonia, e §9.7 numera assim de proposito** (Ruling
   // 73, terceira instancia). A propria linha do passo 8 da spec antecipa a
-  // objecao: o hash e sobre a mudanca canonica, que **ja existe aqui** — o
-  // corpo foi lido no passo 5 e traduzido campo a campo —, e ate esta linha
+  // objecao: o hash e sobre a mudanca canonica, que **ja existe aqui**, o
+  // corpo foi lido no passo 5 e traduzido campo a campo, e ate esta linha
   // nada foi gravado. Ate a etapa 12b a ordem era a inversa, e a combinacao
   // existia: uma mudanca que o validador nunca aceitaria renderizava a tela de
   // conferencia, colhia a digital, VERIFICAVA a assertion com sucesso e so
   // entao era recusada. O gesto era gasto numa operacao que nao podia dar
-  // certo — e atingia justamente a unica recusa que §9.9 sanciona para a
+  // certo, e atingia justamente a unica recusa que §9.9 sanciona para a
   // restauracao, "se a allowlist encolheu".
   //
   // O portao e conhecivel aqui e nada entre as duas posicoes o move:
@@ -444,7 +444,7 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
   // normalizado** pelo mesmo `config-validation.ts`". As duas metades fecham
   // exatamente aqui: "ja validado" e a linha acima, e "normalizado" e o
   // `normalizar` de `jsonCanonico`, que aplica a `limparTexto` do proprio
-  // `config-validation.ts` a cada string — a MESMA funcao nos dois caminhos, e
+  // `config-validation.ts` a cada string, a MESMA funcao nos dois caminhos, e
   // e por isso que os vetores congelados de §13.2 fecham. Limpar o `patch`
   // aqui, antes de entrega-lo, seria uma segunda grafia da mesma normalizacao.
   const passagem = await passarPeloStepUp({
@@ -455,11 +455,11 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     patch,
     // **So os estruturais de TODA ROTA** (Ruling 80), e nao os desta rota. A
     // lista tinha dois significados fundidos num so: "nao e campo de
-    // configuracao, entao atravessa o passo 6 de §11.3" — que e o que
-    // `lerPatchDoCorpo` acima pergunta — e "nao pode ser reemitido no segundo
+    // configuracao, entao atravessa o passo 6 de §11.3", que e o que
+    // `lerPatchDoCorpo` acima pergunta, e "nao pode ser reemitido no segundo
     // POST", que e o que a tela de conferencia pergunta aqui. `confirmar` e do
     // segundo tipo: reemiti-lo faria o gesto de §10.12 virar carimbo. `acao` e
-    // do primeiro, e exclui-lo quebrava o botao "Voltar a esta versao" —
+    // do primeiro, e exclui-lo quebrava o botao "Voltar a esta versao",
     // a operacao declarada sumia do segundo POST, o escopo caia para o do
     // formulario comum de Ajustes, e a resposta era `400 dados_invalidos`
     // DEPOIS da digital, que e exatamente o que o Ruling 73 proibe.
@@ -475,7 +475,7 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     // **O alvo entra na assinatura e na tela de conferencia** (Ruling 96, que
     // emendou o 90). Sem ele o `patch` de `/painel/reel` era identico para
     // qualquer Reel: o `media_id` viajava so no campo escondido `midia`, que a
-    // tela reemite e que ficava fora do `op_hash` — a forma exata do Ruling 86,
+    // tela reemite e que ficava fora do `op_hash`, a forma exata do Ruling 86,
     // com o `oh` do envelope continuando valido depois de a entidade trocar.
     ...(pedido.midias?.alvo == null ? {} : { alvo: pedido.midias.alvo }),
   })
@@ -489,13 +489,13 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     pedido,
     // A linha de `painel_config` recebe o `depois` so quando a gravacao E dela.
     // Numa gravacao por midia ela e reescrita com os PROPRIOS valores, e o
-    // efeito util e a `versao` — que a migration `0002` define como o contador
+    // efeito util e a `versao`, que a migration `0002` define como o contador
     // de toda a configuracao, global e midias. Escrever `depois` aqui gravaria a
     // config efetiva de UM Reel por cima da global de todos.
     ...(daLinhaGlobal ? {} : { linhaGlobal: estadoGlobal }),
     // §9.9: o `ator` e a credencial que AUTORIZOU aquela gravacao, e nao a que
-    // abriu a sessao. Hoje as duas coincidem — so ha uma passkey cadastrada nos
-    // cenarios de teste —, e e justamente por isso que a distincao tem de estar
+    // abriu a sessao. Hoje as duas coincidem, so ha uma passkey cadastrada nos
+    // cenarios de teste, e e justamente por isso que a distincao tem de estar
     // no codigo antes de a Task 14 fazer duas passkeys existirem de verdade: o
     // dia em que o dono confirmar com o aparelho novo uma mudanca de uma sessao
     // aberta pelo antigo, a linha tem de nomear o aparelho que encostou o dedo.
@@ -570,7 +570,7 @@ async function recusarForaDoEscopo(
 /**
  * A transicao `desligada -> ligada` chegou sem o gesto de §10.12?
  *
- * Extraida do funil para a funcao caber no teto de complexidade do Biome — e a
+ * Extraida do funil para a funcao caber no teto de complexidade do Biome, e a
  * pergunta continua sendo UMA, com os tres pedacos juntos, porque separar
  * "religa" de "veio confirmado" daria dois lugares para desencontrar.
  */
@@ -603,14 +603,14 @@ interface PedidoDeValidacao {
  * Sao DUAS recusas, e a primeira nao esta no validador de proposito.
  *
  * **Allowlist vazia nao "passa tudo": ela recusa qualquer endereco** (§9.8,
- * §12.7, LNK-12). O validador devolve zero achados nesse estado por decisao —
+ * §12.7, LNK-12). O validador devolve zero achados nesse estado por decisao,
  * §9.8 nao pune, na LEITURA, quem tem um `destinationUrl` no arquivo e ainda nao
- * preencheu a variavel nova —, e a recusa acontece aqui, na ESCRITA, perguntando
+ * preencheu a variavel nova, e a recusa acontece aqui, na ESCRITA, perguntando
  * a `configurada`. Ate a etapa do step-up a promessa era verdadeira por
  * acidente: os tres campos de endereco paravam no `403 step_up_necessario` antes
  * de chegar a validacao. Com eles gravaveis (Ruling 65), esta pergunta passou a
  * ser a unica coisa entre "sem lista configurada" e "o painel aceita qualquer
- * link" — o oposto do que a allowlist existe para fazer.
+ * link", o oposto do que a allowlist existe para fazer.
  *
  * Desde a etapa 12b esta recusa acontece no PRIMEIRO POST, e nao no segundo: a
  * ordem de §9.7 poe o passo 7 antes do 8, entao a pessoa cujo deploy nao tem a

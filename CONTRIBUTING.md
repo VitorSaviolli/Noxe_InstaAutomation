@@ -63,7 +63,7 @@ O comando que decide se a sua mudança está pronta é este:
 npm run check
 ```
 
-Ele roda, em sequência, **lint + typecheck + testes**. Se ele passar na sua máquina, sua contribuição passa também na verificação automática do GitHub. Se ele falhar, o Pull Request não vai ser aceito — então rode antes de abrir.
+Ele roda, em sequência, **lint + typecheck + testes**. Se ele passar na sua máquina, sua contribuição passa também na verificação automática do GitHub. Se ele falhar, o Pull Request não vai ser aceito, então rode antes de abrir.
 
 Os comandos individuais, para quando você quiser isolar um problema:
 
@@ -76,7 +76,7 @@ Os comandos individuais, para quando você quiser isolar um problema:
 | `npm run lint:fix` | Faz o Biome **corrigir sozinho** tudo o que ele consegue corrigir. Use quando o lint reclamar de formatação. |
 | `npm run typecheck` | Confere os tipos do TypeScript (`tsc --noEmit`), sem gerar arquivos. |
 
-Existem ainda comandos de deploy (`npm run deploy`, `npm run db:migrate:remote`, `npm run tail`). Eles mexem na **sua** conta Cloudflare e não têm nenhum papel numa contribuição — não os rode achando que fazem parte do fluxo de PR.
+Existem ainda comandos de deploy (`npm run deploy`, `npm run db:migrate:remote`, `npm run tail`). Eles mexem na **sua** conta Cloudflare e não têm nenhum papel numa contribuição, não os rode achando que fazem parte do fluxo de PR.
 
 ---
 
@@ -94,7 +94,7 @@ Além do que o Biome checa automaticamente, existem duas convenções que só um
 
 **Comentários em português, explicando o PORQUÊ e não o QUE.**
 
-O código já diz o que ele faz. O comentário existe para registrar a decisão que não está visível na linha — o motivo, a restrição da API da Meta, o ataque que aquilo previne. Se o comentário pode ser deduzido lendo a linha logo abaixo, ele está sobrando.
+O código já diz o que ele faz. O comentário existe para registrar a decisão que não está visível na linha, o motivo, a restrição da API da Meta, o ataque que aquilo previne. Se o comentário pode ser deduzido lendo a linha logo abaixo, ele está sobrando.
 
 ```ts
 // Ruim: repete o que a linha ja diz
@@ -117,21 +117,21 @@ Vale também o que já vale no resto do projeto: funções pequenas e com uma re
 
 Esta é a única regra do projeto que não tem exceção, atenuante nem "só dessa vez".
 
-Os cinco segredos deste projeto são `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `TOKEN_ENCRYPTION_KEY`, `SETUP_ADMIN_TOKEN` e `PANEL_SESSION_KEY`. Nenhum deles pode aparecer em arquivo versionado — nem no código, nem nos testes, nem no `wrangler.jsonc`, nem em um exemplo de documentação, nem "mascarado" trocando alguns caracteres por `x`.
+Os cinco segredos deste projeto são `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN`, `TOKEN_ENCRYPTION_KEY`, `SETUP_ADMIN_TOKEN` e `PANEL_SESSION_KEY`. Nenhum deles pode aparecer em arquivo versionado, nem no código, nem nos testes, nem no `wrangler.jsonc`, nem em um exemplo de documentação, nem "mascarado" trocando alguns caracteres por `x`.
 
 O `PANEL_SESSION_KEY` é a raiz das subchaves do painel administrativo. Ele **nunca** repete o valor de outro segredo: rotacionar o `SETUP_ADMIN_TOKEN` não pode derrubar as sessões do painel, e vazar um dos dois não pode entregar o que o outro protege.
 
 Todo binding novo é propagado, e quantos lugares dependem de ele ser segredo ou não:
 
-- **Segredo** (vai por `wrangler secret put`): cinco lugares — `src/types/env.ts`, `wrangler.jsonc` em `secrets.required`, `.dev.vars.example`, os bindings de teste do `vitest.config.ts` e a documentação.
-- **`var` pública** (fica no `wrangler.jsonc`, versionada): quatro — os mesmos, **menos** o `.dev.vars.example`, que só existe para segredos. É o que já vale para `META_APP_ID` e `META_IG_USER_ID`.
+- **Segredo** (vai por `wrangler secret put`): cinco lugares, `src/types/env.ts`, `wrangler.jsonc` em `secrets.required`, `.dev.vars.example`, os bindings de teste do `vitest.config.ts` e a documentação.
+- **`var` pública** (fica no `wrangler.jsonc`, versionada): quatro, os mesmos, **menos** o `.dev.vars.example`, que só existe para segredos. É o que já vale para `META_APP_ID` e `META_IG_USER_ID`.
 
 Os valores no `vitest.config.ts` são fictícios e existem só para o teste; o metateste `META-04` falha se um binding obrigatório não chegar lá.
 
 Os arquivos onde segredos reais podem existir na sua máquina são:
 
-- **`.dev.vars`** — segredos do desenvolvimento local.
-- **`.env`** — se você tiver criado um.
+- **`.dev.vars`**: segredos do desenvolvimento local.
+- **`.env`**: se você tiver criado um.
 
 Os dois já estão cobertos pelo `.gitignore`. Os arquivos `.dev.vars.example` e `.env.example`, que **são** versionados, existem só para mostrar os nomes das variáveis e devem continuar com os valores vazios.
 
@@ -143,7 +143,7 @@ npm run verificar
 
 Ela varre o repositório e avisa se algum segredo escapou para um arquivo versionado. Não substitui o olho humano: dê também um `git diff --staged` e leia o que você está mandando.
 
-**Se um segredo já foi commitado**, apagar a linha no commit seguinte **não resolve** — o valor continua no histórico do git e, se o repositório for público, considere que ele vazou. O caminho é: rotacionar o segredo imediatamente (gerar um novo e substituir no Worker) e só depois limpar o histórico. O `SECURITY.md` tem o procedimento de rotação de cada um dos quatro segredos.
+**Se um segredo já foi commitado**, apagar a linha no commit seguinte **não resolve**, o valor continua no histórico do git e, se o repositório for público, considere que ele vazou. O caminho é: rotacionar o segredo imediatamente (gerar um novo e substituir no Worker) e só depois limpar o histórico. O `SECURITY.md` tem o procedimento de rotação de cada um dos quatro segredos.
 
 ---
 
@@ -169,7 +169,7 @@ Coloque o teste novo no arquivo que já cobre aquela área, em vez de criar um a
 Como cada pessoa roda a própria instância, existem duas partes do código onde uma mudança sem teste chega direto no Direct de gente real:
 
 1. **O texto enviado por Direct** (`src/utils/templates.ts`). É a mensagem que a pessoa que comentou vai receber. Um erro aqui vira uma mensagem quebrada, com placeholder aparecendo cru ou com o link errado, enviada em nome do perfil de outra pessoa.
-2. **A lógica de gatilho** (`src/utils/normalize.ts` e `src/services/automation.ts`). É o que decide se um comentário aciona ou não a automação. Um erro aqui significa ou não responder quem deveria ser respondido, ou — bem pior — responder quem não pediu nada.
+2. **A lógica de gatilho** (`src/utils/normalize.ts` e `src/services/automation.ts`). É o que decide se um comentário aciona ou não a automação. Um erro aqui significa ou não responder quem deveria ser respondido, ou, bem pior, responder quem não pediu nada.
 
 Mudança em qualquer uma dessas duas áreas **só é aceita com teste cobrindo explicitamente o novo comportamento**, incluindo o caso em que ele **não** deve disparar. "Passou nos testes que já existiam" não basta: se o comportamento mudou e nenhum teste quebrou nem foi adicionado, é sinal de que o novo comportamento não está coberto.
 
@@ -226,14 +226,14 @@ São dois caminhos diferentes, e a diferença importa muito.
 
 Se algo não funciona, funciona diferente do documentado, ou você travou em algum passo da configuração, abra uma issue. Existem dois modelos prontos:
 
-- **Bug** — para algo quebrado no funcionamento.
-- **Dúvida de configuração** — para quem empacou seguindo o `README.md`, o `SETUP_META.md` ou o `SETUP_CLOUDFLARE.md`.
+- **Bug**: para algo quebrado no funcionamento.
+- **Dúvida de configuração**: para quem empacou seguindo o `README.md`, o `SETUP_META.md` ou o `SETUP_CLOUDFLARE.md`.
 
 Em qualquer um dos dois, **não cole segredos**. Nem token, nem App Secret, nem o conteúdo do seu `.dev.vars`, nem URL contendo `code=` ou `state=`. Se precisar mostrar um valor, troque por `<REMOVIDO>`. Os dois modelos têm uma confirmação obrigatória sobre isso justamente porque é o erro mais comum.
 
 ### Vulnerabilidade de segurança → NUNCA em issue pública
 
-Se você encontrou uma falha de segurança — algo que permita forjar um webhook, burlar a validação de assinatura, driblar a proteção das rotas `/setup/*`, ler um token cifrado, ou fazer o Worker enviar Direct em nome de alguém —, **não abra issue, não comente em issue existente, não poste em rede social e não escreva no Discussions**.
+Se você encontrou uma falha de segurança: algo que permita forjar um webhook, burlar a validação de assinatura, driblar a proteção das rotas `/setup/*`, ler um token cifrado, ou fazer o Worker enviar Direct em nome de alguém, **não abra issue, não comente em issue existente, não poste em rede social e não escreva no Discussions**.
 
 Uma issue pública é lida por qualquer pessoa na internet, e cada pessoa que subiu a própria instância continuaria vulnerável enquanto a correção não sai.
 
@@ -249,7 +249,7 @@ O `SECURITY.md` tem o restante do procedimento: o que incluir no relato, até on
 2. Faça a mudança e escreva os testes.
 3. Rode `npm run check` e garanta que passa.
 4. Confira que nenhum segredo entrou no diff.
-5. Abra o Pull Request. O modelo de PR tem uma checklist curta — preencha com honestidade; ela existe para você não descobrir na revisão que esqueceu algo.
-6. A verificação automática do GitHub Actions vai rodar `npm run lint`, `npm run typecheck` e `npm test` num clone limpo. Se falhar lá e passar na sua máquina, quase sempre é porque a mudança depende de algo que só existe localmente — um arquivo não commitado ou uma variável do seu `.dev.vars`.
+5. Abra o Pull Request. O modelo de PR tem uma checklist curta, preencha com honestidade; ela existe para você não descobrir na revisão que esqueceu algo.
+6. A verificação automática do GitHub Actions vai rodar `npm run lint`, `npm run typecheck` e `npm test` num clone limpo. Se falhar lá e passar na sua máquina, quase sempre é porque a mudança depende de algo que só existe localmente, um arquivo não commitado ou uma variável do seu `.dev.vars`.
 
 Pull Requests pequenos e com um propósito só são revisados muito mais rápido do que um PR grande que mistura correção, refatoração e funcionalidade nova. Se a sua mudança for grande, vale abrir uma issue antes para combinar o caminho.

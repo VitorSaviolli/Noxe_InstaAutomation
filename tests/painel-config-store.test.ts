@@ -42,11 +42,11 @@ import {
 } from './fixtures/dubles'
 
 /**
- * CFG — configuracao no D1 e falha segura (18 garantias).
+ * CFG, configuracao no D1 e falha segura (18 garantias).
  *
  * A afirmacao que esta suite existe para provar: **erro nunca alarga, e erro
  * nunca inventa um valor que o dono nao viu na tela.** Configuracao corrompida
- * faz a automacao PARAR — nunca "consertar".
+ * faz a automacao PARAR, nunca "consertar".
  *
  * Nada aqui depende dos VALORES de `src/config.ts`: este repositorio e um
  * template publico e cada pessoa clona com a propria palavra-gatilho e o
@@ -157,7 +157,7 @@ beforeEach(async () => {
 
 // ---------------------------------------------------------------------------
 
-describe('CFG — o estado inicial e o caminho normal', () => {
+describe('CFG: o estado inicial e o caminho normal', () => {
   test('CFG-01: linha ausente usa o padrao de fabrica com origem "arquivo"', async () => {
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
@@ -194,7 +194,7 @@ describe('CFG — o estado inicial e o caminho normal', () => {
   })
 })
 
-describe('CFG — configuracao corrompida para a automacao', () => {
+describe('CFG: configuracao corrompida para a automacao', () => {
   /** Cada linha aqui e um jeito diferente de a configuracao estar errada. */
   const CORROMPIDAS: { nome: string; patch: Partial<LinhaDeConfig> }[] = [
     { nome: 'link que nao e URL', patch: { destination_url: 'nao-e-uma-url' } },
@@ -234,7 +234,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
 
   test('CFG-03: tipo errado numa coluna deixa parado, e nao vira `false` em silencio', async () => {
     // `enabled` chega como 2. Um `row.enabled === 1` solto transformaria isso
-    // em `false` — um conserto silencioso, e na direcao que ninguem pediu.
+    // em `false`, um conserto silencioso, e na direcao que ninguem pediu.
     const banco = new D1DeLinhasFabricadas({ ...LINHA_VALIDA, id: 1, enabled: 2 })
 
     const snapshot = await carregarConfigEfetiva(comBanco(banco), AGORA)
@@ -325,7 +325,7 @@ describe('CFG — configuracao corrompida para a automacao', () => {
   })
 })
 
-describe('CFG — o parser: NULL e chave ausente, nunca undefined', () => {
+describe('CFG: o parser: NULL e chave ausente, nunca undefined', () => {
   test('CFG-05: sobreposicao so com NULL nao produz nenhuma chave com undefined', async () => {
     await gravarConfig(env.DB)
     await gravarMidia(env.DB, MEDIA_A)
@@ -377,7 +377,7 @@ describe('CFG — o parser: NULL e chave ausente, nunca undefined', () => {
   })
 })
 
-describe('CFG — sobreposicoes por midia', () => {
+describe('CFG: sobreposicoes por midia', () => {
   test('CFG-16: linha de midia invalida recebe { enabled: false } e as outras seguem', async () => {
     await gravarConfig(env.DB, { media_scope: 'selecionadas' })
     await gravarMidia(env.DB, MEDIA_A, { destination_url: 'http://inseguro.example' })
@@ -474,13 +474,13 @@ describe('CFG — sobreposicoes por midia', () => {
     const snapshot = await carregarConfigEfetiva(env, AGORA)
 
     expect(snapshot.global.allowedMediaIds).toEqual(['*'])
-    // O alargamento se chama `mediaScope: 'todas'` — nunca "allowedMediaIds
+    // O alargamento se chama `mediaScope: 'todas'`, nunca "allowedMediaIds
     // para *". O campo nao e gravavel, e por isso nao aparece no schema.
     expect(snapshot.overrides).toEqual([{ mediaIds: [MEDIA_A] }])
   })
 })
 
-describe('CFG — o banco fora do ar e a migration atrasada', () => {
+describe('CFG: o banco fora do ar e a migration atrasada', () => {
   test('CFG-15: tabela inexistente usa a fabrica e sinaliza', async () => {
     const snapshot = await carregarConfigEfetiva(comBanco(new D1SemAsTabelasDoPainel()), AGORA)
 
@@ -512,7 +512,7 @@ describe('CFG — o banco fora do ar e a migration atrasada', () => {
   })
 })
 
-describe('§9.6 — o cache por isolate', () => {
+describe('§9.6: o cache por isolate', () => {
   test('§9.6: ligado vive 10 s; a mudanca aparece assim que a janela fecha', async () => {
     await gravarConfig(env.DB)
     expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
@@ -524,7 +524,7 @@ describe('§9.6 — o cache por isolate', () => {
     expect((await carregarConfigEfetiva(env, AGORA + TTL_LIGADO_MS + 1)).origem).toBe('arquivo')
   })
 
-  test('§9.6: desligado vive 60 s — servir "parado" velho nunca causa dano', async () => {
+  test('§9.6: desligado vive 60 s: servir "parado" velho nunca causa dano', async () => {
     await gravarConfig(env.DB, { enabled: 0, trigger_keywords: '[]' })
     expect((await carregarConfigEfetiva(env, AGORA)).global.enabled).toBe(false)
 
@@ -534,7 +534,7 @@ describe('§9.6 — o cache por isolate', () => {
     expect((await carregarConfigEfetiva(env, AGORA + TTL_DESLIGADO_MS + 1)).origem).toBe('arquivo')
   })
 
-  test('§9.6: o painel nao usa o cache — ignorarCache rele do banco', async () => {
+  test('§9.6: o painel nao usa o cache: ignorarCache rele do banco', async () => {
     await gravarConfig(env.DB)
     await carregarConfigEfetiva(env, AGORA)
 
@@ -568,7 +568,7 @@ describe('§9.6 — o cache por isolate', () => {
   })
 })
 
-describe('CFG — uma carga por lote, nunca por comentario', () => {
+describe('CFG: uma carga por lote, nunca por comentario', () => {
   beforeEach(async () => {
     await ligarConta(env, AGORA)
     await gravarConfig(env.DB)
@@ -633,7 +633,7 @@ describe('CFG — uma carga por lote, nunca por comentario', () => {
   })
 })
 
-describe('CFG — o validador unico', () => {
+describe('CFG: o validador unico', () => {
   test('CFG-13: recusar uma config invalida nao custa consulta nenhuma', async () => {
     const contador = new D1Contador(env.DB)
 
@@ -661,7 +661,7 @@ describe('CFG — o validador unico', () => {
     ])
   })
 
-  test('CFG-13: o validador NUNCA conserta — ele devolve o valor que chegou', () => {
+  test('CFG-13: o validador NUNCA conserta: ele devolve o valor que chegou', () => {
     const original = configDeTeste()
     const resultado = validarConfig(original)
 
@@ -694,11 +694,11 @@ describe('CFG — o validador unico', () => {
  * O snapshot e o contrato que as etapas seguintes consomem. Se a forma dele
  * mudar sem que alguem repare, a tela e o webhook passam a discordar.
  */
-describe('§9.2 — a forma do snapshot', () => {
+describe('§9.2: a forma do snapshot', () => {
   test('§9.2: o snapshot tem exatamente os seis campos declarados', async () => {
     // **O sexto campo nasceu para o ORCAMENTO de §12.10, e nao para o
-    // comportamento.** `linhasDeMidia` carrega `painel_midias` INTEIRA — com as
-    // inativas — quando quem le pede por ela, para que as duas telas de Reels
+    // comportamento.** `linhasDeMidia` carrega `painel_midias` INTEIRA, com as
+    // inativas, quando quem le pede por ela, para que as duas telas de Reels
     // parem de gastar uma consulta propria com o que §12.5 manda elas
     // mostrarem. Ele viaja no `db.batch()` que ja existia, entao custa zero
     // subrequest, e o caminho quente NUNCA pede: para o webhook ele e sempre
@@ -706,7 +706,7 @@ describe('§9.2 — a forma do snapshot', () => {
     //
     // A afirmacao de forma continua sendo a mesma, e e por isso que ela nao foi
     // afrouxada para "pelo menos estes": quem acrescentar um sexto de verdade
-    // — um campo que MUDE comportamento — passa por aqui antes.
+    // um campo que MUDE comportamento, passa por aqui antes.
     const snapshot: SnapshotConfig = await carregarConfigEfetiva(env, AGORA)
 
     expect(Object.keys(snapshot).sort()).toEqual([
@@ -723,7 +723,7 @@ describe('§9.2 — a forma do snapshot', () => {
   test('§9.2: `linhasDeMidia` so vem quando quem le pede, e traz as INATIVAS', async () => {
     // O contrapositivo do teste acima, e a trava do conserto de §12.10: sem
     // ele, um `comAsInativas` que nunca chegasse ao SQL passaria calado e as
-    // telas de Reels voltariam a mostrar so as linhas ativas — o Reel apagado
+    // telas de Reels voltariam a mostrar so as linhas ativas, o Reel apagado
     // sumiria em silencio, que e o que §3 proibe.
     await gravarConfig(env.DB)
     await gravarMidia(env.DB, '17912345678901234')
@@ -743,7 +743,7 @@ describe('§9.2 — a forma do snapshot', () => {
       pedindo.linhasDeMidia?.map((linha) => `${linha.media_id}:${String(linha.ativo)}`),
     ).toEqual(['17912345678901234:1', '17912345678901235:0'])
     // E o que resolve COMPORTAMENTO nao mudou: `overrides` sai das linhas
-    // ATIVAS nos dois casos — a inativa entra em `linhasDeMidia` e em lugar
+    // ATIVAS nos dois casos, a inativa entra em `linhasDeMidia` e em lugar
     // nenhum mais. Se o filtro tivesse sumido junto com o `WHERE`, o Reel
     // desmarcado voltaria a responder, que e o alargamento silencioso que esta
     // linha existe para impedir.
@@ -768,9 +768,9 @@ describe('§9.2 — a forma do snapshot', () => {
 /**
  * O cron e a OUTRA ponta da entrega, e desde §16.1 ele drena todo comentario a
  * partir do sexto de cada lote. Um portao que so exista em `processEvents` nao
- * para a automacao — para metade dela.
+ * para a automacao, para metade dela.
  */
-describe('CFG — a configuracao parada tambem para o cron', () => {
+describe('CFG: a configuracao parada tambem para o cron', () => {
   /** Um pendente na fila, pronto para a proxima varredura. */
   async function enfileirarPendente(commentId = 'comment-pendente'): Promise<void> {
     await env.DB.prepare(
@@ -803,7 +803,7 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
     await enfileirarPendente()
   })
 
-  test('CFG-14: o controle — com a config valida o cron ENTREGA o pendente', async () => {
+  test('CFG-14: o controle: com a config valida o cron ENTREGA o pendente', async () => {
     // Sem este teste, o de baixo passaria por a fila estar vazia ou por o cron
     // nem chegar no laco.
     await gravarConfig(env.DB)
@@ -887,13 +887,13 @@ describe('CFG — a configuracao parada tambem para o cron', () => {
 })
 
 /**
- * §9.11 vence a letra de §9.2 — ruling do controlador na rodada 1.
+ * §9.11 vence a letra de §9.2, ruling do controlador na rodada 1.
  *
  * `mediaAutomations` nasce `[]` neste template, entao o ramo so e distinguivel
  * de um `[]` escrito a mao se o teste puder injetar cartoes. E por isso que
  * `sobreposicoesDaFabrica` recebe a lista por parametro.
  */
-describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel', () => {
+describe('§9.11: atualizar o codigo nao pode apagar as automacoes por Reel', () => {
   const CARTAO: MediaAutomation = {
     mediaIds: [MEDIA_A, MEDIA_B],
     triggerKeywords: ['cardapio'],
@@ -904,7 +904,7 @@ describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel',
     expect(sobreposicoesDaFabrica('arquivo', [CARTAO])).toEqual([CARTAO])
   })
 
-  test('§9.11: a heranca e copia PROFUNDA — congelar o cache nao congela o arquivo', () => {
+  test('§9.11: a heranca e copia PROFUNDA: congelar o cache nao congela o arquivo', () => {
     const [copia] = sobreposicoesDaFabrica('arquivo', [CARTAO])
     if (copia === undefined) throw new Error('a copia deveria existir')
 
@@ -926,7 +926,7 @@ describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel',
     expect(Object.values(copia).every((valor) => valor !== undefined)).toBe(true)
   })
 
-  test('§9.11: parado_por_erro NAO herda — no arquivo nada impede enabled: true', () => {
+  test('§9.11: parado_por_erro NAO herda: no arquivo nada impede enabled: true', () => {
     // O estado de erro tem de parar tudo, e um cartao do arquivo poderia
     // religar a midia por cima da global desligada.
     expect(sobreposicoesDaFabrica('parado_por_erro', [CARTAO])).toEqual([])
@@ -941,7 +941,7 @@ describe('§9.11 — atualizar o codigo nao pode apagar as automacoes por Reel',
   })
 })
 
-describe('CFG — invalidarCacheDeConfig()', () => {
+describe('CFG: invalidarCacheDeConfig()', () => {
   test('CFG-18: invalidarCacheDeConfig() faz a leitura seguinte reler o banco', async () => {
     await gravarConfig(env.DB)
     expect((await carregarConfigEfetiva(env, AGORA)).origem).toBe('banco')
@@ -967,11 +967,11 @@ describe('CFG — invalidarCacheDeConfig()', () => {
   })
 })
 
-describe('CFG — o batch que falha sem rejeitar', () => {
+describe('CFG: o batch que falha sem rejeitar', () => {
   test('CFG-14: batch sem sucesso vira parado_por_erro, e nunca a fabrica LIGADA', async () => {
     const snapshot = await carregarConfigEfetiva(comBanco(new D1QueNaoReportaSucesso()), AGORA)
 
-    // Dois resultados vazios seriam lidos como "linha ausente" — a fabrica
+    // Dois resultados vazios seriam lidos como "linha ausente", a fabrica
     // LIGADA. Seria o unico ponto do modulo em que um erro ALARGA.
     expect({ origem: snapshot.origem, enabled: snapshot.global.enabled }).toEqual({
       origem: 'parado_por_erro',

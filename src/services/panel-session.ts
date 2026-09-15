@@ -44,7 +44,7 @@ export const PRAZO_ABSOLUTO_DE_SESSAO_MS = 12 * 60 * 60 * 1000
  *
  * Mora ao lado do irmao absoluto porque sao o mesmo conceito medido de dois
  * jeitos, e porque a rota que EMITE (o login) e a guarda que CONFERE (o passo
- * 9 da escada) precisam do mesmo numero — duas constantes divergiriam, e a
+ * 9 da escada) precisam do mesmo numero, duas constantes divergiriam, e a
  * divergencia se manifestaria como sessao que morre cedo demais ou tarde
  * demais, que sao os dois defeitos que ninguem reporta.
  *
@@ -58,7 +58,7 @@ export const PRAZO_OCIOSO_DE_SESSAO_MS = 2 * 60 * 60 * 1000
  *
  * Quatro deles saem do `PANEL_SESSION_KEY`; `convite` sai do
  * `SETUP_ADMIN_TOKEN`, porque ele e emitido OFFLINE, na maquina do dono, pelo
- * assistente — que ja le esse token e nunca pode ler a chave de sessao. E a
+ * assistente, que ja le esse token e nunca pode ler a chave de sessao. E a
  * separacao que faz um convite vazado nao virar cookie nem desafio, e que faz
  * rotacionar o admin token invalidar convites SEM derrubar as sessoes.
  *
@@ -74,7 +74,7 @@ export type LeituraDeSessao =
 export interface SessaoEmitida {
   /** O valor do cookie `__Host-painel_sessao`. Contem o `sid` em claro. */
   valor: string
-  /** `sha256(sid)`. E ISTO que vai para o banco — nunca o `sid`. */
+  /** `sha256(sid)`. E ISTO que vai para o banco, nunca o `sid`. */
   sidHash: string
   /** Instante do prazo absoluto, em ms. */
   expiraEm: number
@@ -86,7 +86,7 @@ export interface SessaoEmitida {
  * A raiz e parametro porque o convite (etapa do registro) deriva do
  * `SETUP_ADMIN_TOKEN`, e nao do `PANEL_SESSION_KEY`. Dentro deste modulo a
  * raiz e sempre `env.PANEL_SESSION_KEY`, para que nenhum chamador precise
- * escolher — escolher e onde o erro acontece.
+ * escolher, escolher e onde o erro acontece.
  *
  * Trava de SES-02: o rotulo entra no texto do HMAC. Tirar o rotulo, ou repetir
  * um, faria duas subchaves coincidirem e derruba o teste da separacao.
@@ -117,7 +117,7 @@ export async function chaveDeEnvelope(
 /**
  * Emite um envelope de cerimonia ja com a chave do proposito.
  *
- * Este par — `emitirEnvelope`/`lerEnvelope` — e a unica porta do painel para o
+ * Este par, `emitirEnvelope`/`lerEnvelope`, e a unica porta do painel para o
  * envelope. Existe para que nenhum chamador precise escolher a chave: escolher
  * e onde a confusao de proposito nasceria.
  */
@@ -164,7 +164,7 @@ export async function fichaCsrf(env: Env, sidHash: string): Promise<string> {
  * A origem esperada do painel.
  *
  * `PANEL_ORIGIN` NAO existe, e essa ausencia e a defesa: uma variavel a menos
- * para o leigo errar, e torna impossivel a origem e o `rpId` divergirem — a
+ * para o leigo errar, e torna impossivel a origem e o `rpId` divergirem, a
  * classe de erro que produz credencial irrecuperavel, porque o `rpId` gravado
  * dentro da credencial nao pode ser corrigido depois (§7.4).
  *
@@ -178,7 +178,7 @@ export function origemDoPainel(env: Env): string {
  * Portao de sanidade do painel. Falha fechada: sem segredo forte, o painel nao
  * existe (§10.2).
  *
- * Se o segredo nao foi cadastrado, em Workers ele chega como `undefined` — e
+ * Se o segredo nao foi cadastrado, em Workers ele chega como `undefined`, e
  * NAO como string vazia. Por isso cada linha comeca pelo `typeof`:
  * `env.PANEL_RP_ID.length` sozinho lanca `TypeError`, e um HMAC com chave
  * vazia e perfeitamente computavel por qualquer pessoa que leu este codigo.
@@ -205,7 +205,7 @@ export function painelHabilitado(env: Env): { ok: true } | { ok: false; motivo: 
  *
  * O HMAC e o filtro GRATIS: um bot mandando cookie aleatorio e recusado sem
  * nenhuma consulta ao D1. A linha do banco e a autoridade, e chega com a etapa
- * que cria a tabela — este modulo nunca guarda o `sid`, so devolve o
+ * que cria a tabela, este modulo nunca guarda o `sid`, so devolve o
  * `sha256(sid)` para quem for gravar.
  */
 export async function emitirSessao(env: Env, now: number): Promise<SessaoEmitida> {
@@ -215,12 +215,12 @@ export async function emitirSessao(env: Env, now: number): Promise<SessaoEmitida
 /**
  * Sorteia um `sid` novo MANTENDO o prazo absoluto que ja estava valendo.
  *
- * §10.8 manda rotacionar em exatamente dois momentos: login bem-sucedido — e
- * ali o prazo nasce junto, por `emitirSessao` — e **step-up bem-sucedido**, em
+ * §10.8 manda rotacionar em exatamente dois momentos: login bem-sucedido, e
+ * ali o prazo nasce junto, por `emitirSessao`, e **step-up bem-sucedido**, em
  * que a sessao muda de "conseguiu ler" para "acabou de autorizar". Nesse
  * segundo momento o `expira_em` e o da sessao que ja existe: a trava de SES-01
  * e que o prazo absoluto **nunca** e estendido, e uma rotacao que chamasse
- * `emitirSessao(env, now)` daria 12 h novas a cada mudanca protegida — o dono
+ * `emitirSessao(env, now)` daria 12 h novas a cada mudanca protegida, o dono
  * que salvasse uma coisa por dia nunca mais veria o dialogo do sistema
  * operacional que §7.6 existe para forcar.
  *
@@ -287,7 +287,7 @@ async function assinarSessao(env: Env, sid: string, expiraEm: string): Promise<s
 /**
  * `sha256(sid)`, em base64url.
  *
- * Um dump do D1 nao pode entregar cookie utilizavel — o mesmo raciocinio que
+ * Um dump do D1 nao pode entregar cookie utilizavel, o mesmo raciocinio que
  * ja levou o projeto a guardar `commenter_scoped_id_hash` no lugar do IGSID.
  * O hash e do `sid` COMO ELE VIAJA no cookie, isto e, do texto base64url, para
  * que emissao e validacao cheguem sempre ao mesmo valor.

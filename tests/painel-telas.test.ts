@@ -64,14 +64,14 @@ import {
 } from './fixtures/dubles'
 
 /**
- * TELA · DIC · HDR — as cinco telas de leitura, o dicionario e o escape.
+ * TELA · DIC · HDR, as cinco telas de leitura, o dicionario e o escape.
  *
  * `now` e sempre injetado e os handlers sao chamados por `despachar`, que e a
  * MESMA funcao que o roteador usa: um teste que chamasse o handler direto
  * pularia a escada de §11.3 e afirmaria menos do que parece.
  *
  * **Um ID por garantia.** Um mesmo ID em duas afirmacoes diferentes quebra o
- * mapeamento no dia em que alguem procura o que caiu — que e justamente o dia
+ * mapeamento no dia em que alguem procura o que caiu, que e justamente o dia
  * em que o ID precisa servir para alguma coisa.
  *
  * **HDR-07 e HDR-08 nao estao aqui, e a ausencia e declarada.** As duas sao
@@ -106,7 +106,7 @@ const REEL_DA_TELA = '178414000000000001'
  *
  * `busca` e `preparar` nasceram com as duas telas de Reels (Ruling 97). Elas
  * nao sao "telas com um caso especial": sao telas que dependem de um estado que
- * as cinco anteriores nao tinham — `/painel/reel` casa por QUERY STRING
+ * as cinco anteriores nao tinham, `/painel/reel` casa por QUERY STRING
  * (Ruling 93) e recusa um id sem linha, e `/painel/reels` fala com a Meta. Sem
  * os dois campos, as duas ficariam de fora dos catorze lacos, que e exatamente
  * a omissao silenciosa que os lacos existem para impedir.
@@ -127,7 +127,7 @@ interface TelaDoPainel {
    * O item da barra de baixo que fica com `aria-current` (TELA-27).
    *
    * Ausente, e a propria rota. `/painel/reel` e a excecao declarada: ela e uma
-   * sub-tela de Reels e **nao tem item proprio na barra** — §12.1 fixa a barra
+   * sub-tela de Reels e **nao tem item proprio na barra**, §12.1 fixa a barra
    * em cinco destinos (seis ate o "Mais"), e nenhum deles e um Reel especifico.
    * Marcar "Reels" e o que orienta quem usa leitor de tela; nao marcar nada
    * deixaria a pessoa sem saber onde esta.
@@ -195,7 +195,7 @@ const VAZAMENTO = /Error|at \w+ \(|SQLITE|D1_|undefined|payload/
  *
  * Duble local injetado por parametro, como todo duble deste projeto. Ele
  * precisa deixar a configuracao passar: um D1 que estourasse inteiro provaria
- * outra coisa — que a tela de erro funciona —, e nao que a leitura da conta
+ * outra coisa, que a tela de erro funciona, e nao que a leitura da conta
  * falha SOZINHA e mesmo assim nao inventa um fato na tela.
  */
 class D1ComContaQuebrada {
@@ -228,7 +228,7 @@ function ambienteCom(mudanca: Record<string, unknown>): Env {
 /**
  * `vista_em` de quem acabou de agir: a janela de §10.8 ainda tem folga.
  *
- * E o estado que TODO laco deste arquivo construia — sozinho, e sem dizer que
+ * E o estado que TODO laco deste arquivo construia, sozinho, e sem dizer que
  * era uma escolha. Nomear os dois estados e o que impede a proxima pessoa de
  * medir so este e concluir que a tela nao escreve.
  */
@@ -237,7 +237,7 @@ const VISTA_FRESCA = AGORA
 /**
  * `vista_em` de quem VOLTA ao painel depois do intervalo de §10.8.
  *
- * E o estado real de quem abandona a aba, almoca e volta — e o unico em que a
+ * E o estado real de quem abandona a aba, almoca e volta, e o unico em que a
  * escrituracao de sessao da guarda comum acontece. Um milissegundo passado do
  * intervalo, e nao uma hora: o teste tem de morder a BORDA da condicao
  * (`now - vistaEm < INTERVALO_DE_VISTA_MS`), senao um `<=` trocado por `<`
@@ -257,7 +257,7 @@ const VISTA_RETOMADA = AGORA - INTERVALO_DE_VISTA_MS - 1
  * nenhum, porque desliga a atencao de quem le o nome dele.
  *
  * A assinatura e a irma da de `tests/painel-sair.test.ts`, que ja nasceu com o
- * parametro — la ele e o proprio eixo das garantias VIS.
+ * parametro, la ele e o proprio eixo das garantias VIS.
  */
 async function abrirSessao(vistaEm: number = VISTA_FRESCA): Promise<Record<string, string>> {
   const sessao = await emitirSessao(env, AGORA)
@@ -273,7 +273,7 @@ async function abrirSessao(vistaEm: number = VISTA_FRESCA): Promise<Record<strin
       sessao.expiraEm,
       // `ociosa_ate` segue contado de AGORA de proposito, mesmo quando
       // `vista_em` e velho: a sessao esta VIVA e ociosa, e o que se quer
-      // exercitar e a janela deslizando — nao a recusa do passo 9, que
+      // exercitar e a janela deslizando, nao a recusa do passo 9, que
       // `painel-sessao` ja prende.
       AGORA + PRAZO_OCIOSO_DE_SESSAO_MS,
       vistaEm,
@@ -286,7 +286,7 @@ async function abrirSessao(vistaEm: number = VISTA_FRESCA): Promise<Record<strin
 /**
  * Abre uma tela com sessao viva, pela mesma escada que o roteador usa.
  *
- * O `preparar` roda ANTES de `despachar` e escreve no D1 **real** — nunca no
+ * O `preparar` roda ANTES de `despachar` e escreve no D1 **real**, nunca no
  * `ambiente`, que nos lacos de custo e o `D1Contador`. Contar a preparacao
  * como gasto da tela transformaria TELA-19 e TELA-20 em afirmacoes falsas.
  */
@@ -323,24 +323,24 @@ function linksDe(corpo: string): string[] {
  * Quantos subrequests ao D1 aquela tela gastou.
  *
  * Um `db.batch()` inteiro vale UM subrequest, e o unico lote das telas de
- * leitura e o da configuracao — que leva exatamente dois statements. Por isso
+ * leitura e o da configuracao, que leva exatamente dois statements. Por isso
  * `prepares - batches` e a conta: os dois statements do lote viram um. Quem
  * chama confere `batches` tambem, porque essa premissa e o que torna a conta
- * valida — um lote com tres statements a quebraria em silencio.
+ * valida, um lote com tres statements a quebraria em silencio.
  */
 function subrequests(contador: D1Contador): number {
   return contador.prepares - contador.batches
 }
 
-/** `INSERT`, `UPDATE`, `DELETE`, `REPLACE` — o caminho de ESCRITA do D1. */
+/** `INSERT`, `UPDATE`, `DELETE`, `REPLACE`, o caminho de ESCRITA do D1. */
 const ESCRITA_DE_SQL = /^\s*(insert|update|delete|replace)\b/i
 
 /**
  * A UNICA escrita que uma tela de leitura pode executar (§10.8).
  *
  * E a escrituracao de sessao da guarda comum: a linha da PROPRIA sessao de quem
- * esta olhando, e nada do produto. A regex confere o statement INTEIRO —
- * ancorada nas duas pontas, com as tres interrogacoes no lugar — porque uma
+ * esta olhando, e nada do produto. A regex confere o statement INTEIRO,
+ * ancorada nas duas pontas, com as tres interrogacoes no lugar, porque uma
  * allowlist frouxa (`/painel_sessoes/`) deixaria passar um `DELETE FROM
  * painel_sessoes` ou um `UPDATE painel_sessoes SET falhas_stepup`, que sao
  * outra decisao inteiramente.
@@ -357,7 +357,7 @@ function escritasDe(contador: D1Contador): string[] {
  * Os dois estados da janela de §10.8, para os lacos que medem escrita e custo.
  *
  * Rodar cada tela nos DOIS e o que torna as afirmacoes observaveis: o fresco e
- * o caminho barato, e o retomado e o de quem volta ao painel — e era o retomado
+ * o caminho barato, e o retomado e o de quem volta ao painel, e era o retomado
  * que nenhum laco deste arquivo construia.
  */
 const ESTADOS_DA_JANELA = [
@@ -385,7 +385,7 @@ function snapshotDeTeste(
     versao: 1,
     avisos: [],
     // `null` e o default honesto: um snapshot montado a mao nao veio de leitura
-    // nenhuma, e `panorama` — que e o que estes testes exercitam — nao olha as
+    // nenhuma, e `panorama`, que e o que estes testes exercitam, nao olha as
     // linhas de midia.
     linhasDeMidia: null,
     ...extra,
@@ -402,7 +402,7 @@ async function snapshotDoBanco(): Promise<SnapshotConfig> {
  *
  * Elas viraram par de radios quando a escrita nasceu, e por isso as DUAS frases
  * de cada uma aparecem na pagina. A afirmacao de TELA-11 e TELA-12 nao mudou de
- * sentido — a tela nao pode mentir sobre o que esta valendo —, mudou de forma:
+ * sentido, a tela nao pode mentir sobre o que esta valendo, mudou de forma:
  * o que prova o valor agora e qual das duas esta MARCADA.
  *
  * `processOnlyReels` entrou na etapa do step-up (Ruling 65): ir para "responde
@@ -433,7 +433,7 @@ function estaMarcada(corpo: string, frase: string): boolean {
  * A leitura e do MODULO INTEIRO, e nao de uma lista escrita a mao: §12.1 regra
  * 1 vale para o dicionario todo, e uma lista de tabelas so cobre as tabelas que
  * existiam no dia em que ela foi escrita. Funcoes, numeros e a propria
- * `PALAVRAS_PROIBIDAS` — que e a lista das proibidas, e nao frase de tela —
+ * `PALAVRAS_PROIBIDAS`, que e a lista das proibidas, e nao frase de tela,
  * ficam de fora; objetos aninhados (`FRASE_DO_AJUSTE`) sao percorridos ate a
  * string.
  */
@@ -462,16 +462,16 @@ beforeEach(async () => {
   invalidarCacheDeConfig()
   // O cache da listagem de §12.5 e por ISOLATE e sobrevive entre testes, como o
   // da configuracao. Esquece-lo aqui e o que impede um teste de herdar a
-  // listagem que o anterior guardou — e de afirmar sobre uma Meta que nunca foi
+  // listagem que o anterior guardou, e de afirmar sobre uma Meta que nunca foi
   // chamada.
   esquecerAListagem()
 })
 
 // ---------------------------------------------------------------------------
-// HDR — escape, `<script>` e cabecalhos
+// HDR, escape, `<script>` e cabecalhos
 // ---------------------------------------------------------------------------
 
-describe('HDR — o valor do banco na tela', () => {
+describe('HDR: o valor do banco na tela', () => {
   test('HDR-06: uma palavra-gatilho com `<script>` sai escapada na tela de Palavras', async () => {
     await gravarConfig(env.DB, { trigger_keywords: JSON.stringify([VETOR, 'quero o link']) })
     const cookie = await abrirSessao()
@@ -480,7 +480,7 @@ describe('HDR — o valor do banco na tela', () => {
     const corpo = await resposta.text()
 
     expect(resposta.status).toBe(200)
-    // O valor CHEGOU a tela — sem isto o teste passaria com uma tela vazia.
+    // O valor CHEGOU a tela, sem isto o teste passaria com uma tela vazia.
     expect(corpo).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
     expect(corpo).not.toContain(VETOR)
   })
@@ -578,14 +578,14 @@ describe('HDR — o valor do banco na tela', () => {
         })
         // O nome da coluna nao pode aparecer como TEXTO. Desde a etapa do
         // step-up, `/painel/mensagem` grava o link, e `name=`/`id=`/`for=` sao
-        // o nome do campo do formulario — do mesmo jeito que `/painel/ajustes`
+        // o nome do campo do formulario, do mesmo jeito que `/painel/ajustes`
         // ja carrega `name="userCooldownHours"`. O que continua proibido e a
         // coluna vazando em qualquer outro lugar do corpo.
         const semNomesDeCampo = corpo.replace(/(?:name|id|for)="[^"]*"/g, '')
         expect({ [tela.rota.caminho]: semNomesDeCampo.includes('destinationUrl') }).toEqual({
           [tela.rota.caminho]: false,
         })
-        // A frase tecnica do achado — a que fala em "endereco completo" — fica
+        // A frase tecnica do achado, a que fala em "endereco completo", fica
         // no `console`, onde `config-store.ts` ja a publica, e nunca na tela.
         expect({ [tela.rota.caminho]: corpo.includes('endereco completo') }).toEqual({
           [tela.rota.caminho]: false,
@@ -600,12 +600,12 @@ describe('HDR — o valor do banco na tela', () => {
 })
 
 // ---------------------------------------------------------------------------
-// DIC — o dicionario de traducao
+// DIC, o dicionario de traducao
 // ---------------------------------------------------------------------------
 
-describe('DIC — o dicionario de traducao', () => {
+describe('DIC: o dicionario de traducao', () => {
   test('DIC-01: todo campo gravavel da configuracao tem traducao, e nenhuma sobra', () => {
-    // A trava forte deste dicionario e de TIPO — `Record<CampoDaConfig,
+    // A trava forte deste dicionario e de TIPO, `Record<CampoDaConfig,
     // string>` nao compila com um campo faltando. Este teste e a metade
     // runtime: ele prova que o conjunto de chaves e exatamente o esperado, e
     // que ninguem traduziu `allowedMediaIds`, que nao e campo gravavel.
@@ -620,19 +620,19 @@ describe('DIC — o dicionario de traducao', () => {
     // varrida guardava uma violacao de verdade: `MOTIVO_DA_RECUSA
     // .dominio_nao_permitido` escrevia "na lista liberada no deploy", e "deploy"
     // esta em `PALAVRAS_PROIBIDAS`. Uma lista escrita a mao envelhece na
-    // primeira tabela nova, e foi o que aconteceu tres vezes seguidas —
+    // primeira tabela nova, e foi o que aconteceu tres vezes seguidas,
     // `CONFIRMACOES`, `MOTIVO_DA_RECUSA` e `TELA_DOS_REELS` nasceram depois
     // dela e nenhuma entrou.
     //
     // Agora o conjunto vem do MODULO, e nao de uma lista: toda tabela exportada
     // por `dicionario.ts` entra sozinha, e uma tabela nova nasce coberta. E o
-    // mesmo desenho dos metatestes de §13.1 — a trava que falha quando alguem
+    // mesmo desenho dos metatestes de §13.1, a trava que falha quando alguem
     // cria a superficie nova sem proteger.
     const frases = frasesDoDicionario()
 
     // Contrapositivo de COBERTURA, em duas metades. A primeira: o numero de
     // frases nao pode encolher. A segunda, que e a que importa, e o numero de
-    // TABELAS — foi ele que ficou parado em cinco enquanto o dicionario dobrava.
+    // TABELAS, foi ele que ficou parado em cinco enquanto o dicionario dobrava.
     const tabelas = new Set(frases.map((achada) => achada.tabela))
     expect(frases.length).toBeGreaterThan(60)
     expect(tabelas.size).toBeGreaterThanOrEqual(10)
@@ -689,7 +689,7 @@ describe('DIC — o dicionario de traducao', () => {
     // olha o dicionario contra ele mesmo: olha contra a funcao de PRODUCAO.
     // A primeira grafia deste dicionario tinha `sim`/`nao` com significado
     // trocado em dois dos quatro campos, e as telas compensavam com um
-    // ternario invertido — a saida saia certa e a forma mentia.
+    // ternario invertido, a saida saia certa e a forma mentia.
     const sondas: Record<Exclude<CampoDeComparacao, 'processOnlyReels'>, [string, string]> = {
       caseSensitive: ['EU QUERO', 'eu quero'],
       normalizeAccents: ['querô', 'quero'],
@@ -700,8 +700,8 @@ describe('DIC — o dicionario de traducao', () => {
     //
     // **Escritas a mao, e nao lidas de `FRASE_DO_AJUSTE`.** Ler do dicionario
     // faria o teste comparar o dicionario com ele mesmo: trocar as duas
-    // entradas de um campo trocaria tambem a expectativa, e a inversao — que e
-    // exatamente o defeito que este teste existe para pegar — passaria verde.
+    // entradas de um campo trocaria tambem a expectativa, e a inversao, que e
+    // exatamente o defeito que este teste existe para pegar, passaria verde.
     const frasesDeEquivalencia: Record<Exclude<CampoDeComparacao, 'processOnlyReels'>, string> = {
       caseSensitive: 'Tanto faz escrever com maiúscula ou com minúscula.',
       normalizeAccents: 'Escrever sem acento conta igual: “querô” vale por “quero”.',
@@ -743,10 +743,10 @@ describe('DIC — o dicionario de traducao', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TELA — os estados grandes e as pendencias
+// TELA, os estados grandes e as pendencias
 // ---------------------------------------------------------------------------
 
-describe('TELA — os quatro estados grandes', () => {
+describe('TELA: os quatro estados grandes', () => {
   test('TELA-01: tudo resolvido e conta ligada dao "Ligada e respondendo"', () => {
     const visao = panorama(snapshotDeTeste(), true)
 
@@ -824,8 +824,8 @@ describe('TELA — os quatro estados grandes', () => {
   test('TELA-23: a parada por erro diz TAMBEM que o conserto e fora do painel', async () => {
     // TELA-07 afirma que o campo e nomeado. Falta a outra metade, e ela e a que
     // impede o dono de ficar tentando: com a configuracao salva ilegivel o
-    // painel RECUSA toda gravacao — nao pode escrever valores de fabrica por
-    // cima do que ele salvou (§9.2, §12.6) —, entao a tela precisa dizer para
+    // painel RECUSA toda gravacao, nao pode escrever valores de fabrica por
+    // cima do que ele salvou (§9.2, §12.6), entao a tela precisa dizer para
     // onde ir. Frase de tela sem asseracao ja mordeu esta branch antes.
     await gravarConfig(env.DB, { destination_url: '[coloque-seu-link-aqui]' })
     const cookie = await abrirSessao()
@@ -863,10 +863,10 @@ describe('TELA — os quatro estados grandes', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TELA — o que a tela IMPRIME
+// TELA, o que a tela IMPRIME
 // ---------------------------------------------------------------------------
 
-describe('TELA — o que a tela imprime', () => {
+describe('TELA: o que a tela imprime', () => {
   test('TELA-09: sem linha no banco, a TELA imprime a frase dos ajustes de fabrica', async () => {
     // A frase de §12.6, no HTML e nao so na estrutura: a estrutura pode estar
     // certa e o bloco nao ser renderizado, que e como o `blocoDeFabrica`
@@ -939,14 +939,14 @@ describe('TELA — o que a tela imprime', () => {
 
     // E o oposto de cada um NAO aparece. `processOnlyReels` saiu desta lista na
     // etapa do step-up: Ruling 65 o tornou editavel, entao as DUAS frases dele
-    // aparecem — como as das outras chaves — e o que se afirma sobre ele e qual
+    // aparecem, como as das outras chaves, e o que se afirma sobre ele e qual
     // opcao esta MARCADA, no laco de `CHAVES_EDITAVEIS` abaixo.
     for (const proibido of [ESCOPO_DE_MIDIAS.todas, MODO_DE_COMPARACAO.exact]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
     }
 
     // As tres chaves editaveis: a frase do valor que esta valendo e a MARCADA,
-    // e a oposta aparece so como a outra opcao — nunca marcada.
+    // e a oposta aparece so como a outra opcao, nunca marcada.
     for (const campo of CHAVES_EDITAVEIS) {
       expect({
         [campo]: {
@@ -1060,7 +1060,7 @@ describe('TELA — o que a tela imprime', () => {
           normalizeOptionsFrom(snapshot.global),
         ) !== null
 
-      expect({ [modo]: corpo.includes(`${exemplo}&rdquo; &mdash; aciona`) }).toEqual({
+      expect({ [modo]: corpo.includes(`${exemplo}&rdquo;, aciona`) }).toEqual({
         [modo]: acionaDeVerdade,
       })
     }
@@ -1104,12 +1104,12 @@ describe('TELA — o que a tela imprime', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TELA — o portao, o custo e o que a tela promete
+// TELA, o portao, o custo e o que a tela promete
 // ---------------------------------------------------------------------------
 
-describe('TELA — o portao e o custo', () => {
+describe('TELA: o portao e o custo', () => {
   test('TELA-18: sem cookie, as cinco telas respondem 303 e custam ZERO consulta', async () => {
-    // O portao, afirmado nas telas que servem a configuracao do dono — e nao
+    // O portao, afirmado nas telas que servem a configuracao do dono, e nao
     // so na linha `sessao: true` da tabela. As duas metades importam: a recusa
     // acontece E ela acontece antes do D1 (passo 6 da escada, §11.3).
     await gravarConfig(env.DB)
@@ -1138,7 +1138,7 @@ describe('TELA — o portao e o custo', () => {
   })
 
   test('TELA-19: as sete telas nao gravam CONTEUDO, e a unica escrita e a escrituracao de sessao de §10.8', async () => {
-    // §6: o painel le, nao age. A garantia continua sendo essa — o que mudou e
+    // §6: o painel le, nao age. A garantia continua sendo essa, o que mudou e
     // que ela agora e PRECISA, e observavel.
     //
     // **O nome antigo era "as cinco telas escrevem ZERO vezes no D1", e ele
@@ -1153,14 +1153,14 @@ describe('TELA — o portao e o custo', () => {
     // quem le o nome dele.
     //
     // A distincao que este teste passa a fazer, e que e o conteudo dele:
-    //   • escrita de CONTEUDO — `painel_config`, `painel_midias`,
+    //   • escrita de CONTEUDO, `painel_config`, `painel_midias`,
     //     `processed_comments`, `account_tokens`, `painel_auditoria`: ZERO, nos
     //     dois estados da janela. E isto que §6 promete, e continua valendo;
-    //   • escrituracao de SESSAO — `UPDATE painel_sessoes SET vista_em`, que
+    //   • escrituracao de SESSAO, `UPDATE painel_sessoes SET vista_em`, que
     //     §10.8 orca: nenhuma com a janela fresca, EXATAMENTE UMA na primeira
     //     visita depois dos 15 min.
     //
-    // **O contrapositivo e obrigatorio, e sao dois** — um teste que aceitasse
+    // **O contrapositivo e obrigatorio, e sao dois**, um teste que aceitasse
     // "qualquer escrita" nao valeria nada: (1) com a janela fresca a lista de
     // escritas e VAZIA, e nao "pequena"; (2) com a janela vencida ela tem UM
     // item, e o SQL dele e conferido inteiro por `ESCRITURACAO_DE_SESSAO`. Logo
@@ -1169,13 +1169,13 @@ describe('TELA — o portao e o custo', () => {
     //
     // MUTACOES QUE ESTE TESTE MATA (nao enfraqueca sem antes matar as tres):
     //   M-A: acrescentar `UPDATE painel_config SET enabled = enabled` ao ramo de
-    //        >15 min de `exigirSessaoViva` — uma tela de LEITURA gravando
+    //        >15 min de `exigirSessaoViva`, uma tela de LEITURA gravando
     //        conteudo, que e exatamente o que §6 proibe. Medido na versao antiga
     //        deste arquivo: 43/43 VERDES.
-    //   M-B: chamar `marcarVista` duas vezes seguidas (escrita duplicada) — cai
+    //   M-B: chamar `marcarVista` duas vezes seguidas (escrita duplicada), cai
     //        no `toEqual` de UM item.
     //   M-C: apagar o `if (now - linha.vistaEm < INTERVALO_DE_VISTA_MS)` de
-    //        `exigirSessaoViva`, fazendo a guarda escrever a CADA requisicao —
+    //        `exigirSessaoViva`, fazendo a guarda escrever a CADA requisicao,
     //        cai na lista vazia do estado fresco, que e a cadencia de §10.8.
     await gravarConfig(env.DB)
 
@@ -1184,7 +1184,7 @@ describe('TELA — o portao e o custo', () => {
         // Uma sessao NOVA por volta, e isto e load-bearing: a escrita acontece
         // no D1 REAL (o contador so envolve), entao reaproveitar um cookie faria
         // `vista_em` virar AGORA na primeira volta e todas as seguintes mediriam
-        // o estado fresco outra vez — a mesma cegueira, por outro caminho.
+        // o estado fresco outra vez, a mesma cegueira, por outro caminho.
         const cookie = await abrirSessao(estado.vistaEm)
         invalidarCacheDeConfig()
         // O cache de listagem de §12.5 e por ISOLATE e atravessa as voltas do
@@ -1196,7 +1196,7 @@ describe('TELA — o portao e o custo', () => {
         const contador = new D1Contador(env.DB)
         await abrirTela(tela, cookie, ambienteCom({ DB: comoD1(contador) }))
 
-        const chave = `${tela.rota.caminho} — ${estado.nome}`
+        const chave = `${tela.rota.caminho}, ${estado.nome}`
         const escritas = escritasDe(contador)
 
         // Quantas: 0 com a janela fresca, 1 depois dos 15 min. O `escritas` do
@@ -1212,7 +1212,7 @@ describe('TELA — o portao e o custo', () => {
         })
 
         // Quais: nada alem da escrituracao de sessao. Com a lista vazia esta
-        // assercao passa de gracas — e por isso a de cima existe.
+        // assercao passa de gracas, e por isso a de cima existe.
         expect({
           [chave]: escritas.filter((sql) => !ESCRITURACAO_DE_SESSAO.test(sql)),
         }).toEqual({ [chave]: [] })
@@ -1222,8 +1222,8 @@ describe('TELA — o portao e o custo', () => {
 
   test('TELA-20: o orcamento de subrequests de cada tela, nos DOIS estados da janela de sessao', async () => {
     // §12.10 orca 3 para o Inicio e 5 para "O que aconteceu". Quatro telas pagam
-    // 3, e o terceiro e a pergunta sobre a conta: sem ela a barra do topo — que
-    // §12.1 exige IGUAL em toda tela — diria "Ligada e respondendo" numa
+    // 3, e o terceiro e a pergunta sobre a conta: sem ela a barra do topo, que
+    // §12.1 exige IGUAL em toda tela, diria "Ligada e respondendo" numa
     // instalacao que nao consegue enviar nada.
     //
     // **Ajustes paga 4**, e o quarto e o bloco de historico que a Etapa 10 exige
@@ -1237,7 +1237,7 @@ describe('TELA — o portao e o custo', () => {
     //
     // **Cada tela tem DOIS orcamentos, e ate agora este teste media so um.** A
     // escrituracao de sessao de §10.8 mora na guarda COMUM, entao ela soma +1
-    // subrequest a TODA tela autenticada — mas so na primeira visita de cada
+    // subrequest a TODA tela autenticada, mas so na primeira visita de cada
     // janela de 15 min. Enquanto o laco construia apenas `vista_em = AGORA`, o
     // segundo numero de cada linha era invisivel: o teste travava o caminho
     // barato e chamava aquilo de "o orcamento da tela".
@@ -1245,7 +1245,7 @@ describe('TELA — o portao e o custo', () => {
     // **A tabela de §12.10 precisa de EMENDA, e este teste e a medicao dela.**
     // A tabela de la orca a tela e §10.8 orca a cadencia da escrita, e as duas
     // contas nunca se somaram: com a janela vencida o Inicio mede 4 contra os 3
-    // orcados, e "O que aconteceu" mede 5 — que por acaso e o numero que §12.10
+    // orcados, e "O que aconteceu" mede 5, que por acaso e o numero que §12.10
     // ja escreve, por outra razao. A emenda que falta e uma nota de rodape na
     // tabela ("+1 consulta e +1 escrita em toda tela com sessao, no maximo 1 a
     // cada 15 min, §10.8"), e nao um numero novo por linha, que divergiria em
@@ -1263,7 +1263,7 @@ describe('TELA — o portao e o custo', () => {
     //   Mensagem                       2 |      3 |      4
     //   Ajustes                        2 |      4 |      5
     //   O que aconteceu (abertura)     5 |      4 |      5
-    //   Este Reel (sem linha na spec)  — |      3 |      4
+    //   Este Reel (sem linha na spec) , |      3 |      4
     //
     // Tres divergencias, e as tres precisam de emenda na SPEC, nao aqui:
     //   1. a escrituracao de sessao (+1 em toda a coluna `apos15min`), que e o
@@ -1274,17 +1274,17 @@ describe('TELA — o portao e o custo', () => {
     //      historico da Etapa 10. Este numero ja estava desatualizado antes
     //      desta rodada, e o laco antigo o media sem dizer que divergia;
     //   3. "O que aconteceu": a abertura simples paga 4, e o 5 da tabela vale
-    //      para o toque em "Atualizar" — outra invocacao, e por isso duas linhas.
+    //      para o toque em "Atualizar", outra invocacao, e por isso duas linhas.
     //
     // O pior caso do painel continua folgado contra o teto de 50 subrequests por
     // invocacao, e e por isso que a emenda e de TEXTO, e nao de comportamento.
     //
     // MUTACOES QUE ESTE TESTE MATA (as duas medidas VERMELHAS aqui):
     //   M-C: afrouxar o `if (now - linha.vistaEm < INTERVALO_DE_VISTA_MS)` de
-    //        `exigirSessaoViva`, fazendo a guarda escrever a cada requisicao —
+    //        `exigirSessaoViva`, fazendo a guarda escrever a cada requisicao,
     //        cai na coluna `fresco`, que e a cadencia de §10.8 sendo respeitada
     //        (medido: TELA-19, TELA-20 e TELA-22 vermelhos juntos).
-    //   M-D: baixar qualquer `apos15min` para o valor de `fresco` — e a
+    //   M-D: baixar qualquer `apos15min` para o valor de `fresco`, e a
     //        "correcao" tentadora, e ela volta a esconder o custo da escrita.
     const ORCAMENTO: Record<string, { fresco: number; apos15min: number }> = {
       [ROTA_INICIO.caminho]: { fresco: 3, apos15min: 4 },
@@ -1294,8 +1294,8 @@ describe('TELA — o portao e o custo', () => {
       // **"O que aconteceu" paga 4 na abertura simples, e §12.10 sempre orcou 5
       // para ela.** Ate a Etapa 13 esta linha dizia 3 porque a tela ainda nao
       // tinha lista: ela lia so a configuracao, as midias e a conta. Com a lista
-      // implementada entra o quarto — a consulta paginada a `processed_comments`
-      // —, e o quinto so aparece com o toque em "Atualizar", que e outra
+      // implementada entra o quarto, a consulta paginada a `processed_comments`
+      //, e o quinto so aparece com o toque em "Atualizar", que e outra
       // invocacao. O numero fica travado AQUI, e nao dentro do handler, pelo
       // mesmo motivo dos outros: o custo de uma tela tem de ser visivel.
       [ROTA_ATIVIDADE.caminho]: { fresco: 4, apos15min: 5 },
@@ -1303,7 +1303,7 @@ describe('TELA — o portao e o custo', () => {
       // aqui foi removido.** Ele dizia que juntar a leitura de `painel_midias`
       // ao lote da configuracao "acoplaria a falha do `account_tokens` a
       // listagem, virando `500` onde hoje ha tela degradada". A re-revisao
-      // mediu duas coisas contra esse argumento: (1) ja era `500` —
+      // mediu duas coisas contra esse argumento: (1) ja era `500`,
       // `buscarPagina` sempre chamou `loadAccessToken`, que nao tem
       // `try/catch`, e a tela degradada e a de `/painel/atividade`; (2) a saida
       // custa ZERO subrequest, porque `PainelConfigRepository.ler()` ja faz um
@@ -1312,19 +1312,19 @@ describe('TELA — o portao e o custo', () => {
       // O que mudou: `configDaTela` pede a variante `comAsInativas`, e o
       // statement de midias do lote deixa de filtrar `ativo = 1` para o painel.
       // §12.5 manda estas telas mostrarem exatamente o que aquele filtro
-      // descarta — o Reel apagado que "nao some da lista", o selo de regras
+      // descarta, o Reel apagado que "nao some da lista", o selo de regras
       // proprias num Reel desmarcado, a lista "salvo por voce" quando a Meta
-      // nao responde —, e agora elas mostram sem pagar consulta nenhuma. O
+      // nao responde, e agora elas mostram sem pagar consulta nenhuma. O
       // caminho quente do webhook segue com o lote filtrado (CFG-11 e CFG-12
       // travam os numeros dele).
       //
       // Os tres sao os mesmos das outras telas: a sessao, o lote da
-      // configuracao e a pergunta sobre a conta — que em `/painel/reels` sai da
+      // configuracao e a pergunta sobre a conta, que em `/painel/reels` sai da
       // propria listagem (`loadAccessToken`, dentro de `buscarPagina`) e em
       // `/painel/reel` continua sendo `contaConectada`.
       [ROTA_REELS.caminho]: { fresco: 3, apos15min: 4 },
-      // `/painel/reel` nao esta em §12.10 — a tabela de la nao tem linha para
-      // ela —, e ela paga os mesmos 3. A linha daquele Reel vinha de um
+      // `/painel/reel` nao esta em §12.10, a tabela de la nao tem linha para
+      // ela, e ela paga os mesmos 3. A linha daquele Reel vinha de um
       // `lerUma` proprio e agora sai do mesmo lote.
       [ROTA_REEL.caminho]: { fresco: 3, apos15min: 4 },
     }
@@ -1339,7 +1339,7 @@ describe('TELA — o portao e o custo', () => {
         const cookie = await abrirSessao(estado.vistaEm)
         invalidarCacheDeConfig()
         // Idem TELA-19: o cache de listagem de §12.5 sobrevive as voltas, e o
-        // orcamento que §12.10 escreve e o da abertura FRIA — com a leitura do
+        // orcamento que §12.10 escreve e o da abertura FRIA, com a leitura do
         // token dentro. Sem esta linha, `/painel/reels` mediria 3 na volta
         // fresca e 3 na retomada (2 leituras + 1 escrita), e a diferenca de +1
         // desapareceria por artefato de fixture, e nao por comportamento.
@@ -1348,7 +1348,7 @@ describe('TELA — o portao e o custo', () => {
         await abrirTela(tela, cookie, ambienteCom({ DB: comoD1(contador) }))
 
         const orcado = ORCAMENTO[tela.rota.caminho]
-        const chave = `${tela.rota.caminho} — ${estado.nome}`
+        const chave = `${tela.rota.caminho}, ${estado.nome}`
 
         // A escrita entra na conta ao lado do subrequest, e nao em vez dele: e
         // ela que explica o +1, e sem ela um `SELECT` novo na guarda passaria
@@ -1377,7 +1377,7 @@ describe('TELA — o portao e o custo', () => {
     //
     // **Os DOIS estados da janela de §10.8, como em TELA-20**: 4 com a janela
     // fresca e 5 na primeira visita depois dos 15 min. O 5 e o pior caso de
-    // custo do Inicio — automacao desligada E janela vencida —, e ele estava
+    // custo do Inicio, automacao desligada E janela vencida, e ele estava
     // fora de toda medicao. Continua folgadissimo contra o teto de 50
     // subrequests por invocacao; o que nao podia continuar era invisivel.
     await gravarConfig(env.DB, { enabled: 0 })
@@ -1408,23 +1408,23 @@ describe('TELA — o portao e o custo', () => {
   test('TELA-21: nenhuma tela ESCREVE em `processed_comments`, e so uma le', async () => {
     // **A premissa desta garantia mudou na Etapa 13, e a metade que importa
     // continua intacta.** Ate aqui ela dizia "nenhuma tela consulta
-    // `processed_comments`" — verdade enquanto "O que aconteceu" nao tinha
+    // `processed_comments`", verdade enquanto "O que aconteceu" nao tinha
     // lista. §12.6 mandou a tela ler aquela tabela, e §11.8 regra 6 diz por que
     // isso nao afrouxa nada: **a separacao que importa e a do caminho de
     // ESCRITA**. A leitura pelo painel e permitida somente na forma de §12.6.
     //
     // Entao o laco afirma agora DUAS coisas, e a primeira e a antiga:
-    //   1. nenhuma tela executa escrita naquela tabela — nenhuma, nunca;
+    //   1. nenhuma tela executa escrita naquela tabela, nenhuma, nunca;
     //   2. so `/painel/atividade` a le; qualquer outra tela que passe a ler cai
     //      aqui e obriga a decisao a ser escrita, em vez de passar no diff.
     //
-    // A afirmacao e sobre QUAIS statements passaram, e nao sobre quantos —
+    // A afirmacao e sobre QUAIS statements passaram, e nao sobre quantos,
     // contar nao diz nada sobre a tabela tocada.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
     const cookie = await abrirSessao()
 
-    /** `INSERT`, `UPDATE` e `DELETE` — o caminho de escrita de §11.8 regra 6. */
+    /** `INSERT`, `UPDATE` e `DELETE`, o caminho de escrita de §11.8 regra 6. */
     const ESCRITA = /\b(insert|update|delete)\b/i
 
     for (const tela of TELAS) {
@@ -1544,10 +1544,10 @@ describe('TELA — o portao e o custo', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TELA — celular e acessibilidade (§12.9)
+// TELA, celular e acessibilidade (§12.9)
 // ---------------------------------------------------------------------------
 
-describe('TELA — celular e acessibilidade', () => {
+describe('TELA: celular e acessibilidade', () => {
   test('TELA-25: toda tela sai com `lang="pt-BR"` e o viewport de `initial-scale=1`', async () => {
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
@@ -1575,7 +1575,7 @@ describe('TELA — celular e acessibilidade', () => {
     // decide isto: um item que leva a um `404` e pior do que um item a menos,
     // e as trocas acontecem nas etapas que criam aquelas telas.
     //
-    // A Etapa 12 fez a PRIMEIRA das duas trocas — a tela de Reels existe, entao
+    // A Etapa 12 fez a PRIMEIRA das duas trocas, a tela de Reels existe, entao
     // o item entrou. Tirar "O que aconteceu" ou "Ajustes" para manter cinco
     // deixaria uma tela pronta sem entrada na barra, que e a mesma promessa
     // quebrada ao contrario. Sao seis ate a segunda troca, o "Mais" das Tasks 14
@@ -1616,7 +1616,7 @@ describe('TELA — celular e acessibilidade', () => {
 
   test('TELA-28: o freio aparece na barra do topo de TODA tela', async () => {
     // §12.1: a barra do topo e o unico elemento repetido do painel, e a
-    // repeticao e proposital — a pessoa nunca precisa procurar como parar.
+    // repeticao e proposital, a pessoa nunca precisa procurar como parar.
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
 
@@ -1635,16 +1635,16 @@ describe('TELA — celular e acessibilidade', () => {
     // afirmava "conformidade com §12.9", e §12.9 nao e teto: a linha da tabela
     // diz *"Conexao ruim | ... CSS ~6 KB, HTML ~15 KB por tela"*, com til, como
     // diretriz. O que este laco entrega e uma **trava-crescimento desta
-    // branch** — a tela que estoura o orcamento estoura devagar, um bloco por
+    // branch**, a tela que estoura o orcamento estoura devagar, um bloco por
     // etapa, e ninguem percebe pelo olho.
     //
-    // A pergunta que §12.9 protege — "abre em conexao ruim?" — nao se responde
+    // A pergunta que §12.9 protege, "abre em conexao ruim?", nao se responde
     // com o numero cru: 39.473 bytes da tela de Reels viram 2.499 comprimidos.
     // Quem a responde e o MID-27, que mede as duas pontas.
     //
     // **Os 15 KB seguem para as cinco telas de TEXTO. As duas de Reels adotam
     // os tetos ja medidos do MID-27**, porque o laco daqui as percorre com UM
-    // Reel salvo e UM item listado — o cenario que menos importa — e afirmar
+    // Reel salvo e UM item listado, o cenario que menos importa, e afirmar
     // 15 KB sobre ele daria a impressao de cobrir o que nao cobre (§13.1).
     const TETO: Record<string, number> = {
       [ROTA_REELS.caminho]: TETO_NO_LIMITE_DE_200_REELS,
@@ -1669,7 +1669,7 @@ describe('TELA — celular e acessibilidade', () => {
   //
   // Uma primeira versao deste arquivo importava `painel.css?raw` e afirmava o
   // teto sobre o texto lido. Ela passava, e passava por nada: sob
-  // `vitest-pool-workers` o `?raw` de um `.css` devolve **string vazia** —
+  // `vitest-pool-workers` o `?raw` de um `.css` devolve **string vazia**,
   // conferido nos dois caminhos, o `import` direto e o `import.meta.glob` que o
   // Lema 1 de §10.6 usa para os `.ts`. Com a string vazia, o teto passava, o
   // `@import` "nao existia", e duas mutacoes que faziam a folha crescer 2 KB e

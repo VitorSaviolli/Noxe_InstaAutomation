@@ -1,5 +1,5 @@
 /**
- * `GET, POST /painel/mensagem` — a mensagem e o link.
+ * `GET, POST /painel/mensagem`, a mensagem e o link.
  *
  * A tela cabe numa frase: **o que a pessoa recebe quando comenta**. Os tres
  * campos levam cadeado e a palavra "protegido" (§12.3), e desde a etapa do
@@ -8,8 +8,8 @@
  *
  * **Esta e a unica tela em que TODOS os campos sao protegidos**, e por isso ela
  * e a unica que diz, antes do gesto, que aquele toque cobre a tela inteira
- * (§15.4). O botao diz o que vai acontecer — "Salvar (vai pedir a sua digital)"
- * — porque §12.3 e literal: nunca uma surpresa biometrica.
+ * (§15.4). O botao diz o que vai acontecer, "Salvar (vai pedir a sua digital)"
+ * porque §12.3 e literal: nunca uma surpresa biometrica.
  *
  * **A previa usa `renderTemplate`, a funcao de producao** (§12.1 regra 4). Ela
  * mostra os efeitos reais da limpeza de texto: quem colar algo de um editor
@@ -17,7 +17,7 @@
  * cliente reclamar.
  *
  * O link e o unico campo que a allowlist trava, e a lista vem de
- * `ALLOWED_LINK_DOMAINS` — que o painel NAO altera, por construcao: mudar a
+ * `ALLOWED_LINK_DOMAINS`, que o painel NAO altera, por construcao: mudar a
  * lista exige o repositorio mais a credencial de publicacao, as duas coisas
  * que um painel invadido nao tem. Um link fora dela e barrado **mesmo com a
  * digital correta**: a validacao roda depois do step-up, nunca no lugar dele.
@@ -89,11 +89,11 @@ function campoDeLink(valor: string): HtmlSeguro {
 /**
  * O formulario dos tres campos, com o aviso de §15.4 ANTES do botao.
  *
- * §15.4 recusou separar `publicReplyText` numa tela propria — a premissa estava
+ * §15.4 recusou separar `publicReplyText` numa tela propria, a premissa estava
  * errada, porque aqui **todos** os campos ja exigem step-up sempre e nao ha lote
  * a arrastar. O que ela acolheu foi a metade certa da objecao: a tela precisa
  * dizer, antes do gesto, que aquele toque cobre a tela inteira. E o paragrafo
- * abaixo, e ele vem antes do botao — nao depois, e nao numa tela seguinte.
+ * abaixo, e ele vem antes do botao, nao depois, e nao numa tela seguinte.
  */
 function formularioDaMensagem(config: AutomationConfig, ficha: string, versao: number): HtmlSeguro {
   return html`<form method="post" action="${ROTA_MENSAGEM.caminho}" class="protegidos">
@@ -142,13 +142,11 @@ function blocoDePrevia(config: AutomationConfig): HtmlSeguro {
   return html`<section>
 <h2>Como vai chegar</h2>
 <div class="balao balao-direto">
-<p class="quem">No Direct${config.privateReplyEnabled ? null : html` &mdash; hoje desligado`}</p>
+<p class="quem">No Direct${config.privateReplyEnabled ? null : html`, hoje desligado`}</p>
 <p>${direto}</p>
 </div>
 <div class="balao balao-publico">
-<p class="quem">Embaixo do Reel${
-    config.publicReplyEnabled ? null : html` &mdash; hoje desligado`
-  }</p>
+<p class="quem">Embaixo do Reel${config.publicReplyEnabled ? null : html`, hoje desligado`}</p>
 <p>${config.publicReplyText}</p>
 </div>
 <p>No lugar de <code>{username}</code> entra o @ de quem comentou, e no lugar de
@@ -164,7 +162,7 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
       confirmacao: 'salvo',
       // Ruling 70, e e AQUI que ela paga: os tres campos desta tela sao
       // exatamente os tres de `CAMPOS_SEMPRE_PROTEGIDOS`, entao "step-up
-      // **sempre** no POST" (§7.1) e verdade por construcao — nao ha campo
+      // **sempre** no POST" (§7.1) e verdade por construcao, nao ha campo
       // barato que esta rota saiba escrever.
       campos: CAMPOS_DA_MENSAGEM,
     })

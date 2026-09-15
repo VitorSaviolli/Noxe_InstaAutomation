@@ -1,5 +1,5 @@
 /**
- * ATV — "O que aconteceu": a lista, o @ ao vivo e o que a tela promete (§12.6).
+ * ATV, "O que aconteceu": a lista, o @ ao vivo e o que a tela promete (§12.6).
  *
  * As onze garantias ATV de §13.2, mais o dicionario de `CommentStatus` como
  * funcao pura e o par que sustenta a frase honesta da tela: a automacao **nao
@@ -16,7 +16,7 @@
  *   - **`now` e sempre injetado** (`AGORA`), sem fake timers;
  *   - **um ID por garantia**, e nenhum valor da instalacao de quem escreveu.
  *
- * O duble conta a ORDEM e a SIMULTANEIDADE das chamadas — e o que transforma
+ * O duble conta a ORDEM e a SIMULTANEIDADE das chamadas, e o que transforma
  * "em blocos de no maximo 6" numa afirmacao sobre o codigo, e nao sobre a
  * intencao de quem o escreveu.
  */
@@ -218,7 +218,7 @@ function soOCorpo(html: string): string {
  * Os testes de paginacao SEGUEM o link que a tela desenhou, em vez de montar a
  * query string a mao. A diferenca nao e de estilo: um cursor montado pelo teste
  * afirma que o BANCO pagina certo, e um cursor lido da tela afirma que a pessoa
- * que toca em "Ver mais" chega na pagina seguinte — que e a garantia de §12.6.
+ * que toca em "Ver mais" chega na pagina seguinte, que e a garantia de §12.6.
  * Foi exatamente essa distancia que deixou o cursor sem desempate passar verde.
  */
 function hrefDaAcao(corpo: string, texto: string): string {
@@ -239,7 +239,7 @@ function quantasLinhas(corpo: string): number {
 }
 
 /**
- * As formas de ESCREVER naquele nome — as que transformam uma tabela `const`
+ * As formas de ESCREVER naquele nome, as que transformam uma tabela `const`
  * num cache de isolate sem que o `tsc` tenha o que dizer.
  */
 function mutacoesDe(nome: string): RegExp[] {
@@ -259,10 +259,10 @@ beforeEach(async () => {
 // A consulta ao banco (§12.6, §16.6)
 // ---------------------------------------------------------------------------
 
-describe('ATV — a consulta a `processed_comments`', () => {
+describe('ATV: a consulta a `processed_comments`', () => {
   test('ATV-01: o painel NUNCA executa escrita em `processed_comments`', async () => {
     // §6: o painel le, nao age. E §16.6 fecha a outra metade: nem indice novo,
-    // nem escrita — o caminho quente do webhook e quem paga a conta daquela
+    // nem escrita, o caminho quente do webhook e quem paga a conta daquela
     // tabela, e uma escrita por abertura de tela sairia do mesmo orcamento.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -279,7 +279,7 @@ describe('ATV — a consulta a `processed_comments`', () => {
     expect(contador.sqls.some((sql) => sql.includes('processed_comments'))).toBe(true)
 
     // **`escritas === 0` vale porque `abrirSessao()` deixa `vista_em = AGORA`.**
-    // Nesse estado a escrituracao de sessao de §10.8 nao grava — o intervalo de
+    // Nesse estado a escrituracao de sessao de §10.8 nao grava, o intervalo de
     // 15 min nao venceu. Numa sessao RETOMADA a guarda comum grava uma vez, e
     // este numero seria 1 sem que nada desta tela tivesse mudado; quem afirma
     // aquele estado e TELA-19, que separa escrita de CONTEUDO de escrituracao de
@@ -295,7 +295,7 @@ describe('ATV — a consulta a `processed_comments`', () => {
   test('ATV-02: nenhuma consulta do painel retorna `commenter_scoped_id_hash`', async () => {
     // O hash do autor existe para o intervalo por pessoa. Um `SELECT *` o
     // traria para a memoria da tela, e dali seria uma linha de distancia de ele
-    // entrar num log de depuracao — que e o unico jeito de esta tela vazar um
+    // entrar num log de depuracao, que e o unico jeito de esta tela vazar um
     // dado que ela promete nunca ter tido.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -350,7 +350,7 @@ describe('ATV — a consulta a `processed_comments`', () => {
 // O orcamento (§12.6)
 // ---------------------------------------------------------------------------
 
-describe('ATV — o orcamento de chamadas a Meta', () => {
+describe('ATV: o orcamento de chamadas a Meta', () => {
   test('ATV-04: a tela nao emite mais de 20 chamadas a Meta por invocacao', async () => {
     // 35 linhas no banco, e a pagina continua sendo de 20: o teto e de PROJETO
     // e existe para respeitar a cota de 24 h da Meta, que e a mesma que a
@@ -396,7 +396,7 @@ describe('ATV — o orcamento de chamadas a Meta', () => {
     expect(orcamentoDeArrobas(200)).toBe(0)
 
     // E a metade medida: com a pagina cheia, o gasto real da invocacao inteira
-    // — consultas ao D1 mais chamadas a Meta — fica abaixo do teto da
+    // consultas ao D1 mais chamadas a Meta, fica abaixo do teto da
     // plataforma, que o Miniflare nao impoe.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -444,10 +444,10 @@ describe('ATV — o orcamento de chamadas a Meta', () => {
 // A degradacao (§12.6)
 // ---------------------------------------------------------------------------
 
-describe('ATV — quando o @ nao vem', () => {
+describe('ATV: quando o @ nao vem', () => {
   test('ATV-07: comentario apagado mantem a linha, com "@ indisponivel"', async () => {
     // §12.6: nunca sumir com a linha. O mesmo texto cobre perfil apagado e conta
-    // que bloqueou — do lado de ca as tres sao indistinguiveis, e inventar a
+    // que bloqueou, do lado de ca as tres sao indistinguiveis, e inventar a
     // diferenca seria afirmar sobre o Instagram de outra pessoa.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -461,7 +461,7 @@ describe('ATV — quando o @ nao vem', () => {
     const corpo = await corpoDe(comToque(), cookie, { deps: comArrobas(falsa) })
 
     expect(corpo).toContain('@quem_comentou')
-    expect(corpo).toContain('@ indisponível — o comentário foi apagado')
+    expect(corpo).toContain('@ indisponível, o comentário foi apagado')
     // A linha CONTINUA: o resultado dela esta na tela, inteiro.
     expect(corpo.match(/Direct enviado e coment/g)?.length).toBe(2)
     // E a consequencia honesta de §12.6 esta escrita na propria tela.
@@ -513,11 +513,11 @@ describe('ATV — quando o @ nao vem', () => {
 
   test('ATV-08c: com o token vencido a tela NAO gasta chamada nenhuma, e nao afirma normalidade', async () => {
     // `loadAccessToken` devolve `{token, igUserId, expiresAt}` sem olhar a
-    // validade — ele so devolve `null` quando nao existe linha nenhuma. Sem
+    // validade, ele so devolve `null` quando nao existe linha nenhuma. Sem
     // conferir o `expiresAt` a tela disparava ate 20 chamadas com um Bearer
     // morto, todas respondidas 401/190, todas viradas em `falhou`: 20
     // subrequests e 20 chamadas queimadas da cota de 24 h que a AUTOMACAO usa
-    // para enviar — a cota que o botao explicito de §2.3 existe para racionar —,
+    // para enviar, a cota que o botao explicito de §2.3 existe para racionar,
     // e no fim a faixa afirmando que "a sua automacao continua funcionando
     // normalmente" na mesma pagina que dizia "nada e enviado".
     await gravarConfig(env.DB)
@@ -546,7 +546,7 @@ describe('ATV — quando o @ nao vem', () => {
   test('ATV-08d: no caminho feliz a faixa NAO sobe, e uma falha sozinha a liga', async () => {
     // O contrapositivo que faltava. Sem ele, `let mudo = false` trocado por
     // `let mudo = true` deixava a suite inteira verde e a tela passava a exibir
-    // "nao conseguimos falar com o Instagram" com os 20 @ chegando perfeitos —
+    // "nao conseguimos falar com o Instagram" com os 20 @ chegando perfeitos,
     // o dono conclui que a integracao quebrou, e nenhum teste fica vermelho.
     // A garantia ATV de §13.2 valia, na pratica, "a faixa existe no HTML".
     await gravarConfig(env.DB)
@@ -574,7 +574,7 @@ describe('ATV — quando o @ nao vem', () => {
   test('ATV-08e: comentario apagado NAO e falha, e sozinho nao levanta faixa nenhuma', async () => {
     // `apagado` e um desfecho conhecido e explicado na propria linha ("o
     // comentario foi apagado"). Trata-lo como falha faria a tela avisar que o
-    // Instagram esta mudo toda vez que uma linha envelhecesse — que e o estado
+    // Instagram esta mudo toda vez que uma linha envelhecesse, que e o estado
     // NORMAL desta lista, segundo a frase de §12.6 que ela mesma escreve.
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -584,7 +584,7 @@ describe('ATV — quando o @ nao vem', () => {
     const apagados = new MetaDosArrobas(() => ({ tipo: 'apagado' }))
     const corpo = await corpoDe(comToque(), cookie, { deps: comArrobas(apagados) })
 
-    expect(corpo).toContain('@ indisponível — o comentário foi apagado')
+    expect(corpo).toContain('@ indisponível, o comentário foi apagado')
     expect(corpo).not.toContain('falar com o Instagram agora')
     expect(corpo).not.toContain('liga&ccedil;&atilde;o com o Instagram caiu')
     expect(quantasLinhas(corpo)).toBe(3)
@@ -595,7 +595,7 @@ describe('ATV — quando o @ nao vem', () => {
 // O username nao sobrevive (§2.3)
 // ---------------------------------------------------------------------------
 
-describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
+describe('ATV: o @ nao e armazenado em lugar nenhum', () => {
   test('ATV-09: o @ nao vai ao `console`, nao vai a auditoria e nao sobrevive a requisicao', async () => {
     await gravarConfig(env.DB)
     await ligarConta(env, AGORA)
@@ -613,7 +613,7 @@ describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
       console.parar()
     }
 
-    // Contrapositivo: o @ ESTA na tela desta resposta — e so nela.
+    // Contrapositivo: o @ ESTA na tela desta resposta, e so nela.
     expect(corpo).toContain(`@${arroba}`)
 
     expect(console.linhas.join(' ')).not.toContain(arroba)
@@ -622,7 +622,7 @@ describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
     expect(auditoria.results ?? []).toEqual([])
 
     // Nenhuma tabela guardou o @: uma segunda abertura SEM o toque volta sem
-    // arroba nenhum. (Esta linha sozinha NAO prova ausencia de cache — sem o
+    // arroba nenhum. (Esta linha sozinha NAO prova ausencia de cache, sem o
     // toque `arrobaDaLinha` devolve string vazia para toda linha, e mostrar um
     // cache aqui violaria ATV-11. Quem prova e o par abaixo.)
     const segunda = await corpoDe(ROTA_ATIVIDADE.caminho, cookie)
@@ -630,7 +630,7 @@ describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
 
     // **A prova de que nada foi reaproveitado**: o segundo toque busca de novo
     // as tres linhas E o que a tela mostra e a resposta NOVA. Um cache de
-    // isolate lido no lugar da chamada devolveria o @ da primeira requisicao —
+    // isolate lido no lugar da chamada devolveria o @ da primeira requisicao,
     // e o teste anterior, que so contava chamadas, ficaria verde do mesmo jeito.
     const outroArroba = 'pessoa_de_agora'
     const outra = new MetaDosArrobas(() => ({ tipo: 'arroba', username: outroArroba }))
@@ -642,15 +642,15 @@ describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
 
   test('ATV-09b: o arquivo da tela nao tem variavel de modulo onde um @ caberia', async () => {
     // **Um cache so de ESCRITA nao aparece em nenhuma resposta HTTP.** A
-    // mutacao que motivou este teste — `const CACHE = new Map()` no topo do
-    // modulo, alimentado dentro do laco de `buscarArrobas` — passa verde em
+    // mutacao que motivou este teste, `const CACHE = new Map()` no topo do
+    // modulo, alimentado dentro do laco de `buscarArrobas`, passa verde em
     // todos os testes de comportamento deste arquivo, porque nada nunca le esse
     // `Map`. O isolate acumula o @ de cada terceiro que comentou, indefinidamente
     // e por toda a vida do isolate, e o cabecalho de `src/index.ts` mais a
-    // politica de §11.7 viram promessa falsa — com ATV-09 verde ao lado.
+    // politica de §11.7 viram promessa falsa, com ATV-09 verde ao lado.
     //
     // A promessa de §2.3 e ESTRUTURAL ("nao entra em cache de isolate"), entao a
-    // afirmacao tambem e, e ela tem tres partes — as tres formas que um
+    // afirmacao tambem e, e ela tem tres partes, as tres formas que um
     // acumulador de modulo tem: um `Map`/`Set` declarado no topo, um `let`/`var`
     // no topo, e a MUTACAO de qualquer nome do topo (uma tabela `const` como
     // `MOTIVO_DA_FALHA` vira cache com um `[id] =` e nada no tipo reclama).
@@ -728,7 +728,7 @@ describe('ATV — o @ nao e armazenado em lugar nenhum', () => {
 /**
  * Os oito membros de `CommentStatus`, escritos a mao.
  *
- * O tipo nao existe em runtime, entao a lista precisa ser escrita — e e por
+ * O tipo nao existe em runtime, entao a lista precisa ser escrita, e e por
  * isso que ela e anotada como `readonly CommentStatus[]`: um membro novo no
  * enum sem entrada aqui nao quebra nada, mas o `Record<CommentStatus, …>` do
  * dicionario quebra o `tsc` primeiro, que e a trava que importa. Um membro
@@ -745,7 +745,7 @@ const TODOS_OS_STATUS: readonly CommentStatus[] = [
   'uncertain',
 ]
 
-describe('ATV — o dicionario de `CommentStatus`', () => {
+describe('ATV: o dicionario de `CommentStatus`', () => {
   test('ATV-12: todo valor do enum tem frase propria, e nenhuma e a generica', () => {
     // A funcao e PURA: ela nao consulta banco, nao conhece a tela e nao muda de
     // resposta com o relogio. E o que permite afirmar o dicionario inteiro sem
@@ -788,7 +788,7 @@ describe('ATV — o dicionario de `CommentStatus`', () => {
 
   test('ATV-12d: cada frase traduzida aparece na tela quando a linha tem aquele status', async () => {
     // O par que fecha o dicionario: a traducao existe E chega a tela. Os oito
-    // valores sao renderizados aqui a partir de linhas escritas a mao — o que
+    // valores sao renderizados aqui a partir de linhas escritas a mao, o que
     // este teste NAO afirma, e nao pode afirmar sem virar promessa falsa, e que
     // todos os oito acontecem em producao (§12.6, §13.1).
     await gravarConfig(env.DB)
@@ -807,7 +807,7 @@ describe('ATV — o dicionario de `CommentStatus`', () => {
 
   test('ATV-12e: `failed` diz o motivo em portugues, e nunca o codigo cru', async () => {
     // §12.7: detalhe tecnico vai para o `console`, nunca para a tela. Um codigo
-    // que a tabela nao conhece some — a linha fica so com "Não conseguimos
+    // que a tabela nao conhece some, a linha fica so com "Não conseguimos
     // enviar", que continua sendo verdade.
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
@@ -857,7 +857,7 @@ function evento(patch: Partial<CommentEvent> = {}): CommentEvent {
   }
 }
 
-describe('ATV — a frase honesta da tela, e o que a sustenta', () => {
+describe('ATV: a frase honesta da tela, e o que a sustenta', () => {
   test('ATV-13: a automacao nao grava linha para comentario IGNORADO', async () => {
     // Este e o par que torna a frase da tela verdadeira. Todo `skipped` de
     // `processComment` acontece ANTES do unico `INSERT` da tabela, e a decisao
@@ -928,7 +928,7 @@ describe('ATV — a frase honesta da tela, e o que a sustenta', () => {
         // por pessoa e uma LEITURA, e ele impede a escrita seguinte.
         preparar: async () => {
           // O hash REAL daquele autor: `processComment` compara
-          // `sha256Hex(event.fromId)`, e um hash inventado aqui nao casaria —
+          // `sha256Hex(event.fromId)`, e um hash inventado aqui nao casaria,
           // o cenario cairia no caminho de entrega e o teste mediria outra coisa.
           await env.DB.prepare(
             `INSERT INTO processed_comments
@@ -971,7 +971,7 @@ describe('ATV — a frase honesta da tela, e o que a sustenta', () => {
       expect({ [caso.motivo]: contador.escritas }).toEqual({ [caso.motivo]: 0 })
     }
 
-    // Contrapositivo: o caminho que NAO e ignorado grava — sem isto, um
+    // Contrapositivo: o caminho que NAO e ignorado grava, sem isto, um
     // `processComment` quebrado devolveria zero escritas em tudo e o laco acima
     // ficaria verde sem afirmar nada.
     await limparBanco(env.DB)
@@ -990,7 +990,7 @@ describe('ATV — a frase honesta da tela, e o que a sustenta', () => {
 
   test('ATV-14: o aviso de "so os atendidos aparecem" sobe SEMPRE, ate com a lista vazia', async () => {
     // Sem ela, quem abre esta tela conclui que a automacao deixou de responder
-    // alguem — e a etapa entregaria menos do que §3 promete.
+    // alguem, e a etapa entregaria menos do que §3 promete.
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
 
@@ -1049,14 +1049,14 @@ describe('ATV — a frase honesta da tela, e o que a sustenta', () => {
 // A paginacao (§12.6)
 // ---------------------------------------------------------------------------
 
-describe('ATV — "Ver mais"', () => {
+describe('ATV: "Ver mais"', () => {
   /**
    * Uma linha por DIA, da mais nova para a mais velha.
    *
    * As paginas sao distinguidas pela DATA de cada linha, e nao pelo
    * `comment_id`: **o id do comentario nao vai para a tela**, e nao pode ir. Ele
    * e o identificador de um comentario de terceiro no Instagram, e §2.3 fixa que
-   * esta tela mostra o @ e o resultado — nada que sirva para procurar a pessoa
+   * esta tela mostra o @ e o resultado, nada que sirva para procurar a pessoa
    * depois. Um teste que se apoiasse no id pediria a tela a imprimi-lo.
    */
   async function gravarUmaPorDia(quantas: number): Promise<number[]> {
@@ -1072,7 +1072,7 @@ describe('ATV — "Ver mais"', () => {
   test('ATV-16: "Ver mais" leva o `created_at` da ultima linha, e a pagina seguinte continua', async () => {
     // §12.6: outra invocacao, com outro orcamento. O cursor viaja na query
     // string porque a rota e `GET` unico e nenhum caminho ganha segmento
-    // variavel — o mesmo desenho de `/painel/reel?midia=`.
+    // variavel, o mesmo desenho de `/painel/reel?midia=`.
     await gravarConfig(env.DB)
     const cookie = await abrirSessao()
     const instantes = await gravarUmaPorDia(LINHAS_POR_PAGINA + 3)
@@ -1140,7 +1140,7 @@ describe('ATV — "Ver mais"', () => {
   })
 
   /**
-   * N linhas gravadas no MESMO milissegundo — o lote do webhook.
+   * N linhas gravadas no MESMO milissegundo, o lote do webhook.
    *
    * Nao e um cenario inventado para o teste: `src/index.ts` calcula
    * `const now = Date.now()` UMA vez por invocacao e passa esse mesmo valor a
@@ -1157,7 +1157,7 @@ describe('ATV — "Ver mais"', () => {
   test('ATV-17: um lote inteiro no MESMO `created_at` nao perde linha no "Ver mais"', async () => {
     // O defeito que este teste prende: com o cursor sendo so o `created_at` e a
     // consulta usando `created_at < ?`, TODA linha que empatasse com a ultima da
-    // pagina ficava estritamente fora da pagina seguinte — e sumia da unica tela
+    // pagina ficava estritamente fora da pagina seguinte, e sumia da unica tela
     // que existe para dizer o que aconteceu. Trinta comentarios atendidos, vinte
     // na pagina 1, e os dez restantes invisiveis para sempre, sem aviso nenhum.
     // §12.6 e literal: "nunca sumir com a linha".

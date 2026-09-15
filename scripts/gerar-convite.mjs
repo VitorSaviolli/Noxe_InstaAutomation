@@ -18,7 +18,7 @@
  * NAO e enviado ao servidor, nao entra em log de proxy nem no cabecalho
  * Referer. E a mesma regra que o OAuth deste projeto ja segue.
  *
- * Vale 20 minutos e serve UMA vez. Se voce demorar, rode de novo — e de graca.
+ * Vale 20 minutos e serve UMA vez. Se voce demorar, rode de novo, e de graca.
  */
 import { createHmac, randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'

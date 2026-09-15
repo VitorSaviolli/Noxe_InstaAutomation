@@ -43,15 +43,15 @@ import {
 } from './fixtures/dubles'
 
 /**
- * REC — recuperacao, varios aparelhos e revogacao (§10.11, §10.13, §10.14).
+ * REC, recuperacao, varios aparelhos e revogacao (§10.11, §10.13, §10.14).
  *
  * A garantia que da nome a etapa e a REC-01: **apagar a linha invalida a sessao
  * emitida.** Ela e o que faz "sair de todos os aparelhos" e "remover este
  * aparelho" serem revogacao de verdade, e nao um botao que promete.
  *
  * **As rotas sao chamadas por `despachar`**, a MESMA funcao do roteador: um
- * teste que chamasse o handler direto pularia a escada de §11.3 — origem, teto
- * de corpo, limitador, sessao e ficha — e afirmaria muito menos do que parece.
+ * teste que chamasse o handler direto pularia a escada de §11.3, origem, teto
+ * de corpo, limitador, sessao e ficha, e afirmaria muito menos do que parece.
  * As tres rotas de registro sao a excecao conhecida: elas nao passam por
  * `despachar` porque `portaDaApi` ja consome o corpo (§11.1).
  *
@@ -275,14 +275,14 @@ interface EnvioPreparado {
  * ATOMICA, e provar isso exige duas remocoes VOANDO AO MESMO TEMPO: com os dois
  * envios preparados antes e soltos juntos, uma implementacao que lesse a
  * contagem em JavaScript e so depois apagasse deixaria as duas passarem. Com os
- * envios em sequencia — como REC-08 os fazia — a leitura-e-depois-escrita passa
+ * envios em sequencia, como REC-08 os fazia, a leitura-e-depois-escrita passa
  * igual a subconsulta dentro do `DELETE`, e o teste que tem "ATOMICA" no nome
  * nao afirma atomicidade nenhuma.
  *
  * **O POST final e dirigido pelo `<form id="confirmar">` RENDERIZADO**, e nao
  * por uma string que o teste guardou (Ruling 81): e o que prende a ficha, o
  * `acao` e o `aparelho` do formulario de uma vez. Reenviar a string do teste
- * deixaria passar uma tela de conferencia que esqueceu um campo escondido — e o
+ * deixaria passar uma tela de conferencia que esqueceu um campo escondido, e o
  * envio real morreria em `dados_invalidos` DEPOIS de colher a digital.
  */
 async function prepararEnvio(
@@ -300,7 +300,7 @@ async function prepararEnvio(
   // **O campo `digital` tem de ter sido RENDERIZADO pela tela**, e nao criado
   // aqui. Ele e o UNICO campo que o `painel.js` procura no DOM
   // (`querySelector('input[name="digital"]')`); sem ele o navegador aborta com
-  // "Nao foi possivel confirmar" e o painel fica sem revogacao nenhuma — e,
+  // "Nao foi possivel confirmar" e o painel fica sem revogacao nenhuma, e,
   // enquanto o teste o injetava com `set()` incondicional, apagar a linha do
   // `<input>` de `telaDeConferencia` mantinha a suite inteira verde.
   const trazOCampoDaDigital = formulario.campos.has(CAMPO_DA_DIGITAL)
@@ -386,7 +386,7 @@ async function sessaoRotacionada(resposta: Response): Promise<Sessao> {
 }
 
 /**
- * A rotacao do `sid` chegou ao BANCO, e nao so ao cabecalho — e devolve a
+ * A rotacao do `sid` chegou ao BANCO, e nao so ao cabecalho, e devolve a
  * sessao nova, para quem quiser continuar agindo com ela.
  *
  * **Por que um `Set-Cookie` presente nao prova nada.** `validarSessao`
@@ -396,31 +396,31 @@ async function sessaoRotacionada(resposta: Response): Promise<Sessao> {
  * decide se a sessao esta viva e a guarda, no pedido SEGUINTE, quando ela
  * procura a linha. Por isso este auxiliar mede tres coisas em vez de uma:
  *
- *  1. o `sid_hash` novo EXISTE em `painel_sessoes` e o antigo NAO existe mais —
+ *  1. o `sid_hash` novo EXISTE em `painel_sessoes` e o antigo NAO existe mais,
  *     as duas metades da rotacao, lidas do banco;
  *  2. o cookie novo ABRE a requisicao seguinte (`200`), que e o clique que o
  *     dono da logo depois ("Ja anotei, voltar");
  *  3. o cookie antigo NAO abre mais (`303`), que e o que a rotacao existe para
  *     garantir contra quem copiou o valor do envelope de step-up.
  *
- * MUTACOES QUE ESTE AUXILIAR MATA — nao enfraqueca de volta para
+ * MUTACOES QUE ESTE AUXILIAR MATA, nao enfraqueca de volta para
  * `expect(sessaoEmitidaEm(envio)).not.toBe(null)`:
  *  • **M8**: apagar `statementDeRotacao(sessao.sidHash, sessaoNova.sidHash)` do
  *    lote de `gerarCodigos` (src/routes/painel/aparelhos.ts) mantendo o
  *    `Set-Cookie`. Medido: a suite ficava VERDE (26/26 aqui, 267 em 9 suites),
- *    e em producao o dono era DESLOGADO pela propria tela dos codigos — a tela
+ *    e em producao o dono era DESLOGADO pela propria tela dos codigos, a tela
  *    mostra os sete codigos uma vez so, o navegador guarda um cookie cujo
  *    `sid_hash` nao existe na tabela, e o clique seguinte cai em
  *    /painel/entrar. O trancamento que os codigos existem para impedir,
  *    entregue por quem os gera.
  *  • O simetrico, tambem VERIFICADO: rotacionar no banco e perder o
- *    `Set-Cookie` da sessao — trocar o `resposta.headers.append` do fim de
+ *    `Set-Cookie` da sessao, trocar o `resposta.headers.append` do fim de
  *    `gerarCodigos` por `set`, que e exatamente o risco que o comentario dele
  *    descreve, faz o cookie de step-up expirado sobrescrever o da sessao. Cai
  *    em `sessaoRotacionada` ("a resposta nao rotacionou o sid"), porque nao ha
  *    cookie novo para o navegador guardar: o dono fica deslogado do outro lado.
  *  • Trocar o `UPDATE ... SET sid_hash` por um `INSERT` que deixe a linha velha
- *    viva — cai em (1) e em (3).
+ *    viva, cai em (1) e em (3).
  */
 async function esperarRotacaoNoBanco(envio: Response, antiga: Sessao): Promise<Sessao> {
   const nova = await sessaoRotacionada(envio)
@@ -510,7 +510,7 @@ async function gerarCodigosPeloAssistente(): Promise<string[]> {
  * Uma recuperacao INTEIRA pela rota de producao: o codigo abre o registro e a
  * passkey nova entra.
  *
- * O que importa nos testes que a chamam e o estado que o consumo DEIXA — o
+ * O que importa nos testes que a chamam e o estado que o consumo DEIXA, o
  * codigo usado com `usado_em`, os outros cinco com `invalidado_em`, as sessoes
  * apagadas. Escrever esse estado com um `UPDATE` do teste provaria o estado que
  * o teste inventou, e nao o que o Worker produz.
@@ -571,7 +571,7 @@ function postarJson(caminho: string, corpo: unknown, cookie?: string): Request {
 
 // ---------------------------------------------------------------------------
 
-describe('REC — recuperacao, aparelhos e revogacao', () => {
+describe('REC: recuperacao, aparelhos e revogacao', () => {
   let aparelho: AutenticadorFalso
 
   beforeEach(async () => {
@@ -618,7 +618,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     expect(resposta.status).toBe(200)
     // Nenhum cookie: nem de sessao, nem de bilhete. Um codigo nao vira senha.
     expect(resposta.headers.get('set-cookie')).toBe(null)
-    // 1 leitura, 0 escrita — o contrato inteiro desta rota.
+    // 1 leitura, 0 escrita, o contrato inteiro desta rota.
     expect({ escritas: contador.escritas, leituras: contador.prepares }).toEqual({
       escritas: 0,
       leituras: 1,
@@ -626,7 +626,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
 
     const corpo = await resposta.text()
     expect(corpo).toContain('Cadastrar este aparelho')
-    // O codigo volta num campo ESCONDIDO, para o corpo do POST seguinte — nunca
+    // O codigo volta num campo ESCONDIDO, para o corpo do POST seguinte, nunca
     // na URL (§7.1).
     expect(corpo).toContain(`value="${codigos[0] as string}"`)
     expect(corpo).toContain('data-tipo="recuperacao"')
@@ -634,7 +634,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // **O contrato desta pagina com o `painel.js`, nome por nome.** Ele procura
     // `getElementById('registrar')` e, dentro dele,
     // `querySelector('input[name="codigo"]')`; sem os dois, o dono que perdeu o
-    // telefone digita o codigo do papel, aperta o botao e nada acontece — a
+    // telefone digita o codigo do papel, aperta o botao e nada acontece, a
     // unica rota de volta ao painel morre em silencio. Renomear qualquer um dos
     // dois deixava esta suite inteira verde, porque REC-16 chama
     // `handleOpcoesDeRegistro` direto, com o codigo em JSON, e nunca toca esta
@@ -670,7 +670,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     expect(await acoesAuditadas()).toEqual(['codigos_gerados'])
   })
 
-  test('REC-04: o codigo continua valendo depois do POST — quem consome e o registro', async () => {
+  test('REC-04: o codigo continua valendo depois do POST: quem consome e o registro', async () => {
     const codigos = await gerarCodigosPeloAssistente()
 
     expect((await postarCodigo(codigos[0] as string)).status).toBe(200)
@@ -685,7 +685,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
   test('REC-04b: codigo JA CONSUMIDO e recusado na porta, com a recusa de codigo inexistente', async () => {
     // Antes desta trava, `hashesVivos('recuperacao')` nao filtrava `usado_em`:
     // um codigo gasto passava AQUI, o dono percorria a cerimonia WebAuthn
-    // inteira — dois gestos de biometria e uma chave nova criada no aparelho — e
+    // inteira, dois gestos de biometria e uma chave nova criada no aparelho, e
     // so no fim levava `credencial_invalida`, sem nenhuma pista de que o
     // problema era o codigo. O uso unico NUNCA esteve em risco: quem o garante
     // e o `WHERE hash = ? AND usado_em IS NULL` do consumo, que e atomico. O que
@@ -699,7 +699,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
 
     // Marca como consumido do mesmo jeito que o registro marca. O papel inteiro
     // vai junto porque o teste nao tem a subchave para descobrir qual linha e
-    // qual codigo — e nao precisa: o que se afirma e o comportamento da porta
+    // qual codigo, e nao precisa: o que se afirma e o comportamento da porta
     // diante de uma linha com `usado_em` preenchido.
     await env.DB.prepare("UPDATE painel_codigos SET usado_em = ? WHERE tipo = 'recuperacao'")
       .bind(AGORA)
@@ -772,7 +772,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     const sessao = await abrirSessao(aparelho.credentialId)
     const corpo = await (await abrirAparelhos(sessao)).text()
 
-    // O prefixo de 8 hex aparece — e ele e o MESMO dos outros dois destinos.
+    // O prefixo de 8 hex aparece, e ele e o MESMO dos outros dois destinos.
     expect(corpo).toContain(await prefixoDeCredencial(aparelho.credentialId))
 
     // O id cru existe em UM lugar so, e e o `value` do campo escondido que diz
@@ -809,12 +809,12 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     expect(await acoesAuditadas()).toEqual(['stepup_recusado'])
   })
 
-  test('REC-08b: a regra da ultima e ATOMICA — duas remocoes juntas, uma so vence', async () => {
+  test('REC-08b: a regra da ultima e ATOMICA: duas remocoes juntas, uma so vence', async () => {
     const outro = await AutenticadorFalso.criar()
     await cadastrarAparelho(outro, { apelido: 'Tablet da mesa' })
 
     // Duas sessoes vivas, como as duas abas do cenario: cada uma prepara a
-    // remocao do aparelho da OUTRA. Sao alvos diferentes de proposito — dois
+    // remocao do aparelho da OUTRA. Sao alvos diferentes de proposito, dois
     // POSTs para a MESMA linha nao distinguem nada, porque o segundo acha a
     // linha ja apagada de qualquer jeito.
     const daPrimeira = await abrirSessao(aparelho.credentialId)
@@ -838,7 +838,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
       // POSTs entram no Worker juntos. Uma regra escrita como
       // `if (await contarCredenciais() > 1) DELETE` deixa as duas verem "duas"
       // antes de qualquer escrita, apaga as duas, e o dono acorda com ZERO
-      // passkeys — trancado fora do painel, com saida so pelo papel. E o
+      // passkeys, trancado fora do painel, com saida so pelo papel. E o
       // desfecho que a regra da ultima existe para impedir, e ele so aparece
       // com os envios simultaneos.
       respostas = await Promise.all([primeira.disparar(), segunda.disparar()])
@@ -877,7 +877,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     expect(envio.headers.get('location')).toBe(`${ROTA_APARELHOS.caminho}?ok=aparelho_removido`)
     expect(await contarCredenciais()).toBe(1)
 
-    // A sessao do aparelho removido morreu; a de quem removeu continua viva —
+    // A sessao do aparelho removido morreu; a de quem removeu continua viva,
     // **com o `sid` NOVO**. §10.10, passo 4: a mesma resposta que aplica a
     // mudanca expira o envelope e rotaciona o `sid`, entao o cookie ANTIGO
     // deixa de valer junto com ele. Seguir o `Set-Cookie`, como o navegador
@@ -989,7 +989,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // O cartao dessas linhas diz "Pode ser removido sem medo" e desenha o botao
     // de remover. Enquanto o `DELETE` casava a LINHA pelo `rp_id` de hoje, o
     // botao nao podia funcionar nunca: `changes === 0` virava
-    // `409 ultima_passkey` — "Cadastre outra passkey antes de remover esta" —
+    // `409 ultima_passkey`, "Cadastre outra passkey antes de remover esta",
     // com duas passkeys do endereco de hoje na tabela, e sem linha de auditoria
     // nem revogacao de sessao, porque os passos seguintes do lote sao presos a
     // mudanca. O celular perdido do endereco antigo ficava no banco para sempre.
@@ -1014,7 +1014,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     }
 
     // "Inclusive todas": as DUAS do endereco antigo sairam, e a unica do
-    // endereco de hoje continua — a regra da ultima conta so o `rp_id` atual.
+    // endereco de hoje continua, a regra da ultima conta so o `rp_id` atual.
     expect(await contarCredenciais()).toBe(1)
     const removidas = (await acoesAuditadas()).filter((acao) => acao === 'passkey_removida')
     expect(removidas.length).toBe(2)
@@ -1050,7 +1050,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
       expect(envelopeExpiradoEm(envio)).toBe(true)
       const nova = await sessaoRotacionada(envio)
 
-      // O reenvio do MESMO par (envelope + digital), agora com a sessao NOVA —
+      // O reenvio do MESMO par (envelope + digital), agora com a sessao NOVA,
       // o que um script na pagina faria dentro dos 120 s restantes. Sem a
       // rotacao, `exigirStepUp` fecharia de novo e um gesto do dono autorizaria
       // N operacoes; com ela, o `sid` do envelope nao e mais o da sessao.
@@ -1084,7 +1084,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
 
     const console = capturarConsole()
     try {
-      // `digital` PREENCHIDA e invalida — sem envelope nenhum. O envio sem
+      // `digital` PREENCHIDA e invalida, sem envelope nenhum. O envio sem
       // digital e o primeiro passo do caminho normal e nao conta (§10.10); este
       // e martelada, e conta.
       for (let tentativa = 1; tentativa < FALHAS_DE_STEPUP_ATE_APAGAR; tentativa++) {
@@ -1112,7 +1112,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     }
 
     // A decima apaga a linha, e o cookie que ainda esta assinado deixa de valer
-    // — quem roubou a sessao perde a unica tela que remove aparelhos.
+    // quem roubou a sessao perde a unica tela que remove aparelhos.
     expect(await contarSessoes()).toBe(0)
     expect((await abrirAparelhos(sessao)).status).toBe(303)
     expect(await contarCredenciais()).toBe(2)
@@ -1133,7 +1133,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
       console.parar()
     }
 
-    // §10.10: "a tela TEM QUE mostrar o valor literal antes da biometria" — e em
+    // §10.10: "a tela TEM QUE mostrar o valor literal antes da biometria", e em
     // `remover_passkey` o valor literal E o aparelho. Sem isto o dono encosta o
     // dedo sem nada na tela que contradiga um `value` trocado por um XSS.
     expect(doOutro).toContain('Tablet da mesa')
@@ -1144,7 +1144,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // O id cru continua so nos DOIS lugares que a cerimonia exige, e nenhum
     // deles e texto que a pessoa le: o campo escondido que diz ao POST qual
     // linha apagar, e o `data-mudanca` que o `painel.js` manda assinar. O
-    // resumo acima usa o prefixo de 8 hex, como §10.13 manda — uma terceira
+    // resumo acima usa o prefixo de 8 hex, como §10.13 manda, uma terceira
     // ocorrencia aqui e o id cru tendo vazado para a tela.
     expect(doOutro.split(outro.credentialId).length - 1).toBe(2)
 
@@ -1250,7 +1250,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // §10.10, passo 4, tambem na acao que responde `200`: o envelope morre e o
     // `sid` que ele nomeia deixa de existir na MESMA resposta que aplica. Sem a
     // rotacao, o envelope expirado no navegador nao adianta contra quem ja
-    // copiou o valor dele — e um gesto do dono continuaria autorizando conjunto
+    // copiou o valor dele, e um gesto do dono continuaria autorizando conjunto
     // novo de codigos pelo resto dos 120 s.
     expect(envelopeExpiradoEm(envio)).toBe(true)
     // **E a rotacao e conferida no BANCO e no pedido seguinte**, nao pela
@@ -1260,7 +1260,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // o antigo nao abra mais. Enquanto aqui bastava
     // `expect(sessaoEmitidaEm(envio)).not.toBe(null)`, apagar a rotacao do lote
     // (mutacao M8, descrita no auxiliar) deslogava o dono NA TELA DOS CODIGOS
-    // com a suite inteira verde — no unico instante em que ele nao pode ser
+    // com a suite inteira verde, no unico instante em que ele nao pode ser
     // interrompido, porque os codigos aparecem uma vez so (§10.11) e os antigos
     // acabaram de ser apagados.
     const nova = await esperarRotacaoNoBanco(envio, sessao)
@@ -1276,7 +1276,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // Os seis de recuperacao e o da parada, na tela, uma vez so.
     expect(corpo).toContain('Anote estes c&oacute;digos agora')
     // Seis de 20 caracteres (`XXXXX-XXXXX-XXXXX-XXXXX`, 23 com hifens) e um de
-    // 16 (o da parada, `XXXXX-XXXXX-XXXXXX`, 18 com hifens — o ultimo grupo
+    // 16 (o da parada, `XXXXX-XXXXX-XXXXXX`, 18 com hifens, o ultimo grupo
     // absorve o resto). O piso do casamento e o menor dos dois.
     const mostrados = [...corpo.matchAll(/<code>([A-Z0-9-]{18,})<\/code>/g)]
     expect(mostrados.length).toBe(7)
@@ -1285,7 +1285,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     // tela de cadastro.
     expect((await postarCodigo(antigos[0] as string)).status).toBe(403)
 
-    // `codigos_gerados` do assistente; DOIS `stepup_recusado` — o envio sem
+    // `codigos_gerados` do assistente; DOIS `stepup_recusado`, o envio sem
     // digital que este teste faz de proposito e o primeiro envio de
     // `comDigital`, que e o caminho normal de quem aperta o botao; e enfim o
     // `codigos_gerados` da tela. §10.10 manda registrar as duas recusas.
@@ -1417,11 +1417,11 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     const tela = await (await abrirAparelhos(depois)).text()
 
     // O consumo marca `usado_em` no codigo usado e `invalidado_em` nos outros
-    // cinco. Contar so `invalidado_em IS NULL` — que e o que `hashesVivos` faz,
-    // e faz DE PROPOSITO, porque o codigo de PARADA nao e de uso unico — deixa
+    // cinco. Contar so `invalidado_em IS NULL`, que e o que `hashesVivos` faz,
+    // e faz DE PROPOSITO, porque o codigo de PARADA nao e de uso unico, deixa
     // exatamente um hash de pe: o do codigo ja queimado. A tela escrevia entao
     // "voce ainda tem 1 codigos que nunca foram usados", em verde, com ZERO
-    // codigos utilizaveis — e o dono so descobria na proxima perda de aparelho,
+    // codigos utilizaveis, e o dono so descobria na proxima perda de aparelho,
     // trancado fora do painel.
     expect(tela).toContain('n&atilde;o tem nenhum')
     expect(tela).not.toContain('ainda tem')
@@ -1474,7 +1474,7 @@ describe('REC — recuperacao, aparelhos e revogacao', () => {
     expect(tudo.status).toBe(200)
     expect(await contarCredenciais()).toBe(0)
 
-    // A conexao com o Instagram continua intacta — a regressao escrita em §13.2.
+    // A conexao com o Instagram continua intacta, a regressao escrita em §13.2.
     const conta = await env.DB.prepare('SELECT COUNT(*) AS n FROM account_tokens').first<{
       n: number
     }>()

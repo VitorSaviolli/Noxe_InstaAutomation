@@ -1,5 +1,5 @@
 /**
- * O validador UNICO da configuracao — um so codigo, dois chamadores (§9.7).
+ * O validador UNICO da configuracao, um so codigo, dois chamadores (§9.7).
  *
  * Ele roda na ESCRITA (a rota do painel rejeita com mensagem especifica) e na
  * LEITURA (o `config-store.ts` nao pode rejeitar: degrada para falha segura).
@@ -85,19 +85,19 @@ const PIOR_USERNAME = 'w'.repeat(64)
  * letra e um combinante impede a composicao na primeira passada; a remocao
  * entao encosta os dois; e a SEGUNDA passada compoe. Uma letra, um ZWJ e um
  * acento agudo saem como `"a" + U+0301` na primeira passada e so na seguinte
- * viram `U+00E1` — visualmente identicos, hashes DIFERENTES.
+ * viram `U+00E1`, visualmente identicos, hashes DIFERENTES.
  *
  * Isso importa porque os dois caminhos do `op_hash` de §10.10 aplicam esta
  * funcao um numero DIFERENTE de vezes: a rota de escrita uma, a cerimonia
  * duas, porque a tela ja emite a mudanca canonica limpa e o navegador a
  * devolve. Com a ordem antiga, um texto com `Cf` entre letra e combinante
- * fazia o envelope carregar um hash e a rota recalcular outro — a falha que
+ * fazia o envelope carregar um hash e a rota recalcular outro, a falha que
  * §10.10 nomeia por extenso, "o hash recalculado diverge e a trava vira bug
  * intermitente": o dono encostando o dedo para ouvir um nao que ninguem
  * consegue explicar, sempre, para aquele texto.
  *
- * Removendo primeiro, a saida nunca contem `Cc`/`Cf` — o NFKC nao produz
- * nenhum dos dois —, e por isso a segunda passada nao tem o que mudar. E a
+ * Removendo primeiro, a saida nunca contem `Cc`/`Cf`, o NFKC nao produz
+ * nenhum dos dois, e por isso a segunda passada nao tem o que mudar. E a
  * PROPRIEDADE, e nao a lista de exemplos, que o teste guarda.
  */
 export function limparTexto(texto: string): string {
@@ -180,7 +180,7 @@ function validarMatchMode(valores: AutomationConfig, achados: Achado[]): void {
 /**
  * Gatilhos, medidos SEMPRE no texto normalizado com as opcoes vigentes.
  *
- * Medir no cru deixaria passar `"eu!"`, que normaliza para `"eu"` — dois
+ * Medir no cru deixaria passar `"eu!"`, que normaliza para `"eu"`, dois
  * caracteres em modo `contains`, que casaria quase todo comentario. E um item
  * que normaliza para vazio hoje e PULADO EM SILENCIO por `matchKeyword`: a
  * pessoa acha que configurou e nada acontece.
@@ -276,7 +276,7 @@ function validarUmGatilho(
  * O texto publico NAO passa por `renderTemplate`.
  *
  * Um `{link}` ali sairia escrito assim mesmo, publicamente, embaixo do Reel.
- * Por isso nenhum placeholder e aceito — nem os conhecidos.
+ * Por isso nenhum placeholder e aceito, nem os conhecidos.
  */
 function validarTextoPublico(valores: AutomationConfig, achados: Achado[]): void {
   const limpo = medirTexto('publicReplyText', valores.publicReplyText, achados)
@@ -308,7 +308,7 @@ function validarTextoPrivado(valores: AutomationConfig, achados: Achado[]): void
     }
   }
 
-  // `renderTemplate` deixa um placeholder desconhecido INTACTO de proposito —
+  // `renderTemplate` deixa um placeholder desconhecido INTACTO de proposito,
   // bom em tempo de execucao, pessimo como estado salvo. Um Direct sem link e
   // um Direct quebrado, enviado a cada acionamento.
   if (valores.privateReplyEnabled === true && !limpo.includes('{link}')) {
@@ -369,8 +369,8 @@ function medirTexto(campo: string, texto: unknown, achados: Achado[]): string | 
  * A regra de escrita do link e MAIS estrita que `isDestinationUrlConfigured`.
  *
  * Aquela funcao ainda aceita `http://` e fica como esta, por compatibilidade
- * com quem ja usa o projeto; e a gravacao — e a leitura de uma linha do banco,
- * que e a mesma coisa vinda de fora — que aperta.
+ * com quem ja usa o projeto; e a gravacao, e a leitura de uma linha do banco,
+ * que e a mesma coisa vinda de fora, que aperta.
  */
 function validarLink(valores: AutomationConfig, achados: Achado[]): void {
   const bruto = valores.destinationUrl
@@ -434,14 +434,14 @@ function validarLink(valores: AutomationConfig, achados: Achado[]): void {
 
   // `new URL` ja normaliza esquema e host para minusculo e punycode. Se o
   // comeco do texto guardado nao e IGUAL a origem normalizada, o que esta
-  // gravado nao e o endereco que o navegador visitaria — e essa diferenca e a
+  // gravado nao e o endereco que o navegador visitaria, e essa diferenca e a
   // base do ataque de homografo.
   //
   // A comparacao e do pedaco inteiro, e nao um `includes`: com `includes`,
   // `https://EXEMPLO.com/?r=exemplo.com` passava, porque o host normalizado
   // aparecia na query. Comparar so a origem, e nao o `url.href`, e o que evita
   // recusar `https://exemplo.com` por causa da barra final que o `href`
-  // acrescenta — um link legitimo que a pessoa escreve sem barra.
+  // acrescenta, um link legitimo que a pessoa escreve sem barra.
   const origemNormalizada = `${url.protocol}//${url.host}`
   if (bruto.slice(0, origemNormalizada.length) !== origemNormalizada) {
     achados.push({

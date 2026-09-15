@@ -2,7 +2,7 @@
  * Verificacao WebAuthn: attestation (registro) e assertion (login e step-up).
  *
  * Modulo **puro**: nao conhece rota, nao conhece cookie, nao toca no D1 e nao
- * le o relogio. Tudo o que ele precisa chega por parametro — inclusive o
+ * le o relogio. Tudo o que ele precisa chega por parametro, inclusive o
  * desafio, que vem do envelope assinado de `panel-session.ts` e **nunca** do
  * corpo da requisicao (§10.5 passo 4, §10.7 passo 6).
  *
@@ -10,11 +10,11 @@
  * segunda serve ao login **e** ao step-up: e o mesmo autenticador, a mesma
  * assinatura e a mesma exigencia de `UV = 1` (§7.8). O que muda entre os dois e
  * o proposito do envelope de onde o desafio saiu, e isso e escolhido por quem
- * chama — o que mantem a trava de `UV` num ponto unico do codigo.
+ * chama, o que mantem a trava de `UV` num ponto unico do codigo.
  *
  * **Ao cliente vai sempre `credencial_invalida`** (§11.4). O `motivo` que estas
  * funcoes devolvem existe para o `console.warn` do servidor e para a tela poder
- * dizer "endereco antigo" — nunca para o corpo da resposta.
+ * dizer "endereco antigo", nunca para o corpo da resposta.
  */
 import { bytesToBase64Url, decodeBase64Url } from '../../security/base64url'
 import { timingSafeEqual } from '../../security/constant-time'
@@ -62,7 +62,7 @@ const PREFIXO_DE_CREDENCIAL = 8
 /**
  * Chave publica descartavel, para quando o `credentialId` nao existe.
  *
- * E o ponto base G da curva P-256 (FIPS 186-4, D.1.2.3) — constante publica,
+ * E o ponto base G da curva P-256 (FIPS 186-4, D.1.2.3), constante publica,
  * sem segredo nenhum. Serve para que uma credencial desconhecida percorra o
  * MESMO trabalho de uma assinatura invalida, em vez de responder antes e virar
  * um oraculo grosseiro de enumeracao (§11.4). E mitigacao parcial, e esta
@@ -291,9 +291,9 @@ async function credencialDaAttestation(
 /**
  * A forma minima da resposta do autenticador. Qualquer outra vira `null`.
  *
- * Mora AQUI, e nao na rota que a usa, porque as duas cerimonias de assertion —
+ * Mora AQUI, e nao na rota que a usa, porque as duas cerimonias de assertion,
  * o login (`POST /painel/api/entrar/verificar`, corpo JSON) e o step-up (o
- * campo escondido do formulario, §10.10 passo 3) — leem exatamente a mesma
+ * campo escondido do formulario, §10.10 passo 3), leem exatamente a mesma
  * forma. A primeira grafia vivia dentro de `entrar.ts`, e a segunda teria de
  * ser uma copia: uma copia que aceitasse um campo a menos entregaria ao
  * `verificarAssertion` um objeto pela metade num caminho so, e seria o caminho
@@ -317,7 +317,7 @@ export function lerRespostaDeAssertion(corpo: unknown): RespostaDeAssertion | nu
   ) {
     return null
   }
-  // `userHandle` e o unico opcional: o passo 5 de §10.7 confere os DOIS lados —
+  // `userHandle` e o unico opcional: o passo 5 de §10.7 confere os DOIS lados,
   // ausente tambem e uma resposta possivel, e `verificarAssertion` a trata.
   if (lida.userHandle !== null && typeof lida.userHandle !== 'string') return null
 
@@ -369,7 +369,7 @@ export async function verificarAssertion(
   )
 
   // 8. O que e assinado: `authenticatorData || SHA-256(clientDataJSON)`, os
-  // bytes CRUS concatenados — nunca o JSON (§10.7, passo 8). Errar isto e o bug
+  // bytes CRUS concatenados, nunca o JSON (§10.7, passo 8). Errar isto e o bug
   // que faz tudo devolver `false`.
   const assinado = await concatenarComHashDoCliente(authDataBytes, clientData)
 
@@ -392,8 +392,8 @@ export async function verificarAssertion(
  * Trava de WA-19, agora nos TRES casos que precisam custar o mesmo: credencial
  * desconhecida, credencial de endereco antigo e credencial de outro dono. Os
  * tres percorrem um `verify` inteiro com a chave descartavel, entao nenhum
- * deles se denuncia pelo relogio. Continua sendo mitigacao parcial — uma
- * credencial RS256 legitima custa mais que a chave descartavel, que e ES256 — e
+ * deles se denuncia pelo relogio. Continua sendo mitigacao parcial, uma
+ * credencial RS256 legitima custa mais que a chave descartavel, que e ES256, e
  * continua escrita como parcial.
  */
 function chaveParaConferir(
@@ -496,15 +496,15 @@ function camposDaAssertion(
  * A linha do banco: endereco atual e dono certo (§10.7, passos 4 e 5).
  *
  * Trava de WA-18: uma credencial de `rp_id` antigo e IGNORADA e ganha um motivo
- * PROPRIO — nao porque o cliente vá vê-lo (ele vê sempre `credencial_invalida`),
+ * PROPRIO, nao porque o cliente vá vê-lo (ele vê sempre `credencial_invalida`),
  * mas porque a tela de §10.14 precisa poder dizer "endereco antigo" em vez de
  * deixar o dono que trocou de endereco preso num erro incompreensivel.
  *
- * Trava de WA-26: o `usuario_handle` e conferido nos DOIS lados — o da linha do
+ * Trava de WA-26: o `usuario_handle` e conferido nos DOIS lados, o da linha do
  * banco e o que o autenticador devolveu. Conferir so um deixaria metade do
  * caminho aberto.
  *
- * Nada e DECIDIDO aqui — nem o `null`, nem os dois motivos. Esta funcao so
+ * Nada e DECIDIDO aqui, nem o `null`, nem os dois motivos. Esta funcao so
  * calcula; quem recusa e `verificarAssertion`, depois do `verify`. Um retorno
  * mais cedo em qualquer um dos tres casos viraria um oraculo de tempo (§11.4).
  */
@@ -596,7 +596,7 @@ function lerAuthData(authData: Uint8Array): DadosDoAutenticador | null {
  *
  * Trava de WA-10, de WA-11 e de WA-12: `UV = 1` e OBRIGATORIO no login e no
  * step-up (§7.8). Como as duas cerimonias passam por esta funcao, nao existe um
- * caminho onde alguem esqueca de conferir num deles — que e exatamente o erro
+ * caminho onde alguem esqueca de conferir num deles, que e exatamente o erro
  * que §7.8 escreve em letras grandes.
  */
 async function conferirRpIdEFlags(
@@ -619,7 +619,7 @@ async function conferirRpIdEFlags(
  * do corpo e o `challenge` de dentro do `clientDataJSON`, e ele e o lado
  * COMPARADO, nunca o lado esperado.
  *
- * Trava de WA-06: `type` literal — `webauthn.create` no registro,
+ * Trava de WA-06: `type` literal, `webauthn.create` no registro,
  * `webauthn.get` no login.
  *
  * Trava de WA-07 e de WA-08: `origin` por string INTEIRA. Trocar por `includes`
@@ -666,7 +666,7 @@ function conferirClientData(
  * `authenticatorData || SHA-256(clientDataJSON)`, bytes crus concatenados.
  *
  * Trava de WA-14: e ESTA concatenacao que faz a assinatura cobrir os dois
- * blocos. Assinar o `clientDataJSON` — o bug classico do passo 8 de §10.7 —
+ * blocos. Assinar o `clientDataJSON`, o bug classico do passo 8 de §10.7,
  * deixaria qualquer byte do `authData`, `UV` inclusive, livre para ser trocado
  * depois da assinatura.
  */
@@ -691,7 +691,7 @@ async function concatenarComHashDoCliente(
  * Trava de WA-15, WA-16 e WA-17: ES256 passa OBRIGATORIAMENTE por
  * `derParaBruto`. Mandar a assinatura do autenticador direto ao WebCrypto
  * devolveria `false` em silencio, e nenhuma mensagem de erro apareceria em
- * lugar nenhum — o dono so veria "nao foi possivel confirmar", para sempre.
+ * lugar nenhum, o dono so veria "nao foi possivel confirmar", para sempre.
  */
 async function conferirAssinatura(
   jwk: JsonWebKey,
@@ -728,8 +728,8 @@ function mesmosBytes(a: Uint8Array, b: Uint8Array): boolean {
 /**
  * Os 8 primeiros caracteres hexadecimais do `sha256(credential_id)`.
  *
- * Trava de §10.13: sao **tres** destinos — tela, `console` e `painel_auditoria`
- * — e **uma** regra. O `credential_id` inteiro nunca aparece em nenhum deles.
+ * Trava de §10.13: sao **tres** destinos, tela, `console` e `painel_auditoria`
+ * e **uma** regra. O `credential_id` inteiro nunca aparece em nenhum deles.
  */
 export async function prefixoDeCredencial(credentialId: string): Promise<string> {
   const digest = new Uint8Array(

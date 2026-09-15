@@ -1,7 +1,7 @@
 /**
  * Configuracao NAO SECRETA da automacao.
  *
- * Segredos nunca entram aqui — eles vivem no Cloudflare Secrets (producao)
+ * Segredos nunca entram aqui, eles vivem no Cloudflare Secrets (producao)
  * ou no .dev.vars (local) e chegam pelo objeto `Env`.
  *
  * Para trocar o gatilho, altere apenas `triggerKeywords`.
@@ -37,7 +37,7 @@ export interface AutomationConfig {
    * Enquanto o valor comecar com `[`, a automacao recusa o acionamento com o
    * motivo `link_nao_configurado` e ninguem recebe um Direct quebrado.
    * Troque pelo SEU link (comecando com https://) ANTES de ligar a automacao
-   * de verdade — nao adianta configurar o resto e deixar isto para depois.
+   * de verdade, nao adianta configurar o resto e deixar isto para depois.
    */
   destinationUrl: string
   /** Janela em horas antes do mesmo usuario poder acionar de novo. */
@@ -90,7 +90,7 @@ const WILDCARD = '*'
  *
  * Procura uma entrada em `mediaAutomations` que cite o mediaId; se achar,
  * mescla sobre a config global. Caso contrario devolve a global.
- * Retorna sempre um objeto novo — a config global nunca e mutada.
+ * Retorna sempre um objeto novo, a config global nunca e mutada.
  */
 export function resolveConfigForMedia(
   mediaId: string,
