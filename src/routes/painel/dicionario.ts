@@ -141,7 +141,13 @@ export const CONFIRMACOES = {
   aparelho_removido: 'Pronto, o aparelho foi removido. Ele não entra mais neste painel.',
   saiu: 'Você saiu deste aparelho. Os outros aparelhos continuam entrando normalmente.',
   saiu_de_tudo: 'Você saiu de todos os aparelhos. Entre de novo quando quiser.',
+  // O unico `?ok=` que e um AVISO, e nao uma confirmacao: religar pelo Inicio
+  // sem marcar a caixa volta para o Inicio com esta faixa (§10.12).
+  marque_a_caixa: 'Marque a caixa antes de ligar.',
 } as const
+
+/** Os codigos de `?ok=` que pintam a faixa de aviso em vez da verde. */
+export const AVISOS_DE_RESULTADO: readonly CodigoDeConfirmacao[] = ['marque_a_caixa']
 
 export type CodigoDeConfirmacao = keyof typeof CONFIRMACOES
 

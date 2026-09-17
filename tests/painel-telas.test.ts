@@ -16,6 +16,7 @@ import {
   RECUSA_SEM_VALOR,
   traduzirAviso,
 } from '../src/routes/painel/dicionario'
+import { CAMPO_DO_REEL_NA_VOLTA } from '../src/routes/painel/gravar'
 import { INTERVALO_DE_VISTA_MS } from '../src/routes/painel/guardas'
 import { cabecalhos } from '../src/routes/painel/html'
 import { contaConectada, handleInicio, panorama } from '../src/routes/painel/inicio'
@@ -38,6 +39,7 @@ import {
   type RotaDoPainel,
 } from '../src/routes/painel/rotas'
 import { despachar, type HandlerDoPainel } from '../src/routes/painel/router'
+import { TELA_DE_ORIGEM } from '../src/routes/painel/tela'
 import {
   carregarConfigEfetiva,
   invalidarCacheDeConfig,
@@ -748,6 +750,20 @@ describe('DIC: o dicionario de traducao', () => {
 // ---------------------------------------------------------------------------
 // TELA, os estados grandes e as pendencias
 // ---------------------------------------------------------------------------
+
+describe('TELA: as paginas intermediarias voltam para a tela de origem', () => {
+  test('TELA-40: toda tela de origem existe na tabela de rotas, e volta para uma rota GET', () => {
+    const caminhos = new Map(ROTAS.map((rota) => [rota.caminho, rota]))
+    for (const [caminho, origem] of Object.entries(TELA_DE_ORIGEM)) {
+      expect({ [caminho]: caminhos.has(caminho) }).toEqual({ [caminho]: true })
+      expect({ [origem.voltar]: caminhos.get(origem.voltar)?.metodos.includes('GET') }).toEqual({
+        [origem.voltar]: true,
+      })
+    }
+    // O campo do Reel escrito no funil e o mesmo da tela do Reel.
+    expect(CAMPO_DO_REEL_NA_VOLTA).toBe(CAMPO_DO_REEL)
+  })
+})
 
 describe('TELA: os quatro estados grandes', () => {
   test('TELA-01: tudo resolvido e conta ligada dao "Ligada e respondendo"', () => {

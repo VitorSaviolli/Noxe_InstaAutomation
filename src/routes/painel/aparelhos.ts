@@ -65,12 +65,13 @@ import {
 } from './aparelhos-tela'
 import { CAMPO_DA_ACAO, CAMPO_DA_DIGITAL, COOKIE_DA_SESSAO, cookieDoPainel } from './campos'
 import { CAMINHO_DE_ENTRAR } from './guardas'
-import { type HtmlSeguro, html, pagina } from './html'
+import { type HtmlSeguro, html } from './html'
 import { conjuntoNovoDeCodigos } from './parada'
 import { erro, redirecionar } from './resposta'
 import { ROTA_APARELHOS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { cookieDeStepUpExpirado, exigirStepUp, type MudancaCanonica, opHash } from './stepup'
+import { molduraIntermediaria, telaDoPainel } from './tela'
 
 /**
  * O nome CANONICO da remocao, o que entra no `op_hash` (§10.10, §10.13).
@@ -480,8 +481,22 @@ c&oacute;digo de emerg&ecirc;ncia. Tenha onde anotar antes de confirmar.</p>`,
     new PainelSessoesRepository(env.DB).statementDeRotacao(sessao.sidHash, sessaoNova.sidHash),
   ])
 
-  const resposta = pagina({
-    titulo: 'Anote estes códigos agora',
+  const corpo = html`<h1>Anote estes c&oacute;digos agora</h1>
+<p><strong>Eles aparecem uma vez s&oacute;.</strong> Escreva no papel, guarde num lugar seguro e
+n&atilde;o tire foto: uma foto no celular fica junto do aparelho que os c&oacute;digos existem para
+substituir.</p>
+<h2>C&oacute;digos de recupera&ccedil;&atilde;o, para cadastrar um aparelho quando voc&ecirc; n&atilde;o tiver nenhum</h2>
+<ul class="codigos">${conjunto.recuperacao.map(
+    (codigo) => html`<li><code>${formatarCodigo(codigo)}</code></li>`,
+  )}</ul>
+<h2>C&oacute;digo de emerg&ecirc;ncia, para parar a automa&ccedil;&atilde;o sem entrar no painel</h2>
+<p><code>${formatarCodigo(conjunto.parada)}</code></p>
+<p>Os c&oacute;digos anteriores <strong>deixaram de valer agora</strong>. Se voc&ecirc; tinha um
+papel antigo, rasgue.</p>
+<p><a class="acao" href="${ROTA_APARELHOS.caminho}">J&aacute; anotei, voltar</a></p>`
+
+  const resposta = telaDoPainel({
+    ...molduraIntermediaria('Anote estes códigos agora', 'mais', corpo),
     // Mesmo motivo do `303` da remocao: o envelope ja foi gasto.
     extras: {
       'set-cookie': cookieDoPainel(
@@ -490,21 +505,6 @@ c&oacute;digo de emerg&ecirc;ncia. Tenha onde anotar antes de confirmar.</p>`,
         Math.floor((sessaoNova.expiraEm - now) / 1000),
       ),
     },
-    corpo: html`<main>
-<h1>Anote estes c&oacute;digos agora</h1>
-<p><strong>Eles aparecem uma vez s&oacute;.</strong> Escreva no papel, guarde num lugar seguro e
-n&atilde;o tire foto: uma foto no celular fica junto do aparelho que os c&oacute;digos existem para
-substituir.</p>
-<h2>C&oacute;digos de recupera&ccedil;&atilde;o, para cadastrar um aparelho quando voc&ecirc; n&atilde;o tiver nenhum</h2>
-<ul class="codigos">${conjunto.recuperacao.map(
-      (codigo) => html`<li><code>${formatarCodigo(codigo)}</code></li>`,
-    )}</ul>
-<h2>C&oacute;digo de emerg&ecirc;ncia, para parar a automa&ccedil;&atilde;o sem entrar no painel</h2>
-<p><code>${formatarCodigo(conjunto.parada)}</code></p>
-<p>Os c&oacute;digos anteriores <strong>deixaram de valer agora</strong>. Se voc&ecirc; tinha um
-papel antigo, rasgue.</p>
-<p><a href="${ROTA_APARELHOS.caminho}">J&aacute; anotei, voltar</a></p>
-</main>`,
   })
 
   // O SEGUNDO `Set-Cookie` vai por `append`, e nao por `extras`: aquele campo e

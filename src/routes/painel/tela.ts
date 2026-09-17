@@ -41,11 +41,37 @@ const NAVEGACAO: readonly ItemDeNavegacao[] = [
   { aba: 'mais', para: '/painel/mais', icone: '☰', palavra: 'Mais' },
 ]
 
+/**
+ * A aba e a tela de volta de cada rota logada que responde com pagina.
+ *
+ * Existe para as paginas intermediarias, a recusa e a tela "Confirme a
+ * mudanca": elas nascem do POST de uma tela, mantem a mesma barra e voltam para
+ * ela. Strings e nao `ROTA_*` porque `rotas.ts` depende de modulos que dependem
+ * desta moldura; o teste confere cada caminho contra a tabela de rotas.
+ */
+export const TELA_DE_ORIGEM: Readonly<Record<string, { aba: Aba; voltar: string }>> = {
+  '/painel': { aba: 'inicio', voltar: '/painel' },
+  '/painel/chave': { aba: 'inicio', voltar: '/painel' },
+  '/painel/reels': { aba: 'reels', voltar: '/painel/reels' },
+  '/painel/reel': { aba: 'reels', voltar: '/painel/reels' },
+  '/painel/palavras': { aba: 'palavras', voltar: '/painel/palavras' },
+  '/painel/mensagem': { aba: 'mensagem', voltar: '/painel/mensagem' },
+  '/painel/mais': { aba: 'mais', voltar: '/painel/mais' },
+  '/painel/atividade': { aba: 'mais', voltar: '/painel/atividade' },
+  '/painel/ajustes': { aba: 'mais', voltar: '/painel/ajustes' },
+  '/painel/aparelhos': { aba: 'mais', voltar: '/painel/aparelhos' },
+}
+
 /** O que muda de uma tela para outra. Tudo o mais e igual, e de proposito. */
 export interface Moldura {
   readonly titulo: string
   readonly aba: Aba
-  /** O estado global, curto, para a barra do topo. Uma frase, sem ponto. */
+  /**
+   * O estado global, curto, para a barra do topo. Uma frase, sem ponto.
+   *
+   * Vazio nas paginas intermediarias (recusa, conferencia, codigos novos): elas
+   * nao leem a configuracao, e a barra nao afirma um estado que nao conferiu.
+   */
   readonly resumo: string
   /** O icone daquele estado. Vem sempre ao lado da palavra, nunca sozinho. */
   readonly iconeDoResumo: string
@@ -57,6 +83,10 @@ export interface Moldura {
    * seria um arquivo a mais numa conexao ruim sem trabalho nenhum (§12.9).
    */
   readonly comScript?: boolean
+  /** O status HTTP. `200` quando ausente. */
+  readonly status?: number
+  /** Cabecalhos a mais, como o `set-cookie`. Os de seguranca sempre ganham. */
+  readonly extras?: Record<string, string>
 }
 
 /**
@@ -69,10 +99,14 @@ export interface Moldura {
  * botoes com o mesmo nome e comportamentos diferentes confundiam a pessoa.
  */
 function barraDoTopo(moldura: Moldura): HtmlSeguro {
+  const estado =
+    moldura.resumo === ''
+      ? html`<span></span>`
+      : html`<p class="estado ${moldura.classeDoResumo}"><span aria-hidden="true">${
+          moldura.iconeDoResumo
+        }</span> ${moldura.resumo}</p>`
   return html`<header class="topo">
-<p class="estado ${moldura.classeDoResumo}"><span aria-hidden="true">${
-    moldura.iconeDoResumo
-  }</span> ${moldura.resumo}</p>
+${estado}
 <a class="parar" href="/painel/parar">Emerg&ecirc;ncia</a>
 </header>`
 }
@@ -103,10 +137,20 @@ export function telaDoPainel(moldura: Moldura): Response {
   return pagina({
     titulo: moldura.titulo,
     comScript: moldura.comScript === true,
+    ...(moldura.status === undefined ? {} : { status: moldura.status }),
+    ...(moldura.extras === undefined ? {} : { extras: moldura.extras }),
     corpo: html`${barraDoTopo(moldura)}
 <main>
 ${moldura.corpo}
 </main>
 ${navegacao(moldura.aba)}`,
   })
+}
+
+/**
+ * A moldura de uma pagina intermediaria: a barra de baixo com a aba da tela de
+ * origem, e a barra do topo sem estado.
+ */
+export function molduraIntermediaria(titulo: string, aba: Aba, corpo: HtmlSeguro): Moldura {
+  return { titulo, aba, resumo: '', iconeDoResumo: '', classeDoResumo: '', corpo }
 }

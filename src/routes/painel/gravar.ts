@@ -69,6 +69,17 @@ import {
 import { type CodigoDeErro, erro, redirecionar } from './resposta'
 import type { EntradaDaRota } from './router'
 import { passarPeloStepUp } from './stepup'
+import { TELA_DE_ORIGEM } from './tela'
+
+/**
+ * O nome do campo do Reel na query string da tela dele. E o `CAMPO_DO_REEL` de
+ * `reel.ts`, escrito aqui porque `reel.ts` importa este arquivo; o teste
+ * confere que os dois sao o mesmo.
+ */
+export const CAMPO_DO_REEL_NA_VOLTA = 'midia'
+
+/** `POST /painel/chave`, a unica rota cuja recusa de religar volta ao Inicio. */
+const CAMINHO_DA_CHAVE = '/painel/chave'
 
 // ---------------------------------------------------------------------------
 // O estado de comportamento: o que entra em `antes`/`depois` (§9.9)
@@ -239,6 +250,8 @@ export interface ParteDeMidias {
    * bump, entao as duas travas casam juntas ou falham juntas.
    */
   readonly statements: readonly D1PreparedStatement[]
+  /** A legenda do Reel do `alvo`, para a tela de conferencia o reconhecer. */
+  readonly legenda?: string
   /**
    * Estes statements mudam alguma coisa de fato?
    *
@@ -256,13 +269,20 @@ export async function gravarConfiguracao(
   entrada: EntradaDaRota,
   pedido: PedidoDeGravacao,
 ): Promise<Response> {
-  const { env, now, contexto, corpo, sessao } = entrada
+  const { env, now, corpo, sessao } = entrada
 
   // Nenhuma das tres rotas chega aqui sem sessao nem sem formulario:
   // `despachar` so entrega ao handler depois do passo 9 da escada. O `if`
   // existe porque o TIPO admite os dois casos, e um `!` calaria justamente o
   // dia em que a tabela de rotas mudasse.
-  if (corpo.familia !== 'formulario' || sessao === null) return erro('corpo_invalido', contexto)
+  if (corpo.familia !== 'formulario' || sessao === null) {
+    return erro('corpo_invalido', entrada.contexto)
+  }
+
+  // Toda pagina que este funil devolve no lugar da tela (recusa, conferencia)
+  // volta para a tela de onde o formulario veio. So o Reel tem a query string.
+  const voltar = telaDeVolta(entrada, pedido)
+  const contexto = { ...entrada.contexto, voltar }
 
   const ator = `passkey:${await prefixoDeCredencial(sessao.credentialId)}`
 
@@ -397,15 +417,7 @@ export async function gravarConfiguracao(
   // ja autorizou. Exigir a caixa de confirmacao ali pediria o gesto da parada de
   // emergencia para desfazer uma pausa de um Reel so.
   if (faltaConfirmarOReligar(daLinhaGlobal, antes, depois, corpo.campos)) {
-    return await recusa.registrar({
-      acao: 'mudanca_recusada',
-      campos: ['enabled'],
-      codigo: 'dados_invalidos',
-      motivoInterno: 'confirmacao_ausente',
-      explicacao: html`<p>Para ligar a automa&ccedil;&atilde;o de novo, use o bot&atilde;o do
-In&iacute;cio: ele mostra desde quando ela est&aacute; desligada e pede a sua
-confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
-    })
+    return await recusarReligarSemConfirmacao(entrada, pedido, recusa, rascunho)
   }
 
   // Passo 7, com a allowlist de HOJE, inclusive na restauracao (§9.9).
@@ -477,7 +489,8 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     // qualquer Reel: o `media_id` viajava so no campo escondido `midia`, que a
     // tela reemite e que ficava fora do `op_hash`, a forma exata do Ruling 86,
     // com o `oh` do envelope continuando valido depois de a entidade trocar.
-    ...(pedido.midias?.alvo == null ? {} : { alvo: pedido.midias.alvo }),
+    ...doAlvo(pedido),
+    voltar,
   })
   if ('resposta' in passagem) return passagem.resposta
   const credencialDoStepUp = passagem.credentialId
@@ -510,6 +523,27 @@ confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
     versaoResultante: snapshot.versao + 1,
     comStepUp: credencialDoStepUp !== null,
   })
+}
+
+/** O Reel da gravacao, e a legenda dele, quando a gravacao e sobre UM Reel. */
+function doAlvo(pedido: PedidoDeGravacao): { alvo?: string; legendaDoAlvo?: string } {
+  const midias = pedido.midias
+  if (midias?.alvo == null) return {}
+  return midias.legenda === undefined
+    ? { alvo: midias.alvo }
+    : { alvo: midias.alvo, legendaDoAlvo: midias.legenda }
+}
+
+/**
+ * A tela para onde "Voltar e corrigir" e "Cancelar" levam.
+ *
+ * E a tela de origem da rota; numa gravacao sobre UM Reel, a tela daquele Reel,
+ * com o `?midia=`. O `media_id` ja foi conferido pela rota antes de chegar aqui.
+ */
+function telaDeVolta(entrada: EntradaDaRota, pedido: PedidoDeGravacao): string {
+  const alvo = pedido.midias?.alvo
+  if (alvo != null) return `${entrada.rota.caminho}?${CAMPO_DO_REEL_NA_VOLTA}=${alvo}`
+  return TELA_DE_ORIGEM[entrada.rota.caminho]?.voltar ?? pedido.para
 }
 
 /**
@@ -583,6 +617,32 @@ function faltaConfirmarOReligar(
   if (!daLinhaGlobal) return false
   if (!religa(antes, depois)) return false
   return campos.get(CAMPO_DA_CONFIRMACAO) !== CONFIRMADO
+}
+
+/**
+ * A recusa de religar sem a caixa marcada (§10.12), com a linha de auditoria.
+ *
+ * Pelo botao do Inicio (`/painel/chave`), a recusa nao vira pagina de erro: a
+ * pessoa volta ao Inicio com a faixa pedindo para marcar a caixa. A linha de
+ * auditoria e gravada igual nos dois caminhos.
+ */
+async function recusarReligarSemConfirmacao(
+  entrada: EntradaDaRota,
+  pedido: PedidoDeGravacao,
+  recusa: RecusaAuditada,
+  rascunho: (reenviavel: boolean) => Promise<HtmlSeguro>,
+): Promise<Response> {
+  const recusada = await recusa.registrar({
+    acao: 'mudanca_recusada',
+    campos: ['enabled'],
+    codigo: 'dados_invalidos',
+    motivoInterno: 'confirmacao_ausente',
+    explicacao: html`<p>Para ligar a automa&ccedil;&atilde;o de novo, use o bot&atilde;o do
+In&iacute;cio: ele mostra desde quando ela est&aacute; desligada e pede a sua
+confirma&ccedil;&atilde;o.</p>${await rascunho(false)}`,
+  })
+  if (entrada.rota.caminho !== CAMINHO_DA_CHAVE) return recusada
+  return redirecionar(`${pedido.para}?ok=marque_a_caixa`)
 }
 
 /** O que o passo 7 precisa do funil. */

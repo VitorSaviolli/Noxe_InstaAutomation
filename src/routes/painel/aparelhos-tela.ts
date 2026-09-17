@@ -405,6 +405,7 @@ data-mudanca="${jsonCanonico(mudanca)}">
 ${escondidos}
 <button type="submit">Confirmar com a digital</button>
 </form>
-<p><a href="${ROTA_APARELHOS.caminho}">Cancelar</a>, nada muda.</p>
+<p><a class="acao" href="${ROTA_APARELHOS.caminho}" data-voltar="">Cancelar</a></p>
+<p>Cancelar n&atilde;o muda nada.</p>
 </section>`
 }

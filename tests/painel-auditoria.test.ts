@@ -782,7 +782,23 @@ describe('AUD: a auditoria da gravacao', () => {
       'acao=ligar',
       sessao,
     )
-    expect(semConfirmar.status).toBe(400)
+    // Pelo botao do Inicio, a recusa volta ao Inicio com a faixa de aviso, em
+    // vez de uma pagina de erro. A trava e a linha de auditoria sao as mesmas.
+    expect(semConfirmar.status).toBe(303)
+    expect(semConfirmar.headers.get('location')).toBe('/painel?ok=marque_a_caixa')
+    // E a faixa que o Inicio pinta e a de AVISO, e nao a verde.
+    const inicio = await (
+      await despachar(
+        new Request(`${RAIZ}/painel?ok=marque_a_caixa`, { headers: { cookie: sessao.cookie } }),
+        env,
+        AGORA,
+        ROTA_INICIO,
+        handleInicio,
+      )
+    ).text()
+    expect(inicio).toContain(
+      '<p class="faixa faixa-aviso" role="status" aria-live="polite">Marque a caixa antes de ligar.</p>',
+    )
     expect((await linhaDeConfig())?.enabled).toBe(0)
     // A confirmacao ausente e uma mudanca JULGADA e recusada: a linha existe,
     // com `antes = depois = NULL` e o campo que ela tentou mexer.
@@ -1474,7 +1490,7 @@ describe('GRAV: a forma da gravacao', () => {
     // E a tela que veio no `403` e a de conferencia, com o valor LITERAL dos
     // dois lados (§10.10): sem ela, o `403` seria so uma recusa com outro numero.
     const tela = await volta.text()
-    expect(tela).toContain('Confira o que vai mudar')
+    expect(tela).toContain('Confirme a mudança')
     expect(tela).toContain(escapeHtml(`https://${DOMINIO_DE_TESTE}/antigo`))
   })
 
@@ -1737,7 +1753,7 @@ describe('GRAV: a forma da gravacao', () => {
     expect(semConfirmar.status).toBe(400)
     // Nenhuma cerimonia foi oferecida: sem tela de conferencia, sem mudanca
     // canonica para o `painel.js` assinar, e sem linha de step-up recusado.
-    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('Confirme a mudança')
     expect(tela).not.toContain('data-mudanca')
     expect((await unicaLinha()).acao).toBe('mudanca_recusada')
     expect((await linhaDeConfig())?.enabled).toBe(0)
@@ -1757,7 +1773,7 @@ describe('GRAV: a forma da gravacao', () => {
     expect(comConfirmar.status).toBe(403)
     expect((await unicaLinha()).acao).toBe('stepup_recusado')
     const conferencia = await comConfirmar.text()
-    expect(conferencia).toContain('Confira o que vai mudar')
+    expect(conferencia).toContain('Confirme a mudança')
     expect((await linhaDeConfig())?.enabled).toBe(0)
 
     // E a outra metade de §10.12, a que ninguem afirmava de verdade: a tela de
@@ -1849,7 +1865,8 @@ describe('GRAV: a forma da gravacao', () => {
       sessao,
       { versao: 3 },
     )
-    expect(pelaChave.status).toBe(400)
+    expect(pelaChave.status).toBe(303)
+    expect(pelaChave.headers.get('location')).toBe('/painel?ok=marque_a_caixa')
     expect((await linhaDeConfig())?.enabled).toBe(0)
     expect((await unicaLinha()).acao).toBe('mudanca_recusada')
   })
@@ -1925,7 +1942,11 @@ describe('GRAV: a forma da gravacao', () => {
     const corpo = await resposta.text()
 
     expect(resposta.status).toBe(400)
-    expect(corpo).toContain(escapeHtml('Confira os campos destacados.'))
+    expect(corpo).toContain('<h1>Não deu para salvar</h1>')
+    // Com a barra de baixo, e voltando para a tela de onde veio, nao ao Inicio.
+    expect(corpo).toContain('<nav class="navegacao"')
+    expect(corpo).toContain('href="/painel/palavras" data-voltar="">Voltar e corrigir</a>')
+    expect(corpo).not.toContain('Voltar ao início')
     // O campo, com o NOME do dicionario, nunca `triggerKeywords` cru.
     expect(corpo).toContain(escapeHtml(NOME_DO_CAMPO.triggerKeywords))
     // O nome tecnico aparece SO como `name=` do rascunho que volta, nunca como
@@ -2051,7 +2072,8 @@ describe('GRAV: a forma da gravacao', () => {
       handleChave,
     )
 
-    expect(segunda.status).toBe(400)
+    expect(segunda.status).toBe(303)
+    expect(segunda.headers.get('location')).toBe('/painel?ok=marque_a_caixa')
     expect((await linhaDeConfig())?.enabled).toBe(0)
   })
 

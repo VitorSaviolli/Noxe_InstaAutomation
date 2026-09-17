@@ -1346,6 +1346,8 @@ describe('STEP: step-up preso ao conteudo', () => {
     expect(tela).toContain(TELA_DOS_REELS.soNesteReel)
     expect(tela).toContain(REEL_A)
     expect(tela).not.toContain(REEL_B)
+    // O Cancelar volta para a tela DESTE Reel, e nao para a lista.
+    expect(tela).toContain(`href="/painel/reel?${CAMPO_DO_REEL}=${REEL_A}" data-voltar=""`)
 
     // E a metade da maquina: o alvo esta DENTRO da mudanca assinada, como texto.
     expect(mudanca.alvo).toBe(REEL_A)
@@ -1413,7 +1415,13 @@ describe('STEP: step-up preso ao conteudo', () => {
       await postar(MENSAGEM, `destinationUrl=${encodeURIComponent(LINK_NOVO)}`, sessao)
     ).text()
 
-    expect(corpo).toContain('Confira o que vai mudar')
+    expect(corpo).toContain('<h1>Confirme a mudança</h1>')
+    // A tela intermediaria mantem a barra de baixo, com a aba de origem acesa,
+    // e o Cancelar volta para a tela de origem.
+    expect(corpo).toContain('<nav class="navegacao"')
+    expect(corpo).toMatch(/<a href="\/painel\/mensagem"[^>]*aria-current="page"/)
+    expect(corpo).toContain('href="/painel/mensagem" data-voltar="">Cancelar</a>')
+    expect(corpo).not.toContain('Voltar ao início')
     expect(corpo).toContain(`https://${DOMINIO_DE_TESTE}/antigo`)
     expect(corpo).toContain(LINK_NOVO)
     // O gesto que a resolve precisa do `painel.js`, e a pagina o carrega.
@@ -1505,7 +1513,7 @@ describe('STEP: step-up preso ao conteudo', () => {
     // Nenhuma cerimonia foi oferecida: sem tela de conferencia, sem a mudanca
     // canonica que o `painel.js` mandaria assinar, e sem a linha de step-up
     // recusado na frente. So a recusa do validador.
-    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('Confirme a mudança')
     expect(tela).not.toContain('data-mudanca')
     expect((await auditoria()).map((linha) => linha.acao)).toEqual(['mudanca_recusada'])
   })
@@ -1701,7 +1709,7 @@ describe('STEP: step-up preso ao conteudo', () => {
     // Nenhuma cerimonia foi oferecida: sem tela de conferencia, sem mudanca
     // canonica para o `painel.js` assinar, e sem linha de step-up recusado.
     expect(tela).not.toContain('data-mudanca')
-    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('Confirme a mudança')
     expect((await auditoria()).map((linha) => linha.acao)).toEqual(['mudanca_recusada'])
     expect((await linhaDeConfig())?.destination_url).toBe('https://exemplo.com/do-banco')
 
@@ -1952,7 +1960,7 @@ describe('STEP: step-up preso ao conteudo', () => {
       // E a contraprova de que nenhum gesto foi pedido: a tela da recusa nao
       // traz a conferencia nem a mudanca canonica.
       expect({ [caso.campo]: tela.includes('data-mudanca') }).toEqual({ [caso.campo]: false })
-      expect({ [caso.campo]: tela.includes('Confira o que vai mudar') }).toEqual({
+      expect({ [caso.campo]: tela.includes('Confirme a mudança') }).toEqual({
         [caso.campo]: false,
       })
     }
@@ -2087,7 +2095,7 @@ describe('STEP: step-up preso ao conteudo', () => {
     expect(recusa.status).toBe(400)
     expect((await linhaDeConfig())?.public_reply_text).toBe(antes)
 
-    expect(tela).not.toContain('Confira o que vai mudar')
+    expect(tela).not.toContain('Confirme a mudança')
     expect(tela).not.toContain('data-mudanca')
     expect((await auditoria()).map((linha) => linha.acao)).toEqual(['mudanca_recusada'])
   })

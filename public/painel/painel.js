@@ -372,6 +372,23 @@
     })
   }
 
+  // "Voltar e corrigir" e "Cancelar": quando a pessoa chegou aqui pela tela de
+  // origem, voltar pelo historico devolve a tela com o que ela digitou. Sem
+  // isso, o link leva a tela de origem, vazia. Nenhum destino novo: o voltar do
+  // navegador so vai para onde a pessoa ja estava.
+  var voltas = document.querySelectorAll('a[data-voltar]')
+  for (var v = 0; v < voltas.length; v++) {
+    voltas[v].addEventListener('click', function (evento) {
+      var anterior = document.referrer === '' ? null : new URL(document.referrer)
+      var destino = new URL(evento.currentTarget.href)
+      if (anterior === null || window.history.length < 2) return
+      if (anterior.origin !== location.origin) return
+      if (anterior.pathname + anterior.search !== destino.pathname + destino.search) return
+      evento.preventDefault()
+      window.history.back()
+    })
+  }
+
   var deEntrar = document.getElementById('entrar')
   if (deEntrar !== null) {
     ligar(deEntrar, entrar)

@@ -35,6 +35,7 @@ import type { Env } from '../../types/env'
 import { CAMPO_DA_ACAO, CAMPO_DA_CONFIRMACAO, CAMPO_DA_FICHA, CAMPO_DA_VERSAO } from './campos'
 import type { CampoDaConfig } from './dicionario'
 import {
+  AVISOS_DE_RESULTADO,
   dataEmPortugues,
   escopoDeMidias,
   fraseDeConfirmacao,
@@ -507,10 +508,12 @@ export async function configDaTela(env: Env, now: number): Promise<SnapshotConfi
  * coisa nesta linha.
  */
 export function blocoDeConfirmacao(request: Request): HtmlSeguro {
-  const frase = fraseDeConfirmacao(new URL(request.url).searchParams.get('ok'))
+  const codigo = new URL(request.url).searchParams.get('ok')
+  const frase = fraseDeConfirmacao(codigo)
   if (frase === null) return html``
 
-  return html`<p class="faixa faixa-ok" role="status" aria-live="polite">${frase}</p>`
+  const aviso = (AVISOS_DE_RESULTADO as readonly string[]).includes(codigo ?? '')
+  return html`<p class="${aviso ? 'faixa faixa-aviso' : 'faixa faixa-ok'}" role="status" aria-live="polite">${frase}</p>`
 }
 
 /**

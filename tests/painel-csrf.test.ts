@@ -346,7 +346,8 @@ describe('CSRF: a ficha derivada da sessao (§10.9, camada 3)', () => {
     )
 
     expect(resposta.status).toBe(403)
-    expect(await resposta.text()).toContain('Confirme com a sua digital para continuar.')
+    // Numa tela logada, a pagina do `403` e a tela "Confirme a mudanca".
+    expect(await resposta.text()).toContain('Confirme a mudança')
     expect(espiao.chamadas).toBe(0)
     // O passo 8 vem ANTES do passo 9: recusar por step-up nao custa banco.
     expect(contador.prepares).toBe(0)

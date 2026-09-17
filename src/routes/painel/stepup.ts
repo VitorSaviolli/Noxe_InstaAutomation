@@ -513,6 +513,14 @@ export interface PedidoDeConferencia {
   readonly versao: number
   /** O caminho do POST, a ROTA que recebeu o formulario. */
   readonly paraOPost: string
+  /** A tela de origem, para onde o Cancelar volta (com o `?midia=` do Reel). */
+  readonly voltar: string
+  /**
+   * A legenda do Reel, quando a mudanca e sobre um Reel e ele tem legenda. A
+   * tela mostra a legenda para a pessoa reconhecer o Reel; o numero continua ao
+   * lado, pequeno, porque e ele que entra na assinatura.
+   */
+  readonly legendaDoAlvo?: string
   /** A mudanca canonica, que o `painel.js` manda para a cerimonia. */
   readonly mudanca: MudancaCanonica
   /**
@@ -566,7 +574,6 @@ export function telaDeConferencia(pedido: PedidoDeConferencia): HtmlSeguro {
   )
 
   return html`<section class="conferencia">
-<h2>Confira o que vai mudar</h2>
 ${
   // §10.10, literal: "a tela **tem que** mostrar o valor literal antes da
   // biometria. Se o humano nao leu o que assinou, a amarracao ao conteudo nao
@@ -580,9 +587,11 @@ ${
   // aparece no permalink publico do Reel.
   pedido.mudanca.alvo === undefined
     ? null
-    : html`<p class="alvo-da-mudanca">${TELA_DOS_REELS.soNesteReel} <code>${
-        pedido.mudanca.alvo
-      }</code></p>`
+    : html`<p class="alvo-da-mudanca">${TELA_DOS_REELS.soNesteReel} ${
+        pedido.legendaDoAlvo === undefined || pedido.legendaDoAlvo === ''
+          ? null
+          : html`<strong>${pedido.legendaDoAlvo}</strong> `
+      }<small>(n&ordm; <code>${pedido.mudanca.alvo}</code>)</small></p>`
 }
 <ul class="mudancas">${linhas}</ul>
 ${
@@ -602,8 +611,8 @@ data-mudanca="${jsonCanonico(pedido.mudanca)}">
 ${escondidos}
 <button type="submit">Confirmar com a digital</button>
 </form>
-<p><a href="${pedido.paraOPost}">Cancelar</a>, nada &eacute; salvo, e o que voc&ecirc;
-escreveu continua na tela.</p>
+<p><a class="acao" href="${pedido.voltar}" data-voltar="">Cancelar</a></p>
+<p>Cancelar n&atilde;o salva nada.</p>
 </section>`
 }
 
@@ -702,6 +711,10 @@ export interface PassagemDeStepUp {
    * assinou, a amarracao ao conteudo nao vale nada".
    */
   readonly alvo?: string
+  /** A tela de origem, para o Cancelar da tela de conferencia. */
+  readonly voltar: string
+  /** A legenda do Reel do `alvo`, quando ha uma. */
+  readonly legendaDoAlvo?: string
 }
 
 /**
@@ -761,6 +774,8 @@ export async function passarPeloStepUp(passagem: PassagemDeStepUp): Promise<Resu
       // carimbo automatico no unico formulario que pede biometria.
       versao: versaoEnviada,
       paraOPost: entrada.rota.caminho,
+      voltar: passagem.voltar,
+      ...(passagem.legendaDoAlvo === undefined ? {} : { legendaDoAlvo: passagem.legendaDoAlvo }),
       mudanca,
       mudancasNoToque: mudados.length,
     })}`

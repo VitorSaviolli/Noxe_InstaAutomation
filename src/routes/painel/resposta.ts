@@ -24,6 +24,7 @@
  */
 import { cabecalhos, type HtmlSeguro, html, pagina } from './html'
 import type { FormatoDeRota } from './rotas'
+import { type Aba, molduraIntermediaria, TELA_DE_ORIGEM, telaDoPainel } from './tela'
 
 /**
  * A tabela canonica de §11.4, inteira.
@@ -132,6 +133,71 @@ export interface ContextoDoErro {
    * para uma tela que nao tem nada a fazer com ele.
    */
   readonly comScript?: boolean
+  /**
+   * A tela para onde "Voltar e corrigir" e "Cancelar" levam.
+   *
+   * Ausente, e a tela de origem da rota em `TELA_DE_ORIGEM`. So o Reel precisa
+   * dizer mais, porque a tela dele tem o `?midia=` na query string.
+   */
+  readonly voltar?: string
+}
+
+/** O titulo da recusa de um formulario, na tela. */
+const TITULO_DA_RECUSA = 'Não deu para salvar'
+
+/**
+ * O titulo que a TELA mostra, quando ele e diferente da `mensagem` da tabela.
+ *
+ * A `mensagem` continua a mesma no JSON e no log (§11.4). Na tela, a recusa de
+ * um formulario diz o que aconteceu ("Nao deu para salvar"), e o `403` do
+ * step-up e a tela em que a pessoa confere e confirma a mudanca.
+ */
+function tituloNaTela(codigo: CodigoDeErro, request: Request): string {
+  if (codigo === 'step_up_necessario') return 'Confirme a mudança'
+  if (
+    request.method === 'POST' &&
+    (codigo === 'dados_invalidos' || codigo === 'dominio_nao_permitido')
+  ) {
+    return TITULO_DA_RECUSA
+  }
+  return ERROS[codigo].mensagem
+}
+
+/**
+ * A pagina de uma recusa ou conferencia que nasceu de uma tela logada: a mesma
+ * barra de baixo da tela de origem, e o caminho de volta para ela.
+ */
+function paginaIntermediaria(
+  codigo: CodigoDeErro,
+  contexto: ContextoDoErro,
+  origem: { readonly aba: Aba; readonly voltar: string },
+): Response {
+  const titulo = tituloNaTela(codigo, contexto.request)
+  const voltar = contexto.voltar ?? origem.voltar
+  // A tela "Confirme a mudanca" ja traz o Cancelar dentro dela. As outras
+  // voltam para a tela de onde vieram, e nao para o Inicio.
+  const link =
+    codigo === 'step_up_necessario'
+      ? null
+      : html`<p><a class="acao" href="${voltar}" data-voltar="">${
+          titulo === TITULO_DA_RECUSA ? 'Voltar e corrigir' : 'Voltar'
+        }</a></p>`
+
+  return telaDoPainel({
+    ...molduraIntermediaria(
+      titulo,
+      origem.aba,
+      html`<h1>${titulo}</h1>
+${contexto.explicacao ?? null}
+${link}`,
+    ),
+    status: ERROS[codigo].status,
+    ...(contexto.extras === undefined ? {} : { extras: contexto.extras }),
+    // O `painel.js` faz o "Voltar" ser o voltar do navegador, que devolve a
+    // tela com o que a pessoa digitou. Sem ele, o link continua levando a tela
+    // de origem.
+    comScript: true,
+  })
 }
 
 /** Um codigo de motivo interno bem formado: snake_case curto, e nada mais. */
@@ -167,6 +233,9 @@ export function erro(codigo: CodigoDeErro, contexto: ContextoDoErro): Response {
       { status, headers: { ...contexto.extras, ...cabecalhos('api') } },
     )
   }
+
+  const origem = TELA_DE_ORIGEM[contexto.caminho]
+  if (origem !== undefined) return paginaIntermediaria(codigo, contexto, origem)
 
   return pagina({
     titulo: mensagem,

@@ -314,7 +314,9 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
   const sobreposicao = sobreposicaoDaLinha(linha)
 
   if (request.method === 'POST') {
-    return await gravarNoReel(entrada, mediaId, sobreposicao, snapshot.global, snapshot.versao)
+    return await gravarNoReel(entrada, mediaId, sobreposicao, snapshot.global, snapshot.versao, {
+      legenda: linha.legenda_curta,
+    })
   }
 
   const global = estadoDaConfig(snapshot.global)
@@ -382,8 +384,13 @@ async function gravarNoReel(
   atual: Sobreposicao,
   global: AutomationConfig,
   versao: number,
+  doReel: { readonly legenda: string | null },
 ): Promise<Response> {
-  const { env, now, contexto, corpo, sessao } = entrada
+  const { env, now, corpo, sessao } = entrada
+  const contexto = {
+    ...entrada.contexto,
+    voltar: `${ROTA_REEL.caminho}?${CAMPO_DO_REEL}=${mediaId}`,
+  }
   if (corpo.familia !== 'formulario' || sessao === null) return erro('corpo_invalido', contexto)
 
   const acao = corpo.campos.get(CAMPO_DA_ACAO)
@@ -430,6 +437,7 @@ async function gravarNoReel(
       // §9.9: o `alvo` nomeia a entidade. Um `media_id` cabe nos 32 caracteres
       // da coluna, e ele viaja como TEXT do formulario ate o `bind` (Ruling 90).
       alvo: mediaId,
+      ...(doReel.legenda === null ? {} : { legenda: doReel.legenda }),
       statements: [
         new PainelMidiasRepository(env.DB).statementDeSobreposicao(now, versao, mediaId, nova),
       ],
