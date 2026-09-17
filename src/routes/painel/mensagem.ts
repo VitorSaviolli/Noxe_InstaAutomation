@@ -89,47 +89,52 @@ function campoDeLink(valor: string): HtmlSeguro {
 /**
  * O formulario dos tres campos, com o aviso de §15.4 ANTES do botao.
  *
- * §15.4 recusou separar `publicReplyText` numa tela propria, a premissa estava
- * errada, porque aqui **todos** os campos ja exigem step-up sempre e nao ha lote
- * a arrastar. O que ela acolheu foi a metade certa da objecao: a tela precisa
- * dizer, antes do gesto, que aquele toque cobre a tela inteira. E o paragrafo
- * abaixo, e ele vem antes do botao, nao depois, e nao numa tela seguinte.
+ * §15.4: todos os campos desta tela exigem step-up sempre, e a tela precisa
+ * dizer, antes do gesto, que aquele toque cobre a tela inteira. E a linha logo
+ * acima do botao.
+ *
+ * **Sem endereco liberado, o formulario vem desabilitado.** Nesse estado o
+ * painel recusa trocar o link (§9.8), e um formulario editavel que sempre
+ * recusa e uma promessa quebrada. A faixa acima dele diz o que fazer.
  */
-function formularioDaMensagem(config: AutomationConfig, ficha: string, versao: number): HtmlSeguro {
+function formularioDaMensagem(
+  config: AutomationConfig,
+  ficha: string,
+  versao: number,
+  liberado: boolean,
+): HtmlSeguro {
   return html`<form method="post" action="${ROTA_MENSAGEM.caminho}" class="protegidos">
 ${camposDoFormulario(ficha, versao)}
+<fieldset${liberado ? null : html` disabled`}>
 ${campoDeTexto('privateReplyText', 'Texto do Direct', config.privateReplyText, 4)}
 ${campoDeLink(config.destinationUrl)}
 ${campoDeTexto('publicReplyText', 'Resposta no comentário', config.publicReplyText, 3)}
-<p>Estes tr&ecirc;s campos s&atilde;o salvos juntos: <strong>um toque s&oacute; confirma a tela
-inteira</strong>. Se voc&ecirc; mudar s&oacute; um deles, o toque continua valendo pelos tr&ecirc;s
-que est&atilde;o aqui.</p>
+<p><strong>Como escrever:</strong> use <code>{username}</code> para o @ da pessoa e
+<code>{link}</code> para o link.</p>
+<p>Os tr&ecirc;s campos s&atilde;o salvos juntos: <strong>um toque s&oacute; confirma a tela
+inteira</strong>.</p>
 <p><button type="submit">Salvar (vai pedir a sua digital)</button></p>
+</fieldset>
 </form>`
 }
 
 /**
- * A frase da lista de enderecos liberados (§12.7).
+ * Os enderecos permitidos para o link, ANTES dos campos (§12.7).
  *
- * Lista vazia NAO e "libera tudo": e o estado em que o painel nao altera link
- * nem texto, e a entrega segue com o que ja esta valendo (§9.8). Dizer isso e
- * o que impede o dono de achar que o campo esta editavel e que o salvamento
- * falhou por outro motivo.
+ * Lista vazia NAO e "libera tudo": e o estado em que o painel nao altera o
+ * link, e a entrega segue com o que ja esta valendo (§9.8). A faixa diz isso e
+ * diz o que fazer, e o formulario abaixo vem desabilitado.
  */
-function blocoDaLista(bruto: string | undefined): HtmlSeguro {
-  const lista = lerAllowlist(bruto)
-
+function blocoDaLista(lista: ReturnType<typeof lerAllowlist>): HtmlSeguro {
   if (!lista.configurada) {
-    return html`<p class="faixa faixa-aviso" role="status">Nenhum endere&ccedil;o foi liberado nesta
-instala&ccedil;&atilde;o. Enquanto estiver assim, o painel n&atilde;o altera o link nem o texto do
-Direct, e a entrega segue com o que j&aacute; est&aacute; valendo.</p>`
+    return html`<p class="faixa faixa-aviso" role="status">Ainda n&atilde;o &eacute; poss&iacute;vel
+trocar a mensagem. Pe&ccedil;a para quem instalou liberar o endere&ccedil;o do seu link.</p>`
   }
 
-  return html`<p>S&oacute; d&aacute; para usar links destes endere&ccedil;os: ${lista.dominios.join(
+  return html`<p><strong>Endere&ccedil;os permitidos para o link:</strong> ${lista.dominios.join(
     ', ',
-  )}. Isso &eacute; uma trava do pr&oacute;prio programa, e &eacute; proposital: se um dia
-algu&eacute;m invadir o seu painel, essa pessoa n&atilde;o consegue apontar o seu link para um site
-de golpe.</p>`
+  )}. &Eacute; uma trava de prop&oacute;sito: quem invadir o painel n&atilde;o consegue apontar o
+seu link para um site de golpe.</p>`
 }
 
 /** A previa, em formato de balao de conversa (§3). */
@@ -149,9 +154,6 @@ function blocoDePrevia(config: AutomationConfig): HtmlSeguro {
 <p class="quem">Embaixo do Reel${config.publicReplyEnabled ? null : html`, hoje desligado`}</p>
 <p>${config.publicReplyText}</p>
 </div>
-<p>No lugar de <code>{username}</code> entra o @ de quem comentou, e no lugar de
-<code>{link}</code> entra o seu link. S&atilde;o os dois &uacute;nicos apelidos que o programa
-conhece.</p>
 </section>`
 }
 
@@ -172,12 +174,13 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
   const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const { global } = snapshot
 
+  const lista = lerAllowlist(entrada.env.ALLOWED_LINK_DOMAINS)
+
   const corpo = html`<h1>Mensagem</h1>
+<p>O que a pessoa recebe. Mudar aqui sempre pede a sua digital.</p>
 ${blocoDeConfirmacao(entrada.request)}
-<p>Estes tr&ecirc;s campos s&atilde;o os que decidem o que a pessoa recebe. Trocar qualquer um deles
-vai pedir a sua digital ou o seu rosto, sempre.</p>
-${formularioDaMensagem(global, await fichaDaTela(entrada), snapshot.versao)}
-${blocoDaLista(entrada.env.ALLOWED_LINK_DOMAINS)}
+${blocoDaLista(lista)}
+${formularioDaMensagem(global, await fichaDaTela(entrada), snapshot.versao, lista.configurada)}
 ${blocoDePrevia(global)}`
 
   return telaDoPainel(molduraCom('mensagem', 'Mensagem', visao, corpo))

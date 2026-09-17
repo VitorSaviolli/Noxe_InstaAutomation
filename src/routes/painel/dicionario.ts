@@ -66,14 +66,14 @@ export const NOME_DO_CAMPO: Record<CampoDaConfig, string> = {
  * dois vocabularios, e e por isso que ele mora numa rota e nao no `config.ts`.
  */
 export const MODO_DE_COMPARACAO: Record<MatchMode, string> = {
-  exact: 'O comentário tem que ser só isso',
-  contains: 'Basta aparecer no meio do comentário',
+  exact: 'O comentário tem que ser só a palavra',
+  contains: 'Basta a palavra aparecer no comentário',
 }
 
 /** As duas opcoes da tela de Reels, com as frases de §3. */
 export const ESCOPO_DE_MIDIAS: Record<EscopoDeMidias, string> = {
-  todas: 'Em todos os meus Reels',
-  selecionadas: 'Só nos que eu escolher',
+  todas: 'Todos os meus Reels',
+  selecionadas: 'Só os que eu marcar',
 }
 
 /**
@@ -174,7 +174,7 @@ export function fraseDeConfirmacao(codigo: string | null): string | null {
  */
 export const MOTIVO_DA_RECUSA: Record<string, string> = {
   gatilho_curto:
-    'Esta palavra é curta demais para o modo que está valendo. Escreva mais letras, no modo “basta aparecer no meio”, pelo menos duas palavras.',
+    'Esta palavra é curta demais para o modo que está valendo. Escreva mais letras, no modo “basta a palavra aparecer no comentário”, pelo menos duas palavras.',
   gatilho_longo: 'Esta frase é longa demais. Use no máximo 40 letras.',
   gatilho_vazio:
     'Isto não vai funcionar nunca. A automação ignora emojis e pontuação ao comparar, então esta palavra fica vazia e é pulada em silêncio.',
@@ -370,8 +370,8 @@ export const FRASE_DO_AJUSTE: Record<
     falso: 'A pontuação e os emojis contam na comparação.',
   },
   processOnlyReels: {
-    verdadeiro: 'A automação responde só nos Reels.',
-    falso: 'A automação responde em qualquer publicação.',
+    verdadeiro: 'Só Reels',
+    falso: 'Qualquer publicação',
   },
 }
 

@@ -738,11 +738,11 @@ describe('DIC: o dicionario de traducao', () => {
 
     // `processOnlyReels` nao passa por `normalizeText`; a frase dele e conferida
     // contra o que ele significa em `evaluateComment`: `true` restringe.
-    expect(fraseDoAjuste('processOnlyReels', configDeTeste({ processOnlyReels: true }))).toContain(
-      'só nos Reels',
+    expect(fraseDoAjuste('processOnlyReels', configDeTeste({ processOnlyReels: true }))).toBe(
+      'Só Reels',
     )
-    expect(fraseDoAjuste('processOnlyReels', configDeTeste({ processOnlyReels: false }))).toContain(
-      'qualquer publicação',
+    expect(fraseDoAjuste('processOnlyReels', configDeTeste({ processOnlyReels: false }))).toBe(
+      'Qualquer publicação',
     )
   })
 })
@@ -977,21 +977,22 @@ describe('TELA: o que a tela imprime', () => {
     const config = (await snapshotDoBanco()).global
 
     for (const esperado of [
-      ESCOPO_DE_MIDIAS.selecionadas,
       'A mesma pessoa só aciona de novo depois de 5 horas.',
-      MODO_DE_COMPARACAO.contains,
       fraseDoAjuste('processOnlyReels', config),
-      'Desligada: nada é escrito embaixo do Reel.',
-      'Ligado: quem comenta recebe o Direct com o link.',
     ]) {
       expect({ [esperado]: corpo.includes(escapeHtml(esperado)) }).toEqual({ [esperado]: true })
     }
 
-    // E o oposto de cada um NAO aparece. `processOnlyReels` saiu desta lista na
-    // etapa do step-up: Ruling 65 o tornou editavel, entao as DUAS frases dele
-    // aparecem, como as das outras chaves, e o que se afirma sobre ele e qual
-    // opcao esta MARCADA, no laco de `CHAVES_EDITAVEIS` abaixo.
-    for (const proibido of [ESCOPO_DE_MIDIAS.todas, MODO_DE_COMPARACAO.exact]) {
+    // O que se edita em OUTRA tela nao se repete aqui em leitura: quais Reels
+    // (Reels), o modo de comparacao (Palavras) e os canais (Mensagem).
+    for (const proibido of [
+      ESCOPO_DE_MIDIAS.todas,
+      ESCOPO_DE_MIDIAS.selecionadas,
+      MODO_DE_COMPARACAO.exact,
+      MODO_DE_COMPARACAO.contains,
+      'Como est&aacute; agora',
+      'O que a automa&ccedil;&atilde;o envia',
+    ]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
     }
 
@@ -1030,17 +1031,13 @@ describe('TELA: o que a tela imprime', () => {
     const config = (await snapshotDoBanco()).global
 
     for (const esperado of [
-      ESCOPO_DE_MIDIAS.todas,
       'A mesma pessoa pode acionar quantas vezes quiser, sem espera.',
-      MODO_DE_COMPARACAO.exact,
       FRASE_DO_AJUSTE.processOnlyReels.verdadeiro,
-      'Ligada: a automação responde embaixo do Reel.',
-      'Desligado: ninguém recebe Direct.',
     ]) {
       expect({ [esperado]: corpo.includes(escapeHtml(esperado)) }).toEqual({ [esperado]: true })
     }
 
-    for (const proibido of [ESCOPO_DE_MIDIAS.selecionadas, MODO_DE_COMPARACAO.contains]) {
+    for (const proibido of [ESCOPO_DE_MIDIAS.todas, MODO_DE_COMPARACAO.exact]) {
       expect({ [proibido]: corpo.includes(escapeHtml(proibido)) }).toEqual({ [proibido]: false })
     }
 
@@ -1074,7 +1071,7 @@ describe('TELA: o que a tela imprime', () => {
     expect(corpo).toContain('class="protegidos"')
     // E o botao nunca promete "Salvar" e surpreende com a digital: a tela diz
     // o que vai acontecer antes.
-    expect(corpo).toContain('vai pedir a sua digital ou o seu rosto')
+    expect(corpo).toContain('Salvar (vai pedir a sua digital)')
   })
 
   test('TELA-14: "O que aconteceu" imprime o aviso obrigatorio de §12.6', async () => {
@@ -1110,7 +1107,7 @@ describe('TELA: o que a tela imprime', () => {
           normalizeOptionsFrom(snapshot.global),
         ) !== null
 
-      expect({ [modo]: corpo.includes(`${exemplo}&rdquo;, aciona`) }).toEqual({
+      expect({ [modo]: corpo.includes(`✓</span> responde a &ldquo;${exemplo}&rdquo;`) }).toEqual({
         [modo]: acionaDeVerdade,
       })
     }
@@ -1140,7 +1137,11 @@ describe('TELA: o que a tela imprime', () => {
     const cookie = await abrirSessao()
 
     const semLista = await corpoDa(TELA_MENSAGEM, cookie)
-    expect(semLista).toContain('Nenhum endere&ccedil;o foi liberado')
+    expect(semLista).toContain('Ainda n&atilde;o &eacute; poss&iacute;vel')
+    // Sem endereco liberado o formulario vem desabilitado, e a faixa vem ANTES
+    // dos campos.
+    expect(semLista).toContain('<fieldset disabled>')
+    expect(semLista.indexOf('trocar a mensagem')).toBeLessThan(semLista.indexOf('Texto do Direct'))
 
     invalidarCacheDeConfig()
     const comLista = await corpoDa(
@@ -1149,7 +1150,8 @@ describe('TELA: o que a tela imprime', () => {
       ambienteCom({ ALLOWED_LINK_DOMAINS: DOMINIO_DE_TESTE }),
     )
     expect(comLista).toContain(DOMINIO_DE_TESTE)
-    expect(comLista).not.toContain('Nenhum endere&ccedil;o foi liberado')
+    expect(comLista).not.toContain('trocar a mensagem')
+    expect(comLista).not.toContain('<fieldset disabled>')
   })
 })
 

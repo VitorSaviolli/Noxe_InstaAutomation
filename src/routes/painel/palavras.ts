@@ -1,10 +1,11 @@
 /**
- * `GET /painel/palavras`, as palavras que ligam a automacao, em modo leitura.
+ * `GET, POST /painel/palavras`, as palavras que ligam a automacao.
  *
  * A tela cabe numa frase: **o que uma pessoa precisa comentar para receber o
- * Direct**. Ela mostra as palavras salvas, o modo de comparacao escrito sem
- * jargao (§3) e exemplos gerados a partir da palavra e dos ajustes REAIS do
- * dono.
+ * Direct**. A caixa das palavras vem primeiro, depois como comparar, o Salvar,
+ * e os exemplos gerados a partir da palavra e dos ajustes REAIS do dono. As
+ * regras de maiusculas, acentos e pontuacao moram em Ajustes, e aqui ha so o
+ * link para la.
  *
  * **Os exemplos usam `matchKeyword`, a funcao de producao** (§12.1 regra 4).
  * Nao existe segunda implementacao do casamento, nem aqui, nem em JavaScript
@@ -22,7 +23,7 @@
 import type { AutomationConfig } from '../../config'
 import { MAX_GATILHOS } from '../../services/config-validation'
 import { matchKeyword, normalizeOptionsFrom } from '../../utils/normalize'
-import { type CampoDaConfig, fraseDoAjuste, MODO_DE_COMPARACAO } from './dicionario'
+import { type CampoDaConfig, MODO_DE_COMPARACAO } from './dicionario'
 import { comoLinhas, MODO_NO_FORMULARIO } from './formulario'
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
@@ -36,7 +37,7 @@ import {
   panorama,
   seloProtegido,
 } from './inicio'
-import { ROTA_PALAVRAS } from './rotas'
+import { ROTA_AJUSTES, ROTA_PALAVRAS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { telaDoPainel } from './tela'
 
@@ -90,9 +91,9 @@ function blocoDeExemplos(config: AutomationConfig): HtmlSeguro {
 
   const linhas = exemplosPara(primeira, config).map(
     (exemplo) =>
-      html`<li><span aria-hidden="true">${exemplo.aciona ? '✓' : '✕'}</span> &ldquo;${
-        exemplo.comentario
-      }&rdquo;, ${exemplo.aciona ? 'aciona' : 'não aciona'}${
+      html`<li><span aria-hidden="true">${exemplo.aciona ? '✓' : '✕'}</span> ${
+        exemplo.aciona ? 'responde a' : 'não responde a'
+      } &ldquo;${exemplo.comentario}&rdquo;${
         exemplo.surpreende
           ? html` <em>(responde tamb&eacute;m, e talvez voc&ecirc; n&atilde;o queira)</em>`
           : null
@@ -100,25 +101,8 @@ function blocoDeExemplos(config: AutomationConfig): HtmlSeguro {
   )
 
   return html`<section>
-<h2>O que aciona, com a sua palavra</h2>
-<p>Estes exemplos s&atilde;o conferidos com a mesma fun&ccedil;&atilde;o que a automa&ccedil;&atilde;o
-usa para responder de verdade.</p>
+<h2>Exemplos com a sua palavra</h2>
 <ul class="exemplos">${linhas}</ul>
-</section>`
-}
-
-/** As tres frases de comparacao, geradas dos ajustes reais do dono (§3). */
-function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
-  // O MODO nao aparece mais aqui: ele virou escolha dentro do formulario, e um
-  // eco em leitura ao lado de um controle editavel seriam duas telas dizendo o
-  // mesmo valor, a primeira a divergir seria a que ninguem atualizou.
-  return html`<section>
-<h2>Como o coment&aacute;rio &eacute; comparado</h2>
-<ul>
-<li>${fraseDoAjuste('caseSensitive', config)}</li>
-<li>${fraseDoAjuste('normalizeAccents', config)}</li>
-<li>${fraseDoAjuste('ignorePunctuation', config)}</li>
-</ul>
 </section>`
 }
 
@@ -130,10 +114,9 @@ function blocoDeRegras(config: AutomationConfig): HtmlSeguro {
  * caixas vazias. Uma linha por palavra e o formato que a propria pessoa ja usa
  * quando escreve uma lista, e a linha em branco e o Enter dela, nao um item.
  *
- * O formulario grava SO as palavras. As tres chaves de comparacao aparecem
- * aqui como explicacao e sao editadas em Ajustes (§3), onde elas moram: dois
- * formularios gravando o mesmo campo seriam duas telas discordando sobre quem
- * manda.
+ * O formulario grava as palavras e o modo. As tres chaves de comparacao sao
+ * editadas em Ajustes (§3), onde elas moram: dois formularios gravando o mesmo
+ * campo seriam duas telas discordando sobre quem manda.
  */
 function formularioDasPalavras(
   config: AutomationConfig,
@@ -142,12 +125,13 @@ function formularioDasPalavras(
 ): HtmlSeguro {
   return html`<form method="post" action="${ROTA_PALAVRAS.caminho}">
 ${camposDoFormulario(ficha, versao)}
-<p><label for="triggerKeywords">Uma palavra ou frase por linha, at&eacute;
-${String(MAX_GATILHOS)}.</label></p>
+<p><label for="triggerKeywords">Uma palavra ou frase por linha (at&eacute;
+${String(MAX_GATILHOS)})</label></p>
 <textarea id="triggerKeywords" name="triggerKeywords" rows="6"
 >${comoLinhas(config.triggerKeywords)}</textarea>
 ${escolhaDeModo(config)}
 <p><button type="submit">Salvar</button></p>
+<p>Mudar para a op&ccedil;&atilde;o com ${seloProtegido()} vai pedir a sua digital.</p>
 </form>`
 }
 
@@ -158,13 +142,14 @@ ${escolhaDeModo(config)}
  * aparecer no meio" ALARGA o envelope de alcance, e alargar pede a digital;
  * voltar para "o comentario tem que ser so isso" estreita, e estreitar nunca
  * pede. E a promessa do rodape dos Ajustes escrita dentro do controle que a
- * exerce, e por isso o botao diz so "Salvar": §12.3 manda que, nas telas em que
- * so PARTE dos campos e protegida, quem avisa seja o cadeado no campo mais a
- * tela de conferencia, nunca uma surpresa biometrica.
+ * exerce, e por isso o botao diz so "Salvar" e a linha logo abaixo dele avisa:
+ * §12.3 manda que, nas telas em que so PARTE dos campos e protegida, quem avisa
+ * seja o cadeado no campo mais a tela de conferencia, nunca uma surpresa
+ * biometrica.
  */
 function escolhaDeModo(config: AutomationConfig): HtmlSeguro {
   return html`<fieldset>
-<legend>Como o coment&aacute;rio &eacute; comparado</legend>
+<legend>Como comparar</legend>
 <p><label><input type="radio" name="matchMode" value="${MODO_NO_FORMULARIO.exact}"${
     config.matchMode === 'exact' ? html` checked` : null
   }> ${MODO_DE_COMPARACAO.exact}</label></p>
@@ -190,21 +175,18 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
   const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const { global } = snapshot
 
-  const fichas = global.triggerKeywords.map((palavra) => html`<li class="ficha">${palavra}</li>`)
-
   const corpo = html`<h1>Palavras</h1>
 <p>Quem comentar uma destas palavras recebe a mensagem.</p>
 ${blocoDeConfirmacao(entrada.request)}
 ${
   global.triggerKeywords.length === 0
     ? html`<p class="faixa faixa-aviso" role="status">Sem nenhuma palavra a automa&ccedil;&atilde;o
-nunca responde. Ou escreva pelo menos uma, ou desligue, as duas s&atilde;o seguras, mas
-s&oacute; uma fica clara no seu painel.</p>`
-    : html`<ul class="fichas">${fichas}</ul>`
+nunca responde. Escreva pelo menos uma.</p>`
+    : null
 }
 ${formularioDasPalavras(global, await fichaDaTela(entrada), snapshot.versao)}
-${blocoDeRegras(global)}
-${blocoDeExemplos(global)}`
+${blocoDeExemplos(global)}
+<p>Mai&uacute;sculas, acentos e pontua&ccedil;&atilde;o: <a href="${ROTA_AJUSTES.caminho}">ver em Ajustes</a></p>`
 
   return telaDoPainel(molduraCom('palavras', 'Palavras', visao, corpo))
 }

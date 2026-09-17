@@ -1,17 +1,16 @@
 /**
- * `GET, POST /painel/ajustes`, os ajustes finos.
+ * `GET, POST /painel/ajustes`, os Ajustes.
  *
  * A tela cabe numa frase: **onde, com que frequencia e por quais canais a
- * automacao responde**. Sao os ajustes que mudam o ALCANCE da automacao, e por
- * isso ela termina com a regra escrita de §12.3, que e a promessa que o painel
- * inteiro faz sobre quando a digital vai ser pedida.
+ * automacao responde**. Sao blocos com uma pergunta simples cada: maiusculas,
+ * acentos e pontuacao; tipo de publicacao; intervalo por pessoa. Depois vem o
+ * Salvar e as mudancas recentes. O que se edita em outra tela (quais Reels, o
+ * modo de comparacao, os canais) nao se repete aqui em leitura. A tela termina
+ * com a regra escrita de §12.3, a promessa sobre quando a digital e pedida.
  *
- * **O que esta tela GRAVA hoje**: as tres chaves de comparacao, maiusculas,
- * acentos, pontuacao, e o intervalo por pessoa, **so para cima**. Diminuir o
- * intervalo alarga o alcance, e alargar exige step-up (§10.10): enquanto o
- * verificador nao existe, o funil RECUSA a mudanca com `403`, nunca a aceita em
- * silencio. O modo de comparacao, o tipo de publicacao e os dois canais
- * continuam em leitura pela mesma razao.
+ * **O que esta tela GRAVA**: as tres chaves de comparacao, o tipo de publicacao
+ * e o intervalo por pessoa. Diminuir o intervalo e ir para "qualquer
+ * publicacao" alargam o alcance, e alargar pede a digital (§10.10).
  *
  * **Custo: 4 subrequests ao D1** no `GET`, a linha de sessao, o lote da
  * configuracao, a pergunta sobre a conta e o historico. §12.10 orca 2 para esta
@@ -28,10 +27,7 @@ import { CAMPO_DA_ACAO } from './campos'
 import {
   type CampoDaConfig,
   dataEmPortugues,
-  ESCOPO_DE_MIDIAS,
-  escopoDeMidias,
   FRASE_DO_AJUSTE,
-  MODO_DE_COMPARACAO,
   NOME_DO_CAMPO,
   ORIGEM_DOS_AJUSTES,
 } from './dicionario'
@@ -93,14 +89,6 @@ export const CAMPOS_DE_AJUSTES: readonly CampoDaConfig[] = [
 /** O valor de `acao` que declara a operacao de restauracao (Ruling 74). */
 export const RESTAURAR = 'restaurar'
 
-/** Uma linha "nome do ajuste / o que ele quer dizer hoje". */
-function linha(rotulo: string, valor: string): HtmlSeguro {
-  return html`<div class="linha-de-ajuste">
-<p class="rotulo">${rotulo}</p>
-<p class="valor">${valor}</p>
-</div>`
-}
-
 /**
  * O intervalo por pessoa, escrito como frase.
  *
@@ -112,30 +100,6 @@ function frasedoIntervalo(horas: number): string {
   if (horas === 0) return 'A mesma pessoa pode acionar quantas vezes quiser, sem espera.'
   if (horas === 1) return 'A mesma pessoa só aciona de novo depois de 1 hora.'
   return `A mesma pessoa só aciona de novo depois de ${horas} horas.`
-}
-
-function blocoDeCanais(config: AutomationConfig): HtmlSeguro {
-  return html`<section>
-<h2>O que a automa&ccedil;&atilde;o envia</h2>
-${linha(
-  'Direct',
-  config.privateReplyEnabled
-    ? 'Ligado: quem comenta recebe o Direct com o link.'
-    : 'Desligado: ninguém recebe Direct.',
-)}
-${linha(
-  'Resposta no comentário',
-  config.publicReplyEnabled
-    ? 'Ligada: a automação responde embaixo do Reel.'
-    : 'Desligada: nada é escrito embaixo do Reel.',
-)}
-${
-  config.privateReplyEnabled || config.publicReplyEnabled
-    ? null
-    : html`<p class="faixa faixa-aviso" role="status">Com os dois desligados, a
-automa&ccedil;&atilde;o n&atilde;o envia nada, nem no Direct, nem embaixo do Reel.</p>`
-}
-</section>`
 }
 
 /**
@@ -200,18 +164,18 @@ function escolhaDoTipoDePublicacao(config: AutomationConfig): HtmlSeguro {
 function formularioDosAjustes(config: AutomationConfig, ficha: string, versao: number): HtmlSeguro {
   return html`<form method="post" action="${ROTA_AJUSTES.caminho}">
 ${camposDoFormulario(ficha, versao)}
-<h2>Como o coment&aacute;rio &eacute; comparado</h2>
-${linha('Modo', MODO_DE_COMPARACAO[config.matchMode])}
+<h2>Mai&uacute;sculas, acentos e pontua&ccedil;&atilde;o</h2>
 ${escolhaDeChave('caseSensitive', config)}
 ${escolhaDeChave('normalizeAccents', config)}
 ${escolhaDeChave('ignorePunctuation', config)}
-<h2>Onde a automa&ccedil;&atilde;o responde</h2>
+<h2>Tipo de publica&ccedil;&atilde;o</h2>
 ${escolhaDoTipoDePublicacao(config)}
 <h2>Intervalo por pessoa</h2>
-<p><label for="userCooldownHours">Quantas horas a mesma pessoa espera para acionar de novo.
-Aumentar &eacute; a dire&ccedil;&atilde;o segura.</label></p>
+<p><label for="userCooldownHours">Quantas horas a mesma pessoa espera para receber de novo.
+Diminuir pede a sua digital.</label></p>
 <input type="number" id="userCooldownHours" name="userCooldownHours" min="0" step="1"
 value="${String(config.userCooldownHours)}">
+<p>Hoje: ${frasedoIntervalo(config.userCooldownHours)}</p>
 <p><button type="submit">Salvar</button></p>
 </form>`
 }
@@ -309,7 +273,7 @@ function blocoDoHistorico(
   hoje: EstadoDeComportamento,
 ): HtmlSeguro {
   return html`<section>
-<h2>O que voc&ecirc; mudou por aqui</h2>
+<h2>Mudan&ccedil;as recentes</h2>
 ${
   mudancas.length === 0
     ? html`<p>Voc&ecirc; ainda n&atilde;o mudou nada por aqui. Quando mudar, as
@@ -366,17 +330,11 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
 
   const corpo = html`<h1>Ajustes</h1>
 ${blocoDeConfirmacao(entrada.request)}
-<section>
-<h2>Como est&aacute; agora</h2>
-${linha('Quais Reels', ESCOPO_DE_MIDIAS[escopoDeMidias(global)])}
-${linha('Intervalo por pessoa', frasedoIntervalo(global.userCooldownHours))}
-</section>
 ${formularioDosAjustes(global, ficha, snapshot.versao)}
-${blocoDeCanais(global)}
 ${blocoDoHistorico(mudancas, ficha, snapshot.versao, estadoDaConfig(global))}
 <footer>
 <p>Os ajustes que est&atilde;o valendo agora s&atilde;o ${ORIGEM_DOS_AJUSTES[snapshot.origem]}.</p>
-<p><strong>Diminuir o alcance da automa&ccedil;&atilde;o nunca pede a sua digital ou o seu rosto.
+<p><strong>Diminuir o alcance da automa&ccedil;&atilde;o nunca pede a sua digital.
 Aumentar, sim.</strong></p>
 </footer>`
 
