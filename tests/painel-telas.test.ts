@@ -19,6 +19,7 @@ import {
 import { INTERVALO_DE_VISTA_MS } from '../src/routes/painel/guardas'
 import { cabecalhos } from '../src/routes/painel/html'
 import { contaConectada, handleInicio, panorama } from '../src/routes/painel/inicio'
+import { handleMais } from '../src/routes/painel/mais'
 import { handleMensagem } from '../src/routes/painel/mensagem'
 import { esquecerAListagem } from '../src/routes/painel/midias'
 import { handlePalavras } from '../src/routes/painel/palavras'
@@ -28,6 +29,7 @@ import {
   ROTA_AJUSTES,
   ROTA_ATIVIDADE,
   ROTA_INICIO,
+  ROTA_MAIS,
   ROTA_MENSAGEM,
   ROTA_PALAVRAS,
   ROTA_REEL,
@@ -126,9 +128,9 @@ interface TelaDoPainel {
   /**
    * O item da barra de baixo que fica com `aria-current` (TELA-27).
    *
-   * Ausente, e a propria rota. `/painel/reel` e a excecao declarada: ela e uma
-   * sub-tela de Reels e **nao tem item proprio na barra**, §12.1 fixa a barra
-   * em cinco destinos (seis ate o "Mais"), e nenhum deles e um Reel especifico.
+   * Ausente, e a propria rota. `/painel/reel` e uma sub-tela de Reels, e
+   * Ajustes e Historico moram dentro de "Mais": nenhuma delas tem item proprio
+   * na barra, que §12.1 fixa em cinco destinos.
    * Marcar "Reels" e o que orienta quem usa leitor de tela; nao marcar nada
    * deixaria a pessoa sem saber onde esta.
    */
@@ -146,13 +148,13 @@ async function prepararOReel(): Promise<void> {
   await gravarMidia(env.DB, REEL_DA_TELA, { user_cooldown_hours: 48 })
 }
 
-/** As sete telas de leitura, com o handler de cada uma. */
+/** As oito telas de leitura, com o handler de cada uma. */
 const TELAS: readonly TelaDoPainel[] = [
   { rota: ROTA_INICIO, handler: handleInicio },
   { rota: ROTA_PALAVRAS, handler: handlePalavras },
   { rota: ROTA_MENSAGEM, handler: handleMensagem },
-  { rota: ROTA_AJUSTES, handler: handleAjustes },
-  { rota: ROTA_ATIVIDADE, handler: handleAtividade },
+  { rota: ROTA_AJUSTES, handler: handleAjustes, marcado: ROTA_MAIS.caminho },
+  { rota: ROTA_ATIVIDADE, handler: handleAtividade, marcado: ROTA_MAIS.caminho },
   {
     rota: ROTA_REELS,
     // O duble da Meta e uma classe local injetada por parametro, como manda
@@ -171,6 +173,7 @@ const TELAS: readonly TelaDoPainel[] = [
     marcado: ROTA_REELS.caminho,
     preparar: prepararOReel,
   },
+  { rota: ROTA_MAIS, handler: handleMais },
 ]
 
 const TELA_INICIO = TELAS[0] as (typeof TELAS)[number]
@@ -1299,6 +1302,8 @@ describe('TELA: o portao e o custo', () => {
       // invocacao. O numero fica travado AQUI, e nao dentro do handler, pelo
       // mesmo motivo dos outros: o custo de uma tela tem de ser visivel.
       [ROTA_ATIVIDADE.caminho]: { fresco: 4, apos15min: 5 },
+      // "Mais" so le o estado para a barra do topo: sessao, configuracao e conta.
+      [ROTA_MAIS.caminho]: { fresco: 3, apos15min: 4 },
       // **As duas telas de Reels pagam 3, e o DESVIO que a rodada 1 declarou
       // aqui foi removido.** Ele dizia que juntar a leitura de `painel_midias`
       // ao lote da configuracao "acoplaria a falha do `account_tokens` a
@@ -1565,21 +1570,11 @@ describe('TELA: celular e acessibilidade', () => {
     }
   })
 
-  test('TELA-26: a barra de baixo tem seis itens, cada um com icone E palavra', async () => {
+  test('TELA-26: a barra de baixo tem cinco itens, cada um com icone E palavra', async () => {
     // **O numero mudou na Etapa 12, e a FORMA que este teste guarda nao.**
     //
     // §12.1 descreve a barra como **Inicio · Reels · Palavras · Mensagem ·
-    // Mais**, cinco itens. A barra de hoje ja divergia dessa lista: "Mais" nao
-    // existe, e no lugar dele estao "Ajustes" e "O que aconteceu", as duas telas
-    // que ele vai absorver. O docblock de `tela.ts` ja escrevia a regra que
-    // decide isto: um item que leva a um `404` e pior do que um item a menos,
-    // e as trocas acontecem nas etapas que criam aquelas telas.
-    //
-    // A Etapa 12 fez a PRIMEIRA das duas trocas, a tela de Reels existe, entao
-    // o item entrou. Tirar "O que aconteceu" ou "Ajustes" para manter cinco
-    // deixaria uma tela pronta sem entrada na barra, que e a mesma promessa
-    // quebrada ao contrario. Sao seis ate a segunda troca, o "Mais" das Tasks 14
-    // e 15, e ai a conta volta a cinco.
+    // Mais**, cinco itens. Historico, Ajustes e Aparelhos moram dentro de Mais.
     //
     // O que este teste existe para guardar continua intacto e e o laco abaixo:
     // **icone E palavra em todo item**, porque §12.1 proibe navegacao so por
@@ -1590,7 +1585,7 @@ describe('TELA: celular e acessibilidade', () => {
     const corpo = await corpoDa(TELA_INICIO, cookie)
     const itens = [...corpo.matchAll(/<a href="[^"]*" class="item[^"]*"[^>]*>(.*?)<\/a>/g)]
 
-    expect(itens).toHaveLength(6)
+    expect(itens).toHaveLength(5)
     for (const item of itens) {
       const dentro = item[1] ?? ''
       expect(dentro).toContain('class="icone" aria-hidden="true"')

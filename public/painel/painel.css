@@ -264,6 +264,31 @@ footer {
   line-height: 1;
 }
 
+/* A tela "Mais": linhas grandes, cada uma com o nome e uma frase. */
+.lista-mais {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.lista-mais a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-height: 44px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.6rem;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--fundo-cartao);
+  color: var(--texto);
+  text-decoration: none;
+}
+
+.lista-mais span {
+  color: var(--texto-fraco);
+}
+
 /* O estado grande da primeira dobra: icone, palavra e cor, os tres juntos. */
 .bloco-estado {
   border: 1px solid var(--borda);

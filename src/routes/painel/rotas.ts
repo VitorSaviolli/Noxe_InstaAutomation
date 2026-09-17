@@ -286,6 +286,22 @@ export const ROTA_ATIVIDADE: RotaDoPainel = {
   gravaConfig: false,
 }
 
+/**
+ * "Mais": a lista de links para Historico, Ajustes e Aparelhos e codigos.
+ *
+ * `GET` unico e so le, como o Inicio: a unica leitura e a do estado global
+ * para a barra do topo. Nao existe acao nesta tela, entao nao ha ficha CSRF.
+ */
+export const ROTA_MAIS: RotaDoPainel = {
+  caminho: '/painel/mais',
+  metodos: ['GET'],
+  sessao: true,
+  csrf: false,
+  stepUp: false,
+  escreve: false,
+  gravaConfig: false,
+}
+
 /** Entrar. Renderiza com ZERO consulta ao D1 (§14, etapa 8). */
 export const ROTA_ENTRAR: RotaDoPainel = {
   // O caminho vem de `guardas.ts`, que precisa dele para o `303` do passo 6.
@@ -494,6 +510,7 @@ export const ROTAS: readonly RotaDoPainel[] = [
   ROTA_REELS,
   ROTA_REEL,
   ROTA_ATIVIDADE,
+  ROTA_MAIS,
   ROTA_APARELHOS,
   ROTA_SAIR,
   ROTA_ENTRAR,

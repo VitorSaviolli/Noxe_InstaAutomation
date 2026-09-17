@@ -49,6 +49,7 @@ import {
   limitar,
 } from './guardas'
 import { handleChave, handleInicio } from './inicio'
+import { handleMais } from './mais'
 import { handleMensagem } from './mensagem'
 import { handlePalavras } from './palavras'
 import { handleReel } from './reel'
@@ -72,6 +73,7 @@ import {
   ROTA_ENTRAR,
   ROTA_ENTRAR_CODIGO,
   ROTA_INICIO,
+  ROTA_MAIS,
   ROTA_MENSAGEM,
   ROTA_OPCOES_DE_ENTRAR,
   ROTA_OPCOES_DE_STEPUP,
@@ -172,6 +174,9 @@ export async function routePainel(
 
     case ROTA_ATIVIDADE.caminho:
       return despachar(request, env, now, ROTA_ATIVIDADE, handleAtividade)
+
+    case ROTA_MAIS.caminho:
+      return despachar(request, env, now, ROTA_MAIS, handleMais)
 
     // Aparelhos e codigos de recuperacao (§10.13). Sem familia de limitador,
     // pela mesma razao de `/painel/api/stepup/opcoes`: ela corre com sessao

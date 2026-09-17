@@ -28,11 +28,13 @@ import { prefixoDeCredencial } from '../../services/webauthn/verificar'
 import type { Env } from '../../types/env'
 import { CAMPO_DA_ACAO, CAMPO_DA_DIGITAL, CAMPO_DA_FICHA } from './campos'
 import { dataEmPortugues, fraseDeConfirmacao } from './dicionario'
-import { type HtmlSeguro, html, pagina } from './html'
+import { type HtmlSeguro, html } from './html'
+import { configDaTela, contaConectada, molduraCom, panorama } from './inicio'
 import { TETO_DE_CREDENCIAIS } from './registrar'
 import { ROTA_APARELHOS, ROTA_SAIR } from './rotas'
 import type { EntradaDaRota } from './router'
 import { jsonCanonico, type MudancaCanonica } from './stepup'
+import { telaDoPainel } from './tela'
 
 /**
  * O nome do campo escondido que carrega o aparelho a remover.
@@ -103,18 +105,12 @@ export async function telaDeAparelhos(
     cartoes.push(await cartaoDoAparelho(linha, sessao, env, ficha))
   }
 
-  return pagina({
-    titulo: 'Aparelhos e códigos',
-    // A UNICA tela autenticada que le a digital. Sem ele, os botoes de remover
-    // e de gerar codigos ficariam parados depois da tela de conferencia, e um
-    // controle que nao faz o que promete e defeito, nao cosmetica.
-    comScript: true,
-    corpo: html`<header class="topo">
-<p class="estado"><span aria-hidden="true">&#128274;</span> Quem entra neste painel</p>
-<a class="parar" href="/painel/parar">Desligar a automa&ccedil;&atilde;o</a>
-</header>
-<main>
-${confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`}
+  const visao = panorama(
+    await configDaTela(env, entrada.now),
+    await contaConectada(env.DB, entrada.now),
+  )
+
+  const corpo = html`${confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`}
 ${estado.aviso ?? null}
 <h1>Aparelhos e c&oacute;digos</h1>
 
@@ -154,8 +150,14 @@ algu&eacute;m pode ter entrado sem voc&ecirc;.</p>
 sempre o lado seguro, e travar quem est&aacute; se protegendo seria o pior momento para pedir uma
 confirma&ccedil;&atilde;o a mais.</p>
 
-<p><a href="/painel">Voltar ao in&iacute;cio</a></p>
-</main>`,
+`
+
+  return telaDoPainel({
+    ...molduraCom('mais', 'Aparelhos e códigos', visao, corpo),
+    // A tela le a digital. Sem o script, os botoes de remover e de gerar
+    // codigos ficariam parados depois da tela de conferencia, e um controle que
+    // nao faz o que promete e defeito, nao cosmetica.
+    comScript: true,
   })
 }
 

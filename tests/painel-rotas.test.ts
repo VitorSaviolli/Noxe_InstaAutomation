@@ -9,11 +9,13 @@ import {
 import { invalidarBaldesDeReserva } from '../src/routes/painel/guardas'
 import { cabecalhos } from '../src/routes/painel/html'
 import { handleInicio } from '../src/routes/painel/inicio'
+import { handleMais } from '../src/routes/painel/mais'
 import { TETO_DO_CORPO_DA_API } from '../src/routes/painel/registrar'
 import {
   ROTA_ATIVIDADE,
   ROTA_ENTRAR,
   ROTA_INICIO,
+  ROTA_MAIS,
   ROTA_OPCOES_DE_ENTRAR,
   ROTA_OPCOES_DE_STEPUP,
   ROTA_VERIFICAR_ENTRADA,
@@ -1241,6 +1243,7 @@ describe('ROTA: os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)', ()
     const HANDLER_DA_ROTA: Record<string, HandlerDoPainel> = {
       [ROTA_INICIO.caminho]: handleInicio,
       [ROTA_ATIVIDADE.caminho]: handleAtividade,
+      [ROTA_MAIS.caminho]: handleMais,
       [ROTA_OPCOES_DE_STEPUP.caminho]: handleOpcoesDeStepUp,
     }
 
@@ -1251,6 +1254,7 @@ describe('ROTA: os tetos de corpo e o `content-type` (§11.3, passos 3 e 4)', ()
     expect(comSessao.map((rota) => rota.caminho)).toEqual([
       ROTA_INICIO.caminho,
       ROTA_ATIVIDADE.caminho,
+      ROTA_MAIS.caminho,
       ROTA_OPCOES_DE_STEPUP.caminho,
     ])
 

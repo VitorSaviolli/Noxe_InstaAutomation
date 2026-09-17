@@ -813,5 +813,5 @@ ${verMais(linhas)}
 <p>${SEM_ARROBA.envelhece}</p>
 </section>`
 
-  return telaDoPainel(molduraCom('atividade', 'Histórico', visao, corpo))
+  return telaDoPainel(molduraCom('mais', 'Histórico', visao, corpo))
 }

@@ -15,7 +15,7 @@
 import { type HtmlSeguro, html, pagina } from './html'
 
 /** Qual item da barra de baixo esta aceso. Um por tela, sempre. */
-export type Aba = 'inicio' | 'reels' | 'palavras' | 'mensagem' | 'atividade' | 'ajustes'
+export type Aba = 'inicio' | 'reels' | 'palavras' | 'mensagem' | 'mais'
 
 interface ItemDeNavegacao {
   readonly aba: Aba
@@ -26,28 +26,19 @@ interface ItemDeNavegacao {
 }
 
 /**
- * Os cinco itens da barra de baixo.
+ * Os cinco itens da barra de baixo: **Início · Reels · Palavras · Mensagem ·
+ * Mais** (§12.1).
  *
- * §12.1 descreve **Início · Reels · Palavras · Mensagem · Mais**. "Reels" e
- * "Mais" abrem telas que ainda nao existem, e um item que leva a um `404` e
- * pior do que um item a menos: ele ensina a pessoa a desconfiar da barra. A
- * forma de §12.1 esta respeitada, cinco itens, icone E palavra, e as duas
- * trocas acontecem nas etapas que criam aquelas telas. O laco de teste
- * "nenhum link aponta para fora da tabela de rotas" e o que impede a barra de
- * voltar a prometer o que nao existe.
+ * Histórico, Ajustes e Aparelhos e códigos moram dentro de "Mais", e as tres
+ * acendem esse item. O laco de teste "nenhum link aponta para fora da tabela de
+ * rotas" e o que impede a barra de prometer uma tela que nao existe.
  */
 const NAVEGACAO: readonly ItemDeNavegacao[] = [
   { aba: 'inicio', para: '/painel', icone: '⌂', palavra: 'Início' },
-  // A primeira das duas trocas que o paragrafo acima anunciou: a Etapa 12 criou
-  // a tela de Reels, entao o item deixou de levar a um `404` e entrou. Sao SEIS
-  // itens ate a segunda troca, o "Mais" de §12.1, que absorve Ajustes e "O que
-  // aconteceu", e seis com destino real e melhor do que cinco com um deles
-  // levando a lugar nenhum, que e a regra que este paragrafo ja escrevia.
   { aba: 'reels', para: '/painel/reels', icone: '▶', palavra: 'Reels' },
   { aba: 'palavras', para: '/painel/palavras', icone: '✎', palavra: 'Palavras' },
   { aba: 'mensagem', para: '/painel/mensagem', icone: '✉', palavra: 'Mensagem' },
-  { aba: 'atividade', para: '/painel/atividade', icone: '◷', palavra: 'Histórico' },
-  { aba: 'ajustes', para: '/painel/ajustes', icone: '⚙', palavra: 'Ajustes' },
+  { aba: 'mais', para: '/painel/mais', icone: '☰', palavra: 'Mais' },
 ]
 
 /** O que muda de uma tela para outra. Tudo o mais e igual, e de proposito. */
@@ -61,27 +52,28 @@ export interface Moldura {
   /** A classe do estado, que da a cor. A palavra vem junto, sempre (§12.9). */
   readonly classeDoResumo: string
   readonly corpo: HtmlSeguro
+  /**
+   * Carrega o `painel.js`. So as telas que leem a digital pedem: nas outras ele
+   * seria um arquivo a mais numa conexao ruim sem trabalho nenhum (§12.9).
+   */
+  readonly comScript?: boolean
 }
 
 /**
- * A barra do topo: o estado global e o caminho para parar.
+ * A barra do topo: o estado global e o caminho para a parada de emergencia.
  *
- * §3 pede um botao vermelho e grande de **DESLIGAR TUDO**. Ele existe, e um
- * `POST /painel/chave`, e mora na tela de Inicio, que e a tela que o estado
- * dele muda e para onde o `303` dele volta.
- *
- * **O link daqui continua sendo `/painel/parar`, e nao e duplicata.** Um `POST`
- * na barra do topo obrigaria as cinco telas a carregar a ficha CSRF so para
- * pintar um botao, e ainda assim so funcionaria com sessao viva. `/painel/parar`
- * e o freio que funciona SEM sessao, com o codigo anotado no papel, que e o
- * caso em que a barra do topo precisa mesmo estar em toda tela (§12.1).
+ * O botao que desliga com um toque mora SO no Inicio (`POST /painel/chave`),
+ * que e a tela cujo estado ele muda. Aqui fica um link discreto para
+ * `/painel/parar`, o freio que funciona SEM sessao, com o codigo de
+ * emergencia, que e o caso em que ele precisa estar em toda tela (§12.1). Dois
+ * botoes com o mesmo nome e comportamentos diferentes confundiam a pessoa.
  */
 function barraDoTopo(moldura: Moldura): HtmlSeguro {
   return html`<header class="topo">
 <p class="estado ${moldura.classeDoResumo}"><span aria-hidden="true">${
     moldura.iconeDoResumo
   }</span> ${moldura.resumo}</p>
-<a class="parar" href="/painel/parar">Desligar a automa&ccedil;&atilde;o</a>
+<a class="parar" href="/painel/parar">Emerg&ecirc;ncia</a>
 </header>`
 }
 
@@ -103,13 +95,14 @@ function navegacao(ativa: Aba): HtmlSeguro {
 /**
  * A tela inteira: topo, conteudo e navegacao.
  *
- * `comScript` fica FORA: nenhuma das telas de leitura le a digital, e carregar
- * o `painel.js` onde ele nao tem trabalho e pedir um arquivo a mais numa
- * conexao ruim (§12.9) sem nada em troca.
+ * `comScript` so vem ligado nas telas que leem a digital: carregar o
+ * `painel.js` onde ele nao tem trabalho e pedir um arquivo a mais numa conexao
+ * ruim (§12.9) sem nada em troca.
  */
 export function telaDoPainel(moldura: Moldura): Response {
   return pagina({
     titulo: moldura.titulo,
+    comScript: moldura.comScript === true,
     corpo: html`${barraDoTopo(moldura)}
 <main>
 ${moldura.corpo}

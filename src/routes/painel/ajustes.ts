@@ -380,5 +380,5 @@ ${blocoDoHistorico(mudancas, ficha, snapshot.versao, estadoDaConfig(global))}
 Aumentar, sim.</strong></p>
 </footer>`
 
-  return telaDoPainel(molduraCom('ajustes', 'Ajustes', visao, corpo))
+  return telaDoPainel(molduraCom('mais', 'Ajustes', visao, corpo))
 }

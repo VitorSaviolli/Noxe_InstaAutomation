@@ -21,14 +21,9 @@
  * chegou a marcar a tela inteira como step-up "sim", o que §15.4 corrigiu
  * nomeando o caso.
  *
- * **A tela nao usa `telaDoPainel`, e a ausencia e decisao.** A moldura das
- * telas de leitura deixa o `painel.js` de fora de proposito (§12.9: carregar um
- * arquivo a mais numa conexao ruim onde ele nao tem trabalho), e esta e a unica
- * tela autenticada que LE A DIGITAL, duas vezes, no caso de cadastrar outro
- * aparelho. Passar `comScript` pela moldura carregaria o script nas seis telas
- * que nao precisam dele, e a barra de baixo de §12.1 tem seis itens e nenhuma
- * vaga ate o "Mais" nascer. O freio de §12.1 continua aqui: `/painel/parar`
- * aparece nesta pagina como em toda outra.
+ * **A tela usa `telaDoPainel` com `comScript`**: ela e uma das que leem a
+ * digital, e mora dentro de "Mais" na barra de baixo. O link da parada de
+ * emergencia vem da barra do topo, como em toda tela.
  *
  * **Nunca o `credential_id` inteiro na tela** (§10.13). Sao tres destinos e uma
  * regra, tela, `console` e `painel_auditoria` veem o mesmo `passkey:<8 hex do
