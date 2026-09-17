@@ -104,7 +104,7 @@ export async function telaDeAparelhos(
   }
 
   return pagina({
-    titulo: 'Aparelhos e códigos de recuperação',
+    titulo: 'Aparelhos e códigos',
     // A UNICA tela autenticada que le a digital. Sem ele, os botoes de remover
     // e de gerar codigos ficariam parados depois da tela de conferencia, e um
     // controle que nao faz o que promete e defeito, nao cosmetica.
@@ -116,7 +116,7 @@ export async function telaDeAparelhos(
 <main>
 ${confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`}
 ${estado.aviso ?? null}
-<h1>Aparelhos e c&oacute;digos de recupera&ccedil;&atilde;o</h1>
+<h1>Aparelhos e c&oacute;digos</h1>
 
 <p class="aviso-do-endereco"><strong>Estes aparelhos est&atilde;o presos ao endere&ccedil;o
 ${env.PANEL_RP_ID}.</strong> Se um dia o painel mudar de endere&ccedil;o, todos v&atilde;o precisar
@@ -304,8 +304,8 @@ remova antes algum que voc&ecirc; n&atilde;o usa.</p>`
 
   return html`<h2>Cadastrar outro aparelho</h2>
 <p>Abra este painel <strong>no aparelho novo</strong> e use o bot&atilde;o abaixo l&aacute;. Vai
-pedir a sua digital duas vezes: a primeira confirma que &eacute; voc&ecirc;, a segunda cria a chave
-do aparelho novo.</p>
+pedir a sua digital duas vezes: a primeira confirma que &eacute; voc&ecirc;, a segunda cadastra
+o aparelho novo.</p>
 <form id="registrar" method="dialog" data-tipo="sessao" data-ficha="${ficha}">
 <label for="apelido">Como voc&ecirc; chama este aparelho</label>
 <input id="apelido" name="apelido" type="text" maxlength="40" autocomplete="off"
@@ -362,7 +362,7 @@ papel. Sem eles, perder todos os aparelhos significa perder o painel.</p>`
       )}</strong> c&oacute;digos que nunca foram usados.</p>`
 }
 <p>Gerar um conjunto novo <strong>apaga o conjunto antigo inteiro</strong>, inclusive o
-c&oacute;digo do papel que desliga a automa&ccedil;&atilde;o. Os c&oacute;digos novos aparecem
+c&oacute;digo de emerg&ecirc;ncia. Os c&oacute;digos novos aparecem
 <strong>uma vez s&oacute;</strong>, nesta tela, e n&atilde;o d&aacute; para v&ecirc;-los de novo
 depois.</p>
 <form method="post" action="${ROTA_APARELHOS.caminho}">

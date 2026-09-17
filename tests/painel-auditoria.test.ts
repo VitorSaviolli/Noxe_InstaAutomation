@@ -1612,7 +1612,7 @@ describe('GRAV: a forma da gravacao', () => {
     // ali so da para ler. As outras duas mentiriam: a do caminho prometeria um
     // botao que nao existe, e a do "ainda nao" mandaria esperar por uma tela
     // pronta que nenhuma etapa de §14 vai construir.
-    expect(tela).toContain('nos Ajustes finos')
+    expect(tela).toContain('em Ajustes')
     expect(tela).toContain(
       'mas por enquanto só para leitura: ainda não dá para ligá-lo ou desligá-lo pelo painel.',
     )
@@ -2291,7 +2291,7 @@ describe('GRAV: a forma da gravacao', () => {
     })
     expect(await semCampos.json()).toEqual({
       erro: 'csrf_invalido',
-      mensagem: 'Requisição bloqueada por segurança.',
+      mensagem: 'Bloqueado por segurança. Abra a tela de novo e tente outra vez.',
     })
   })
 

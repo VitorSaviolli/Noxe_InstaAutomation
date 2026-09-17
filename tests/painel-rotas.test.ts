@@ -192,7 +192,7 @@ describe('ROTA: o portao de sanidade e o despacho', () => {
     )
 
     expect(resposta?.status).toBe(503)
-    expect(await resposta?.text()).toContain('O painel ainda não foi ativado neste deploy.')
+    expect(await resposta?.text()).toContain('O painel ainda não foi ativado.')
   })
 
   test('o 503 do portao respeita a familia: HTML na pagina, JSON na API', async () => {
@@ -214,7 +214,7 @@ describe('ROTA: o portao de sanidade e o despacho', () => {
     expect(daPagina?.headers.get('content-type')).toBe('text/html; charset=utf-8')
     expect(await daApi?.json()).toEqual({
       erro: 'painel_desativado',
-      mensagem: 'O painel ainda não foi ativado neste deploy.',
+      mensagem: 'O painel ainda não foi ativado.',
     })
   })
 
@@ -375,7 +375,7 @@ describe('ROTA: o portao de sessao (§11.3, passos 6 e 9)', () => {
     expect(semCookie.status).toBe(401)
     expect(await semCookie.json()).toEqual({
       erro: 'sessao_ausente',
-      mensagem: 'Sua sessão expirou. Entre de novo.',
+      mensagem: 'Você precisa entrar de novo.',
     })
     expect(semCookie.headers.get('location')).toBeNull()
     expect(espiao.chamadas).toBe(0)

@@ -225,14 +225,14 @@ function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Penden
   if (!isDestinationUrlConfigured(global)) {
     lista.push({
       texto: 'O link ainda não foi configurado, e por isso nada é enviado.',
-      acao: { rotulo: 'Ver o link', para: '/painel/mensagem' },
+      acao: { rotulo: 'Abrir Mensagem', para: '/painel/mensagem' },
     })
   }
 
   if (global.triggerKeywords.length === 0) {
     lista.push({
       texto: 'Você não tem nenhuma palavra que aciona a automação.',
-      acao: { rotulo: 'Ver as palavras', para: '/painel/palavras' },
+      acao: { rotulo: 'Abrir Palavras', para: '/painel/palavras' },
     })
   }
 
@@ -246,7 +246,7 @@ function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Penden
     lista.push({
       texto:
         'Você escolheu “só nos Reels que eu escolher”, mas não marcou nenhum, então a automação não responde em lugar nenhum.',
-      acao: { rotulo: 'Escolher os Reels', para: ROTA_REELS.caminho },
+      acao: { rotulo: 'Abrir Reels', para: ROTA_REELS.caminho },
     })
   }
 
@@ -609,17 +609,16 @@ ${blocoDePendencias(visao)}
 <section>
 <h2>Onde mexer</h2>
 <ul>
-<li><a href="${ROTA_REELS.caminho}">Em quais Reels a automa&ccedil;&atilde;o responde</a></li>
-<li><a href="/painel/palavras">As palavras que ligam a automa&ccedil;&atilde;o</a></li>
-<li><a href="/painel/mensagem">A mensagem e o link</a></li>
-<li><a href="/painel/ajustes">Ajustes finos</a></li>
-<li><a href="/painel/atividade">O que aconteceu</a></li>
+<li><a href="${ROTA_REELS.caminho}">Reels</a></li>
+<li><a href="/painel/palavras">Palavras</a></li>
+<li><a href="/painel/mensagem">Mensagem</a></li>
+<li><a href="/painel/ajustes">Ajustes</a></li>
+<li><a href="/painel/atividade">Hist&oacute;rico</a></li>
 <!-- A tela dos aparelhos nao tem item na barra de baixo: §12.1 desenha SEIS
      itens e a setima vaga so nasce com o "Mais". Sem este link ela ficaria sem
      porta de entrada nenhuma, e uma tela que existe e ninguem alcanca e a
      mesma classe de promessa quebrada que §13.1 chama de defeito. -->
-<li><a href="${ROTA_APARELHOS.caminho}">Aparelhos e c&oacute;digos de
-recupera&ccedil;&atilde;o</a></li>
+<li><a href="${ROTA_APARELHOS.caminho}">Aparelhos e c&oacute;digos</a></li>
 </ul>
 </section>`
 

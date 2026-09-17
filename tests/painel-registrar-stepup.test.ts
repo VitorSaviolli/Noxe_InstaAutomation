@@ -268,7 +268,7 @@ describe('REGSTEP: a recusa conta e deixa rastro (§10.10)', () => {
     expect(recusa.status).toBe(403)
     expect(await recusa.json()).toEqual({
       erro: 'step_up_necessario',
-      mensagem: 'Confirme com sua passkey para continuar.',
+      mensagem: 'Confirme com a sua digital para continuar.',
     })
 
     // A regra das 10 falhas so trava a conta se TODO caminho contar.

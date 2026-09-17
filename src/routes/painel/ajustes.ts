@@ -364,7 +364,7 @@ export async function handleAjustes(entrada: EntradaDaRota): Promise<Response> {
   const ficha = await fichaDaTela(entrada)
   const { global } = snapshot
 
-  const corpo = html`<h1>Ajustes finos</h1>
+  const corpo = html`<h1>Ajustes</h1>
 ${blocoDeConfirmacao(entrada.request)}
 <section>
 <h2>Como est&aacute; agora</h2>
@@ -380,5 +380,5 @@ ${blocoDoHistorico(mudancas, ficha, snapshot.versao, estadoDaConfig(global))}
 Aumentar, sim.</strong></p>
 </footer>`
 
-  return telaDoPainel(molduraCom('ajustes', 'Ajustes finos', visao, corpo))
+  return telaDoPainel(molduraCom('ajustes', 'Ajustes', visao, corpo))
 }

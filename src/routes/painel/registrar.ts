@@ -366,12 +366,11 @@ const PAGINA_DESATIVADA = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Painel nao ativado</title>
+<title>Painel ainda nao ativado</title>
 </head>
 <body>
-<h1>O painel ainda n&atilde;o foi ativado neste deploy.</h1>
-<p>Quem instalou precisa preencher o endere&ccedil;o do painel e cadastrar a chave de
-sess&atilde;o antes do primeiro acesso.</p>
+<h1>O painel ainda n&atilde;o foi ativado.</h1>
+<p>Quem instalou precisa terminar de preparar o painel antes do primeiro acesso.</p>
 </body>
 </html>
 `

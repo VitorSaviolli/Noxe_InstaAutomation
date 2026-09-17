@@ -355,8 +355,8 @@ async function removerAparelho(
     // o aparelho abaixo (§10.10): a frase existia antes dele, e apontava para
     // uma tela onde nao havia aparelho nenhum, nem apelido, nem data, nem o
     // prefixo de 8 hex, nem o aviso de §10.13 sobre o aparelho de agora.
-    async () => html`<p>Remover um aparelho tira o acesso dele <strong>na hora</strong> e encerra a
-sess&atilde;o que ele tiver aberta. Confira o aparelho abaixo antes de confirmar.</p>
+    async () => html`<p>Remover um aparelho tira o acesso dele <strong>na hora</strong>: se ele
+estiver dentro do painel, sai. Confira o aparelho abaixo antes de confirmar.</p>
 ${await resumoDoAparelho(env, alvo, sessao)}`,
     alvoAuditado,
   )
@@ -456,8 +456,8 @@ async function gerarCodigos(
     sessao,
     campos,
     mudanca,
-    () => html`<p>Gerar c&oacute;digos novos <strong>apaga os antigos</strong>, inclusive o do papel
-que desliga a automa&ccedil;&atilde;o. Tenha onde anotar antes de confirmar.</p>`,
+    () => html`<p>Gerar c&oacute;digos novos <strong>apaga os antigos</strong>, inclusive o
+c&oacute;digo de emerg&ecirc;ncia. Tenha onde anotar antes de confirmar.</p>`,
     null,
   )
   if ('resposta' in passagem) return passagem.resposta
@@ -500,11 +500,11 @@ que desliga a automa&ccedil;&atilde;o. Tenha onde anotar antes de confirmar.</p>
 <p><strong>Eles aparecem uma vez s&oacute;.</strong> Escreva no papel, guarde num lugar seguro e
 n&atilde;o tire foto: uma foto no celular fica junto do aparelho que os c&oacute;digos existem para
 substituir.</p>
-<h2>Para cadastrar um aparelho novo quando voc&ecirc; n&atilde;o tiver nenhum</h2>
+<h2>C&oacute;digos de recupera&ccedil;&atilde;o, para cadastrar um aparelho quando voc&ecirc; n&atilde;o tiver nenhum</h2>
 <ul class="codigos">${conjunto.recuperacao.map(
       (codigo) => html`<li><code>${formatarCodigo(codigo)}</code></li>`,
     )}</ul>
-<h2>Para desligar a automa&ccedil;&atilde;o sem entrar no painel</h2>
+<h2>C&oacute;digo de emerg&ecirc;ncia, para parar a automa&ccedil;&atilde;o sem entrar no painel</h2>
 <p><code>${formatarCodigo(conjunto.parada)}</code></p>
 <p>Os c&oacute;digos anteriores <strong>deixaram de valer agora</strong>. Se voc&ecirc; tinha um
 papel antigo, rasgue.</p>

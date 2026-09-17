@@ -1707,7 +1707,7 @@ describe('STEP: step-up preso ao conteudo', () => {
 
     // E a recusa diz ONDE o campo se muda, em vez de "ainda nao da" (Ruling 75):
     // o link JA e editavel, so que na tela dele.
-    expect(tela).toContain('na tela da mensagem e do link')
+    expect(tela).toContain('na tela Mensagem')
   })
 
   test('STEP-35: a restauracao alcanca o link, e a digital fecha (Ruling 74)', async () => {

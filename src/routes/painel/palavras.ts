@@ -192,7 +192,8 @@ export async function handlePalavras(entrada: EntradaDaRota): Promise<Response> 
 
   const fichas = global.triggerKeywords.map((palavra) => html`<li class="ficha">${palavra}</li>`)
 
-  const corpo = html`<h1>Palavras que ligam a automa&ccedil;&atilde;o</h1>
+  const corpo = html`<h1>Palavras</h1>
+<p>Quem comentar uma destas palavras recebe a mensagem.</p>
 ${blocoDeConfirmacao(entrada.request)}
 ${
   global.triggerKeywords.length === 0

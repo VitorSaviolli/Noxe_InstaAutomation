@@ -172,7 +172,7 @@ export async function handleMensagem(entrada: EntradaDaRota): Promise<Response> 
   const visao = panorama(snapshot, await contaConectada(entrada.env.DB, entrada.now))
   const { global } = snapshot
 
-  const corpo = html`<h1>A mensagem e o link</h1>
+  const corpo = html`<h1>Mensagem</h1>
 ${blocoDeConfirmacao(entrada.request)}
 <p>Estes tr&ecirc;s campos s&atilde;o os que decidem o que a pessoa recebe. Trocar qualquer um deles
 vai pedir a sua digital ou o seu rosto, sempre.</p>
@@ -180,5 +180,5 @@ ${formularioDaMensagem(global, await fichaDaTela(entrada), snapshot.versao)}
 ${blocoDaLista(entrada.env.ALLOWED_LINK_DOMAINS)}
 ${blocoDePrevia(global)}`
 
-  return telaDoPainel(molduraCom('mensagem', 'A mensagem e o link', visao, corpo))
+  return telaDoPainel(molduraCom('mensagem', 'Mensagem', visao, corpo))
 }

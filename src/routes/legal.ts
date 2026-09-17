@@ -210,7 +210,7 @@ uma conta profissional do Instagram, usando exclusivamente a API oficial da Meta
       configuração pelo painel, o registro dessa alteração fica guardado no
       <em>seu</em> banco de dados, na sua conta da Cloudflare. Ele existe para
       você poder ver o que mudou e voltar atrás.</li>
-  <li><strong>O nome de usuário na tela "O que aconteceu"</strong>, essa tela abre
+  <li><strong>O nome de usuário na tela "Histórico"</strong>, essa tela abre
       <em>sem</em> consultar o Instagram. Somente <strong>quando você pede</strong>, tocando no
       botão que busca os nomes, o painel pergunta ao Instagram, naquele momento, o
       @ de quem comentou nos comentários listados. Esse nome é usado apenas para

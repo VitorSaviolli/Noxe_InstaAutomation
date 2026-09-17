@@ -920,7 +920,7 @@ describe('CONV: o modo sessao, e a ficha CSRF que §15.4 exige', () => {
     expect(resposta.status).toBe(401)
     expect(await resposta.json()).toEqual({
       erro: 'sessao_ausente',
-      mensagem: 'Sua sessão expirou. Entre de novo.',
+      mensagem: 'Você precisa entrar de novo.',
     })
   })
 
@@ -943,7 +943,7 @@ describe('CONV: o modo sessao, e a ficha CSRF que §15.4 exige', () => {
     expect(resposta.status).toBe(403)
     expect(await resposta.json()).toEqual({
       erro: 'csrf_invalido',
-      mensagem: 'Requisição bloqueada por segurança.',
+      mensagem: 'Bloqueado por segurança. Abra a tela de novo e tente outra vez.',
     })
   })
 
@@ -991,7 +991,7 @@ describe('CONV: o modo sessao, e a ficha CSRF que §15.4 exige', () => {
     expect(resposta.status).toBe(403)
     expect(await resposta.json()).toEqual({
       erro: 'step_up_necessario',
-      mensagem: 'Confirme com sua passkey para continuar.',
+      mensagem: 'Confirme com a sua digital para continuar.',
     })
   })
 
@@ -1079,7 +1079,7 @@ describe('CONV: o modo sessao, e a ficha CSRF que §15.4 exige', () => {
     expect(resposta.status).toBe(401)
     expect(await resposta.json()).toEqual({
       erro: 'sessao_ausente',
-      mensagem: 'Sua sessão expirou. Entre de novo.',
+      mensagem: 'Você precisa entrar de novo.',
     })
   })
 })
@@ -1474,7 +1474,7 @@ describe('CONV: a escada de §11.3 e a pagina do convite', () => {
     expect(resposta.status).toBe(503)
     expect(await resposta.json()).toEqual({
       erro: 'painel_desativado',
-      mensagem: 'O painel ainda não foi ativado neste deploy.',
+      mensagem: 'O painel ainda não foi ativado.',
     })
   })
 

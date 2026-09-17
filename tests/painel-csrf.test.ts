@@ -133,7 +133,9 @@ describe('CSRF: a ficha derivada da sessao (§10.9, camada 3)', () => {
     )
 
     expect(resposta.status).toBe(403)
-    expect(await resposta.text()).toContain('Requisição bloqueada por segurança.')
+    expect(await resposta.text()).toContain(
+      'Bloqueado por segurança. Abra a tela de novo e tente outra vez.',
+    )
     // "Nada gravado" nas duas metades que importam: o handler nao rodou, e
     // NENHUMA escrita saiu, a recusa acontece no passo 7, antes do passo 9.
     expect(espiao.chamadas).toBe(0)
@@ -344,7 +346,7 @@ describe('CSRF: a ficha derivada da sessao (§10.9, camada 3)', () => {
     )
 
     expect(resposta.status).toBe(403)
-    expect(await resposta.text()).toContain('Confirme com sua passkey para continuar.')
+    expect(await resposta.text()).toContain('Confirme com a sua digital para continuar.')
     expect(espiao.chamadas).toBe(0)
     // O passo 8 vem ANTES do passo 9: recusar por step-up nao custa banco.
     expect(contador.prepares).toBe(0)
@@ -375,7 +377,7 @@ describe('CSRF: a ficha derivada da sessao (§10.9, camada 3)', () => {
     )
 
     expect(resposta.status).toBe(403)
-    expect(await resposta.text()).toContain('Confirme com sua passkey para continuar.')
+    expect(await resposta.text()).toContain('Confirme com a sua digital para continuar.')
     expect(espiao.chamadas).toBe(0)
   })
 
@@ -414,7 +416,9 @@ describe('CSRF: origem obrigatoria e exata (§10.9, camada 2)', () => {
     // A origem e o passo 2 e a ficha e o passo 7: a ordem e o que faz a recusa
     // sair antes de qualquer HMAC.
     expect(resposta.status).toBe(403)
-    expect(await resposta.text()).toContain('Requisição bloqueada por segurança.')
+    expect(await resposta.text()).toContain(
+      'Bloqueado por segurança. Abra a tela de novo e tente outra vez.',
+    )
     expect(espiao.chamadas).toBe(0)
   })
 

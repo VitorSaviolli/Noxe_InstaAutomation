@@ -121,7 +121,7 @@ in&iacute;cio.</p>
 <p><a href="${ROTA_ENTRAR_CODIGO.caminho}">Entrar com um c&oacute;digo de
 recupera&ccedil;&atilde;o</a>, para quando voc&ecirc; n&atilde;o tem nenhum aparelho
 cadastrado por perto.</p>
-<p><a href="/painel/parar">Parar a automa&ccedil;&atilde;o com o c&oacute;digo do papel</a></p>
+<p><a href="/painel/parar">Parada de emerg&ecirc;ncia</a>, para parar a automa&ccedil;&atilde;o sem entrar.</p>
 <noscript>
 <p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Funcionam assim mesmo:
 entrar com um c&oacute;digo de recupera&ccedil;&atilde;o, a p&aacute;gina de parada de
@@ -191,14 +191,14 @@ export async function handleEntrarPorCodigo(entrada: EntradaDaRota): Promise<Res
 /** O formulario do codigo. Ele aparece na tela limpa e dentro da recusa. */
 function formularioDoCodigo(): HtmlSeguro {
   return html`<form method="post" action="${ROTA_ENTRAR_CODIGO.caminho}">
-<label for="${CAMPO_DO_CODIGO}">Digite um dos c&oacute;digos do papel</label>
+<label for="${CAMPO_DO_CODIGO}">Digite um dos seus c&oacute;digos de recupera&ccedil;&atilde;o</label>
 <input id="${CAMPO_DO_CODIGO}" name="${CAMPO_DO_CODIGO}" type="text" autocomplete="off"
 autocapitalize="characters" spellcheck="false" enterkeyhint="done" required
 inputmode="text" maxlength="40">
 <button type="submit">Continuar</button>
 </form>
 <p>Os h&iacute;fens n&atilde;o fazem diferen&ccedil;a, e mai&uacute;sculas e min&uacute;sculas
-tamb&eacute;m n&atilde;o. Pode digitar do jeito que estiver escrito no papel.</p>`
+tamb&eacute;m n&atilde;o. Pode digitar do jeito que voc&ecirc; anotou.</p>`
 }
 
 /**
@@ -241,7 +241,7 @@ function paginaDaChaveNova(codigo: string): Response {
     titulo: 'Cadastrar este aparelho',
     comScript: true,
     corpo: html`<h1>Cadastrar este aparelho</h1>
-<p>O c&oacute;digo confere. Agora crie a chave <strong>deste</strong> aparelho: o telefone vai pedir
+<p>O c&oacute;digo confere. Agora cadastre <strong>este</strong> aparelho: o telefone vai pedir
 a sua digital, o rosto ou o PIN.</p>
 <form id="registrar" method="dialog" data-tipo="recuperacao">
 <input type="hidden" name="${CAMPO_DO_CODIGO}" value="${codigo}">
@@ -251,7 +251,7 @@ enterkeyhint="done" required>
 <button type="submit">Cadastrar este aparelho</button>
 </form>
 <p><strong>Ao terminar, todos os outros c&oacute;digos da sua lista deixam de valer</strong> e
-qualquer sess&atilde;o aberta &eacute; encerrada. Gere um conjunto novo de c&oacute;digos assim que
+todo aparelho que estiver dentro do painel sai. Gere um conjunto novo de c&oacute;digos assim que
 entrar.</p>
 <h2>Antes de cadastrar, duas coisas importantes</h2>
 <p><strong>O endere&ccedil;o deste painel fica gravado dentro da sua digital.</strong> Se um dia o

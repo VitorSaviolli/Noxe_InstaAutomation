@@ -790,7 +790,7 @@ export async function handleAtividade(
       ? await buscarArrobas(entrada.env, deps, linhas, entrada.now)
       : semBusca()
 
-  const corpo = html`<h1>O que aconteceu</h1>
+  const corpo = html`<h1>Hist&oacute;rico</h1>
 ${blocoDeEstado(visao)}
 ${blocoDeAvisos(visao)}
 ${blocoDeFabrica(visao)}
@@ -813,5 +813,5 @@ ${verMais(linhas)}
 <p>${SEM_ARROBA.envelhece}</p>
 </section>`
 
-  return telaDoPainel(molduraCom('atividade', 'O que aconteceu', visao, corpo))
+  return telaDoPainel(molduraCom('atividade', 'Histórico', visao, corpo))
 }

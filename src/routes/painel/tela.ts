@@ -46,7 +46,7 @@ const NAVEGACAO: readonly ItemDeNavegacao[] = [
   { aba: 'reels', para: '/painel/reels', icone: '▶', palavra: 'Reels' },
   { aba: 'palavras', para: '/painel/palavras', icone: '✎', palavra: 'Palavras' },
   { aba: 'mensagem', para: '/painel/mensagem', icone: '✉', palavra: 'Mensagem' },
-  { aba: 'atividade', para: '/painel/atividade', icone: '◷', palavra: 'O que aconteceu' },
+  { aba: 'atividade', para: '/painel/atividade', icone: '◷', palavra: 'Histórico' },
   { aba: 'ajustes', para: '/painel/ajustes', icone: '⚙', palavra: 'Ajustes' },
 ]
 

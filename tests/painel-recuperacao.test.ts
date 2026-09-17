@@ -797,7 +797,7 @@ describe('REC: recuperacao, aparelhos e revogacao', () => {
     }
 
     expect(envio.status).toBe(409)
-    expect(await envio.text()).toContain('Cadastre outra passkey antes de remover esta.')
+    expect(await envio.text()).toContain('Cadastre outro aparelho antes de remover este.')
     // A linha continua, e a sessao dela tambem: uma remocao recusada nao pode
     // deslogar quem tentou.
     expect(await contarCredenciais()).toBe(1)
@@ -1269,7 +1269,7 @@ describe('REC: recuperacao, aparelhos e revogacao', () => {
     // cookie que ela devolveu. `esperarRotacaoNoBanco` ja mediu o `200`; aqui a
     // tela e lida para provar que e a de Aparelhos, e nao a de entrar.
     expect(await (await abrirAparelhos(nova)).text()).toContain(
-      '<h1>Aparelhos e c&oacute;digos de recupera&ccedil;&atilde;o</h1>',
+      '<h1>Aparelhos e c&oacute;digos</h1>',
     )
 
     const corpo = await envio.text()

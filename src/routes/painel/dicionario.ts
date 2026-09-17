@@ -43,13 +43,13 @@ export type EscopoDeMidias = 'todas' | 'selecionadas'
  */
 export const NOME_DO_CAMPO: Record<CampoDaConfig, string> = {
   enabled: 'automação ligada ou desligada',
-  triggerKeywords: 'palavras que ligam a automação',
+  triggerKeywords: 'palavras',
   matchMode: 'como o comentário é comparado',
   caseSensitive: 'maiúsculas e minúsculas',
   normalizeAccents: 'acentos',
   ignorePunctuation: 'pontuação e emojis',
-  processOnlyReels: 'onde a automação responde',
-  mediaScope: 'em quais Reels a automação responde',
+  processOnlyReels: 'tipo de publicação',
+  mediaScope: 'quais Reels',
   publicReplyEnabled: 'resposta no comentário',
   publicReplyText: 'texto da resposta no comentário',
   privateReplyEnabled: 'Direct',
@@ -196,7 +196,7 @@ export const MOTIVO_DA_RECUSA: Record<string, string> = {
   listagem_indisponivel:
     'Não conseguimos falar com o Instagram agora, então não dá para salvar a sua escolha de Reels. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
   reel_nao_pode_ligar:
-    'Um Reel só pode ficar parado, nunca ligado por conta própria: a chave geral é quem manda, e é ela que desliga tudo de uma vez.',
+    'Um Reel só pode ficar parado, nunca ligado por conta própria: quem manda é o botão Desligar a automação, no Início, e é ele que desliga tudo de uma vez.',
 }
 
 /** O motivo daquele codigo, ou a frase geral quando ele nao esta na tabela. */
@@ -251,18 +251,18 @@ export const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
   enabled: 'no bot\u00e3o do In\u00edcio',
   triggerKeywords: 'na tela de Palavras',
   matchMode: 'na tela de Palavras',
-  caseSensitive: 'nos Ajustes finos',
-  normalizeAccents: 'nos Ajustes finos',
-  ignorePunctuation: 'nos Ajustes finos',
-  processOnlyReels: 'nos Ajustes finos',
-  userCooldownHours: 'nos Ajustes finos',
+  caseSensitive: 'em Ajustes',
+  normalizeAccents: 'em Ajustes',
+  ignorePunctuation: 'em Ajustes',
+  processOnlyReels: 'em Ajustes',
+  userCooldownHours: 'em Ajustes',
   // A Etapa 12 quitou esta divida: ate ela, `mediaScope` caia na frase que
   // promete "a tela que cuida dele chega em uma proxima parte", e a tela chegou.
   // Frase que mente e defeito, e nao cosmetica (Rulings 75 e 82).
-  mediaScope: 'na tela dos Reels',
-  destinationUrl: 'na tela da mensagem e do link',
-  privateReplyText: 'na tela da mensagem e do link',
-  publicReplyText: 'na tela da mensagem e do link',
+  mediaScope: 'na tela Reels',
+  destinationUrl: 'na tela Mensagem',
+  privateReplyText: 'na tela Mensagem',
+  publicReplyText: 'na tela Mensagem',
 }
 
 /**
@@ -282,8 +282,8 @@ export const TELA_DO_CAMPO: Partial<Record<CampoDaConfig, string>> = {
  * botao nao. Eles ficam aqui ate ganharem o interruptor, e ai mudam de mapa.
  */
 export const TELA_QUE_SO_MOSTRA: Partial<Record<CampoDaConfig, string>> = {
-  publicReplyEnabled: 'nos Ajustes finos',
-  privateReplyEnabled: 'nos Ajustes finos',
+  publicReplyEnabled: 'em Ajustes',
+  privateReplyEnabled: 'em Ajustes',
 }
 
 /**
@@ -517,6 +517,10 @@ export const PALAVRAS_PROIBIDAS: readonly string[] = [
   'assinatura',
   'passkey',
   'passkeys',
+  'sessão',
+  'sessões',
+  'requisição',
+  'chave geral',
   'webauthn',
   'credencial',
   'credenciais',
@@ -558,7 +562,7 @@ export function escopoDeMidias(config: AutomationConfig): EscopoDeMidias {
  * lista de proibidas que estariam a um passo daqui.
  */
 export const TELA_DOS_REELS = {
-  titulo: 'Meus Reels',
+  titulo: 'Reels',
   /** §12.5, conta sem Reels. */
   semReels:
     'Não encontramos nenhum Reel nesta conta. A automação só responde em Reels. Se você acabou de publicar, espere alguns minutos e toque em Atualizar.',
@@ -569,7 +573,7 @@ export const TELA_DOS_REELS = {
   salvoPorVoce: 'salvo por você',
   /** §12.5, linha de midia invalida no banco. O campo entra no fim. */
   reelParado: 'Este Reel está parado por um problema na configuração dele:',
-  reelParadoComoResolver: 'Abra “Este Reel responde diferente” e corrija.',
+  reelParadoComoResolver: 'Abra “Este Reel” e corrija.',
   /** §12.5, linhas orfas. A mesma frase que o aviso do validador ja usa. */
   orfas:
     'Encontramos escolhas de Reels sem uma configuração salva. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
@@ -644,7 +648,7 @@ export const TELA_DOS_REELS = {
   /** O singular. "há 1 minutos" e o portugues que nenhuma pessoa escreve. */
   listaBuscadaHaFimUm: 'minuto.',
   /** §3, a tela de UM Reel. */
-  tituloDoReel: 'Este Reel responde diferente',
+  tituloDoReel: 'Este Reel',
   seguirRegraGeral: 'Voltar tudo a seguir a regra geral',
   pausarEsteReel: 'Parar a automação só neste Reel',
   religarEsteReel: 'Voltar a responder neste Reel',
