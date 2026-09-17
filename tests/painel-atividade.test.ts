@@ -430,7 +430,7 @@ describe('ATV: o orcamento de chamadas a Meta', () => {
 
     expect(falsa.consultados).toEqual([])
     // A lista continua inteira, e o botao que gasta a cota esta oferecido.
-    expect(corpo).toContain('Ver quem comentou')
+    expect(corpo).toContain('Mostrar quem comentou')
     expect(corpo).toContain(`acao=${ATUALIZAR}`)
 
     // Contrapositivo: com o toque, as chamadas saem.
@@ -995,9 +995,9 @@ describe('ATV: a frase honesta da tela, e o que a sustenta', () => {
     const cookie = await abrirSessao()
 
     const trechos = [
-      'Sobre o que aparece aqui',
-      'a automa&ccedil;&atilde;o <strong>atendeu</strong>',
-      'n&atilde;o deixam registro, e por isso n&atilde;o aparecem aqui',
+      'S&oacute; aparecem os coment&aacute;rios',
+      '<strong>atendeu</strong>',
+      'Os que ela ignorou n&atilde;o deixam registro.',
     ]
 
     // 1) Lista vazia.
@@ -1169,10 +1169,10 @@ describe('ATV: "Ver mais"', () => {
     const pagina1 = await corpoDe(comToque(), cookie, { deps: comArrobas(sempreArroba()) })
     expect(quantasLinhas(pagina1)).toBe(LINHAS_POR_PAGINA)
 
-    // A pessoa toca em "Ver mais", e depois em "Ver quem comentou": os dois
+    // A pessoa toca em "Ver mais", e depois em "Mostrar quem comentou": os dois
     // links sao os que a tela desenhou.
     const pagina2 = await corpoDe(hrefDaAcao(pagina1, 'Ver mais'), cookie)
-    const comOsArrobas = await corpoDe(hrefDaAcao(pagina2, 'Ver quem comentou'), cookie, {
+    const comOsArrobas = await corpoDe(hrefDaAcao(pagina2, 'Mostrar quem comentou'), cookie, {
       deps: comArrobas(sempreArroba()),
     })
 
@@ -1202,7 +1202,7 @@ describe('ATV: "Ver mais"', () => {
     expect(quantasLinhas(pagina1)).toBe(LINHAS_POR_PAGINA)
 
     const pagina2 = await corpoDe(hrefDaAcao(pagina1, 'Ver mais'), cookie)
-    const comOsArrobas = await corpoDe(hrefDaAcao(pagina2, 'Ver quem comentou'), cookie, {
+    const comOsArrobas = await corpoDe(hrefDaAcao(pagina2, 'Mostrar quem comentou'), cookie, {
       deps: comArrobas(sempreArroba()),
     })
 

@@ -795,6 +795,37 @@ describe('TELA: os quatro estados grandes', () => {
     expect(comUma.estado.chave).toBe('ligada')
   })
 
+  test('TELA-05b: os passos vem na ordem certa, e o passo pronto fica com o ✓', () => {
+    // A pessoa ve o progresso: o passo resolvido nao some da lista.
+    const visao = panorama(snapshotDeTeste({ triggerKeywords: [] }), true)
+
+    expect(visao.passos.map((passo) => [passo.nome, passo.feito])).toEqual([
+      ['Conta do Instagram conectada', true],
+      ['Mensagem com link', true],
+      ['Pelo menos uma palavra', false],
+    ])
+  })
+
+  test('TELA-05c: no Inicio, o estado vem antes dos passos, e os passos antes da chave', async () => {
+    // Sem conta ligada, o passo 1 falta e a lista aparece.
+    await gravarConfig(env.DB)
+    const cookie = await abrirSessao()
+
+    const corpo = await corpoDa(TELA_INICIO, cookie)
+    const estado = corpo.indexOf('class="bloco-estado')
+    const passos = corpo.indexOf('Falta pouco para funcionar')
+    const chave = corpo.indexOf('class="bloco-chave"')
+
+    expect(estado).toBeGreaterThan(-1)
+    expect(passos).toBeGreaterThan(estado)
+    expect(chave).toBeGreaterThan(passos)
+    expect(corpo).toContain('<ol class="passos">')
+    expect(corpo).toContain('Peça para quem instalou conectar a conta.')
+    expect(corpo).toContain('Mensagem com link (pronto)')
+    // O bloco "Onde mexer" repetia a barra de baixo e saiu.
+    expect(corpo).not.toContain('Onde mexer')
+  })
+
   test('TELA-06: `enabled = 0` da cinza, e o cinza ganha do ambar', () => {
     // Quem desligou de proposito nao precisa ouvir que faltam coisas.
     const visao = panorama(
@@ -1493,7 +1524,7 @@ describe('TELA: o portao e o custo', () => {
       outro.parar()
     }
 
-    expect(corpo).toContain('Não está conectada')
+    expect(corpo).toContain('Conta do Instagram não conectada')
     expect(VAZAMENTO.test(corpo)).toBe(false)
     expect(outro.linhas.join(' ')).toContain('conta_nao_verificada')
   })

@@ -18,11 +18,10 @@
  * confirmacao de religar. `ignorarCache: true` porque mostrar ao dono um valor
  * mais velho que o salvo destroi a confianca mais rapido que qualquer defeito.
  *
- * **O aviso bloqueante de §10.11 abre esta tela**, e ele nasceu aqui pelo lugar
- * onde §10.11 o pediu: "o **painel** abre com aviso bloqueante". A faixa
- * vermelha de "zero codigos" so existia em `/painel/aparelhos`, que e a unica
- * tela sem item na barra de baixo, depois de uma recuperacao o dono ficava
- * sem rede de seguranca e sem nada que ele visse dizendo isso.
+ * **O aviso de §10.11 mora nesta tela**, pelo lugar onde §10.11 o pediu: "o
+ * **painel** abre com aviso bloqueante". A faixa vermelha de "zero codigos" so
+ * existia em `/painel/aparelhos`, e depois de uma recuperacao o dono ficava sem
+ * rede de seguranca e sem nada que ele visse dizendo isso.
  *
  * Este arquivo tambem hospeda `POST /painel/chave`, a chave liga/desliga de
  * §7.1: ela nao tem tela propria e o `303` dela aponta para `/painel?ok=`, que
@@ -46,7 +45,7 @@ import {
 import { gravarConfiguracao } from './gravar'
 import { type HtmlSeguro, html } from './html'
 import { erro } from './resposta'
-import { ROTA_APARELHOS, ROTA_CHAVE, ROTA_INICIO, ROTA_REELS } from './rotas'
+import { ROTA_AJUSTES, ROTA_APARELHOS, ROTA_CHAVE, ROTA_INICIO, ROTA_REELS } from './rotas'
 import type { EntradaDaRota } from './router'
 import { type Aba, type Moldura, telaDoPainel } from './tela'
 
@@ -75,8 +74,26 @@ export interface Pendencia {
   readonly acao: { readonly rotulo: string; readonly para: string } | null
 }
 
+/**
+ * Um passo do "Falta pouco para funcionar", feito ou nao.
+ *
+ * Os passos resolvidos continuam na lista com o ✓: a pessoa ve o progresso, e
+ * a numeracao nao muda de um dia para o outro.
+ */
+export interface PassoDaConfiguracao {
+  /** O nome curto do passo, igual feito ou por fazer. */
+  readonly nome: string
+  readonly feito: boolean
+  /** A frase do que falta. So aparece quando o passo nao esta feito. */
+  readonly falta: string
+  readonly acao: { readonly rotulo: string; readonly para: string } | null
+}
+
 export interface Panorama {
   readonly estado: EstadoNaTela
+  /** Os passos da primeira configuracao, na ordem em que se resolvem. */
+  readonly passos: readonly PassoDaConfiguracao[]
+  /** Os passos que ainda faltam, com a frase do que falta. */
   readonly pendencias: readonly Pendencia[]
   /** Avisos do validador, ja traduzidos. Vazio no caminho normal. */
   readonly avisos: readonly string[]
@@ -207,58 +224,48 @@ export async function perguntasDoInicio(db: D1Database, now: number): Promise<Pe
 }
 
 /**
- * O que falta para a automacao responder de verdade.
+ * Os passos para a automacao responder de verdade, na ordem em que a pessoa os
+ * resolve: a conta, a mensagem com o link, as palavras e, quando a escolha e
+ * "so os que eu marcar", os Reels.
  *
- * A lista e a de §3, e a ordem e a de quem le: o link primeiro, porque e o
- * unico que faz a automacao recusar disparar mesmo com tudo o mais certo
- * (`link_nao_configurado`, `automation.ts`).
- *
- * UMA pendencia sai SEM botao, e a ausencia e decisao: conectar a conta e um
- * passo do assistente, no computador. Um botao que leva a um `404`, ou a lugar
- * nenhum, ensina a desconfiar dos outros botoes da mesma lista. A dos Reels
- * tinha a mesma forma ate a Etapa 12, e ganhou o botao junto com a tela.
+ * O passo da conta sai SEM botao, e a ausencia e decisao: conectar a conta e
+ * um passo de quem instalou, no computador. Um botao que leva a lugar nenhum
+ * ensina a desconfiar dos outros botoes da mesma lista.
  */
-function pendenciasDe(snapshot: SnapshotConfig, conta: boolean): readonly Pendencia[] {
+function passosDe(snapshot: SnapshotConfig, conta: boolean): readonly PassoDaConfiguracao[] {
   const { global } = snapshot
-  const lista: Pendencia[] = []
-
-  if (!isDestinationUrlConfigured(global)) {
-    lista.push({
-      texto: 'O link ainda não foi configurado, e por isso nada é enviado.',
+  const passos: PassoDaConfiguracao[] = [
+    {
+      nome: 'Conta do Instagram conectada',
+      feito: conta,
+      falta: 'A conta do Instagram não está conectada. Peça para quem instalou conectar a conta.',
+      acao: null,
+    },
+    {
+      nome: 'Mensagem com link',
+      feito: isDestinationUrlConfigured(global),
+      falta: 'O link ainda não foi configurado, e por isso nada é enviado.',
       acao: { rotulo: 'Abrir Mensagem', para: '/painel/mensagem' },
-    })
-  }
-
-  if (global.triggerKeywords.length === 0) {
-    lista.push({
-      texto: 'Você não tem nenhuma palavra que aciona a automação.',
+    },
+    {
+      nome: 'Pelo menos uma palavra',
+      feito: global.triggerKeywords.length > 0,
+      falta: 'Você não tem nenhuma palavra que aciona a automação.',
       acao: { rotulo: 'Abrir Palavras', para: '/painel/palavras' },
-    })
-  }
+    },
+  ]
 
-  if (escopoDeMidias(global) === 'selecionadas' && global.allowedMediaIds.length === 0) {
-    // **A frase mudou na Etapa 12, e a mudanca e uma divida quitada.** Ela dizia
-    // "a tela de escolher os Reels chega junto com a proxima parte do painel", e
-    // a tela chegou: mandar a pessoa esperar por uma tela pronta e a mesma
-    // familia de defeito dos Rulings 75 e 82. Com ela existindo, a pendencia
-    // ganha o botao que a resolve, que e o que §3 pede de toda pendencia cujo
-    // caminho ja exista.
-    lista.push({
-      texto:
-        'Você escolheu “só nos Reels que eu escolher”, mas não marcou nenhum, então a automação não responde em lugar nenhum.',
+  if (escopoDeMidias(global) === 'selecionadas') {
+    passos.push({
+      nome: 'Reels escolhidos',
+      feito: global.allowedMediaIds.length > 0,
+      falta:
+        'Você escolheu “só os que eu marcar”, mas não marcou nenhum, então a automação não responde em lugar nenhum.',
       acao: { rotulo: 'Abrir Reels', para: ROTA_REELS.caminho },
     })
   }
 
-  if (!conta) {
-    lista.push({
-      texto:
-        'A conta do Instagram não está conectada. Quem conecta é o assistente, no computador onde o projeto foi publicado.',
-      acao: null,
-    })
-  }
-
-  return lista
+  return passos
 }
 
 /**
@@ -340,10 +347,14 @@ function estadoDe(snapshot: SnapshotConfig, pendencias: readonly Pendencia[]): E
  */
 export function panorama(snapshot: SnapshotConfig, conta: boolean): Panorama {
   const avisos = snapshot.avisos.map(traduzirAviso)
-  const pendencias = pendenciasDe(snapshot, conta)
+  const passos = passosDe(snapshot, conta)
+  const pendencias = passos
+    .filter((passo) => !passo.feito)
+    .map((passo): Pendencia => ({ texto: passo.falta, acao: passo.acao }))
 
   return {
     estado: estadoDe(snapshot, pendencias),
+    passos,
     pendencias,
     avisos,
     aindaDeFabrica: snapshot.origem === 'arquivo',
@@ -360,22 +371,29 @@ export function blocoDeEstado(panorama: Panorama): HtmlSeguro {
 </section>`
 }
 
-/** As pendencias, cada uma com o caminho que a resolve quando ele existe. */
-export function blocoDePendencias(panorama: Panorama): HtmlSeguro {
+/**
+ * "Falta pouco para funcionar": os passos numerados, cada um com o botao que o
+ * resolve. Some quando todos estao feitos, e ai o estado grande ja diz o resto.
+ */
+export function blocoDosPassos(panorama: Panorama): HtmlSeguro {
   if (panorama.pendencias.length === 0) return html``
 
-  const itens = panorama.pendencias.map(
-    (pendencia) =>
-      html`<li>${pendencia.texto}${
-        pendencia.acao === null
-          ? null
-          : html` <a class="acao" href="${pendencia.acao.para}">${pendencia.acao.rotulo}</a>`
-      }</li>`,
-  )
+  const itens = panorama.passos.map((passo) => {
+    if (passo.feito) {
+      return html`<li class="passo passo-feito"><span aria-hidden="true">✓</span> ${passo.nome} (pronto)</li>`
+    }
+    return html`<li class="passo"><strong>${passo.nome}</strong>
+<p>${passo.falta}</p>${
+      passo.acao === null
+        ? null
+        : html`
+<a class="acao" href="${passo.acao.para}">${passo.acao.rotulo}</a>`
+    }</li>`
+  })
 
   return html`<section>
-<h2>O que falta resolver</h2>
-<ul class="pendencias">${itens}</ul>
+<h2>Falta pouco para funcionar</h2>
+<ol class="passos">${itens}</ol>
 </section>`
 }
 
@@ -390,9 +408,7 @@ export function blocoDeAvisos(panorama: Panorama): HtmlSeguro {
  * O aviso bloqueante de §10.11: **"gere um novo conjunto de codigos agora"**.
  *
  * **Por que ele mora no Inicio.** A faixa vermelha existia so em
- * `/painel/aparelhos`, que e, por decisao declarada no cabecalho daquele
- * arquivo, a UNICA tela sem item na barra de baixo: o acesso a ela e um `<li>`
- * no fim desta pagina. Depois de uma recuperacao, §10.11 invalida em bloco
+ * `/painel/aparelhos`, que fica dentro de "Mais". Depois de uma recuperacao, §10.11 invalida em bloco
  * todos os outros codigos, e o dono ficava com ZERO codigo utilizavel sem que
  * nada que ele visse dissesse isso. O desfecho e o trancamento que os seis
  * codigos existem para impedir: o proximo aparelho que quebrar deixa o painel
@@ -420,8 +436,9 @@ papel. Sem eles, perder todos os aparelhos significa perder o painel.
 /** A frase de "ainda com os ajustes de fabrica" (§12.6). Nao e erro. */
 export function blocoDeFabrica(panorama: Panorama): HtmlSeguro {
   if (!panorama.aindaDeFabrica) return html``
-  return html`<p class="faixa">Seus ajustes ainda s&atilde;o os que vieram no programa. Salve uma
-vez para o painel passar a mandar.</p>`
+  return html`<p class="faixa">Seus ajustes ainda s&atilde;o os que vieram no programa. Abra Ajustes
+e toque em Salvar para o painel passar a mandar.
+<a class="acao" href="${ROTA_AJUSTES.caminho}">Abrir Ajustes</a></p>`
 }
 
 /**
@@ -594,33 +611,17 @@ export async function handleInicio(entrada: EntradaDaRota): Promise<Response> {
     ? null
     : await new PainelConfigRepository(entrada.env.DB).lerParadaPorCodigo()
 
+  // A ordem e a da pergunta que a pessoa faz ao abrir: esta funcionando? O
+  // estado vem primeiro, depois o que falta, e so entao a chave. O aviso de
+  // "zero codigos" de §10.11 vem logo depois da chave, ainda na primeira tela.
   const corpo = html`<h1>In&iacute;cio</h1>
-${blocoDeConfirmacao(entrada.request)}
-${
-  // ANTES do estado grande, e nao no rodape ao lado do link: §10.11 pede um
-  // aviso BLOQUEANTE, e um aviso que exige rolagem nao bloqueia nada.
-  blocoDosCodigos(perguntas.codigos)
-}
 ${blocoDeEstado(visao)}
+${blocoDeConfirmacao(entrada.request)}
+${blocoDosPassos(visao)}
 ${blocoDaChave(snapshot, await fichaDaTela(entrada), paradaEm)}
+${blocoDosCodigos(perguntas.codigos)}
 ${blocoDeAvisos(visao)}
-${blocoDeFabrica(visao)}
-${blocoDePendencias(visao)}
-<section>
-<h2>Onde mexer</h2>
-<ul>
-<li><a href="${ROTA_REELS.caminho}">Reels</a></li>
-<li><a href="/painel/palavras">Palavras</a></li>
-<li><a href="/painel/mensagem">Mensagem</a></li>
-<li><a href="/painel/ajustes">Ajustes</a></li>
-<li><a href="/painel/atividade">Hist&oacute;rico</a></li>
-<!-- A tela dos aparelhos nao tem item na barra de baixo: §12.1 desenha SEIS
-     itens e a setima vaga so nasce com o "Mais". Sem este link ela ficaria sem
-     porta de entrada nenhuma, e uma tela que existe e ninguem alcanca e a
-     mesma classe de promessa quebrada que §13.1 chama de defeito. -->
-<li><a href="${ROTA_APARELHOS.caminho}">Aparelhos e c&oacute;digos</a></li>
-</ul>
-</section>`
+${blocoDeFabrica(visao)}`
 
   return telaDoPainel(molduraCom('inicio', 'Início', visao, corpo))
 }

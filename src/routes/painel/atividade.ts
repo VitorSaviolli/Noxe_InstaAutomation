@@ -1,10 +1,9 @@
 /**
- * `GET /painel/atividade`, "O que aconteceu", com a lista e o @ ao vivo.
+ * `GET /painel/atividade`, o "Historico", com a lista e o @ ao vivo.
  *
- * §3 quer tres coisas nesta tela: os tres estados grandes, as pendencias com
- * botao, e a lista dos ultimos comentarios atendidos com o @ de quem acionou
+ * A tela e a lista dos ultimos comentarios atendidos, com o @ de quem acionou
  * **buscado ao vivo na Graph API, sem armazenar nada de novo** (§2.3, §12.6).
- * As tres estao aqui.
+ * O estado e os passos que faltam moram no Inicio e nao se repetem aqui.
  *
  * **Armazenamento novo: nenhum.** O `username` nao vai para o D1, nao entra em
  * Cache API, nao entra em cache de isolate, nao existe uma variavel de modulo
@@ -19,7 +18,7 @@
  * `commenter_scoped_id_hash`: o hash do autor existe para o intervalo por
  * pessoa e nao tem nada que fazer numa tela.
  *
- * **O aviso de §12.6 sobe SEMPRE, inclusive com a lista vazia.** Ele nao
+ * **O aviso de §12.6 sobe SEMPRE, em uma linha, inclusive com a lista vazia.** Ele nao
  * descreve a lista: descreve o que o programa NAO guarda. Todo `skipped` de
  * `processComment` acontece antes do unico `INSERT` da tabela, e a decisao
  * tomada em §12.6 e nao passar a gravar linha para comentario ignorado, um
@@ -51,16 +50,7 @@ import type { Env } from '../../types/env'
 import { CAMPO_DA_ACAO } from './campos'
 import { dataEmPortugues, resultadoNaTela } from './dicionario'
 import { type HtmlSeguro, html } from './html'
-import {
-  blocoDeAvisos,
-  blocoDeEstado,
-  blocoDeFabrica,
-  blocoDePendencias,
-  configDaTela,
-  contaConectada,
-  molduraCom,
-  panorama,
-} from './inicio'
+import { configDaTela, contaConectada, molduraCom, panorama } from './inicio'
 import { erro } from './resposta'
 import { ROTA_ATIVIDADE } from './rotas'
 import type { EntradaDaRota } from './router'
@@ -550,15 +540,10 @@ function motivoDaFalha(codigo: string | null): string | null {
 // A montagem da tela
 // ---------------------------------------------------------------------------
 
-/** O aviso obrigatorio de §12.6. Ele sobe SEMPRE, inclusive com a lista vazia. */
+/** O aviso obrigatorio de §12.6, em uma linha. Ele sobe SEMPRE, inclusive com a lista vazia. */
 function avisoDoQueNaoAparece(): HtmlSeguro {
-  return html`<section>
-<h2>Sobre o que aparece aqui</h2>
-<p>Aqui aparecem os coment&aacute;rios que a automa&ccedil;&atilde;o <strong>atendeu</strong>.
-Coment&aacute;rios que ela ignorou, por n&atilde;o serem de um Reel da sua lista, por
-n&atilde;o terem nenhuma das suas palavras, ou porque a pessoa j&aacute; tinha recebido,
-n&atilde;o deixam registro, e por isso n&atilde;o aparecem aqui.</p>
-</section>`
+  return html`<p>S&oacute; aparecem os coment&aacute;rios que a automa&ccedil;&atilde;o
+<strong>atendeu</strong>. Os que ela ignorou n&atilde;o deixam registro.</p>`
 }
 
 /** O `href` desta mesma tela, com o cursor e o pedido de @ que ela precisar. */
@@ -594,9 +579,8 @@ guardados em lugar nenhum.</p>`
       ? enderecoDaTela({ comArrobas: true })
       : enderecoDaTela({ posicao, comArrobas: true })
 
-  return html`<p><a class="acao" href="${destino}">Ver quem comentou</a></p>
-<p>Buscar os @ custa uma consulta ao Instagram por linha, da mesma cota que a
-automa&ccedil;&atilde;o usa para enviar. Por isso ela s&oacute; acontece quando voc&ecirc; pede.</p>`
+  return html`<p><a class="acao" href="${destino}">Mostrar quem comentou</a></p>
+<p>Busca os @ no Instagram (conta na cota que a automa&ccedil;&atilde;o usa para enviar).</p>`
 }
 
 /**
@@ -790,28 +774,20 @@ export async function handleAtividade(
       ? await buscarArrobas(entrada.env, deps, linhas, entrada.now)
       : semBusca()
 
+  // A lista e o conteudo desta tela, entao ela vem primeiro. O estado, os
+  // avisos e os passos que faltam moram no Inicio, e nao se repetem aqui.
   const corpo = html`<h1>Hist&oacute;rico</h1>
-${blocoDeEstado(visao)}
-${blocoDeAvisos(visao)}
-${blocoDeFabrica(visao)}
-${blocoDePendencias(visao)}
-<section>
-<h2>A conta do Instagram</h2>
-<p>${
-    conta
-      ? 'Conectada. A automação consegue falar com o Instagram para enviar.'
-      : 'Não está conectada. Enquanto estiver assim, nada é enviado. Quem conecta é o assistente, no computador onde o projeto foi publicado.'
-  }</p>
-</section>
 ${avisoDoQueNaoAparece()}
-<section>
-<h2>Os &uacute;ltimos coment&aacute;rios atendidos</h2>
 ${faixaDoInstagramMudo(busca)}
 ${botaoDosArrobas(busca, pedido.posicao)}
 ${listaDasLinhas(linhas, busca, falhou)}
 ${verMais(linhas)}
 <p>${SEM_ARROBA.envelhece}</p>
-</section>`
+<p>${
+    conta
+      ? 'Conta do Instagram conectada ✓'
+      : 'Conta do Instagram não conectada: nada é enviado. Peça para quem instalou conectar a conta.'
+  }</p>`
 
   return telaDoPainel(molduraCom('mais', 'Histórico', visao, corpo))
 }

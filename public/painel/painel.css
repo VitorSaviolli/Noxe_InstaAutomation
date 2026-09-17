@@ -326,8 +326,17 @@ footer {
   padding-left: 1.1rem;
 }
 
-.pendencias li {
+.pendencias li,
+.passos li {
   margin-bottom: 0.75rem;
+}
+
+.passos {
+  padding-left: 1.3rem;
+}
+
+.passo-feito {
+  color: var(--acento);
 }
 
 /* O botao que resolve a pendencia. Alvo de toque de 44px como qualquer outro. */
