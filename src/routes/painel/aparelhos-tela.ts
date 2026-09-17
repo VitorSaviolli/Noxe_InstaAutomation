@@ -110,47 +110,44 @@ export async function telaDeAparelhos(
     await contaConectada(env.DB, entrada.now),
   )
 
-  const corpo = html`${confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`}
+  // A ordem: os aparelhos que entram, como adicionar outro, os codigos de
+  // recuperacao e, no fim, os dois botoes de sair lado a lado. A nota sobre o
+  // endereco do painel fica recolhida no fim: e importante, mas raramente e a
+  // pergunta de quem abre esta tela.
+  const corpo = html`<h1>Aparelhos e c&oacute;digos</h1>
+${confirmacao === null ? null : html`<p class="faixa faixa-ok" role="status">${confirmacao}</p>`}
 ${estado.aviso ?? null}
-<h1>Aparelhos e c&oacute;digos</h1>
 
-<p class="aviso-do-endereco"><strong>Estes aparelhos est&atilde;o presos ao endere&ccedil;o
-${env.PANEL_RP_ID}.</strong> Se um dia o painel mudar de endere&ccedil;o, todos v&atilde;o precisar
-ser cadastrados de novo, usando um c&oacute;digo de recupera&ccedil;&atilde;o. N&atilde;o &eacute;
-poss&iacute;vel transferir, &eacute; assim que a digital protege voc&ecirc; de um site falso
-com outro endere&ccedil;o.</p>
-
-<h2>Os aparelhos que conseguem entrar</h2>
+<h2>Aparelhos que entram</h2>
 <ul class="aparelhos">${cartoes}</ul>
-<p>Voc&ecirc; pode cadastrar at&eacute; ${String(TETO_DE_CREDENCIAIS)} aparelhos neste
-endere&ccedil;o. Hoje s&atilde;o ${String(desteEndereco.length)}.</p>
 
 ${formularioDeCadastro(ficha, desteEndereco.length >= TETO_DE_CREDENCIAIS)}
 ${blocoDosCodigos(ficha, codigosUtilizaveis)}
 
-<h2>Sair deste aparelho</h2>
-<p>Encerra o acesso <strong>s&oacute; aqui</strong>. Os seus outros aparelhos continuam entrando, e
-este volta a entrar com a sua digital quando voc&ecirc; quiser. &Eacute; o bot&atilde;o para quando
-voc&ecirc; usou um computador que n&atilde;o &eacute; seu.</p>
+<h2>Sair</h2>
+<div class="lado-a-lado">
 <form method="post" action="${ROTA_SAIR.caminho}">
 <input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
 <button type="submit">Sair deste aparelho</button>
 </form>
-
-<h2>Sair de todos os aparelhos</h2>
-<p>Isso encerra o acesso em <strong>todos</strong> os aparelhos, inclusive neste. Ningu&eacute;m
-perde o cadastro: cada aparelho entra de novo com a pr&oacute;pria digital. Use quando achar que
-algu&eacute;m pode ter entrado sem voc&ecirc;.</p>
 <form method="post" action="${ROTA_APARELHOS.caminho}">
 <input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
 <input type="hidden" name="${CAMPO_DA_ACAO}" value="${ACAO_SAIR_DE_TUDO}">
 <button type="submit">Sair de todos os aparelhos</button>
 </form>
-<p>Esta n&atilde;o pede a sua digital, e isso &eacute; de prop&oacute;sito: tirar acesso &eacute;
-sempre o lado seguro, e travar quem est&aacute; se protegendo seria o pior momento para pedir uma
-confirma&ccedil;&atilde;o a mais.</p>
+</div>
+<p>&ldquo;Sair deste aparelho&rdquo; encerra o acesso s&oacute; aqui. &ldquo;Sair de todos&rdquo;
+encerra em todos, inclusive neste: use quando achar que algu&eacute;m entrou sem voc&ecirc;. Nenhum
+dos dois pede a digital, e ningu&eacute;m perde o cadastro.</p>
 
-`
+<details>
+<summary>Sobre o endere&ccedil;o deste painel</summary>
+<p>Estes aparelhos est&atilde;o presos ao endere&ccedil;o ${env.PANEL_RP_ID}. Se um dia o painel
+mudar de endere&ccedil;o, todos v&atilde;o precisar ser cadastrados de novo, usando um c&oacute;digo
+de recupera&ccedil;&atilde;o. &Eacute; assim que a digital protege voc&ecirc; de um site falso com
+outro endere&ccedil;o. Voc&ecirc; pode cadastrar at&eacute; ${String(TETO_DE_CREDENCIAIS)} aparelhos;
+hoje s&atilde;o ${String(desteEndereco.length)}.</p>
+</details>`
 
   return telaDoPainel({
     ...molduraCom('mais', 'Aparelhos e códigos', visao, corpo),
@@ -182,8 +179,8 @@ async function cartaoDoAparelho(
   const ehOAtual = linha.credentialId === sessao.credentialId
 
   return html`<li class="aparelho">
-<h3>${linha.apelido}</h3>
-<p class="datas">Cadastrado em ${dataEmPortugues(linha.criadoEm)}. ${
+<h3>${linha.apelido}${ehOAtual ? html` <span class="e-este">(este aparelho)</span>` : null}</h3>
+<p class="datas">${
     linha.usadoEm === null
       ? html`Ainda n&atilde;o foi usado para entrar.`
       : html`&Uacute;ltima entrada em ${dataEmPortugues(linha.usadoEm)}.`
@@ -198,18 +195,16 @@ ou for formatado, este acesso se perde.`
 ${
   desteEndereco
     ? null
-    : html`<p class="endereco-antigo"><span aria-hidden="true">&#9650;</span> Foi cadastrado no
-endere&ccedil;o antigo <code>${linha.rpId}</code> e <strong>n&atilde;o consegue mais
-entrar</strong>. Pode ser removido sem medo.</p>`
+    : html`<p class="endereco-antigo"><span aria-hidden="true">&#9650;</span> Foi cadastrado
+quando o painel tinha outro endere&ccedil;o e <strong>n&atilde;o consegue mais entrar</strong>.
+Pode ser removido sem medo.</p>`
 }
 ${ehOAtual ? avisoDoAparelhoDeAgora() : null}
-<p class="identificacao">Identifica&ccedil;&atilde;o curta:
-<code>${await prefixoDeCredencial(linha.credentialId)}</code></p>
 <form method="post" action="${ROTA_APARELHOS.caminho}">
 <input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
 <input type="hidden" name="${CAMPO_DA_ACAO}" value="${ACAO_REMOVER}">
 <input type="hidden" name="${CAMPO_DO_APARELHO}" value="${linha.credentialId}">
-<button type="submit">Remover este aparelho</button>
+<button type="submit">Remover (vai pedir a sua digital)</button>
 </form>
 </li>`
 }
@@ -299,20 +294,23 @@ ${linha.credentialId === sessao.credentialId ? avisoDoAparelhoDeAgora() : null}
  */
 function formularioDeCadastro(ficha: string, noTeto: boolean): HtmlSeguro {
   if (noTeto) {
-    return html`<h2>Cadastrar outro aparelho</h2>
+    return html`<h2>Adicionar outro aparelho</h2>
 <p>Voc&ecirc; j&aacute; chegou ao limite de aparelhos deste endere&ccedil;o. Para cadastrar mais um,
 remova antes algum que voc&ecirc; n&atilde;o usa.</p>`
   }
 
-  return html`<h2>Cadastrar outro aparelho</h2>
-<p>Abra este painel <strong>no aparelho novo</strong> e use o bot&atilde;o abaixo l&aacute;. Vai
-pedir a sua digital duas vezes: a primeira confirma que &eacute; voc&ecirc;, a segunda cadastra
-o aparelho novo.</p>
+  return html`<h2>Adicionar outro aparelho</h2>
+<ol class="passos">
+<li>Abra este painel <strong>no aparelho novo</strong> e entre em Mais, Aparelhos e c&oacute;digos.</li>
+<li>L&aacute;, escreva um nome para ele e toque em &ldquo;Cadastrar este aparelho&rdquo;.</li>
+<li>Confirme com a digital duas vezes: a primeira confirma que &eacute; voc&ecirc;, a segunda
+cadastra o aparelho novo.</li>
+</ol>
 <form id="registrar" method="dialog" data-tipo="sessao" data-ficha="${ficha}">
 <label for="apelido">Como voc&ecirc; chama este aparelho</label>
 <input id="apelido" name="apelido" type="text" maxlength="40" autocomplete="off"
 enterkeyhint="done" required>
-<button type="submit">Cadastrar este aparelho</button>
+<button type="submit">Cadastrar este aparelho (vai pedir a sua digital)</button>
 </form>
 <noscript>
 <p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Cadastrar a digital
@@ -359,19 +357,15 @@ ${
     ? html`<p class="faixa faixa-erro" role="status"><strong>Voc&ecirc; n&atilde;o tem nenhum
 c&oacute;digo de recupera&ccedil;&atilde;o valendo.</strong> Gere um conjunto novo agora e anote no
 papel. Sem eles, perder todos os aparelhos significa perder o painel.</p>`
-    : html`<p>Voc&ecirc; ainda tem <strong>${String(
-        quantosValem,
-      )}</strong> c&oacute;digos que nunca foram usados.</p>`
+    : html`<p>Restam <strong>${String(quantosValem)}</strong> c&oacute;digos que nunca foram usados.</p>`
 }
-<p>Gerar um conjunto novo <strong>apaga o conjunto antigo inteiro</strong>, inclusive o
-c&oacute;digo de emerg&ecirc;ncia. Os c&oacute;digos novos aparecem
-<strong>uma vez s&oacute;</strong>, nesta tela, e n&atilde;o d&aacute; para v&ecirc;-los de novo
-depois.</p>
 <form method="post" action="${ROTA_APARELHOS.caminho}">
 <input type="hidden" name="${CAMPO_DA_FICHA}" value="${ficha}">
 <input type="hidden" name="${CAMPO_DA_ACAO}" value="${ACAO_GERAR_CODIGOS}">
-<button type="submit">Gerar c&oacute;digos novos</button>
-</form>`
+<button type="submit">Gerar c&oacute;digos novos (vai pedir a sua digital)</button>
+</form>
+<p>Gerar um conjunto novo <strong>apaga o antigo inteiro</strong>, inclusive o c&oacute;digo de
+emerg&ecirc;ncia. Os novos aparecem <strong>uma vez s&oacute;</strong>.</p>`
 }
 
 /**

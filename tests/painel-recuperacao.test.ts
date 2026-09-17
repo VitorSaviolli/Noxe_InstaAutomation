@@ -772,8 +772,10 @@ describe('REC: recuperacao, aparelhos e revogacao', () => {
     const sessao = await abrirSessao(aparelho.credentialId)
     const corpo = await (await abrirAparelhos(sessao)).text()
 
-    // O prefixo de 8 hex aparece, e ele e o MESMO dos outros dois destinos.
-    expect(corpo).toContain(await prefixoDeCredencial(aparelho.credentialId))
+    // Nem o prefixo de 8 hex aparece na lista: ele so serve na tela de
+    // conferencia da remocao, que e onde a pessoa confere o alvo (REC-10).
+    expect(corpo).not.toContain(await prefixoDeCredencial(aparelho.credentialId))
+    expect(corpo).not.toContain('Identifica')
 
     // O id cru existe em UM lugar so, e e o `value` do campo escondido que diz
     // ao POST qual linha apagar. Fora dali, nenhuma ocorrencia.
@@ -961,7 +963,8 @@ describe('REC: recuperacao, aparelhos e revogacao', () => {
     const sessao = await abrirSessao(aparelho.credentialId)
     const corpo = await (await abrirAparelhos(sessao)).text()
 
-    expect(corpo).toContain(ENDERECO_ANTIGO)
+    // Sem o endereco tecnico no cartao: a frase diz o que importa.
+    expect(corpo).not.toContain(ENDERECO_ANTIGO)
     expect(corpo).toContain('n&atilde;o consegue mais')
 
     // Ela nao conta para a regra da ultima: remover a UNICA do endereco de hoje

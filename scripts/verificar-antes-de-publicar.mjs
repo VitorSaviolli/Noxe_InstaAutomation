@@ -1542,8 +1542,15 @@ function checagem19() {
 // renumerar faria "checagem 13" e "checagem 19" significarem coisas diferentes
 // em partes diferentes do projeto.
 
-/** O teto do `painel.css`, em bytes. §12.9 orca "~6 KB"; ver o texto abaixo. */
-const TETO_DO_CSS_DO_PAINEL = 9 * 1024
+/**
+ * O teto do `painel.css`, em bytes. §12.9 orca "~6 KB"; ver o texto abaixo.
+ *
+ * Subiu de 9 para 12 KB com a arquitetura de informacao do painel: a tela
+ * Mais, os passos numerados do Inicio, o Salvar fixo e as caixas esmaecidas dos
+ * Reels (feitas em CSS para nao depender de JavaScript) e os botoes de sair
+ * lado a lado. Comprimida, a folha continua abaixo de 4 KB.
+ */
+const TETO_DO_CSS_DO_PAINEL = 12 * 1024
 
 /** Fonte, imagem ou folha buscada de outro host. */
 const BUSCA_EXTERNA = /@import|url\(\s*["']?(https?:)?\/\//

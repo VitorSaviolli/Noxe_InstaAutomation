@@ -464,6 +464,29 @@ describe('ROTA: a tela de entrar, e o custo dela', () => {
     expect(corpo).toContain('<link rel="stylesheet" href="/painel/painel.css">')
   })
 
+  test('GET /painel/entrar so oferece "Continuar" a quem chegou de outro aplicativo', async () => {
+    const abrir = async (origem: string) =>
+      await (
+        await despachar(
+          new Request(`${RAIZ}/painel/entrar`, { headers: { 'sec-fetch-site': origem } }),
+          env,
+          AGORA,
+          ROTA_ENTRAR,
+          handlePaginaDeEntrar,
+        )
+      ).text()
+
+    // Vindo de outro app o cookie `SameSite=Strict` nao chega: o link resolve.
+    expect(await abrir('cross-site')).toContain('>Continuar</a>')
+    // Vindo do proprio painel, ou digitado, ele so confundiria.
+    expect(await abrir('same-origin')).not.toContain('>Continuar</a>')
+    expect(await abrir('none')).not.toContain('>Continuar</a>')
+    // Os caminhos secundarios aparecem sempre.
+    const corpo = await abrir('same-origin')
+    expect(corpo).toContain('href="/painel/entrar/codigo"')
+    expect(corpo).toContain('href="/painel/parar"')
+  })
+
   test('POST /painel/api/entrar/opcoes devolve as options com ZERO consulta ao D1', async () => {
     const contador = new D1Contador(env.DB)
     const { resposta, desafio } = await pedirDesafio(ambienteCom({ DB: comoD1(contador) }))

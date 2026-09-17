@@ -100,8 +100,10 @@ export const PAGINA_DO_FORMULARIO = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parada de emergencia</title>
+<link rel="stylesheet" href="/painel/painel.css">
 </head>
 <body>
+<main>
 <h1>Parada de emerg&ecirc;ncia</h1>
 <p>Digite abaixo o c&oacute;digo de emerg&ecirc;ncia que voc&ecirc; anotou.</p>
 <form method="post" action="/painel/parada">
@@ -109,6 +111,8 @@ export const PAGINA_DO_FORMULARIO = `<!doctype html>
 <input id="codigo" name="codigo" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="32" required>
 <button type="submit">Parar a automa&ccedil;&atilde;o</button>
 </form>
+<p><a href="/painel/entrar">Voltar para Entrar</a></p>
+</main>
 </body>
 </html>
 `
@@ -140,9 +144,10 @@ type ExtrasDaPagina = { 'retry-after'?: string }
 /**
  * Uma das tres respostas, montada sem interpolar NADA que venha de fora.
  *
- * Nenhuma delas contem campo de configuracao, link, contagem ou estado da
- * conta, e nenhuma delas diz se existe codigo cadastrado. Trava de STOP-05,
- * STOP-11 e STOP-12.
+ * Nenhuma delas contem campo de configuracao, contagem ou estado da conta, e
+ * nenhuma delas diz se existe codigo cadastrado. O unico link e fixo, "Ir para
+ * o painel", e a folha de estilo e a mesma do resto do painel. Trava de
+ * STOP-05, STOP-11 e STOP-12.
  *
  * Trava de STOP-01 e de STOP-09: a `Response` sai SEM `set-cookie`, em todas
  * as tres. Parar nao e entrar, o codigo de parada nao vira sessao, e por isso
@@ -156,9 +161,13 @@ function pagina(frase: string, status: number, extras: ExtrasDaPagina = {}): Res
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parada de emergencia</title>
+<link rel="stylesheet" href="/painel/painel.css">
 </head>
 <body>
+<main>
 <h1>${frase}</h1>
+<p><a href="/painel">Ir para o painel</a></p>
+</main>
 </body>
 </html>
 `

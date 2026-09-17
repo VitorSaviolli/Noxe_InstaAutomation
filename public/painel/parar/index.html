@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parada de emergencia</title>
+<link rel="stylesheet" href="/painel/painel.css">
 </head>
 <body>
+<main>
 <h1>Parada de emerg&ecirc;ncia</h1>
 <p>Digite abaixo o c&oacute;digo de emerg&ecirc;ncia que voc&ecirc; anotou.</p>
 <form method="post" action="/painel/parada">
@@ -13,5 +15,7 @@
 <input id="codigo" name="codigo" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="32" required>
 <button type="submit">Parar a automa&ccedil;&atilde;o</button>
 </form>
+<p><a href="/painel/entrar">Voltar para Entrar</a></p>
+</main>
 </body>
 </html>

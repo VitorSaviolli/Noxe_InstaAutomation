@@ -522,3 +522,10 @@ code {
   font-size: 0.85rem;
   color: var(--texto-fraco);
 }
+
+/* Os dois botoes de sair, lado a lado, quebrando linha na tela estreita. */
+.lado-a-lado {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

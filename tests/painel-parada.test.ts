@@ -105,9 +105,13 @@ function paginaEsperada(frase: string): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Parada de emergencia</title>
+<link rel="stylesheet" href="/painel/painel.css">
 </head>
 <body>
+<main>
 <h1>${frase}</h1>
+<p><a href="/painel">Ir para o painel</a></p>
+</main>
 </body>
 </html>
 `
@@ -456,8 +460,12 @@ describe('STOP: a parada de emergencia', () => {
       expect(corpo).not.toContain('eu quero')
       expect(corpo).not.toContain(IG_USER_ID)
       expect(corpo).not.toContain(parada)
-      // Nenhum link: a pagina nao leva a lugar nenhum.
-      expect(corpo).not.toContain('href')
+      // So os dois enderecos fixos: a folha de estilo e "Ir para o painel".
+      // Nenhum link que dependa do que foi digitado ou do que esta salvo.
+      expect([...corpo.matchAll(/href="([^"]*)"/g)].map((achado) => achado[1])).toEqual([
+        '/painel/painel.css',
+        '/painel',
+      ])
     }
   })
 

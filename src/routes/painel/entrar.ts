@@ -85,7 +85,8 @@ const SEGUNDOS_DO_DESAFIO = Math.floor(PRAZO_DE_ENVELOPE_MS.entrar / 1000)
  * 1. O botao da digital, que so funciona dentro de um clique, o Safari exige
  *    gesto do usuario, e chamar `navigator.credentials.get()` no `onload`
  *    quebra em iOS (§10.7).
- * 2. O link **"Continuar"** para `/painel`, que e a mitigacao escrita de
+ * 2. O link **"Continuar"** para `/painel`, so quando a pessoa chegou de outro
+ *    aplicativo (`veioDeOutroApp`), que e a mitigacao escrita de
  *    §10.8: com `SameSite=Strict`, abrir o painel por um link vindo de fora
  *    (WhatsApp, atalho de outro app) e navegacao cross-site e o navegador NAO
  *    manda o cookie, o dono cai aqui mesmo tendo sessao viva. Clicar em
@@ -96,6 +97,19 @@ const SEGUNDOS_DO_DESAFIO = Math.floor(PRAZO_DE_ENVELOPE_MS.entrar / 1000)
  *
  * Nenhuma interpolacao: o texto e constante, e e o que o torna seguro.
  */
+/**
+ * A pessoa chegou por um link de outro aplicativo?
+ *
+ * E so nesse caso que o "Continuar" faz sentido: com `SameSite=Strict`, a
+ * navegacao cross-site chega sem o cookie mesmo com sessao viva. O navegador
+ * diz isso em `Sec-Fetch-Site`. Sem o cabecalho (navegador antigo), o link
+ * aparece, que e o lado seguro: ele nunca atrapalha, so sobra.
+ */
+function veioDeOutroApp(request: Request): boolean {
+  const origem = request.headers.get('sec-fetch-site')
+  return origem === null || origem === 'cross-site'
+}
+
 export function handlePaginaDeEntrar(entrada: EntradaDaRota): Response {
   // A faixa de `?ok=`, e ela existe aqui por UM caso: "sair de todos os
   // aparelhos" (§10.13) apaga a propria sessao de quem apertou, entao o `303`
@@ -115,13 +129,18 @@ export function handlePaginaDeEntrar(entrada: EntradaDaRota): Response {
 <form id="entrar" method="dialog">
 <button type="submit">Entrar com a digital</button>
 </form>
-<p><a href="${DESTINO_DEPOIS_DO_LOGIN}">Continuar</a>, se voc&ecirc; abriu este painel por um
-link de outro aplicativo e j&aacute; estava conectado, este bot&atilde;o leva voc&ecirc; direto ao
-in&iacute;cio.</p>
-<p><a href="${ROTA_ENTRAR_CODIGO.caminho}">Entrar com um c&oacute;digo de
-recupera&ccedil;&atilde;o</a>, para quando voc&ecirc; n&atilde;o tem nenhum aparelho
-cadastrado por perto.</p>
-<p><a href="/painel/parar">Parada de emerg&ecirc;ncia</a>, para parar a automa&ccedil;&atilde;o sem entrar.</p>
+${
+  veioDeOutroApp(entrada.request)
+    ? html`<p><a class="acao" href="${DESTINO_DEPOIS_DO_LOGIN}">Continuar</a> Se voc&ecirc; abriu
+este painel por um link de outro aplicativo e j&aacute; estava conectado, este bot&atilde;o leva
+voc&ecirc; direto ao In&iacute;cio.</p>`
+    : null
+}
+<ul class="pequeno">
+<li>Perdi meu aparelho: <a href="${ROTA_ENTRAR_CODIGO.caminho}">Entrar com c&oacute;digo de
+recupera&ccedil;&atilde;o</a></li>
+<li>Emerg&ecirc;ncia: <a href="/painel/parar">Parar a automa&ccedil;&atilde;o sem entrar</a></li>
+</ul>
 <noscript>
 <p><strong>Este navegador est&aacute; com o JavaScript desligado.</strong> Funcionam assim mesmo:
 entrar com um c&oacute;digo de recupera&ccedil;&atilde;o, a p&aacute;gina de parada de

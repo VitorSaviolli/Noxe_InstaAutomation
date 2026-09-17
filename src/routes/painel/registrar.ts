@@ -356,6 +356,7 @@ entrada. Uma chavinha USB que apenas "toca" e n&atilde;o pede PIN vai ser recusa
 precisa dele. Continuam funcionando sem JavaScript: entrar com um c&oacute;digo de
 recupera&ccedil;&atilde;o e a p&aacute;gina de parada de emerg&ecirc;ncia.</p>
 </noscript>
+<p class="pequeno"><a href="/painel/entrar">J&aacute; tenho acesso: ir para Entrar</a></p>
 <script src="/painel/painel.js" defer></script>
 </body>
 </html>
