@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Recusa o commit se ele estiver levando segredo ou dado pessoal seu.
+#
+# Fica versionado de proposito: hook dentro de .git/hooks nao vai para o
+# GitHub e some a cada clone. Aqui ele acompanha o projeto, e cada clone
+# liga uma vez so, com:
+#
+#   npm run guardiao:instalar
+#
+# Se o Node nao estiver disponivel, o commit e recusado em vez de passar
+# calado: um guardiao que falha aberto e pior do que nao ter guardiao,
+# porque voce confia nele.
+if ! command -v node >/dev/null 2>&1; then
+  echo "[FALHA] guardiao: o Node nao foi encontrado, e o commit nao pode ser conferido." >&2
+  echo "        Instale o Node 20 ou rode a conferencia a mao:" >&2
+  echo "        node scripts/guardiao-do-commit.mjs" >&2
+  exit 1
+fi
+
+exec node scripts/guardiao-do-commit.mjs

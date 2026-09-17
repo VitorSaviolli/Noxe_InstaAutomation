@@ -40,6 +40,9 @@ Thumbs.db
 # .claude/ pode conter settings.local.json com caminhos e dados seus.
 .claude/
 .direnv/
+# .design/ e rascunho de arquitetura de tela, escrito durante o trabalho.
+.design/
+.superpowers/
 
 # Lacunas comuns que os padroes acima nao pegam
 *~

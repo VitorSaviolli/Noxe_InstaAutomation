@@ -41,6 +41,8 @@
     "tail": "wrangler tail",
     "check": "npm run lint && npm run typecheck && npm run test",
     "verificar": "node scripts/verificar-antes-de-publicar.mjs",
+    "guardiao": "node scripts/guardiao-do-commit.mjs",
+    "guardiao:instalar": "git config core.hooksPath .githooks",
     "test:webhook": "node scripts/simular-webhook.mjs",
     "gerar:segredos": "node scripts/gerar-segredos.mjs",
     "gerar:convite": "node scripts/gerar-convite.mjs"
