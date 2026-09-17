@@ -192,13 +192,13 @@ export const MOTIVO_DA_RECUSA: Record<string, string> = {
     'Este endereço não está na lista de endereços liberados. Quem muda essa lista é quem publicou o projeto, no computador.',
   // --- Os Reels (§12.5) ---
   reel_desconhecido:
-    'Este Reel não é da sua conta, ou não existe mais. Toque em Atualizar e escolha de novo na lista.',
+    'Este Reel não é da sua conta, ou não existe mais. Toque em Atualizar lista e escolha de novo.',
   reel_repetido: 'Você marcou o mesmo Reel duas vezes. Marque uma só.',
   reels_demais: 'Você chegou a 200 Reels, o máximo. Desmarque algum para escolher outro.',
   reels_novos_demais:
     'Marque até 20 Reels novos por vez. Salve estes e continue, o que já estava escolhido continua valendo.',
   selecao_vazia_com_automacao_ligada:
-    'Você escolheu “só nos que eu escolher” e não marcou nenhum Reel. Ou marque pelo menos um, ou desligue a automação, as duas são seguras, mas só uma fica clara no seu painel.',
+    'Você escolheu “só os que eu marcar” e não marcou nenhum Reel. Ou marque pelo menos um, ou desligue a automação, as duas são seguras, mas só uma fica clara no seu painel.',
   listagem_indisponivel:
     'Não conseguimos falar com o Instagram agora, então não dá para salvar a sua escolha de Reels. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
   reel_nao_pode_ligar:
@@ -539,6 +539,11 @@ export const PALAVRAS_PROIBIDAS: readonly string[] = [
   'deploy',
   'exact',
   'contains',
+  // Os nomes antigos das telas, que o glossario do painel aposentou: um nome
+  // por coisa, e o mesmo na barra, no titulo e nos links.
+  'ajustes finos',
+  'ver o link',
+  'responde diferente',
 ]
 
 /**

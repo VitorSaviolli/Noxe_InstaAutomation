@@ -177,6 +177,8 @@ Diminuir pede a sua digital.</label></p>
 value="${String(config.userCooldownHours)}">
 <p>Hoje: ${frasedoIntervalo(config.userCooldownHours)}</p>
 <p><button type="submit">Salvar</button></p>
+<p>Diminuir o intervalo ou escolher a op&ccedil;&atilde;o com ${seloProtegido()} vai pedir a sua
+digital.</p>
 </form>`
 }
 
