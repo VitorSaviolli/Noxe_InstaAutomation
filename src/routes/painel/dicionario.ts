@@ -571,7 +571,7 @@ export const TELA_DOS_REELS = {
   titulo: 'Reels',
   /** §12.5, conta sem Reels. */
   semReels:
-    'Não encontramos nenhum Reel nesta conta. A automação só responde em Reels. Se você acabou de publicar, espere alguns minutos e toque em Atualizar.',
+    'Não encontramos nenhum Reel nesta conta. A automação só responde em Reels. Se você acabou de publicar, espere alguns minutos e toque em Atualizar lista.',
   /** §12.5, Instagram nao respondeu. A segunda metade e a que acalma. */
   metaMuda:
     'Não conseguimos falar com o Instagram agora. A sua automação continua funcionando normalmente com os Reels que você já tinha escolhido.',
@@ -579,7 +579,6 @@ export const TELA_DOS_REELS = {
   salvoPorVoce: 'salvo por você',
   /** §12.5, linha de midia invalida no banco. O campo entra no fim. */
   reelParado: 'Este Reel está parado por um problema na configuração dele:',
-  reelParadoComoResolver: 'Abra “Este Reel” e corrija.',
   /** §12.5, linhas orfas. A mesma frase que o aviso do validador ja usa. */
   orfas:
     'Encontramos escolhas de Reels sem uma configuração salva. Elas estão sendo ignoradas até você salvar seus ajustes uma vez.',
@@ -593,7 +592,7 @@ export const TELA_DOS_REELS = {
    * esta frase e alcancavel (§13.1).
    */
   cursorVencido:
-    'A lista ficou velha enquanto esta página estava aberta. Toque em Atualizar. O que você já marcou está guardado nesta tela.',
+    'A lista ficou velha enquanto esta página estava aberta. Toque em Atualizar lista. O que você já marcou está guardado nesta tela.',
   /** §3, Reel apagado no Instagram. Ele NAO some da lista. */
   reelApagado: 'Este Reel não existe mais',
   tirarDaLista: 'Tirar da lista',
@@ -615,9 +614,20 @@ export const TELA_DOS_REELS = {
   /** §12.5, o selo de quem tem regras proprias. */
   regrasProprias: 'Regras próprias',
   /** §12.5, abrir “responder diferente” num Reel que nao esta na lista. */
-  foraDaLista:
-    'Estas regras não vão valer ainda. Este Reel não está na sua lista de Reels escolhidos.',
-  incluirNaLista: 'Incluir este Reel na lista',
+  foraDaLista: 'Este Reel não está marcado.',
+  voltarParaReels: 'Voltar para Reels',
+  /** O link de cada cartao da lista para a tela daquele Reel. */
+  abrirReel: 'Abrir',
+  /** A legenda da escolha "todos / so os escolhidos". */
+  quaisReels: 'Quais Reels',
+  /** Com "Todos" marcado, as caixas de marcar nao valem. */
+  marqueParaEscolher: 'Marque “Só os que eu marcar” para escolher.',
+  /** O estado de UM Reel, no topo da tela dele. */
+  estadoRespondendo: 'Respondendo',
+  estadoPausado: 'Pausado neste Reel',
+  estadoForaDaLista: 'Não está na sua lista',
+  /** O detalhe das regras daquele Reel, recolhido. */
+  verAsRegras: 'Ver as regras deste Reel',
   /** §3, o rotulo do que a listagem nao conseguiu confirmar (§15.2, pend. 7). */
   videoOuReel: 'vídeo/Reel',
   /**
@@ -636,7 +646,7 @@ export const TELA_DOS_REELS = {
   marcarOsDesta: 'Marcar os',
   marcarOsDestaFim: 'desta lista',
   carregarMais: 'Carregar mais',
-  atualizar: 'Atualizar',
+  atualizar: 'Atualizar lista',
   /**
    * §12.5: a tela diz DE QUANDO a lista e, e oferece o botao que a renova.
    *
@@ -648,15 +658,15 @@ export const TELA_DOS_REELS = {
    * ela e?", e nao depende de fuso nenhum. Quando o fuso virar dado de
    * ambiente, esta frase vira a de §12.5 palavra por palavra.
    */
-  listaBuscadaAgora: 'Esta lista acabou de ser buscada no Instagram.',
-  listaBuscadaHa: 'Esta lista foi buscada no Instagram há',
+  listaBuscadaAgora: 'Lista buscada agora.',
+  listaBuscadaHa: 'Lista buscada há',
   listaBuscadaHaFim: 'minutos.',
   /** O singular. "há 1 minutos" e o portugues que nenhuma pessoa escreve. */
   listaBuscadaHaFimUm: 'minuto.',
   /** §3, a tela de UM Reel. */
   tituloDoReel: 'Este Reel',
-  seguirRegraGeral: 'Voltar tudo a seguir a regra geral',
-  pausarEsteReel: 'Parar a automação só neste Reel',
+  seguirRegraGeral: 'Voltar à regra geral',
+  pausarEsteReel: 'Pausar só este Reel',
   religarEsteReel: 'Voltar a responder neste Reel',
   /** §3, o resumo de uma frase antes de salvar. */
   seguindoOGeral: 'Este Reel segue a regra geral em tudo.',
@@ -677,7 +687,7 @@ export const TELA_DOS_REELS = {
    * conferencia, nunca uma surpresa biometrica".
    */
   esteBotaoPedeDigital:
-    'Neste Reel, este botão aumenta o alcance da automação, então ele vai pedir a sua digital ou o seu rosto, e mostrar antes o que muda.',
+    'Neste Reel, este botão aumenta o alcance da automação, então ele vai pedir a sua digital e mostrar antes o que muda.',
   /** O que o botao acrescenta ao proprio rotulo, para dizer o que vai acontecer. */
   vaiPedirADigital: '(vai pedir a sua digital)',
 } as const

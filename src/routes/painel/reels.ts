@@ -116,6 +116,9 @@ const ESTRUTURAIS_DOS_REELS: readonly string[] = [
   CAMPO_DO_CURSOR,
 ]
 
+/** O `id` do formulario da lista, que o botao Salvar fixo no rodape aponta. */
+const FORMULARIO_DOS_REELS = 'reels-salvar'
+
 /** O nome que entra em `campos` da auditoria quando a SELECAO muda (§9.9). */
 const CAMPO_DA_SELECAO = 'mediaIds'
 
@@ -264,26 +267,38 @@ async function montarTela(desenho: DesenhoDaTela): Promise<Response> {
       ? salvas.filter((midia) => midia.ativo && !naListagem.has(midia.mediaId))
       : []
 
+  // A ordem da tela: a escolha de quais Reels, a lista, "Carregar mais" logo
+  // abaixo dela, o Salvar fixo no rodape e, no fim, pequeno, o Atualizar.
+  //
+  // HTML nao aninha `<form>`, entao "Carregar mais" e um formulario proprio
+  // entre a lista e o Salvar, e o botao Salvar aponta para o formulario da
+  // lista pelo atributo `form`. O `data-escopo-salvo` deixa o CSS trocar o
+  // rotulo do Salvar para "(vai pedir a sua digital)" quando a pessoa marca
+  // "Todos os meus Reels" partindo de "Só os que eu marcar", sem JavaScript.
   const corpo = html`<h1>${TELA_DOS_REELS.titulo}</h1>
 ${blocoDeConfirmacao(entrada.request)}
 ${faixaDaListagem(listagem, reels.length)}
 ${faixaDeOrfas(snapshot.avisos)}
 ${faixaDoTeto(ativos.length)}
-${botaoDeAtualizar(buscada.em, entrada.now, ficha, snapshot.versao, marcados, ativos)}
-<form method="post" action="${ROTA_REELS.caminho}">
+<div class="tela-reels" data-escopo-salvo="${escopo}">
+<form method="post" action="${ROTA_REELS.caminho}" id="${FORMULARIO_DOS_REELS}">
 ${camposDoFormulario(ficha, snapshot.versao)}
 ${escolhaDoEscopo(escopo)}
 ${listaDeReels(reels, salvas, marcados, listagem.ok)}
 ${cartoesSumidos(sumidos, marcados)}
 ${escondidosPreservados(marcados, reels, sumidos, desenho.vistos)}
+</form>
+${listagem.ok && listagem.proximoCursor !== null ? maisPagina(listagem.proximoCursor, ficha, snapshot.versao, marcados, desenho.vistos, reels) : null}
+<div class="salvar-fixo">
 ${
   listagem.ok
-    ? html`<p><button type="submit">Salvar</button></p>`
-    : html`<p><button type="submit" disabled>Salvar</button></p>
+    ? html`<button type="submit" form="${FORMULARIO_DOS_REELS}"><span class="rotulo-simples">Salvar</span><span class="rotulo-digital">Salvar ${TELA_DOS_REELS.vaiPedirADigital}</span></button>`
+    : html`<button type="submit" form="${FORMULARIO_DOS_REELS}" disabled>Salvar</button>
 <p>${TELA_DOS_REELS.metaMuda}</p>`
 }
-</form>
-${listagem.ok && listagem.proximoCursor !== null ? maisPagina(listagem.proximoCursor, ficha, snapshot.versao, marcados, desenho.vistos, reels) : null}`
+</div>
+</div>
+${botaoDeAtualizar(buscada.em, entrada.now, ficha, snapshot.versao, marcados, ativos)}`
 
   return telaDoPainel(molduraCom('reels', TELA_DOS_REELS.titulo, visao, corpo))
 }

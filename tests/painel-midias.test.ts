@@ -307,7 +307,7 @@ describe('MID: Reels e automacoes por midia', () => {
     // e desabilita o botao de salvar.
     expect(corpo).toContain('Não conseguimos falar com o Instagram agora')
     expect(corpo).toContain('continua funcionando normalmente')
-    expect(corpo).toContain('<button type="submit" disabled>')
+    expect(corpo).toContain('<button type="submit" form="reels-salvar" disabled>')
 
     // E a lista salva aparece, marcada como "salvo por voce" (§12.5).
     expect(corpo).toContain('salvo por você')
@@ -822,6 +822,58 @@ describe('MID: a extensao do funil, o `enabled` por Reel e a auditoria', () => {
     ).text()
     expect(semMeta).toContain(escapeHtml(TELA_DOS_REELS.metaMuda))
     expect(semMeta).toContain(`value="${ATUALIZAR}"`)
+  })
+
+  test('MID-41: Este Reel mostra o estado, as acoes reais e as regras recolhidas', async () => {
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    await gravarMidias(env.DB, [REEL_A])
+    await gravarMidias(env.DB, [REEL_B], 0)
+    const sessao = await abrirSessao()
+
+    const naLista = await (await telaDeUmReel(sessao, `?midia=${REEL_A}`)).text()
+    expect(naLista).toContain(`<strong>${TELA_DOS_REELS.estadoRespondendo}</strong>`)
+    expect(naLista).toContain(TELA_DOS_REELS.pausarEsteReel)
+    expect(naLista).toContain(`<summary>${TELA_DOS_REELS.verAsRegras}</summary>`)
+
+    // Fora da lista: nenhuma acao prometida, so o caminho de volta para Reels.
+    const fora = await (await telaDeUmReel(sessao, `?midia=${REEL_B}`)).text()
+    expect(fora).toContain(`<strong>${TELA_DOS_REELS.estadoForaDaLista}</strong>`)
+    expect(fora).toContain(TELA_DOS_REELS.foraDaLista)
+    expect(fora).toContain(TELA_DOS_REELS.voltarParaReels)
+    expect(fora).not.toContain(TELA_DOS_REELS.pausarEsteReel)
+  })
+
+  test('MID-40: a ordem da tela de Reels: escolha, lista, Carregar mais, Salvar e Atualizar no fim', async () => {
+    await gravarConfig(env.DB, { media_scope: 'selecionadas' })
+    const sessao = await abrirSessao()
+
+    const resposta = await telaDeReels(
+      sessao,
+      // Quatro paginas com `next`: o toque para nelas, e sobra cursor para o
+      // "Carregar mais".
+      new MetaDeListagem([
+        pagina([item(REEL_A)], 'depois'),
+        pagina([], 'depois'),
+        pagina([], 'depois'),
+        pagina([], 'depois'),
+      ]),
+    )
+    const corpo = await resposta.text()
+
+    const escolha = corpo.indexOf(TELA_DOS_REELS.quaisReels)
+    const lista = corpo.indexOf('class="reels"')
+    const mais = corpo.indexOf(TELA_DOS_REELS.carregarMais)
+    const salvar = corpo.indexOf('class="salvar-fixo"')
+    const atualizar = corpo.indexOf(TELA_DOS_REELS.atualizar)
+
+    expect(escolha).toBeGreaterThan(-1)
+    expect(lista).toBeGreaterThan(escolha)
+    expect(mais).toBeGreaterThan(lista)
+    expect(salvar).toBeGreaterThan(mais)
+    expect(atualizar).toBeGreaterThan(salvar)
+    // O Salvar aponta para o formulario da lista, e o cartao abre o Reel.
+    expect(corpo).toContain('form="reels-salvar"')
+    expect(cartaoDoReel(corpo, REEL_A)).toContain(`>${TELA_DOS_REELS.abrirReel}</a>`)
   })
 
   test('MID-27: o peso da tela de Reels, medido cru E comprimido', async () => {

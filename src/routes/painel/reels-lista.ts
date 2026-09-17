@@ -27,7 +27,7 @@
  */
 import { AVISO_DE_TETO_DE_MIDIAS } from '../../repositories/painel-midias-repository'
 import { CAMPO_DA_ACAO } from './campos'
-import { dataEmPortugues, ESCOPO_DE_MIDIAS, NOME_DO_CAMPO, TELA_DOS_REELS } from './dicionario'
+import { dataEmPortugues, ESCOPO_DE_MIDIAS, TELA_DOS_REELS } from './dicionario'
 import { type HtmlSeguro, html } from './html'
 import { camposDoFormulario, seloProtegido } from './inicio'
 import { type buscarPagina, type MidiaSalva, POUCOS_REELS, type ReelDaListagem } from './midias'
@@ -117,14 +117,15 @@ export function faixaDoTeto(quantos: number): HtmlSeguro {
  * Voltar para "so nos que eu escolher" estreita, e estreitar nunca pede.
  */
 export function escolhaDoEscopo(escopo: 'todas' | 'selecionadas'): HtmlSeguro {
-  return html`<fieldset>
-<legend>${NOME_DO_CAMPO.mediaScope}</legend>
+  return html`<fieldset class="quais-reels">
+<legend>${TELA_DOS_REELS.quaisReels}</legend>
 <p><label><input type="radio" name="mediaScope" value="todas"${
     escopo === 'todas' ? html` checked` : null
   }> ${ESCOPO_DE_MIDIAS.todas} ${seloProtegido()}</label></p>
 <p><label><input type="radio" name="mediaScope" value="selecionadas"${
     escopo === 'selecionadas' ? html` checked` : null
   }> ${ESCOPO_DE_MIDIAS.selecionadas}</label></p>
+<p class="so-com-todos">${TELA_DOS_REELS.marqueParaEscolher}</p>
 </fieldset>`
 }
 
@@ -152,7 +153,7 @@ ${
       }</p>`
     : null
 }
-<p><a href="${ROTA_REEL.caminho}?midia=${reel.mediaId}">${TELA_DOS_REELS.tituloDoReel}</a></p>
+<p><a href="${ROTA_REEL.caminho}?midia=${reel.mediaId}">${TELA_DOS_REELS.abrirReel}</a></p>
 </li>`
 }
 
@@ -207,7 +208,7 @@ function listaSalva(salvas: readonly MidiaSalva[], marcados: readonly string[]):
     (midia) => html`<li class="cartao-reel">
 <span class="legenda">${midia.legendaCurta ?? midia.mediaId}</span>
 <span class="salvo">${TELA_DOS_REELS.salvoPorVoce}</span>
-<p><a href="${ROTA_REEL.caminho}?midia=${midia.mediaId}">${TELA_DOS_REELS.tituloDoReel}</a></p>
+<p><a href="${ROTA_REEL.caminho}?midia=${midia.mediaId}">${TELA_DOS_REELS.abrirReel}</a></p>
 </li>`,
   )}</ul>`
 }
@@ -263,7 +264,7 @@ export function escondidosPreservados(
  * "Esta lista foi buscada ha N minutos. [Atualizar]" (§12.5).
  *
  * Ele mora FORA do formulario de salvar porque HTML nao aninha `<form>`, e vem
- * antes dele porque §12.5 poe a idade da lista no topo, junto do estado dela.
+ * no FIM da tela, pequeno: e um toque raro, e a lista e o que importa.
  * Carrega os mesmos escondidos de "Carregar mais": o que a pessoa ja marcou e
  * nao salvou sobrevive ao toque, que e o que a frase do cursor vencido promete.
  */
@@ -294,7 +295,7 @@ export function botaoDeAtualizar(
   // joga fora o retrato velho, e o retrato do banco e o que fica.
   const naoSalvos = marcados.filter((id) => !ativos.includes(id))
 
-  return html`<form method="post" action="${ROTA_REELS.caminho}" class="atualizar">
+  return html`<form method="post" action="${ROTA_REELS.caminho}" class="atualizar pequeno">
 ${camposDoFormulario(ficha, versao)}
 <input type="hidden" name="${CAMPO_DA_ACAO}" value="${ATUALIZAR}">
 ${naoSalvos.map((id) => html`<input type="hidden" name="${CAMPO_DA_MIDIA}" value="${id}">`)}

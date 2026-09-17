@@ -1,5 +1,5 @@
 /**
- * `GET (?midia=), POST /painel/reel`, "Este Reel responde diferente" (§3).
+ * `GET (?midia=), POST /painel/reel`, a tela "Este Reel" (§3).
  *
  * **A palavra "sobreposicao" nunca aparece na tela** (§3): cada linha mostra o
  * que vale hoje naquele Reel, e o valor herdado fica escrito entre parenteses.
@@ -324,33 +324,39 @@ export async function handleReel(entrada: EntradaDaRota): Promise<Response> {
   const visao = panorama(snapshot, await contaConectada(env.DB, now))
   const ficha = await fichaDaTela(entrada)
 
-  const corpo = html`<h1>${TELA_DOS_REELS.tituloDoReel}</h1>
+  const titulo = linha.legenda_curta ?? TELA_DOS_REELS.tituloDoReel
+  const naLista = linha.ativo === 1
+  const estado = !naLista
+    ? TELA_DOS_REELS.estadoForaDaLista
+    : sobreposicao.enabled === 0
+      ? TELA_DOS_REELS.estadoPausado
+      : TELA_DOS_REELS.estadoRespondendo
+
+  // A ordem: o Reel (legenda), o estado dele, as acoes reais e, recolhido, o
+  // detalhe das regras. Um Reel fora da lista nao oferece acao: a tela diz isso
+  // e leva de volta a Reels, onde ele se marca. Sem selo nem frase mandando
+  // "corrigir" enquanto nao ha edicao por Reel.
+  const corpo = html`<h1>${titulo}</h1>
 ${blocoDeConfirmacao(request)}
-${
-  linha.ativo === 1
-    ? null
-    : // §12.5 escreve o rotulo como acao, "[Incluir este Reel na lista]", e o
-      // que a tela entrega e um LINK para "Meus Reels", onde a pessoa marca o
-      // Reel e salva. Aceitavel sem JavaScript: incluir um Reel e uma GRAVACAO,
-      // e uma gravacao precisa da ficha, da versao e do funil inteiro, um
-      // `<form>` aqui seria a segunda grafia do POST de `/painel/reels`, com a
-      // revalidacao dos ids novos e o teto de 200 por conta propria. Fica
-      // REGISTRADO como divergencia de rotulo, e nao como funcionalidade
-      // entregue.
-      html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.foraDaLista}
-<a href="${ROTA_REELS.caminho}">${TELA_DOS_REELS.incluirNaLista}</a></p>`
-}
+<p class="estado-do-reel"><strong>${estado}</strong></p>
 ${
   linha.indisponivel_desde === null
     ? null
     : html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.reelApagado}</p>`
 }
 ${faixaDeLinhaInvalida(sobreposicao)}
+${
+  naLista
+    ? blocoDosBotoes(mediaId, ficha, snapshot.versao, efetivo, global, sobreposicao)
+    : html`<p>${TELA_DOS_REELS.foraDaLista}</p>
+<p><a class="acao" href="${ROTA_REELS.caminho}">${TELA_DOS_REELS.voltarParaReels}</a></p>`
+}
+<details>
+<summary>${TELA_DOS_REELS.verAsRegras}</summary>
 ${blocoDosAjustes(efetivo, global, sobreposicao)}
-${blocoDosBotoes(mediaId, ficha, snapshot.versao, efetivo, global, sobreposicao)}
-<p><a href="${ROTA_REELS.caminho}">${TELA_DOS_REELS.titulo}</a></p>`
+</details>`
 
-  return telaDoPainel(molduraCom('reels', TELA_DOS_REELS.tituloDoReel, visao, corpo))
+  return telaDoPainel(molduraCom('reels', titulo, visao, corpo))
 }
 
 /**
@@ -367,7 +373,7 @@ function faixaDeLinhaInvalida(sobreposicao: Sobreposicao): HtmlSeguro {
 
   return html`<p class="faixa faixa-aviso" role="status">${TELA_DOS_REELS.reelParado} ${
     NOME_DO_CAMPO.enabled
-  }. ${TELA_DOS_REELS.reelParadoComoResolver}</p>`
+  }.</p>`
 }
 
 /**

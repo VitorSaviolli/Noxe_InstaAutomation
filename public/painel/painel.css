@@ -484,3 +484,41 @@ code {
   color: var(--texto);
   font-size: 1.05rem;
 }
+
+/* Reels: com "Todos" marcado as caixas nao valem, e a frase diz o que fazer.
+   So CSS (`:has`), sem JavaScript; num navegador sem `:has` tudo fica visivel. */
+.so-com-todos,
+.rotulo-digital {
+  display: none;
+}
+
+.tela-reels:has(input[name="mediaScope"][value="todas"]:checked) .so-com-todos {
+  display: block;
+}
+
+.tela-reels:has(input[name="mediaScope"][value="todas"]:checked) .reels .cartao {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Sair de "so os que eu marcar" para "todos" pede a digital: o rotulo avisa. */
+.tela-reels[data-escopo-salvo="selecionadas"]:has(input[name="mediaScope"][value="todas"]:checked) .rotulo-digital {
+  display: inline;
+}
+
+.tela-reels[data-escopo-salvo="selecionadas"]:has(input[name="mediaScope"][value="todas"]:checked) .rotulo-simples {
+  display: none;
+}
+
+/* O Salvar fica sempre a vista numa lista longa, logo acima da barra de baixo. */
+.salvar-fixo {
+  position: sticky;
+  bottom: calc(56px + env(safe-area-inset-bottom));
+  padding: 0.6rem 0;
+  background: var(--fundo);
+}
+
+.pequeno {
+  font-size: 0.85rem;
+  color: var(--texto-fraco);
+}
